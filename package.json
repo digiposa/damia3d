@@ -1,0 +1,20 @@
+{
+  "name": "damia3d",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Isometric 3D browser JRPG — spiritual homage to The Legend of Dragoon",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^7.0.0",
+    "@babylonjs/materials": "^7.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}
