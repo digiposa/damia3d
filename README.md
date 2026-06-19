@@ -48,16 +48,28 @@ et la mise en page est responsive sur toutes tailles d'écran.
 
 ## Combat
 
-Les formules de dégâts reproduisent fidèlement celles de *The Legend of Dragoon*
-(troncatures `floor` à chaque étape, `round` spécial `(x + y/2) / y`, et les
-« modifier wrappers » avec leur imbrication exacte) dans
-[`src/combat/formula.ts`](src/combat/formula.ts) : attaque physique de base,
-Additions, attaques physiques/magiques ennemies, attaques en pourcentage et
-dégâts de statut. Couvert par des tests (`npm test`).
+**Hack & slash temps réel** (esprit Diablo II) avec des **attaques fidèles à
+*The Legend of Dragoon***.
 
-Dans **Training**, Dart peut frapper le Knight of Sandora (Espace / bouton ⚔
-quand il est à portée) : les dégâts utilisent ces formules, le Knight riposte,
-et vaincre l'ennemi octroie de l'EXP à Dart.
+Les formules de dégâts reproduisent exactement celles du jeu PS1
+([`src/combat/formula.ts`](src/combat/formula.ts)) : troncatures `floor` à chaque
+étape, `round` spécial `(x + y/2) / y`, et les « modifier wrappers » avec leur
+imbrication précise (attaque physique de base, Additions, attaques
+physiques/magiques ennemies, attaques en pourcentage, dégâts de statut). Couvert
+par des tests (`npm test`).
+
+Les **Additions** sont traduites en **combos temps réel** : chaque coup
+([`AdditionRunner`](src/combat/AdditionRunner.ts)) enchaîne le hit suivant de
+l'Addition équipée dans une fenêtre de timing ; tout enchaîner = Addition
+« parfaite ». Les dégâts par coup proviennent directement de la formule
+`additionAttack`, si bien que la somme du combo égale exactement l'Addition
+parfaite de LoD.
+
+Dans **Training** (arène) : Dart affronte des **vagues** de Knights of Sandora
+qui le poursuivent et ripostent. Attaque = **clic / Espace** (ou bouton **⚔** sur
+tactile), à rythmer pour prolonger le combo. Vaincre les ennemis octroie de
+l'EXP ; nettoyer une vague en lance une plus grande. Barres de vie flottantes et
+nombres de dégâts à l'écran.
 
 ## Architecture
 
@@ -81,19 +93,25 @@ src/
     types.ts           interface Stats (maxHp, at, df, mat, mdf)
     modifiers.ts       modificateurs de dégâts (Fear, Power, Field, Element…)
     formula.ts         formules de dégâts LoD fidèles (floor/round + wrappers)
-    formula.test.ts    tests des formules (Vitest)
+    AdditionRunner.ts  moteur de combo temps réel (fenêtres de timing)
+    *.test.ts          tests des formules et du combo (Vitest)
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
     additions.ts       données d'Additions de Dart (hits + multiplicateurs)
     enemies.ts         définitions d'ennemis (Knight of Sandora : Seles + Black Castle)
   entities/
-    Player.ts          Dart : avatar déplaçable + état de combat (LV/EXP/HP)
-    Enemy.ts           ennemi placeholder + HP, adossé à une EnemyDef
+    Player.ts          Dart : avatar déplaçable + état de combat + Addition équipée
+    Enemy.ts           ennemi : HP, IA poursuite/attaque, barre de vie flottante
+  world/
+    project.ts         projection monde→écran pour les overlays DOM
   ui/
     MainMenu.ts        écran-titre / sélection de mode
     ModeBar.ts         boutons de modes à l'écran (tactile + desktop)
     VirtualJoystick.ts joystick analogique tactile
-    DebugOverlay.ts    HUD debug (FPS, position, stats Dart/ennemi)
+    ActionButton.ts    bouton d'action tactile (⚔ attaque)
+    PlayerHud.ts       barre de vie + indicateur de combo
+    FloatingText.ts    nombres de dégâts flottants
+    DebugOverlay.ts    HUD debug (FPS, vague, stats Dart)
     VersionTag.ts      hash du commit déployé (coin bas-droite)
 ```
 

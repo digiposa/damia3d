@@ -6,13 +6,15 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
+import { DART_ADDITIONS, type AdditionDef } from "../data/additions";
 
 const SPEED = 6; // world units per second
 
 /**
  * Dart — the player avatar. Placeholder capsule body with a "nose" marker so
  * facing direction is visible; swap for a rigged glTF model later. Carries the
- * party-leader battle state (level, EXP, HP) driven by the canonical stat table.
+ * party-leader battle state (level, EXP, HP) driven by the canonical stat table,
+ * plus the currently equipped Addition used by the real-time combo system.
  */
 export class Player {
   readonly root: TransformNode;
@@ -21,6 +23,9 @@ export class Player {
   exp: number;
   hp: number;
   stats: DartLevel;
+
+  /** Equipped Addition performed by the melee combo system. */
+  addition: AdditionDef = DART_ADDITIONS.doubleSlash;
 
   constructor(scene: Scene, spawn = new Vector3(0, 0, 0), level = 1) {
     this.level = level;
@@ -77,5 +82,11 @@ export class Player {
     this.root.position.addInPlace(step);
     // Face the direction of travel.
     this.root.rotation.y = Math.atan2(step.x, step.z);
+  }
+
+  /** Turn to face a world-space ground direction (e.g. toward an attack target). */
+  face(dir: Vector3): void {
+    if (dir.lengthSquared() < 1e-4) return;
+    this.root.rotation.y = Math.atan2(dir.x, dir.z);
   }
 }
