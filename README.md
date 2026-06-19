@@ -26,7 +26,18 @@ npm run preview  # prévisualise le build
 | **Story** | F2 | 🚧 Stub — campagne fidèle au jeu PS1 |
 | **Survival** | F3 | 🚧 Stub — vagues d'ennemis |
 
-Déplacement : **WASD** ou **flèches**.
+Sur tactile, des boutons de modes (coin haut-droit) remplacent les touches F.
+
+### Contrôles
+
+Le jeu est jouable au clavier/souris **et** au tactile (mobile / tablette) :
+
+- **Desktop** : déplacement **WASD** ou **flèches** ; modes via **F1 / F2 / F3**.
+- **Mobile / tablette** : **joystick virtuel** (bas-gauche) pour se déplacer ;
+  **boutons de modes** (haut-droite) pour basculer entre les modes.
+
+Le rendu s'adapte au pixel ratio de l'appareil et aux zones sûres (encoches),
+et la mise en page est responsive sur toutes tailles d'écran.
 
 ## Architecture
 

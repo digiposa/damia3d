@@ -1,9 +1,14 @@
+import { hasTouch } from "../core/device";
+
 /**
  * Lightweight HTML overlay for the Training mode: live FPS, player position,
- * active mode and the mode-switch hotkeys. Plain DOM keeps it dependency-free.
+ * active mode and a control hint. Plain DOM keeps it dependency-free.
  */
 export class DebugOverlay {
   private el: HTMLDivElement;
+  private hint = hasTouch()
+    ? "Joystick to move\nMode buttons (top-right) to switch"
+    : "WASD / Arrows to move\nF1 Training   F2 Story   F3 Survival";
 
   constructor() {
     this.el = document.createElement("div");
@@ -28,8 +33,7 @@ export class DebugOverlay {
     const body = Object.entries(lines)
       .map(([k, v]) => `${k.padEnd(8)} ${v}`)
       .join("\n");
-    this.el.textContent =
-      body + "\n\nF1 Training   F2 Story   F3 Survival\nWASD / Arrows to move";
+    this.el.textContent = body + "\n\n" + this.hint;
   }
 
   dispose(): void {

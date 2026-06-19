@@ -5,6 +5,7 @@
 export class Input {
   private held = new Set<string>();
   private pressedThisFrame = new Set<string>();
+  private virtual = { x: 0, y: 0 };
 
   constructor() {
     window.addEventListener("keydown", (e) => {
@@ -26,10 +27,19 @@ export class Input {
     return this.pressedThisFrame.has(code);
   }
 
+  /**
+   * Set the analog movement axis from a virtual control (e.g. touch joystick).
+   * Components are expected in [-1, 1]; y points "up" on screen (forward).
+   */
+  setVirtualAxis(x: number, y: number): void {
+    this.virtual.x = x;
+    this.virtual.y = y;
+  }
+
   /** Movement axis on the ground plane, normalized to length <= 1. */
   axis(): { x: number; y: number } {
-    let x = 0;
-    let y = 0;
+    let x = this.virtual.x;
+    let y = this.virtual.y;
     if (this.isDown("KeyW") || this.isDown("ArrowUp")) y += 1;
     if (this.isDown("KeyS") || this.isDown("ArrowDown")) y -= 1;
     if (this.isDown("KeyD") || this.isDown("ArrowRight")) x += 1;

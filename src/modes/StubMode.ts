@@ -4,6 +4,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 import { GameMode } from "../core/GameMode";
 import { IsoCamera } from "../world/IsoCamera";
+import { hasTouch } from "../core/device";
 
 /**
  * Placeholder for a mode that isn't built yet. Shows a centered banner so the
@@ -34,11 +35,14 @@ export abstract class StubMode extends GameMode {
       pointerEvents: "none",
       zIndex: "10",
     } satisfies Partial<CSSStyleDeclaration>);
+    const hint = hasTouch()
+      ? "Use the mode buttons (top-right) to switch"
+      : "F1 Training&nbsp;&nbsp;&nbsp;F2 Story&nbsp;&nbsp;&nbsp;F3 Survival";
     this.banner.innerHTML =
       `<div>${this.title}</div>` +
       `<div style="font:14px/1.4 system-ui;opacity:0.7">${this.subtitle}</div>` +
       `<div style="font:12px/1.4 ui-monospace,monospace;opacity:0.55;margin-top:16px">` +
-      `F1 Training&nbsp;&nbsp;&nbsp;F2 Story&nbsp;&nbsp;&nbsp;F3 Survival</div>`;
+      `${hint}</div>`;
     document.body.appendChild(this.banner);
   }
 
