@@ -48,6 +48,11 @@ export class ModeBar {
     document.body.appendChild(this.bar);
   }
 
+  /** Show or hide the whole bar (e.g. while the main menu is open). */
+  setVisible(visible: boolean): void {
+    this.bar.style.display = visible ? "flex" : "none";
+  }
+
   /** Highlight the button matching the active mode. */
   setActive(mode: ModeId): void {
     for (const [id, btn] of this.buttons) {

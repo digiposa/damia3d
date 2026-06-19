@@ -5,16 +5,29 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
+import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
+
 const SPEED = 6; // world units per second
 
 /**
- * Placeholder player avatar: a capsule body with a "nose" marker so facing
- * direction is visible. Swap the mesh for a rigged glTF model later.
+ * Dart — the player avatar. Placeholder capsule body with a "nose" marker so
+ * facing direction is visible; swap for a rigged glTF model later. Carries the
+ * party-leader battle state (level, EXP, HP) driven by the canonical stat table.
  */
 export class Player {
   readonly root: TransformNode;
 
-  constructor(scene: Scene, spawn = new Vector3(0, 0, 0)) {
+  level: number;
+  exp: number;
+  hp: number;
+  stats: DartLevel;
+
+  constructor(scene: Scene, spawn = new Vector3(0, 0, 0), level = 1) {
+    this.level = level;
+    this.stats = dartStatsForLevel(level);
+    this.exp = this.stats.exp;
+    this.hp = this.stats.maxHp;
+
     this.root = new TransformNode("player", scene);
     this.root.position = spawn.clone();
 
@@ -36,6 +49,21 @@ export class Player {
 
   get position(): Vector3 {
     return this.root.position;
+  }
+
+  /**
+   * Award EXP and apply any resulting level-ups. Current HP grows by the Max HP
+   * gained so a level-up never lowers effective health.
+   */
+  gainExp(amount: number): void {
+    this.exp += Math.max(0, amount);
+    const newLevel = dartLevelForExp(this.exp);
+    if (newLevel === this.level) return;
+
+    const prevMax = this.stats.maxHp;
+    this.level = newLevel;
+    this.stats = dartStatsForLevel(newLevel);
+    this.hp = Math.min(this.hp + (this.stats.maxHp - prevMax), this.stats.maxHp);
   }
 
   /**

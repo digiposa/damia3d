@@ -8,17 +8,20 @@ import { StoryMode } from "../modes/StoryMode";
 import { SurvivalMode } from "../modes/SurvivalMode";
 import { ModeBar, type ModeId } from "../ui/ModeBar";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
+import { MainMenu } from "../ui/MainMenu";
 
 /**
  * Top-level application: owns the Babylon engine and the mode manager, runs the
- * render loop, and wires up the cross-device controls (F1/F2/F3 hotkeys, an
- * on-screen mode bar, and a touch joystick).
+ * render loop, and wires up the cross-device controls (main menu, F1/F2/F3
+ * hotkeys, an on-screen mode bar, and a touch joystick).
  */
 export class Game {
   private engine: Engine;
   private input: Input;
   private modes: ModeManager;
   private modeBar: ModeBar;
+  private joystick?: VirtualJoystick;
+  private menu: MainMenu;
 
   constructor(canvas: HTMLCanvasElement) {
     // 4th arg (adaptToDeviceRatio) keeps rendering crisp on high-DPI phones/tablets.
@@ -32,9 +35,8 @@ export class Game {
     this.modes = new ModeManager(this.engine, this.input);
 
     this.modeBar = new ModeBar((mode) => this.switchMode(mode));
-    // The joystick wires itself to window/DOM listeners, so it stays alive for
-    // the page lifetime without needing to be retained on the Game instance.
-    if (hasTouch()) new VirtualJoystick(this.input);
+    if (hasTouch()) this.joystick = new VirtualJoystick(this.input);
+    this.menu = new MainMenu((mode) => this.switchMode(mode));
 
     const resize = () => this.engine.resize();
     window.addEventListener("resize", resize);
@@ -43,7 +45,8 @@ export class Game {
   }
 
   start(): void {
-    this.switchMode("Training");
+    // Boot into the title screen; the HUD stays hidden until a mode is chosen.
+    this.openMenu();
 
     this.engine.runRenderLoop(() => {
       const dt = this.engine.getDeltaTime() / 1000;
@@ -53,7 +56,18 @@ export class Game {
     });
   }
 
-  /** Single entry point for mode changes, shared by hotkeys and the mode bar. */
+  /** Show the main menu and hide the in-game HUD. */
+  private openMenu(): void {
+    this.menu.show();
+    this.setHudVisible(false);
+  }
+
+  private setHudVisible(visible: boolean): void {
+    this.modeBar.setVisible(visible);
+    this.joystick?.setVisible(visible);
+  }
+
+  /** Single entry point for mode changes, shared by the menu, hotkeys and mode bar. */
   private switchMode(mode: ModeId): void {
     switch (mode) {
       case "Training":
@@ -66,6 +80,8 @@ export class Game {
         this.modes.switchTo((s, i) => new SurvivalMode(s, i));
         break;
     }
+    this.menu.hide();
+    this.setHudVisible(true);
     this.modeBar.setActive(mode);
   }
 
@@ -82,6 +98,10 @@ export class Game {
       case "F3":
         e.preventDefault();
         this.switchMode("Survival");
+        break;
+      case "Escape":
+        e.preventDefault();
+        this.openMenu();
         break;
     }
   }

@@ -8,6 +8,8 @@ import { GameMode } from "../core/GameMode";
 import { IsoCamera } from "../world/IsoCamera";
 import { createGround } from "../world/Ground";
 import { Player } from "../entities/Player";
+import { Enemy } from "../entities/Enemy";
+import { KNIGHT_OF_SANDORA } from "../data/enemies";
 import { DebugOverlay } from "../ui/DebugOverlay";
 
 /**
@@ -21,6 +23,7 @@ export class TrainingMode extends GameMode {
 
   private camera!: IsoCamera;
   private player!: Player;
+  private enemy!: Enemy;
   private overlay!: DebugOverlay;
 
   enter(): void {
@@ -38,6 +41,9 @@ export class TrainingMode extends GameMode {
     this.player = new Player(this.scene, new Vector3(0, 0, 0));
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
+    // Spawn a Knight of Sandora to walk up to while combat is wired up.
+    this.enemy = new Enemy(this.scene, KNIGHT_OF_SANDORA, new Vector3(4, 0, 4));
+
     this.overlay = new DebugOverlay();
   }
 
@@ -52,10 +58,17 @@ export class TrainingMode extends GameMode {
 
     const fps = Math.round(this.scene.getEngine().getFps());
     const p = this.player.position;
+    const s = this.player.stats;
+    const e = this.enemy;
     this.overlay.set({
       mode: this.name,
       fps: String(fps),
       pos: `${p.x.toFixed(1)}, ${p.z.toFixed(1)}`,
+      "—": "—",
+      Dart: `LV ${this.player.level}  HP ${this.player.hp}/${s.maxHp}`,
+      stats: `AT ${s.at} DF ${s.df} MAT ${s.mat} MDF ${s.mdf}`,
+      enemy: `${e.def.name} (${e.def.element})`,
+      "enemy HP": `${e.hp}/${e.def.stats.maxHp}`,
     });
   }
 

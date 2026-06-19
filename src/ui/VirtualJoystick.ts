@@ -99,6 +99,12 @@ export class VirtualJoystick {
     this.input.setVirtualAxis(dx / RADIUS, -dy / RADIUS);
   }
 
+  /** Show or hide the stick (e.g. while the main menu is open). */
+  setVisible(visible: boolean): void {
+    this.base.style.display = visible ? "block" : "none";
+    if (!visible) this.input.setVirtualAxis(0, 0);
+  }
+
   dispose(): void {
     this.base.removeEventListener("pointerdown", this.onDown);
     window.removeEventListener("pointermove", this.onMove);

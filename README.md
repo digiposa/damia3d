@@ -18,11 +18,17 @@ npm run build    # build de production dans dist/
 npm run preview  # prévisualise le build
 ```
 
+## Menu principal
+
+Au démarrage, un écran-titre permet de choisir un mode. **Échap** le rouvre en
+cours de jeu. Le HUD (boutons de modes, joystick) est masqué tant que le menu
+est affiché.
+
 ## Modes de jeu
 
 | Mode | Touche | État |
 |------|--------|------|
-| **Training** | F1 | ✅ Bac à sable de dev : exploration isométrique + overlay debug |
+| **Training** | F1 | ✅ Bac à sable de dev : exploration iso + Knight of Sandora + overlay debug |
 | **Story** | F2 | 🚧 Stub — campagne fidèle au jeu PS1 |
 | **Survival** | F3 | 🚧 Stub — vagues d'ennemis |
 
@@ -57,10 +63,19 @@ src/
   world/
     IsoCamera.ts       caméra orthographique iso qui suit le joueur
     Ground.ts          sol en grille
+  combat/
+    types.ts           interface Stats (maxHp, at, df, mat, mdf)
+  data/
+    dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
+    enemies.ts         définitions d'ennemis (Knight of Sandora : Seles + Black Castle)
   entities/
-    Player.ts          avatar placeholder déplaçable
+    Player.ts          Dart : avatar déplaçable + état de combat (LV/EXP/HP)
+    Enemy.ts           ennemi placeholder + HP, adossé à une EnemyDef
   ui/
-    DebugOverlay.ts    HUD debug (FPS, position)
+    MainMenu.ts        écran-titre / sélection de mode
+    ModeBar.ts         boutons de modes à l'écran (tactile + desktop)
+    VirtualJoystick.ts joystick analogique tactile
+    DebugOverlay.ts    HUD debug (FPS, position, stats Dart/ennemi)
     VersionTag.ts      hash du commit déployé (coin bas-droite)
 ```
 
