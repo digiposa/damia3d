@@ -19,32 +19,34 @@ npm run preview  # prévisualise le build
 npm test         # tests unitaires (Vitest) — ex. formules de dégâts
 ```
 
-## Menu principal
+## Menu & options
 
-Au démarrage, un écran-titre permet de choisir un mode. **Échap** le rouvre en
-cours de jeu. Le HUD (boutons de modes, joystick) est masqué tant que le menu
-est affiché.
+Au démarrage, un écran-titre permet de **choisir un mode**. En jeu, le bouton
+**⚙** (haut-droite) ou **Échap** ouvre le **menu Options** (qui met le jeu en
+pause) : réglages du **son** (placeholder, pas d'audio pour l'instant) et de la
+**vitesse de combat**, plus **Reprendre** et **Menu principal**. Changer de mode
+passe **obligatoirement** par le menu principal (via Options → Menu principal).
 
 ## Modes de jeu
 
-| Mode | Touche | État |
-|------|--------|------|
-| **Training** | F1 | ✅ Bac à sable de dev : exploration iso + Knight of Sandora + overlay debug |
-| **Story** | F2 | 🚧 Stub — campagne fidèle au jeu PS1 |
-| **Survival** | F3 | 🚧 Stub — vagues d'ennemis |
-
-Sur tactile, des boutons de modes (coin haut-droit) remplacent les touches F.
+| Mode | État |
+|------|------|
+| **Training** | ✅ Arène hack & slash : spawn de Knights of Sandora à la demande |
+| **Story** | 🚧 Stub — campagne fidèle au jeu PS1 |
+| **Survival** | 🚧 Stub — vagues d'ennemis |
 
 ### Contrôles
 
-Le jeu est jouable au clavier/souris **et** au tactile (mobile / tablette) :
+Jouable à la souris **et** au tactile (mobile / tablette) :
 
-- **Desktop** : déplacement **WASD** ou **flèches** ; modes via **F1 / F2 / F3**.
+- **Desktop** : **clic au sol** pour se déplacer, **clic sur un ennemi** pour
+  l'approcher et l'attaquer (re-cliquer en rythme enchaîne le combo).
 - **Mobile / tablette** : **joystick virtuel** (bas-gauche) pour se déplacer ;
-  **boutons de modes** (haut-droite) pour basculer entre les modes.
+  bouton **⚔** (bas-droite) pour attaquer.
 
-Le rendu s'adapte au pixel ratio de l'appareil et aux zones sûres (encoches),
-et la mise en page est responsive sur toutes tailles d'écran.
+La vitesse de **déplacement** n'est jamais affectée par le réglage de vitesse de
+combat. Le rendu s'adapte au pixel ratio et aux zones sûres (encoches), et la
+mise en page est responsive.
 
 ## Combat
 
@@ -65,11 +67,12 @@ l'Addition équipée dans une fenêtre de timing ; tout enchaîner = Addition
 `additionAttack`, si bien que la somme du combo égale exactement l'Addition
 parfaite de LoD.
 
-Dans **Training** (arène) : Dart affronte des **vagues** de Knights of Sandora
-qui le poursuivent et ripostent. Attaque = **clic / Espace** (ou bouton **⚔** sur
-tactile), à rythmer pour prolonger le combo. Vaincre les ennemis octroie de
-l'EXP ; nettoyer une vague en lance une plus grande. Barres de vie flottantes et
-nombres de dégâts à l'écran.
+Dans **Training** (arène) : on fait apparaître des Knights of Sandora **un par
+un** via le bouton **🛡 Spawn Knight**. Ils poursuivent Dart et ripostent ;
+vaincre un ennemi octroie de l'EXP. Barres de vie flottantes et nombres de
+dégâts à l'écran. La **vitesse de combat** (réglable dans les Options) accélère
+l'IA, la cadence d'attaque et les fenêtres de combo — sans toucher au
+déplacement.
 
 ## Architecture
 
@@ -77,12 +80,14 @@ nombres de dégâts à l'écran.
 src/
   main.ts              point d'entrée
   core/
-    Game.ts            moteur + boucle de rendu + hotkeys de modes
+    Game.ts            moteur + boucle de rendu + navigation (menu/options/pause)
     GameMode.ts        interface d'un mode
-    ModeManager.ts     bascule entre modes (une Scene isolée par mode)
-    Input.ts           état clavier
+    ModeManager.ts     bascule/efface le mode actif (une Scene isolée par mode)
+    Input.ts           état d'entrée (axe virtuel + presses)
+    settings.ts        réglages partagés (son, vitesse de combat)
+    device.ts          détection tactile
   modes/
-    TrainingMode.ts    sandbox jouable (exploration)
+    TrainingMode.ts    arène hack & slash jouable
     StoryMode.ts       stub
     SurvivalMode.ts    stub
     StubMode.ts        base des modes non implémentés
@@ -106,12 +111,13 @@ src/
     project.ts         projection monde→écran pour les overlays DOM
   ui/
     MainMenu.ts        écran-titre / sélection de mode
-    ModeBar.ts         boutons de modes à l'écran (tactile + desktop)
+    OptionsMenu.ts     menu pause : son, vitesse de combat, retour au menu
+    Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)
     PlayerHud.ts       barre de vie + indicateur de combo
     FloatingText.ts    nombres de dégâts flottants
-    DebugOverlay.ts    HUD debug (FPS, vague, stats Dart)
+    DebugOverlay.ts    HUD debug (FPS, vitesse, stats Dart)
     VersionTag.ts      hash du commit déployé (coin bas-droite)
 ```
 

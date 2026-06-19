@@ -43,6 +43,8 @@ export class Enemy {
     bodyMat.specularColor = new Color3(0.6, 0.65, 0.75);
     body.material = bodyMat;
     body.parent = this.root;
+    // Tag meshes so click-picking can resolve back to this enemy.
+    body.metadata = this;
 
     const helm = MeshBuilder.CreateBox("enemyHelm", { width: 0.5, height: 0.4, depth: 0.5 }, scene);
     helm.position = new Vector3(0, 1.75, 0);
@@ -50,6 +52,7 @@ export class Enemy {
     helmMat.diffuseColor = new Color3(0.3, 0.34, 0.42);
     helm.material = helmMat;
     helm.parent = this.root;
+    helm.metadata = this;
 
     // Floating health bar (positioned each frame via syncHud).
     this.bar = document.createElement("div");

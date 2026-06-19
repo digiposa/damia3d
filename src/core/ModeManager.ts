@@ -37,4 +37,12 @@ export class ModeManager {
   update(dt: number): void {
     this.mode?.update(dt);
   }
+
+  /** Tear down the active mode and its scene (e.g. when returning to the menu). */
+  clear(): void {
+    this.mode?.dispose();
+    this.scene?.dispose();
+    this.mode = undefined;
+    this.scene = undefined;
+  }
 }

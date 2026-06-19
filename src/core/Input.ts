@@ -44,14 +44,14 @@ export class Input {
     this.virtual.y = y;
   }
 
-  /** Movement axis on the ground plane, normalized to length <= 1. */
+  /**
+   * Movement axis on the ground plane, normalized to length <= 1. Driven solely
+   * by the virtual (touch) joystick — desktop uses click-to-move instead, so no
+   * keyboard movement keys are read here.
+   */
   axis(): { x: number; y: number } {
     let x = this.virtual.x;
     let y = this.virtual.y;
-    if (this.isDown("KeyW") || this.isDown("ArrowUp")) y += 1;
-    if (this.isDown("KeyS") || this.isDown("ArrowDown")) y -= 1;
-    if (this.isDown("KeyD") || this.isDown("ArrowRight")) x += 1;
-    if (this.isDown("KeyA") || this.isDown("ArrowLeft")) x -= 1;
     const len = Math.hypot(x, y);
     if (len > 1) {
       x /= len;

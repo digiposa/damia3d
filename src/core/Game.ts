@@ -6,22 +6,26 @@ import { hasTouch } from "./device";
 import { TrainingMode } from "../modes/TrainingMode";
 import { StoryMode } from "../modes/StoryMode";
 import { SurvivalMode } from "../modes/SurvivalMode";
-import { ModeBar, type ModeId } from "../ui/ModeBar";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
-import { MainMenu } from "../ui/MainMenu";
+import { MainMenu, type ModeId } from "../ui/MainMenu";
+import { OptionsMenu } from "../ui/OptionsMenu";
+import { Button } from "../ui/Button";
 
 /**
  * Top-level application: owns the Babylon engine and the mode manager, runs the
- * render loop, and wires up the cross-device controls (main menu, F1/F2/F3
- * hotkeys, an on-screen mode bar, and a touch joystick).
+ * render loop, and wires up navigation. Flow: the main menu picks a mode; in
+ * game an Options (⚙) button / Escape opens the pause menu, which is the only
+ * way back to the main menu — so changing modes always goes through the menu.
  */
 export class Game {
   private engine: Engine;
   private input: Input;
   private modes: ModeManager;
-  private modeBar: ModeBar;
   private joystick?: VirtualJoystick;
   private menu: MainMenu;
+  private options: OptionsMenu;
+  private optionsBtn: Button;
+  private paused = false;
 
   constructor(canvas: HTMLCanvasElement) {
     // 4th arg (adaptToDeviceRatio) keeps rendering crisp on high-DPI phones/tablets.
@@ -34,9 +38,22 @@ export class Game {
     this.input = new Input();
     this.modes = new ModeManager(this.engine, this.input);
 
-    this.modeBar = new ModeBar((mode) => this.switchMode(mode));
     if (hasTouch()) this.joystick = new VirtualJoystick(this.input);
-    this.menu = new MainMenu((mode) => this.switchMode(mode));
+    this.menu = new MainMenu((mode) => this.startMode(mode));
+    this.options = new OptionsMenu({
+      onResume: () => this.closeOptions(),
+      onMainMenu: () => this.openMainMenu(),
+    });
+    this.optionsBtn = new Button({
+      label: "⚙",
+      onClick: () => this.openOptions(),
+      style: {
+        top: "calc(env(safe-area-inset-top, 0px) + 10px)",
+        right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+        font: "600 18px/1 system-ui, sans-serif",
+        padding: "10px 14px",
+      },
+    });
 
     const resize = () => this.engine.resize();
     window.addEventListener("resize", resize);
@@ -45,30 +62,26 @@ export class Game {
   }
 
   start(): void {
-    // Boot into the title screen; the HUD stays hidden until a mode is chosen.
-    this.openMenu();
+    this.openMainMenu();
 
     this.engine.runRenderLoop(() => {
       const dt = this.engine.getDeltaTime() / 1000;
-      this.modes.update(dt);
+      if (!this.paused) this.modes.update(dt);
       this.input.endFrame();
       this.modes.currentScene?.render();
     });
   }
 
-  /** Show the main menu and hide the in-game HUD. */
-  private openMenu(): void {
-    this.menu.show();
+  /** Show the title screen, tearing down any running mode. */
+  private openMainMenu(): void {
+    this.options.hide();
+    this.modes.clear();
+    this.paused = true;
     this.setHudVisible(false);
+    this.menu.show();
   }
 
-  private setHudVisible(visible: boolean): void {
-    this.modeBar.setVisible(visible);
-    this.joystick?.setVisible(visible);
-  }
-
-  /** Single entry point for mode changes, shared by the menu, hotkeys and mode bar. */
-  private switchMode(mode: ModeId): void {
+  private startMode(mode: ModeId): void {
     switch (mode) {
       case "Training":
         this.modes.switchTo((s, i) => new TrainingMode(s, i));
@@ -81,28 +94,34 @@ export class Game {
         break;
     }
     this.menu.hide();
+    this.options.hide();
+    this.paused = false;
     this.setHudVisible(true);
-    this.modeBar.setActive(mode);
+  }
+
+  private openOptions(): void {
+    if (this.paused) return; // already in a menu
+    this.paused = true;
+    this.setHudVisible(false);
+    this.options.show();
+  }
+
+  private closeOptions(): void {
+    this.options.hide();
+    this.paused = false;
+    this.setHudVisible(true);
+  }
+
+  private setHudVisible(visible: boolean): void {
+    this.optionsBtn.setVisible(visible);
+    this.joystick?.setVisible(visible);
   }
 
   private handleHotkeys(e: KeyboardEvent): void {
-    switch (e.code) {
-      case "F1":
-        e.preventDefault();
-        this.switchMode("Training");
-        break;
-      case "F2":
-        e.preventDefault();
-        this.switchMode("Story");
-        break;
-      case "F3":
-        e.preventDefault();
-        this.switchMode("Survival");
-        break;
-      case "Escape":
-        e.preventDefault();
-        this.openMenu();
-        break;
-    }
+    if (e.code !== "Escape") return;
+    e.preventDefault();
+    if (this.menu.isOpen) return;
+    if (this.options.isOpen) this.closeOptions();
+    else this.openOptions();
   }
 }

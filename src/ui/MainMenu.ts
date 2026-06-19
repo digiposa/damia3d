@@ -1,5 +1,6 @@
 import { hasTouch } from "../core/device";
-import type { ModeId } from "./ModeBar";
+
+export type ModeId = "Training" | "Story" | "Survival";
 
 interface MenuEntry {
   mode: ModeId;
