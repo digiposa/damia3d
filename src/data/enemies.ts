@@ -10,6 +10,16 @@ export type Element =
   | "Thunder"
   | "Non-Elemental";
 
+/**
+ * An enemy action. `multiplier` is the hidden Attack Multiplier fed to the
+ * damage formula (e.g. Sword Slash = 1× physical, Throw Dagger = 0.5×).
+ */
+export interface EnemyAttack {
+  name: string;
+  kind: "physical" | "magical";
+  multiplier: number;
+}
+
 /** Static definition of an enemy: identity, element, stats and battle yield. */
 export interface EnemyDef {
   id: string;
@@ -23,6 +33,8 @@ export interface EnemyDef {
   mAv: number;
   /** Whether the enemy can counter the player's Additions. */
   countersAdditions: boolean;
+  /** Actions the enemy can take. The first is its default basic attack. */
+  attacks: EnemyAttack[];
   /** EXP awarded on defeat. */
   expReward: number;
   /** Gold awarded on defeat. */
@@ -42,6 +54,10 @@ export const KNIGHT_OF_SANDORA_SELES: EnemyDef = {
   aAv: 0,
   mAv: 0,
   countersAdditions: false,
+  attacks: [
+    { name: "Sword Slash", kind: "physical", multiplier: 1 },
+    { name: "Throw Dagger", kind: "physical", multiplier: 0.5 },
+  ],
   expReward: 2,
   goldReward: 3,
 };
@@ -59,6 +75,10 @@ export const KNIGHT_OF_SANDORA_BLACK_CASTLE: EnemyDef = {
   aAv: 0,
   mAv: 0,
   countersAdditions: true,
+  attacks: [
+    { name: "Throw Knife", kind: "physical", multiplier: 1 },
+    { name: "Sword Slash", kind: "physical", multiplier: 2 },
+  ],
   expReward: 24,
   goldReward: 15,
 };

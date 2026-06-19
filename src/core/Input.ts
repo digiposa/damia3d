@@ -28,6 +28,14 @@ export class Input {
   }
 
   /**
+   * Inject a one-frame "press" for a key code from a virtual control (e.g. a
+   * touch action button), so gameplay can treat touch and keyboard uniformly.
+   */
+  pressVirtual(code: string): void {
+    this.pressedThisFrame.add(code);
+  }
+
+  /**
    * Set the analog movement axis from a virtual control (e.g. touch joystick).
    * Components are expected in [-1, 1]; y points "up" on screen (forward).
    */

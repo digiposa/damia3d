@@ -7,8 +7,8 @@ import { hasTouch } from "../core/device";
 export class DebugOverlay {
   private el: HTMLDivElement;
   private hint = hasTouch()
-    ? "Joystick to move\nMode buttons (top-right) to switch"
-    : "WASD / Arrows to move\nF1 Training   F2 Story   F3 Survival";
+    ? "Joystick to move · ⚔ to attack\nMode buttons (top-right) to switch"
+    : "WASD / Arrows to move · Space to attack\nF1 Training   F2 Story   F3 Survival";
 
   constructor() {
     this.el = document.createElement("div");

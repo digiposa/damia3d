@@ -16,6 +16,7 @@ npm install
 npm run dev      # serveur de dev sur http://localhost:5173
 npm run build    # build de production dans dist/
 npm run preview  # prévisualise le build
+npm test         # tests unitaires (Vitest) — ex. formules de dégâts
 ```
 
 ## Menu principal
@@ -45,6 +46,19 @@ Le jeu est jouable au clavier/souris **et** au tactile (mobile / tablette) :
 Le rendu s'adapte au pixel ratio de l'appareil et aux zones sûres (encoches),
 et la mise en page est responsive sur toutes tailles d'écran.
 
+## Combat
+
+Les formules de dégâts reproduisent fidèlement celles de *The Legend of Dragoon*
+(troncatures `floor` à chaque étape, `round` spécial `(x + y/2) / y`, et les
+« modifier wrappers » avec leur imbrication exacte) dans
+[`src/combat/formula.ts`](src/combat/formula.ts) : attaque physique de base,
+Additions, attaques physiques/magiques ennemies, attaques en pourcentage et
+dégâts de statut. Couvert par des tests (`npm test`).
+
+Dans **Training**, Dart peut frapper le Knight of Sandora (Espace / bouton ⚔
+quand il est à portée) : les dégâts utilisent ces formules, le Knight riposte,
+et vaincre l'ennemi octroie de l'EXP à Dart.
+
 ## Architecture
 
 ```
@@ -65,8 +79,12 @@ src/
     Ground.ts          sol en grille
   combat/
     types.ts           interface Stats (maxHp, at, df, mat, mdf)
+    modifiers.ts       modificateurs de dégâts (Fear, Power, Field, Element…)
+    formula.ts         formules de dégâts LoD fidèles (floor/round + wrappers)
+    formula.test.ts    tests des formules (Vitest)
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
+    additions.ts       données d'Additions de Dart (hits + multiplicateurs)
     enemies.ts         définitions d'ennemis (Knight of Sandora : Seles + Black Castle)
   entities/
     Player.ts          Dart : avatar déplaçable + état de combat (LV/EXP/HP)
