@@ -27,6 +27,12 @@ export class Player {
   /** Equipped Addition performed by the melee combo system. */
   addition: AdditionDef = DART_ADDITIONS.doubleSlash;
 
+  /** Dragoon Spirit Points accumulated from landing Addition hits. */
+  sp = 0;
+
+  /** Successful performances per Addition (drives leveling: 20 each, up to Lv 5). */
+  private additionPerf = new Map<string, number>();
+
   constructor(scene: Scene, spawn = new Vector3(0, 0, 0), level = 1) {
     this.level = level;
     this.stats = dartStatsForLevel(level);
@@ -88,5 +94,16 @@ export class Player {
   face(dir: Vector3): void {
     if (dir.lengthSquared() < 1e-4) return;
     this.root.rotation.y = Math.atan2(dir.x, dir.z);
+  }
+
+  /** Current level (1–5) of an Addition: +1 every 20 successful performances. */
+  additionLevel(def: AdditionDef): number {
+    const perf = this.additionPerf.get(def.name) ?? 0;
+    return Math.min(5, 1 + Math.floor(perf / 20));
+  }
+
+  /** Record a completed (perfect) Addition toward its leveling. */
+  recordAddition(def: AdditionDef): void {
+    this.additionPerf.set(def.name, (this.additionPerf.get(def.name) ?? 0) + 1);
   }
 }

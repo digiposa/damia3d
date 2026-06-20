@@ -60,12 +60,19 @@ imbrication précise (attaque physique de base, Additions, attaques
 physiques/magiques ennemies, attaques en pourcentage, dégâts de statut). Couvert
 par des tests (`npm test`).
 
-Les **Additions** sont traduites en **combos temps réel** : chaque coup
-([`AdditionRunner`](src/combat/AdditionRunner.ts)) enchaîne le hit suivant de
-l'Addition équipée dans une fenêtre de timing ; tout enchaîner = Addition
-« parfaite ». Les dégâts par coup proviennent directement de la formule
-`additionAttack`, si bien que la somme du combo égale exactement l'Addition
-parfaite de LoD.
+Les **Additions** reprennent le **« timing sight » authentique de LoD**
+([`AdditionRunner`](src/combat/AdditionRunner.ts) + [`TimingSight`](src/ui/TimingSight.ts)) :
+la commande Attaque déclenche l'Addition (le **Hit 1 est gratuit**), puis un
+carré extérieur se referme sur un carré cible — il faut **presser pile à
+l'alignement** pour valider chaque hit suivant. Un press trop tôt/tard ou laissé
+filer **interrompt** l'Addition. Tout réussir = Addition « parfaite ». Les dégâts
+par hit viennent de la formule `additionAttack`, donc la somme égale exactement
+l'Addition parfaite. Réussir des inputs accumule des **SP** (jauge Dragoon), et
+20 réussites font monter l'Addition d'un niveau (max 5), augmentant son
+multiplicateur de dégâts.
+
+> **Double Slash** (initiale de Dart) : 1 press, jamais contrée — Hit 1 auto +
+> un seul carré à valider pour le « Double ». Parfait = 150 % × multiplicateur.
 
 Dans **Training** (arène) : on fait apparaître des Knights of Sandora **un par
 un** via le bouton **🛡 Spawn Knight**. Ils poursuivent Dart et ripostent ;
@@ -98,11 +105,11 @@ src/
     types.ts           interface Stats (maxHp, at, df, mat, mdf)
     modifiers.ts       modificateurs de dégâts (Fear, Power, Field, Element…)
     formula.ts         formules de dégâts LoD fidèles (floor/round + wrappers)
-    AdditionRunner.ts  moteur de combo temps réel (fenêtres de timing)
-    *.test.ts          tests des formules et du combo (Vitest)
+    AdditionRunner.ts  timing-sight des Additions (Hit 1 auto + presses)
+    *.test.ts          tests des formules et du timing (Vitest)
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
-    additions.ts       données d'Additions de Dart (hits + multiplicateurs)
+    additions.ts       données d'Additions de Dart (hits, multiplicateurs, SP)
     enemies.ts         définitions d'ennemis (Knight of Sandora : Seles + Black Castle)
   entities/
     Player.ts          Dart : avatar déplaçable + état de combat + Addition équipée
@@ -116,6 +123,7 @@ src/
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)
     PlayerHud.ts       barre de vie + indicateur de combo
+    TimingSight.ts     carré de visée des Additions (timing LoD)
     FloatingText.ts    nombres de dégâts flottants
     DebugOverlay.ts    HUD debug (FPS, vitesse, stats Dart)
     VersionTag.ts      hash du commit déployé (coin bas-droite)

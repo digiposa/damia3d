@@ -11,6 +11,8 @@ export interface AdditionDef {
   hits: number[];
   /** Damage multiplier per Addition level (index 0 = Lv 1 … index 4 = Lv 5). */
   multiplier: [number, number, number, number, number];
+  /** SP awarded at max level for a perfect performance (Dragoon gauge). */
+  spMax: number;
 }
 
 export const DART_ADDITIONS = {
@@ -18,38 +20,53 @@ export const DART_ADDITIONS = {
     name: "Double Slash",
     hits: [100, 50],
     multiplier: [100, 105, 110, 120, 135],
+    spMax: 35,
   },
   volcano: {
     name: "Volcano",
     hits: [50, 50, 50, 50],
     multiplier: [100, 105, 110, 115, 125],
+    spMax: 36,
   },
   burningRush: {
     name: "Burning Rush",
     hits: [50, 50, 50],
     multiplier: [100, 100, 100, 100, 100],
+    spMax: 102,
   },
   crushDance: {
     name: "Crush Dance",
     hits: [30, 30, 30, 30, 30],
     multiplier: [100, 115, 130, 145, 167],
+    spMax: 100,
   },
   madnessHero: {
     name: "Madness Hero",
     hits: [20, 20, 20, 20, 10, 10],
     multiplier: [100, 100, 100, 100, 100],
+    spMax: 204,
   },
   moonStrike: {
     name: "Moon Strike",
     hits: [30, 30, 30, 30, 30, 30, 20],
     multiplier: [100, 120, 140, 160, 175],
+    spMax: 20,
   },
   blazingDynamo: {
     name: "Blazing Dynamo",
     hits: [40, 30, 30, 30, 30, 30, 30, 30],
     multiplier: [100, 120, 140, 160, 180],
+    spMax: 150,
   },
 } satisfies Record<string, AdditionDef>;
+
+/**
+ * Number of timed button presses an Addition needs. Hit 1 is free (the Attack
+ * command), so presses = hits − 1. Double Slash has 1 press.
+ */
+export function additionPresses(def: AdditionDef): number {
+  return Math.max(0, def.hits.length - 1);
+}
 
 /** Sum of the first `hitsLanded` hits (defaults to all = a perfect Addition). */
 export function additionHitsPercent(def: AdditionDef, hitsLanded = def.hits.length): number {

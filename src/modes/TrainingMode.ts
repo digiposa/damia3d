@@ -13,13 +13,14 @@ import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
 import { Enemy } from "../entities/Enemy";
 import { KNIGHT_OF_SANDORA } from "../data/enemies";
-import { additionHitsPercent, additionMultiplier } from "../data/additions";
+import { additionHitsPercent, additionMultiplier, additionPresses } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack } from "../combat/formula";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { DebugOverlay } from "../ui/DebugOverlay";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { PlayerHud } from "../ui/PlayerHud";
+import { TimingSight } from "../ui/TimingSight";
 import { floatingText } from "../ui/FloatingText";
 
 /** How close Dart must be to land a combo hit on an enemy. */
@@ -39,6 +40,7 @@ export class TrainingMode extends GameMode {
   private player!: Player;
   private overlay!: DebugOverlay;
   private hud!: PlayerHud;
+  private sight!: TimingSight;
   private spawnBtn!: Button;
   private attackBtn?: ActionButton;
 
@@ -71,6 +73,7 @@ export class TrainingMode extends GameMode {
 
     this.overlay = new DebugOverlay();
     this.hud = new PlayerHud();
+    this.sight = new TimingSight();
     this.spawnBtn = new Button({
       label: "🛡 Spawn Knight",
       onClick: () => this.spawnKnight(),
@@ -101,18 +104,35 @@ export class TrainingMode extends GameMode {
 
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
-    this.runner.tick(cdt);
-    if (!this.runner.active) this.comboTarget = undefined;
+    if (this.runner.tick(cdt)) {
+      this.log = `${this.player.addition.name} raté`;
+      this.comboTarget = undefined;
+    }
     this.updateEnemies(cdt);
+    this.updateSight();
 
     this.refreshHud();
+  }
+
+  private updateSight(): void {
+    if (this.runner.active && this.comboTarget) {
+      const head = this.comboTarget.position.add(new Vector3(0, 1.6, 0));
+      this.sight.update(this.scene, head, this.runner.sightProgress, this.runner.inWindow);
+    } else {
+      this.sight.hide();
+    }
   }
 
   // --- Navigation (desktop click-to-move) ----------------------------------
 
   private onPointerDown = (e: PointerEvent): void => {
     if (hasTouch()) {
-      this.input.pressVirtual("Space"); // tap = attack nearest in reach
+      this.input.pressVirtual("Space"); // tap = attack / timing press
+      return;
+    }
+    // While an Addition is running, any click is the timing-sight press.
+    if (this.runner.active) {
+      this.input.pressVirtual("Space");
       return;
     }
     const picked = this.scene.pick(e.offsetX, e.offsetY)?.pickedMesh?.metadata;
@@ -176,34 +196,63 @@ export class TrainingMode extends GameMode {
 
   // --- Combat ---------------------------------------------------------------
 
-  /** Chain the equipped Addition against a target, applying LoD-formula damage. */
+  /**
+   * Attack input. Begins the equipped Addition on a target in reach (auto hit 1)
+   * or, while one is running, resolves the current timing-sight press.
+   */
   private attack(preferred?: Enemy): void {
-    let target: Enemy | undefined;
-    if (this.runner.active) target = this.comboTarget;
-    else if (preferred && preferred.alive && this.inReach(preferred)) target = preferred;
-    else target = this.nearestInReach();
-
-    if (!target || !target.alive) {
-      this.runner.cancel();
-      this.comboTarget = undefined;
+    if (this.runner.active) {
+      this.resolveTimingPress();
       return;
     }
 
+    const target =
+      preferred && preferred.alive && this.inReach(preferred) ? preferred : this.nearestInReach();
+    if (!target) return;
+
+    const res = this.runner.press(this.player.addition);
+    if (res.kind !== "started") return; // ignored (e.g. during recovery)
+    this.comboTarget = target;
     this.player.face(target.position.subtract(this.player.position));
+    this.applyHit(target, res.hits); // guaranteed hit 1
+  }
 
+  /** Resolve a timing-sight press against the locked combo target. */
+  private resolveTimingPress(): void {
+    const target = this.comboTarget;
     const add = this.player.addition;
-    const out = this.runner.press(add);
-    if (out.started) this.comboTarget = target;
-    if (!out.landed) return;
+    const res = this.runner.press(add);
 
-    // Per-hit damage = the Addition formula's running total minus the previous
-    // hits' total, so the combo's sum equals a perfect Addition.
+    if (res.kind === "miss") {
+      this.log = `${add.name} raté`;
+      this.comboTarget = undefined;
+      return;
+    }
+    if (res.kind !== "hit" || !target || !target.alive) return;
+
+    this.applyHit(target, res.hits);
+    // SP accrues per landed input (hit 1 is free); award an even share of spMax.
+    this.player.sp += Math.floor(add.spMax / additionPresses(add));
+    if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), "PERFECT", "#ffffff");
+    if (res.completed) {
+      this.player.recordAddition(add);
+      this.log = `${add.name} — Addition réussie !`;
+      this.comboTarget = undefined;
+    }
+  }
+
+  /**
+   * Apply hit `k` of the current Addition. Per-hit damage is the LoD formula's
+   * running total minus the previous hits' total, so the chain's sum equals a
+   * perfect Addition. Handles the target dying.
+   */
+  private applyHit(target: Enemy, k: number): void {
+    const add = this.player.addition;
     const atk = { at: this.player.stats.at, lv: this.player.level };
     const df = target.def.stats.df;
-    const mult = additionMultiplier(add, 1);
-    const before =
-      out.hits > 1 ? additionAttack(atk, df, additionHitsPercent(add, out.hits - 1), mult) : 0;
-    const now = additionAttack(atk, df, additionHitsPercent(add, out.hits), mult);
+    const mult = additionMultiplier(add, this.player.additionLevel(add));
+    const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult) : 0;
+    const now = additionAttack(atk, df, additionHitsPercent(add, k), mult);
     const dmg = Math.max(1, now - before);
 
     target.takeDamage(dmg);
@@ -214,9 +263,6 @@ export class TrainingMode extends GameMode {
       this.log = `${target.def.name} vaincu · +${target.def.expReward} EXP`;
       this.removeEnemy(target);
       this.runner.cancel();
-      this.comboTarget = undefined;
-    } else if (out.completed) {
-      this.log = `${add.name} parfait !`;
       this.comboTarget = undefined;
     }
   }
@@ -277,19 +323,23 @@ export class TrainingMode extends GameMode {
   }
 
   private refreshHud(): void {
-    const combo = this.runner.current
-      ? `${this.runner.current.name}  ${this.runner.hits}/${this.runner.current.hits.length}`
+    const add = this.runner.current;
+    const combo = add
+      ? `${add.name}  ${this.runner.hits}/${add.hits.length}` +
+        (this.runner.inWindow ? "  ▸ APPUIE !" : "")
       : "";
     this.hud.set(this.player.hp, this.player.stats.maxHp, combo);
 
     const s = this.player.stats;
+    const eq = this.player.addition;
     this.overlay.set({
       mode: this.name,
       fps: String(Math.round(this.scene.getEngine().getFps())),
       speed: `${settings.combatSpeed}× combat`,
       "—": "—",
-      Dart: `LV ${this.player.level}  EXP ${this.player.exp}`,
+      Dart: `LV ${this.player.level}  EXP ${this.player.exp}  SP ${this.player.sp}`,
       stats: `AT ${s.at} DF ${s.df} MAT ${s.mat} MDF ${s.mdf}`,
+      addition: `${eq.name} (Lv ${this.player.additionLevel(eq)})`,
       enemies: String(this.enemies.length),
       log: this.log,
     });
@@ -301,6 +351,7 @@ export class TrainingMode extends GameMode {
     this.enemies = [];
     this.overlay.dispose();
     this.hud.dispose();
+    this.sight.dispose();
     this.spawnBtn.dispose();
     this.attackBtn?.dispose();
   }

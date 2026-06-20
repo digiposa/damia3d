@@ -1,111 +1,129 @@
 import type { AdditionDef } from "../data/additions";
+import { additionPresses } from "../data/additions";
 
-export interface PressOutcome {
-  /** A new hit landed on this press. */
-  landed: boolean;
-  /** Whether a brand-new combo started on this press. */
-  started: boolean;
-  /** Total hits landed in the current combo after this press. */
-  hits: number;
-  /** The combo reached its final hit (a perfect Addition). */
-  completed: boolean;
-}
+// --- Timing-sight tuning (seconds / progress fractions) --------------------
 
-const NO_PRESS: PressOutcome = { landed: false, started: false, hits: 0, completed: false };
+/** Real-time seconds for the outer square to collapse onto the inner square. */
+export const SIGHT_DURATION = 0.85;
+/** Success window, as a fraction of SIGHT_DURATION (1 = perfect alignment). */
+export const WINDOW_LO = 0.8;
+export const WINDOW_HI = 1.1;
+/** Tighter "white / perfect" band inside the success window. */
+export const PERFECT_LO = 0.93;
+export const PERFECT_HI = 1.05;
+/** Lockout after an Addition ends (completed or failed). */
+const RECOVERY = 0.4;
 
-/** Seconds within which the next hit must be pressed to chain the combo. */
-const DEFAULT_WINDOW = 0.55;
-/** Seconds of lockout after a combo ends (whiffed or completed). */
-const DEFAULT_RECOVERY = 0.4;
+export type AttackResult =
+  | { kind: "none" }
+  /** A new Addition began; hit 1 is guaranteed (no input needed). */
+  | { kind: "started"; hits: number }
+  /** A timed input landed the next hit. */
+  | { kind: "hit"; hits: number; perfect: boolean; completed: boolean }
+  /** A mistimed press ended the Addition. */
+  | { kind: "miss" };
 
 /**
- * Real-time driver for a LoD Addition rendered as a hack-and-slash combo. Each
- * attack press lands the next hit of the equipped Addition, but only if pressed
- * within the chaining window; let it lapse and the combo ends. Landing every hit
- * is a "perfect" Addition. This carries no damage math — the owner reads
- * {@link PressOutcome.hits} and applies the LoD formula per landed hit.
+ * Faithful LoD Addition timing system. The Attack command begins the Addition
+ * and lands hit 1 for free; thereafter a "timing sight" collapses and each
+ * subsequent hit requires a press while the squares overlap. A press outside the
+ * window — or letting it lapse — ends the chain. Carries no damage math; the
+ * owner reads the hit count and applies the LoD Addition formula per hit.
+ *
+ * Pure logic (no DOM/Babylon) so it can be unit-tested; the UI reads
+ * {@link sightProgress} and {@link inWindow} to draw the sight.
  */
 export class AdditionRunner {
   active = false;
   hits = 0;
   private def?: AdditionDef;
-  private windowTimer = 0;
+  /** Timed presses landed so far (hit 1 is free, so presses = hits - 1). */
+  private presses = 0;
+  private sightTimer = 0;
   private recoveryTimer = 0;
 
-  constructor(
-    private window = DEFAULT_WINDOW,
-    private recovery = DEFAULT_RECOVERY,
-  ) {}
+  constructor(private sightDuration = SIGHT_DURATION) {}
 
-  /** The Addition currently being performed, if any. */
   get current(): AdditionDef | undefined {
     return this.def;
   }
 
-  /** Fraction of the chaining window still open, in [0, 1] (for UI feedback). */
-  get windowFraction(): number {
-    return this.active ? Math.max(0, this.windowTimer / this.window) : 0;
-  }
-
-  /** Whether the runner is in its post-combo lockout. */
   get recovering(): boolean {
     return this.recoveryTimer > 0;
   }
 
+  /** Collapse progress of the current sight (0 = wide, 1 = aligned, can exceed). */
+  get sightProgress(): number {
+    return this.active ? this.sightTimer / this.sightDuration : 0;
+  }
+
+  /** True while a press would land the current hit. */
+  get inWindow(): boolean {
+    const p = this.sightProgress;
+    return this.active && p >= WINDOW_LO && p <= WINDOW_HI;
+  }
+
   /**
-   * Press attack with the given equipped Addition. Starts a combo when idle, or
-   * chains the next hit when one is active and the window is open.
+   * Press the attack button with the equipped Addition. Begins the Addition when
+   * idle (auto hit 1), or evaluates the current timing sight when active.
    */
-  press(def: AdditionDef): PressOutcome {
-    if (this.recoveryTimer > 0) return NO_PRESS;
+  press(def: AdditionDef): AttackResult {
+    if (this.recoveryTimer > 0) return { kind: "none" };
 
     if (!this.active) {
       this.def = def;
       this.active = true;
       this.hits = 1;
-      this.windowTimer = this.window;
-      return this.settle(true);
+      this.presses = 0;
+      this.sightTimer = 0;
+      // A single-hit Addition (no presses) would complete instantly; Dart's all
+      // have at least one press, but guard anyway.
+      if (additionPresses(def) === 0) this.endCombo();
+      return { kind: "started", hits: 1 };
     }
 
-    if (this.def === def && this.hits < this.def.hits.length) {
-      this.hits += 1;
-      this.windowTimer = this.window;
-      return this.settle(false);
+    const p = this.sightProgress;
+    if (p < WINDOW_LO || p > WINDOW_HI) {
+      this.endCombo();
+      return { kind: "miss" };
     }
 
-    return { ...NO_PRESS, hits: this.hits };
+    this.hits += 1;
+    this.presses += 1;
+    this.sightTimer = 0;
+    const perfect = p >= PERFECT_LO && p <= PERFECT_HI;
+    const completed = this.presses >= additionPresses(this.def!);
+    const hits = this.hits; // capture before endCombo resets state
+    if (completed) this.endCombo();
+    return { kind: "hit", hits, perfect, completed };
   }
 
-  /** Advance timers; ends the combo if the chaining window lapses. */
-  tick(dt: number): void {
+  /** Advance timers. Returns true on the frame a sight lapses unpressed (a miss). */
+  tick(dt: number): boolean {
     if (this.recoveryTimer > 0) {
       this.recoveryTimer = Math.max(0, this.recoveryTimer - dt);
-      return;
+      return false;
     }
-    if (this.active) {
-      this.windowTimer -= dt;
-      if (this.windowTimer <= 0) this.endCombo();
+    if (!this.active) return false;
+    this.sightTimer += dt;
+    if (this.sightProgress > WINDOW_HI) {
+      this.endCombo();
+      return true;
     }
+    return false;
   }
 
-  /** Force-end the current combo (e.g. the target died or left range). */
+  /** Force-end the Addition (e.g. the target died). */
   cancel(): void {
     if (this.active) this.endCombo();
-  }
-
-  /** Finalize a landed press, returning the outcome before any combo reset. */
-  private settle(started: boolean): PressOutcome {
-    const hits = this.hits;
-    const completed = hits >= this.def!.hits.length;
-    if (completed) this.endCombo();
-    return { landed: true, started, hits, completed };
   }
 
   private endCombo(): void {
     this.active = false;
     this.hits = 0;
+    this.presses = 0;
     this.def = undefined;
-    this.windowTimer = 0;
-    this.recoveryTimer = this.recovery;
+    this.sightTimer = 0;
+    this.recoveryTimer = RECOVERY;
   }
 }

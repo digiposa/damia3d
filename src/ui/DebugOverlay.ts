@@ -7,8 +7,8 @@ import { hasTouch } from "../core/device";
 export class DebugOverlay {
   private el: HTMLDivElement;
   private hint = hasTouch()
-    ? "Joystick: move · ⚔ in rhythm: combo\n⚙ (top-right): options & menu"
-    : "Click ground: move · Click enemy: attack\nRepeat in rhythm to chain · ⚙ / Esc: options";
+    ? "Joystick: move · ⚔ : Addition\nPress as the square aligns · ⚙ : options"
+    : "Click ground: move · Click enemy: Addition\nClick as the square aligns · ⚙ / Esc: options";
 
   constructor() {
     this.el = document.createElement("div");
