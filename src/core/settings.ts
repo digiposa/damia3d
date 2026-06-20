@@ -14,6 +14,8 @@ export interface GameSettings {
    * Addition combo windows). Movement speed is intentionally left untouched.
    */
   combatSpeed: number;
+  /** Camera zoom: higher = closer. The iso view height is divided by this. */
+  cameraZoom: number;
 }
 
 export const settings: GameSettings = {
@@ -21,4 +23,5 @@ export const settings: GameSettings = {
   musicVolume: 0.7,
   sfxVolume: 0.8,
   combatSpeed: 1,
+  cameraZoom: 1.25,
 };

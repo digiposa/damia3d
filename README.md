@@ -19,13 +19,21 @@ npm run preview  # prévisualise le build
 npm test         # tests unitaires (Vitest) — ex. formules de dégâts
 ```
 
-## Menu & options
+## Menu & système
 
 Au démarrage, un écran-titre permet de **choisir un mode**. En jeu, le bouton
-**⚙** (haut-droite) ou **Échap** ouvre le **menu Options** (qui met le jeu en
-pause) : réglages du **son** (placeholder, pas d'audio pour l'instant) et de la
-**vitesse de combat**, plus **Reprendre** et **Menu principal**. Changer de mode
-passe **obligatoirement** par le menu principal (via Options → Menu principal).
+**⚙** (haut-droite), **Échap**, ou le **chip d'Addition** de la barre de stats
+ouvre le **menu système** (style écran PS1 de LoD) qui **met le jeu en pause**,
+avec des sous-sections :
+
+- **Status** : niveau, EXP, HP/SP/MP, AT/DF/MAT/MDF, Gold
+- **Équipement** : à venir
+- **Addition** : détail et équipement des Additions débloquées
+- **Config** : son (placeholder), vitesse de combat, **zoom caméra**, plus
+  **Reprendre** et **Menu principal**
+
+Changer de mode passe **obligatoirement** par le menu principal (Config → Menu
+principal).
 
 ## Modes de jeu
 
@@ -76,8 +84,9 @@ multiplicateur de dégâts.
 >
 > **Volcano** (apprise au niveau 2 de Dart) : 3 presses (4 hits), parfait
 > 200 %. L'Addition équipée s'affiche dans la barre de stats (chip cliquable) ;
-> cliquer ouvre le **menu Additions** (en pause) pour en équiper une autre parmi
-> les débloquées — comme dans LoD, on ne change pas d'Addition en pleine action.
+> cliquer ouvre le **menu système** sur l'onglet Addition (en pause) pour en
+> équiper une autre — comme dans LoD, on ne change pas d'Addition en pleine
+> action.
 
 Dans **Training** (arène) : un bouton **🐾** (sous l'engrenage ⚙) ouvre un **menu
 de spawn** qui **met le jeu en pause** (comme les Options) ; on y fait apparaître
@@ -106,7 +115,8 @@ src/
     GameMode.ts        interface d'un mode
     ModeManager.ts     bascule/efface le mode actif (une Scene isolée par mode)
     Input.ts           état d'entrée (axe virtuel + presses)
-    settings.ts        réglages partagés (son, vitesse de combat)
+    settings.ts        réglages partagés (son, vitesse de combat, zoom)
+    menu.ts            types du menu système (GameHost, données de mode)
     device.ts          détection tactile
   modes/
     TrainingMode.ts    arène hack & slash jouable
@@ -133,9 +143,8 @@ src/
     project.ts         projection monde→écran pour les overlays DOM
   ui/
     MainMenu.ts        écran-titre / sélection de mode
-    OptionsMenu.ts     menu pause : son, vitesse de combat, retour au menu
+    SystemMenu.ts      menu système à onglets (Status/Équipement/Addition/Config)
     SpawnMenu.ts       menu de spawn d'ennemis (Training, met en pause)
-    AdditionsMenu.ts   menu d'équipement d'Addition (en pause)
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)

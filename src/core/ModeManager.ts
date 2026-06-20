@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import type { Engine } from "@babylonjs/core/Engines/engine";
 import type { GameMode, ModeFactory } from "./GameMode";
 import type { Input } from "./Input";
+import type { GameHost } from "./menu";
 
 /**
  * Owns the active game mode and its Scene. Switching modes disposes the old
@@ -14,10 +15,15 @@ export class ModeManager {
   constructor(
     private engine: Engine,
     private input: Input,
+    private host: GameHost,
   ) {}
 
   get currentScene(): Scene | undefined {
     return this.scene;
+  }
+
+  get current(): GameMode | undefined {
+    return this.mode;
   }
 
   get currentName(): string {
@@ -30,7 +36,7 @@ export class ModeManager {
 
     const scene = new Scene(this.engine);
     this.scene = scene;
-    this.mode = factory(scene, this.input);
+    this.mode = factory(scene, this.input, this.host);
     this.mode.enter();
   }
 

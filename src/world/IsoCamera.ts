@@ -3,7 +3,9 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import type { Scene } from "@babylonjs/core/scene";
 
-/** Vertical span (in world units) the orthographic camera shows. Lower = more zoomed in. */
+import { settings } from "../core/settings";
+
+/** Base vertical span (world units) the orthographic camera shows, before zoom. */
 const VIEW_HEIGHT = 16;
 
 /** True isometric tilt: ~54.74° from vertical. */
@@ -28,7 +30,7 @@ export class IsoCamera {
   /** Recompute orthographic bounds from the current aspect ratio. */
   private applyOrtho(scene: Scene): void {
     const aspect = scene.getEngine().getAspectRatio(this.camera);
-    const half = VIEW_HEIGHT / 2;
+    const half = VIEW_HEIGHT / settings.cameraZoom / 2;
     this.camera.orthoTop = half;
     this.camera.orthoBottom = -half;
     this.camera.orthoLeft = -half * aspect;

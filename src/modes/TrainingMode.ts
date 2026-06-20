@@ -18,17 +18,18 @@ import {
   additionMultiplier,
   additionPresses,
   DART_ADDITION_LIST,
+  type AdditionDef,
 } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { dartNextLevelExp } from "../data/dart";
+import type { ModeMenuData, AdditionEntry } from "../core/menu";
 import { TechOverlay } from "../ui/TechOverlay";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
 import { SpawnMenu } from "../ui/SpawnMenu";
-import { AdditionsMenu, type AdditionEntry } from "../ui/AdditionsMenu";
 import { floatingText } from "../ui/FloatingText";
 
 /** Display name of the party leader (the project's 2D protagonist). */
@@ -55,7 +56,6 @@ export class TrainingMode extends GameMode {
   private sight!: TimingSight;
   private spawnOpenBtn!: Button;
   private spawnMenu!: SpawnMenu;
-  private additionsMenu!: AdditionsMenu;
   private attackBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
@@ -89,8 +89,8 @@ export class TrainingMode extends GameMode {
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
     this.tech = new TechOverlay();
-    // The equipped-Addition chip in the stats bar opens the Additions menu.
-    this.stats = new StatsBar(() => this.openAdditionsMenu());
+    // The equipped-Addition chip in the stats bar opens the System menu.
+    this.stats = new StatsBar(() => this.host.openSystemMenu());
     this.sight = new TimingSight();
 
     // Spawn menu (Training only), opened from a button just below the gear (⚙).
@@ -98,10 +98,6 @@ export class TrainingMode extends GameMode {
       onKnight: () => this.spawnKnight(),
       onCommander: () => this.spawnCommander(),
       onResume: () => this.closeSpawnMenu(),
-    });
-    this.additionsMenu = new AdditionsMenu({
-      onEquip: (def) => this.equipAddition(def),
-      onResume: () => this.closeAdditionsMenu(),
     });
     this.spawnOpenBtn = new Button({
       label: "🐾",
@@ -376,25 +372,39 @@ export class TrainingMode extends GameMode {
     enemy.dispose();
   }
 
-  private openAdditionsMenu(): void {
-    this.paused = true;
-    this.spawnOpenBtn.setVisible(false);
-    this.additionsMenu.show(this.additionEntries());
+  /** Data for the System menu's Status / Addition tabs. */
+  menuData(): ModeMenuData {
+    const p = this.player;
+    return {
+      status: {
+        name: HERO_NAME,
+        level: p.level,
+        exp: p.exp,
+        nextExp: dartNextLevelExp(p.level),
+        hp: p.hp,
+        maxHp: p.stats.maxHp,
+        sp: p.sp,
+        maxSp: p.maxSp,
+        mp: p.mp,
+        maxMp: p.maxMp,
+        at: p.stats.at,
+        df: p.stats.df,
+        mat: p.stats.mat,
+        mdf: p.stats.mdf,
+        gold: p.gold,
+      },
+      additions: this.additionEntries(),
+      equipAddition: (def) => this.equipAddition(def),
+    };
   }
 
-  private closeAdditionsMenu(): void {
-    this.additionsMenu.hide();
-    this.spawnOpenBtn.setVisible(true);
-    this.paused = false;
-  }
-
-  private equipAddition(def: (typeof DART_ADDITION_LIST)[number]): void {
+  private equipAddition(def: AdditionDef): void {
     this.player.addition = def;
+    this.runner.cancel(); // never keep a running combo on the old Addition
     this.log = `Addition équipée : ${def.name}`;
-    this.additionsMenu.show(this.additionEntries()); // re-render to move the highlight
   }
 
-  /** Build the Additions-menu rows from the player's unlock/level state. */
+  /** Build the Addition rows from the player's unlock/level state. */
   private additionEntries(): AdditionEntry[] {
     const unlocked = this.player.unlockedAdditions();
     return DART_ADDITION_LIST.map((def) => ({
@@ -473,7 +483,6 @@ export class TrainingMode extends GameMode {
     this.stats.dispose();
     this.sight.dispose();
     this.spawnMenu.dispose();
-    this.additionsMenu.dispose();
     this.spawnOpenBtn.dispose();
     this.attackBtn?.dispose();
   }
