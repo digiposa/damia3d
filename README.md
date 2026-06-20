@@ -79,11 +79,20 @@ multiplicateur de dégâts.
 > Addition en cours, comme dans LoD).
 
 Dans **Training** (arène) : on fait apparaître des Knights of Sandora **un par
-un** via le bouton **🛡 Spawn Knight**. Ils poursuivent Dart et ripostent ;
-vaincre un ennemi octroie de l'EXP. Barres de vie flottantes et nombres de
-dégâts à l'écran. La **vitesse de combat** (réglable dans les Options) accélère
-l'IA, la cadence d'attaque et les fenêtres de combo — sans toucher au
+un** via **🛡 Spawn Knight**, ou la **formation scriptée de Seles** (2 Knights +
+Commander) via **👑 Spawn Commander**. Les ennemis poursuivent Dart et ripostent
+(physique ou magie) ; vaincre un ennemi octroie de l'EXP. Barres de vie
+flottantes et nombres de dégâts à l'écran. La **vitesse de combat** (Options)
+accélère l'IA, la cadence et les fenêtres de timing — sans toucher au
 déplacement.
+
+### Boss : Commander (Seles)
+
+Premier boss, fidèle au wiki : élément **Ténèbres**, alterne **Sword Slash** et
+**Burn Out** (magie Feu, formule `enemyMagicalAttack`), **se soigne** de 30 %
+sous 51 % de PV, et déclenche **Power Up** (usage unique) une fois ses **Knights
+escortes vaincus** — Sword Slash devient **Slash Twice** (2×) et Burn Out passe à
+1.5×. Rendu de boss distinct (plus grand, couronne, barre de vie + nom).
 
 ## Architecture
 
@@ -114,10 +123,10 @@ src/
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
     additions.ts       données d'Additions de Dart (hits, multiplicateurs, SP)
-    enemies.ts         définitions d'ennemis (Knight of Sandora : Seles + Black Castle)
+    enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles)
   entities/
     Player.ts          Dart : avatar déplaçable + état de combat + Addition équipée
-    Enemy.ts           ennemi : HP, IA poursuite/attaque, barre de vie flottante
+    Enemy.ts           ennemi : HP, IA (actions phys/magie/soin), boss, barre de vie
   world/
     project.ts         projection monde→écran pour les overlays DOM
   ui/

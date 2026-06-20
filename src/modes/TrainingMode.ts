@@ -11,15 +11,15 @@ import { IsoCamera } from "../world/IsoCamera";
 import { createGround } from "../world/Ground";
 import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
-import { Enemy } from "../entities/Enemy";
-import { KNIGHT_OF_SANDORA } from "../data/enemies";
+import { Enemy, type EnemyAction } from "../entities/Enemy";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
   additionPresses,
   DART_ADDITION_LIST,
 } from "../data/additions";
-import { additionAttack, enemyPhysicalAttack } from "../combat/formula";
+import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { DebugOverlay } from "../ui/DebugOverlay";
 import { ActionButton } from "../ui/ActionButton";
@@ -47,6 +47,7 @@ export class TrainingMode extends GameMode {
   private hud!: PlayerHud;
   private sight!: TimingSight;
   private spawnBtn!: Button;
+  private commanderBtn!: Button;
   private additionBtn!: Button;
   private attackBtn?: ActionButton;
 
@@ -85,10 +86,15 @@ export class TrainingMode extends GameMode {
       onClick: () => this.spawnKnight(),
       style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)", left: "50%", transform: "translateX(-50%)" },
     });
+    this.commanderBtn = new Button({
+      label: "👑 Spawn Commander",
+      onClick: () => this.spawnCommander(),
+      style: { top: "calc(env(safe-area-inset-top, 0px) + 58px)", left: "50%", transform: "translateX(-50%)" },
+    });
     this.additionBtn = new Button({
       label: "⚔ Addition",
       onClick: () => this.cycleAddition(),
-      style: { top: "calc(env(safe-area-inset-top, 0px) + 58px)", left: "50%", transform: "translateX(-50%)" },
+      style: { top: "calc(env(safe-area-inset-top, 0px) + 106px)", left: "50%", transform: "translateX(-50%)" },
     });
     // Touch devices attack with the ⚔ button; desktop attacks by clicking.
     if (hasTouch()) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
@@ -267,7 +273,7 @@ export class TrainingMode extends GameMode {
     const dmg = Math.max(1, now - before);
 
     target.takeDamage(dmg);
-    this.popText(target.position.add(new Vector3(0, 2.6, 0)), `${dmg}`, "#ffd86b");
+    this.popText(target.headPosition, `${dmg}`, "#ffd86b");
 
     if (!target.alive) {
       this.player.gainExp(target.def.expReward);
@@ -279,20 +285,35 @@ export class TrainingMode extends GameMode {
   }
 
   private updateEnemies(cdt: number): void {
+    const knightsAlive = this.enemies.filter((e) => e.def.id.startsWith("knight_of_sandora")).length;
+    const ctx = { knightsAlive };
     for (const enemy of this.enemies) {
-      const attacked = enemy.aiUpdate(cdt, this.player.position);
+      const action = enemy.aiUpdate(cdt, this.player.position, ctx);
       enemy.syncHud(this.scene);
-      if (!attacked) continue;
+      if (action) this.resolveEnemyAction(enemy, action);
+    }
+  }
 
-      const slash = enemy.def.attacks[0];
-      const dmg = enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, slash.multiplier);
-      this.player.hp = Math.max(0, this.player.hp - dmg);
-      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
+  /** Apply an enemy's chosen action: damage the player, or self-heal. */
+  private resolveEnemyAction(enemy: Enemy, action: EnemyAction): void {
+    if (action.kind === "heal") {
+      enemy.heal(action.amount);
+      this.popText(enemy.headPosition, `+${action.amount}`, "#7CFC7C");
+      this.log = `${enemy.def.name} : ${action.name}`;
+      return;
+    }
 
-      if (this.player.hp === 0) {
-        this.player.hp = this.player.stats.maxHp; // sandbox: revive instead of game-over
-        this.log = "Dart est tombé — PV restaurés";
-      }
+    const dmg =
+      action.kind === "magical"
+        ? enemyMagicalAttack(enemy.def.stats.mat, this.player.stats.mdf, action.multiplier)
+        : enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, action.multiplier);
+    this.player.hp = Math.max(0, this.player.hp - dmg);
+    this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
+    this.log = `${enemy.def.name} : ${action.name} (${dmg})`;
+
+    if (this.player.hp === 0) {
+      this.player.hp = this.player.stats.maxHp; // sandbox: revive instead of game-over
+      this.log = "Dart est tombé — PV restaurés";
     }
   }
 
@@ -340,11 +361,23 @@ export class TrainingMode extends GameMode {
   }
 
   private spawnKnight(): void {
-    const angle = Math.random() * Math.PI * 2;
-    const r = 5 + Math.random() * 2;
-    const pos = this.player.position.add(new Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
-    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, pos));
+    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
     this.log = `Knight of Sandora apparu (${this.enemies.length} en jeu)`;
+  }
+
+  /** Spawn the scripted Seles boss formation: two Knights escorting the Commander. */
+  private spawnCommander(): void {
+    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
+    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
+    this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
+    this.log = "Commander (Seles) + 2 Knights ! Battez les Knights → Power Up";
+  }
+
+  /** A random spawn position on a ring around the player. */
+  private ringPosition(radius = 6): Vector3 {
+    const angle = Math.random() * Math.PI * 2;
+    const r = radius + Math.random() * 2;
+    return this.player.position.add(new Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
   }
 
   private popText(world: Vector3, text: string, color: string): void {
@@ -384,6 +417,7 @@ export class TrainingMode extends GameMode {
     this.hud.dispose();
     this.sight.dispose();
     this.spawnBtn.dispose();
+    this.commanderBtn.dispose();
     this.additionBtn.dispose();
     this.attackBtn?.dispose();
   }

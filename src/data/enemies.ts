@@ -20,6 +20,9 @@ export interface EnemyAttack {
   multiplier: number;
 }
 
+/** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script. */
+export type EnemyBehavior = "basic" | "commander";
+
 /** Static definition of an enemy: identity, element, stats and battle yield. */
 export interface EnemyDef {
   id: string;
@@ -39,6 +42,14 @@ export interface EnemyDef {
   expReward: number;
   /** Gold awarded on defeat. */
   goldReward: number;
+  /** AI profile (defaults to "basic"). */
+  behavior?: EnemyBehavior;
+  /** Visual scale of the placeholder mesh (bosses are larger). */
+  scale?: number;
+  /** Body colour as RGB 0–1 (defaults to the knight's grey-blue). */
+  bodyColor?: [number, number, number];
+  /** Marks a boss: wider health bar + name plate. */
+  isBoss?: boolean;
 }
 
 /**
@@ -85,3 +96,56 @@ export const KNIGHT_OF_SANDORA_BLACK_CASTLE: EnemyDef = {
 
 /** Default Knight of Sandora used in the sandbox (the first-encountered Seles squad member). */
 export const KNIGHT_OF_SANDORA = KNIGHT_OF_SANDORA_SELES;
+
+/**
+ * Commander — Seles Boss. Confronts Dart in Seles alongside two Knights of
+ * Sandora. Once the Knights fall it uses Power Up (single use): Sword Slash is
+ * replaced by Slash Twice (2×) and Burn Out rises to 1.5×. Recovers 30% HP when
+ * below 51%. Darkness element; does not counter Additions.
+ */
+export const COMMANDER_SELES: EnemyDef = {
+  id: "commander_seles",
+  name: "Commander",
+  element: "Darkness",
+  stats: { maxHp: 14, at: 2, df: 40, mat: 4, mdf: 40 },
+  spd: 40,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: false,
+  attacks: [
+    { name: "Sword Slash", kind: "physical", multiplier: 1 },
+    { name: "Burn Out", kind: "magical", multiplier: 1.2 },
+    { name: "Slash Twice", kind: "physical", multiplier: 2 },
+  ],
+  expReward: 20,
+  goldReward: 20,
+  behavior: "commander",
+  isBoss: true,
+  scale: 1.6,
+  bodyColor: [0.28, 0.18, 0.42],
+};
+
+/**
+ * Commander — Marshland minor enemy. A much tougher field version that counters
+ * Additions. Its full kit (Multi Slash at ≤50% HP, Stunning Hammer) awaits a
+ * status-effect system; for now it uses Sword Slash.
+ */
+export const COMMANDER_MARSHLAND: EnemyDef = {
+  id: "commander_marshland",
+  name: "Commander",
+  element: "Darkness",
+  stats: { maxHp: 128, at: 11, df: 120, mat: 9, mdf: 80 },
+  spd: 70,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Sword Slash", kind: "physical", multiplier: 1 },
+    { name: "Multi Slash", kind: "physical", multiplier: 2 },
+    { name: "Stunning Hammer", kind: "physical", multiplier: 0 },
+  ],
+  expReward: 17,
+  goldReward: 9,
+  scale: 1.3,
+  bodyColor: [0.3, 0.2, 0.4],
+};
