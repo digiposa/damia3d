@@ -73,6 +73,10 @@ multiplicateur de dégâts.
 
 > **Double Slash** (initiale de Dart) : 1 press, jamais contrée — Hit 1 auto +
 > un seul carré à valider pour le « Double ». Parfait = 150 % × multiplicateur.
+>
+> **Volcano** (apprise au niveau 2 de Dart) : 3 presses (4 hits), parfait
+> 200 %. Les Additions débloquées s'équipent via le bouton **⚔ Addition** (hors
+> Addition en cours, comme dans LoD).
 
 Dans **Training** (arène) : on fait apparaître des Knights of Sandora **un par
 un** via le bouton **🛡 Spawn Knight**. Ils poursuivent Dart et ripostent ;

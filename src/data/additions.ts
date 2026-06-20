@@ -13,6 +13,8 @@ export interface AdditionDef {
   multiplier: [number, number, number, number, number];
   /** SP awarded at max level for a perfect performance (Dragoon gauge). */
   spMax: number;
+  /** Dart level at which the Addition is learned (Blazing Dynamo has a special quest condition). */
+  acquireLevel: number;
 }
 
 export const DART_ADDITIONS = {
@@ -21,44 +23,63 @@ export const DART_ADDITIONS = {
     hits: [100, 50],
     multiplier: [100, 105, 110, 120, 135],
     spMax: 35,
+    acquireLevel: 1,
   },
   volcano: {
     name: "Volcano",
     hits: [50, 50, 50, 50],
     multiplier: [100, 105, 110, 115, 125],
     spMax: 36,
+    acquireLevel: 2,
   },
   burningRush: {
     name: "Burning Rush",
     hits: [50, 50, 50],
     multiplier: [100, 100, 100, 100, 100],
     spMax: 102,
+    acquireLevel: 8,
   },
   crushDance: {
     name: "Crush Dance",
     hits: [30, 30, 30, 30, 30],
     multiplier: [100, 115, 130, 145, 167],
     spMax: 100,
+    acquireLevel: 15,
   },
   madnessHero: {
     name: "Madness Hero",
     hits: [20, 20, 20, 20, 10, 10],
     multiplier: [100, 100, 100, 100, 100],
     spMax: 204,
+    acquireLevel: 22,
   },
   moonStrike: {
     name: "Moon Strike",
     hits: [30, 30, 30, 30, 30, 30, 20],
     multiplier: [100, 120, 140, 160, 175],
     spMax: 20,
+    acquireLevel: 29,
   },
   blazingDynamo: {
     name: "Blazing Dynamo",
     hits: [40, 30, 30, 30, 30, 30, 30, 30],
     multiplier: [100, 120, 140, 160, 180],
     spMax: 150,
+    // Real condition: perform all prior Additions 80 times. Gated high for now.
+    acquireLevel: 99,
   },
 } satisfies Record<string, AdditionDef>;
+
+/** Dart's Additions in acquisition order. */
+export const DART_ADDITION_LIST: AdditionDef[] = [
+  DART_ADDITIONS.doubleSlash,
+  DART_ADDITIONS.volcano,
+  DART_ADDITIONS.burningRush,
+  DART_ADDITIONS.crushDance,
+  DART_ADDITIONS.madnessHero,
+  DART_ADDITIONS.moonStrike,
+  DART_ADDITIONS.blazingDynamo,
+];
 
 /**
  * Number of timed button presses an Addition needs. Hit 1 is free (the Attack

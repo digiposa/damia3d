@@ -13,7 +13,12 @@ import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
 import { Enemy } from "../entities/Enemy";
 import { KNIGHT_OF_SANDORA } from "../data/enemies";
-import { additionHitsPercent, additionMultiplier, additionPresses } from "../data/additions";
+import {
+  additionHitsPercent,
+  additionMultiplier,
+  additionPresses,
+  DART_ADDITION_LIST,
+} from "../data/additions";
 import { additionAttack, enemyPhysicalAttack } from "../combat/formula";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { DebugOverlay } from "../ui/DebugOverlay";
@@ -42,6 +47,7 @@ export class TrainingMode extends GameMode {
   private hud!: PlayerHud;
   private sight!: TimingSight;
   private spawnBtn!: Button;
+  private additionBtn!: Button;
   private attackBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
@@ -78,6 +84,11 @@ export class TrainingMode extends GameMode {
       label: "🛡 Spawn Knight",
       onClick: () => this.spawnKnight(),
       style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)", left: "50%", transform: "translateX(-50%)" },
+    });
+    this.additionBtn = new Button({
+      label: "⚔ Addition",
+      onClick: () => this.cycleAddition(),
+      style: { top: "calc(env(safe-area-inset-top, 0px) + 58px)", left: "50%", transform: "translateX(-50%)" },
     });
     // Touch devices attack with the ⚔ button; desktop attacks by clicking.
     if (hasTouch()) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
@@ -309,6 +320,25 @@ export class TrainingMode extends GameMode {
     enemy.dispose();
   }
 
+  /** Equip the next unlocked Addition (not allowed mid-Addition, like LoD). */
+  private cycleAddition(): void {
+    if (this.runner.active) {
+      this.log = "Impossible de changer d'Addition pendant une Addition";
+      return;
+    }
+    const list = this.player.unlockedAdditions();
+    if (list.length <= 1) {
+      const next = DART_ADDITION_LIST.find((a) => a.acquireLevel > this.player.level);
+      this.log = next
+        ? `${next.name} se débloque au niveau ${next.acquireLevel}`
+        : "Aucune autre Addition disponible";
+      return;
+    }
+    const i = list.indexOf(this.player.addition);
+    this.player.addition = list[(i + 1) % list.length];
+    this.log = `Addition équipée : ${this.player.addition.name}`;
+  }
+
   private spawnKnight(): void {
     const angle = Math.random() * Math.PI * 2;
     const r = 5 + Math.random() * 2;
@@ -332,6 +362,7 @@ export class TrainingMode extends GameMode {
 
     const s = this.player.stats;
     const eq = this.player.addition;
+    this.additionBtn.setLabel(`⚔ ${eq.name} (Lv ${this.player.additionLevel(eq)}) ▸`);
     this.overlay.set({
       mode: this.name,
       fps: String(Math.round(this.scene.getEngine().getFps())),
@@ -353,6 +384,7 @@ export class TrainingMode extends GameMode {
     this.hud.dispose();
     this.sight.dispose();
     this.spawnBtn.dispose();
+    this.additionBtn.dispose();
     this.attackBtn?.dispose();
   }
 }

@@ -6,7 +6,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
-import { DART_ADDITIONS, type AdditionDef } from "../data/additions";
+import { DART_ADDITIONS, DART_ADDITION_LIST, type AdditionDef } from "../data/additions";
 
 const SPEED = 6; // world units per second
 
@@ -94,6 +94,11 @@ export class Player {
   face(dir: Vector3): void {
     if (dir.lengthSquared() < 1e-4) return;
     this.root.rotation.y = Math.atan2(dir.x, dir.z);
+  }
+
+  /** Additions Dart has learned at his current level, in acquisition order. */
+  unlockedAdditions(): AdditionDef[] {
+    return DART_ADDITION_LIST.filter((a) => a.acquireLevel <= this.level);
   }
 
   /** Current level (1–5) of an Addition: +1 every 20 successful performances. */
