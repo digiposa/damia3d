@@ -75,8 +75,9 @@ multiplicateur de dégâts.
 > un seul carré à valider pour le « Double ». Parfait = 150 % × multiplicateur.
 >
 > **Volcano** (apprise au niveau 2 de Dart) : 3 presses (4 hits), parfait
-> 200 %. Les Additions débloquées s'équipent via le bouton **⚔ Addition** (hors
-> Addition en cours, comme dans LoD).
+> 200 %. L'Addition équipée s'affiche dans la barre de stats (chip cliquable) ;
+> cliquer ouvre le **menu Additions** (en pause) pour en équiper une autre parmi
+> les débloquées — comme dans LoD, on ne change pas d'Addition en pleine action.
 
 Dans **Training** (arène) : un bouton **🐾** (sous l'engrenage ⚙) ouvre un **menu
 de spawn** qui **met le jeu en pause** (comme les Options) ; on y fait apparaître
@@ -134,6 +135,7 @@ src/
     MainMenu.ts        écran-titre / sélection de mode
     OptionsMenu.ts     menu pause : son, vitesse de combat, retour au menu
     SpawnMenu.ts       menu de spawn d'ennemis (Training, met en pause)
+    AdditionsMenu.ts   menu d'équipement d'Addition (en pause)
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)

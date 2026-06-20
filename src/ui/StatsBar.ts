@@ -11,6 +11,8 @@ export interface StatsView {
   exp: number;
   nextExp: number;
   gold: number;
+  additionName: string;
+  additionLevel: number;
 }
 
 interface Gauge {
@@ -34,8 +36,9 @@ export class StatsBar {
   private mp: Gauge;
   private goldEl: HTMLDivElement;
   private expEl: HTMLDivElement;
+  private addition: HTMLDivElement;
 
-  constructor() {
+  constructor(onAddition?: () => void) {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "fixed",
@@ -132,7 +135,37 @@ export class StatsBar {
     this.expEl = document.createElement("div");
     line.append(this.goldEl, this.expEl);
 
-    col.append(this.hp.text.parentElement!, this.sp.text.parentElement!, this.mp.text.parentElement!, line);
+    // Equipped-Addition chip — the access point to the Additions menu (clickable
+    // even though the rest of the bar ignores pointer events).
+    this.addition = document.createElement("div");
+    Object.assign(this.addition.style, {
+      marginTop: "2px",
+      font: "700 11px/1.2 system-ui, sans-serif",
+      color: "#cfe3ff",
+      background: "rgba(40,55,85,0.75)",
+      border: "1px solid rgba(120,150,200,0.45)",
+      borderRadius: "6px",
+      padding: "5px 8px",
+      textAlign: "center",
+      cursor: "pointer",
+      pointerEvents: "auto",
+      touchAction: "manipulation",
+    } satisfies Partial<CSSStyleDeclaration>);
+    this.addition.style.setProperty("-webkit-tap-highlight-color", "transparent");
+    if (onAddition) {
+      this.addition.addEventListener("pointerup", (e) => {
+        e.preventDefault();
+        onAddition();
+      });
+    }
+
+    col.append(
+      this.hp.text.parentElement!,
+      this.sp.text.parentElement!,
+      this.mp.text.parentElement!,
+      line,
+      this.addition,
+    );
     this.root.append(this.portrait, col);
     document.body.appendChild(this.root);
   }
@@ -145,6 +178,7 @@ export class StatsBar {
     fill(this.mp, v.mp, v.maxMp, "MP");
     this.goldEl.textContent = `${v.gold} G`;
     this.expEl.textContent = `EXP ${v.exp} / ${v.nextExp}`;
+    this.addition.textContent = `⚔ ${v.additionName}  Lv ${v.additionLevel} ▸`;
   }
 
   dispose(): void {

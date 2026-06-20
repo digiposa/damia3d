@@ -28,6 +28,7 @@ import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
 import { SpawnMenu } from "../ui/SpawnMenu";
+import { AdditionsMenu, type AdditionEntry } from "../ui/AdditionsMenu";
 import { floatingText } from "../ui/FloatingText";
 
 /** Display name of the party leader (the project's 2D protagonist). */
@@ -54,7 +55,7 @@ export class TrainingMode extends GameMode {
   private sight!: TimingSight;
   private spawnOpenBtn!: Button;
   private spawnMenu!: SpawnMenu;
-  private additionBtn!: Button;
+  private additionsMenu!: AdditionsMenu;
   private attackBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
@@ -88,7 +89,8 @@ export class TrainingMode extends GameMode {
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
     this.tech = new TechOverlay();
-    this.stats = new StatsBar();
+    // The equipped-Addition chip in the stats bar opens the Additions menu.
+    this.stats = new StatsBar(() => this.openAdditionsMenu());
     this.sight = new TimingSight();
 
     // Spawn menu (Training only), opened from a button just below the gear (⚙).
@@ -96,6 +98,10 @@ export class TrainingMode extends GameMode {
       onKnight: () => this.spawnKnight(),
       onCommander: () => this.spawnCommander(),
       onResume: () => this.closeSpawnMenu(),
+    });
+    this.additionsMenu = new AdditionsMenu({
+      onEquip: (def) => this.equipAddition(def),
+      onResume: () => this.closeAdditionsMenu(),
     });
     this.spawnOpenBtn = new Button({
       label: "🐾",
@@ -106,11 +112,6 @@ export class TrainingMode extends GameMode {
         font: "600 18px/1 system-ui, sans-serif",
         padding: "10px 14px",
       },
-    });
-    this.additionBtn = new Button({
-      label: "⚔ Addition",
-      onClick: () => this.cycleAddition(),
-      style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)", left: "50%", transform: "translateX(-50%)" },
     });
     // Touch devices attack with the ⚔ button; desktop attacks by clicking.
     if (hasTouch()) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
@@ -375,23 +376,33 @@ export class TrainingMode extends GameMode {
     enemy.dispose();
   }
 
-  /** Equip the next unlocked Addition (not allowed mid-Addition, like LoD). */
-  private cycleAddition(): void {
-    if (this.runner.active) {
-      this.log = "Impossible de changer d'Addition pendant une Addition";
-      return;
-    }
-    const list = this.player.unlockedAdditions();
-    if (list.length <= 1) {
-      const next = DART_ADDITION_LIST.find((a) => a.acquireLevel > this.player.level);
-      this.log = next
-        ? `${next.name} se débloque au niveau ${next.acquireLevel}`
-        : "Aucune autre Addition disponible";
-      return;
-    }
-    const i = list.indexOf(this.player.addition);
-    this.player.addition = list[(i + 1) % list.length];
-    this.log = `Addition équipée : ${this.player.addition.name}`;
+  private openAdditionsMenu(): void {
+    this.paused = true;
+    this.spawnOpenBtn.setVisible(false);
+    this.additionsMenu.show(this.additionEntries());
+  }
+
+  private closeAdditionsMenu(): void {
+    this.additionsMenu.hide();
+    this.spawnOpenBtn.setVisible(true);
+    this.paused = false;
+  }
+
+  private equipAddition(def: (typeof DART_ADDITION_LIST)[number]): void {
+    this.player.addition = def;
+    this.log = `Addition équipée : ${def.name}`;
+    this.additionsMenu.show(this.additionEntries()); // re-render to move the highlight
+  }
+
+  /** Build the Additions-menu rows from the player's unlock/level state. */
+  private additionEntries(): AdditionEntry[] {
+    const unlocked = this.player.unlockedAdditions();
+    return DART_ADDITION_LIST.map((def) => ({
+      def,
+      unlocked: unlocked.includes(def),
+      level: this.player.additionLevel(def),
+      equipped: this.player.addition === def,
+    }));
   }
 
   private spawnKnight(): void {
@@ -423,6 +434,7 @@ export class TrainingMode extends GameMode {
 
   private refreshHud(): void {
     const p = this.player;
+    const eq = p.addition;
     this.stats.set({
       name: HERO_NAME,
       level: p.level,
@@ -435,10 +447,9 @@ export class TrainingMode extends GameMode {
       exp: p.exp,
       nextExp: dartNextLevelExp(p.level),
       gold: p.gold,
+      additionName: eq.name,
+      additionLevel: p.additionLevel(eq),
     });
-
-    const eq = p.addition;
-    this.additionBtn.setLabel(`⚔ ${eq.name} (Lv ${p.additionLevel(eq)}) ▸`);
 
     const run = this.runner.current;
     const combo = run
@@ -462,8 +473,8 @@ export class TrainingMode extends GameMode {
     this.stats.dispose();
     this.sight.dispose();
     this.spawnMenu.dispose();
+    this.additionsMenu.dispose();
     this.spawnOpenBtn.dispose();
-    this.additionBtn.dispose();
     this.attackBtn?.dispose();
   }
 }
