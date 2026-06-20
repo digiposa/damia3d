@@ -21,12 +21,16 @@ import {
 } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { AdditionRunner } from "../combat/AdditionRunner";
-import { DebugOverlay } from "../ui/DebugOverlay";
+import { dartNextLevelExp } from "../data/dart";
+import { TechOverlay } from "../ui/TechOverlay";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
-import { PlayerHud } from "../ui/PlayerHud";
+import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
 import { floatingText } from "../ui/FloatingText";
+
+/** Display name of the party leader (the project's 2D protagonist). */
+const HERO_NAME = "Damia";
 
 /** How close Dart must be to land a combo hit on an enemy. */
 const PLAYER_REACH = 2.3;
@@ -43,8 +47,8 @@ export class TrainingMode extends GameMode {
 
   private camera!: IsoCamera;
   private player!: Player;
-  private overlay!: DebugOverlay;
-  private hud!: PlayerHud;
+  private tech!: TechOverlay;
+  private stats!: StatsBar;
   private sight!: TimingSight;
   private spawnBtn!: Button;
   private commanderBtn!: Button;
@@ -78,8 +82,8 @@ export class TrainingMode extends GameMode {
     this.player = new Player(this.scene, new Vector3(0, 0, 0));
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
-    this.overlay = new DebugOverlay();
-    this.hud = new PlayerHud();
+    this.tech = new TechOverlay();
+    this.stats = new StatsBar();
     this.sight = new TimingSight();
     this.spawnBtn = new Button({
       label: "🛡 Spawn Knight",
@@ -249,7 +253,8 @@ export class TrainingMode extends GameMode {
 
     this.applyHit(target, res.hits);
     // SP accrues per landed input (hit 1 is free); award an even share of spMax.
-    this.player.sp += Math.floor(add.spMax / additionPresses(add));
+    const share = Math.floor(add.spMax / additionPresses(add));
+    this.player.sp = Math.min(this.player.maxSp, this.player.sp + share);
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), "PERFECT", "#ffffff");
     if (res.completed) {
       this.player.recordAddition(add);
@@ -277,7 +282,8 @@ export class TrainingMode extends GameMode {
 
     if (!target.alive) {
       this.player.gainExp(target.def.expReward);
-      this.log = `${target.def.name} vaincu · +${target.def.expReward} EXP`;
+      this.player.gold += target.def.goldReward;
+      this.log = `${target.def.name} vaincu · +${target.def.expReward} EXP · +${target.def.goldReward} G`;
       this.removeEnemy(target);
       this.runner.cancel();
       this.comboTarget = undefined;
@@ -386,26 +392,35 @@ export class TrainingMode extends GameMode {
   }
 
   private refreshHud(): void {
-    const add = this.runner.current;
-    const combo = add
-      ? `${add.name}  ${this.runner.hits}/${add.hits.length}` +
-        (this.runner.inWindow ? "  ▸ APPUIE !" : "")
-      : "";
-    this.hud.set(this.player.hp, this.player.stats.maxHp, combo);
+    const p = this.player;
+    this.stats.set({
+      name: HERO_NAME,
+      level: p.level,
+      hp: p.hp,
+      maxHp: p.stats.maxHp,
+      sp: p.sp,
+      maxSp: p.maxSp,
+      mp: p.mp,
+      maxMp: p.maxMp,
+      exp: p.exp,
+      nextExp: dartNextLevelExp(p.level),
+      gold: p.gold,
+    });
 
-    const s = this.player.stats;
-    const eq = this.player.addition;
-    this.additionBtn.setLabel(`⚔ ${eq.name} (Lv ${this.player.additionLevel(eq)}) ▸`);
-    this.overlay.set({
-      mode: this.name,
-      fps: String(Math.round(this.scene.getEngine().getFps())),
-      speed: `${settings.combatSpeed}× combat`,
-      "—": "—",
-      Dart: `LV ${this.player.level}  EXP ${this.player.exp}  SP ${this.player.sp}`,
-      stats: `AT ${s.at} DF ${s.df} MAT ${s.mat} MDF ${s.mdf}`,
-      addition: `${eq.name} (Lv ${this.player.additionLevel(eq)})`,
-      enemies: String(this.enemies.length),
-      log: this.log,
+    const eq = p.addition;
+    this.additionBtn.setLabel(`⚔ ${eq.name} (Lv ${p.additionLevel(eq)}) ▸`);
+
+    const run = this.runner.current;
+    const combo = run
+      ? `${run.name} ${this.runner.hits}/${run.hits.length}${this.runner.inWindow ? " ▸ APPUIE !" : ""}`
+      : this.log;
+    const engine = this.scene.getEngine();
+    this.tech.set({
+      fps: Math.round(engine.getFps()),
+      engine: (engine as { isWebGPU?: boolean }).isWebGPU ? "WebGPU" : "WebGL2",
+      build: __COMMIT__,
+      mode: `${this.name} · ${this.enemies.length} ennemi(s) · ${settings.combatSpeed}× combat`,
+      info: combo,
     });
   }
 
@@ -413,8 +428,8 @@ export class TrainingMode extends GameMode {
     this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
-    this.overlay.dispose();
-    this.hud.dispose();
+    this.tech.dispose();
+    this.stats.dispose();
     this.sight.dispose();
     this.spawnBtn.dispose();
     this.commanderBtn.dispose();

@@ -29,6 +29,13 @@ export class Player {
 
   /** Dragoon Spirit Points accumulated from landing Addition hits. */
   sp = 0;
+  /** SP gauge cap (one Dragoon level early on; rises later). */
+  readonly maxSp = 100;
+  /** Magic points (placeholder — Dart uses items/SP in LoD; tune later). */
+  mp = 0;
+  readonly maxMp = 60;
+  /** Gold carried (awarded from defeated enemies). */
+  gold = 0;
 
   /** Successful performances per Addition (drives leveling: 20 each, up to Lv 5). */
   private additionPerf = new Map<string, number>();

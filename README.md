@@ -135,18 +135,17 @@ src/
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)
-    PlayerHud.ts       barre de vie + indicateur de combo
+    StatsBar.ts        barre de stats (portrait, LV, HP/SP/MP, Gold, EXP)
+    TechOverlay.ts     petit encadré technique (FPS · moteur · build, mode, combat)
     TimingSight.ts     carré de visée des Additions (timing LoD)
     FloatingText.ts    nombres de dégâts flottants
-    DebugOverlay.ts    HUD debug (FPS, vitesse, stats Dart)
-    VersionTag.ts      hash du commit déployé (coin bas-droite)
 ```
 
 ## Déploiement
 
 Chaque push sur `main` build et déploie automatiquement sur **GitHub Pages**
 via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Le hash du
-commit déployé est injecté au build et affiché discrètement en jeu (coin
-inférieur droit).
+commit déployé est injecté au build et affiché dans l'overlay technique en jeu
+(FPS · moteur · build).
 
 URL : `https://digiposa.github.io/damia3d/`

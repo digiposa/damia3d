@@ -91,3 +91,9 @@ export function dartLevelForExp(exp: number): number {
   }
   return level;
 }
+
+/** Cumulative EXP needed to reach the next level (capped at the max level). */
+export function dartNextLevelExp(level: number): number {
+  if (level >= DART_MAX_LEVEL) return DART_LEVELS[DART_MAX_LEVEL - 1].exp;
+  return DART_LEVELS[level].exp; // row index `level` is the (level+1)th entry
+}
