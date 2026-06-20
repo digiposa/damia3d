@@ -27,6 +27,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
+import { SpawnMenu } from "../ui/SpawnMenu";
 import { floatingText } from "../ui/FloatingText";
 
 /** Display name of the party leader (the project's 2D protagonist). */
@@ -38,9 +39,10 @@ const PLAYER_REACH = 2.3;
 /**
  * Training arena: a Diablo-style real-time hack-and-slash sandbox with
  * LoD-faithful attacks. Desktop uses click-to-move (click an enemy to approach
- * and strike it); mobile uses the joystick. Knights of Sandora are spawned one
- * at a time from a button. Attacks chain the equipped Addition as a timed combo
- * (see {@link AdditionRunner}); per-hit damage comes from the LoD formula.
+ * and strike it); mobile uses the joystick. Enemies are spawned from a pausing
+ * spawn menu (opened below the gear). Attacks chain the equipped Addition as a
+ * timed combo (see {@link AdditionRunner}); per-hit damage comes from the LoD
+ * formula.
  */
 export class TrainingMode extends GameMode {
   readonly name = "Training";
@@ -50,14 +52,17 @@ export class TrainingMode extends GameMode {
   private tech!: TechOverlay;
   private stats!: StatsBar;
   private sight!: TimingSight;
-  private spawnBtn!: Button;
-  private commanderBtn!: Button;
+  private spawnOpenBtn!: Button;
+  private spawnMenu!: SpawnMenu;
   private additionBtn!: Button;
   private attackBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
+
+  /** True while the spawn menu is open — pauses gameplay like the Options menu. */
+  private paused = false;
 
   // Click-to-move intent (desktop).
   private moveTarget?: Vector3;
@@ -85,20 +90,27 @@ export class TrainingMode extends GameMode {
     this.tech = new TechOverlay();
     this.stats = new StatsBar();
     this.sight = new TimingSight();
-    this.spawnBtn = new Button({
-      label: "🛡 Spawn Knight",
-      onClick: () => this.spawnKnight(),
-      style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)", left: "50%", transform: "translateX(-50%)" },
+
+    // Spawn menu (Training only), opened from a button just below the gear (⚙).
+    this.spawnMenu = new SpawnMenu({
+      onKnight: () => this.spawnKnight(),
+      onCommander: () => this.spawnCommander(),
+      onResume: () => this.closeSpawnMenu(),
     });
-    this.commanderBtn = new Button({
-      label: "👑 Spawn Commander",
-      onClick: () => this.spawnCommander(),
-      style: { top: "calc(env(safe-area-inset-top, 0px) + 58px)", left: "50%", transform: "translateX(-50%)" },
+    this.spawnOpenBtn = new Button({
+      label: "🐾",
+      onClick: () => this.openSpawnMenu(),
+      style: {
+        top: "calc(env(safe-area-inset-top, 0px) + 58px)",
+        right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+        font: "600 18px/1 system-ui, sans-serif",
+        padding: "10px 14px",
+      },
     });
     this.additionBtn = new Button({
       label: "⚔ Addition",
       onClick: () => this.cycleAddition(),
-      style: { top: "calc(env(safe-area-inset-top, 0px) + 106px)", left: "50%", transform: "translateX(-50%)" },
+      style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)", left: "50%", transform: "translateX(-50%)" },
     });
     // Touch devices attack with the ⚔ button; desktop attacks by clicking.
     if (hasTouch()) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
@@ -109,7 +121,23 @@ export class TrainingMode extends GameMode {
     this.spawnKnight();
   }
 
+  private openSpawnMenu(): void {
+    this.paused = true;
+    this.spawnOpenBtn.setVisible(false);
+    this.spawnMenu.show();
+  }
+
+  private closeSpawnMenu(): void {
+    this.spawnMenu.hide();
+    this.spawnOpenBtn.setVisible(true);
+    this.paused = false;
+  }
+
   update(dt: number): void {
+    // Spawn menu open: gameplay is paused (the HUD keeps its last state).
+    // Game's render loop still calls input.endFrame() after this returns.
+    if (this.paused) return;
+
     // Movement (unaffected by combat speed): joystick on touch, click-to-move otherwise.
     const axis = this.input.axis();
     if (axis.x !== 0 || axis.y !== 0) {
@@ -371,12 +399,14 @@ export class TrainingMode extends GameMode {
     this.log = `Knight of Sandora apparu (${this.enemies.length} en jeu)`;
   }
 
-  /** Spawn the scripted Seles boss formation: two Knights escorting the Commander. */
+  /**
+   * Spawn the Commander boss on its own. (Its Power Up still triggers if Knights
+   * are present and then defeated — spawn some alongside to see the scripted
+   * Seles behaviour.)
+   */
   private spawnCommander(): void {
-    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
-    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
     this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
-    this.log = "Commander (Seles) + 2 Knights ! Battez les Knights → Power Up";
+    this.log = "Commander (Seles) apparu";
   }
 
   /** A random spawn position on a ring around the player. */
@@ -431,8 +461,8 @@ export class TrainingMode extends GameMode {
     this.tech.dispose();
     this.stats.dispose();
     this.sight.dispose();
-    this.spawnBtn.dispose();
-    this.commanderBtn.dispose();
+    this.spawnMenu.dispose();
+    this.spawnOpenBtn.dispose();
     this.additionBtn.dispose();
     this.attackBtn?.dispose();
   }

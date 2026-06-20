@@ -78,12 +78,12 @@ multiplicateur de dégâts.
 > 200 %. Les Additions débloquées s'équipent via le bouton **⚔ Addition** (hors
 > Addition en cours, comme dans LoD).
 
-Dans **Training** (arène) : on fait apparaître des Knights of Sandora **un par
-un** via **🛡 Spawn Knight**, ou la **formation scriptée de Seles** (2 Knights +
-Commander) via **👑 Spawn Commander**. Les ennemis poursuivent Dart et ripostent
-(physique ou magie) ; vaincre un ennemi octroie de l'EXP. Barres de vie
-flottantes et nombres de dégâts à l'écran. La **vitesse de combat** (Options)
-accélère l'IA, la cadence et les fenêtres de timing — sans toucher au
+Dans **Training** (arène) : un bouton **🐾** (sous l'engrenage ⚙) ouvre un **menu
+de spawn** qui **met le jeu en pause** (comme les Options) ; on y fait apparaître
+un **Knight of Sandora** ou le **Commander** (boss). Les ennemis poursuivent Dart
+et ripostent (physique ou magie) ; vaincre un ennemi octroie EXP et Gold. Barres
+de vie flottantes et nombres de dégâts à l'écran. La **vitesse de combat**
+(Options) accélère l'IA, la cadence et les fenêtres de timing — sans toucher au
 déplacement.
 
 ### Boss : Commander (Seles)
@@ -92,7 +92,8 @@ Premier boss, fidèle au wiki : élément **Ténèbres**, alterne **Sword Slash*
 **Burn Out** (magie Feu, formule `enemyMagicalAttack`), **se soigne** de 30 %
 sous 51 % de PV, et déclenche **Power Up** (usage unique) une fois ses **Knights
 escortes vaincus** — Sword Slash devient **Slash Twice** (2×) et Burn Out passe à
-1.5×. Rendu de boss distinct (plus grand, couronne, barre de vie + nom).
+1.5×. Pour voir le Power Up, faites aussi apparaître quelques Knights avant de
+les battre. Rendu de boss distinct (plus grand, couronne, barre de vie + nom).
 
 ## Architecture
 
@@ -132,6 +133,7 @@ src/
   ui/
     MainMenu.ts        écran-titre / sélection de mode
     OptionsMenu.ts     menu pause : son, vitesse de combat, retour au menu
+    SpawnMenu.ts       menu de spawn d'ennemis (Training, met en pause)
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)
