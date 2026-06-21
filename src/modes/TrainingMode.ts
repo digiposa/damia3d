@@ -25,7 +25,6 @@ import { AdditionRunner } from "../combat/AdditionRunner";
 import { dartNextLevelExp } from "../data/dart";
 import { t } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry } from "../core/menu";
-import { TechOverlay } from "../ui/TechOverlay";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
@@ -52,7 +51,6 @@ export class TrainingMode extends GameMode {
 
   private camera!: IsoCamera;
   private player!: Player;
-  private tech!: TechOverlay;
   private stats!: StatsBar;
   private sight!: TimingSight;
   private spawnOpenBtn!: Button;
@@ -89,7 +87,6 @@ export class TrainingMode extends GameMode {
     this.player = new Player(this.scene, new Vector3(0, 0, 0));
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
-    this.tech = new TechOverlay();
     // The equipped-Addition chip in the stats bar opens the System menu.
     this.stats = new StatsBar(() => this.host.openSystemMenu());
     this.sight = new TimingSight();
@@ -470,25 +467,18 @@ export class TrainingMode extends GameMode {
     const combo = run
       ? `${run.name} ${this.runner.hits}/${run.hits.length}${this.runner.inWindow ? "  " + t("combat.press") : ""}`
       : this.log;
-    const engine = this.scene.getEngine();
-    this.tech.set({
-      fps: Math.round(engine.getFps()),
-      engine: (engine as { isWebGPU?: boolean }).isWebGPU ? "WebGPU" : "WebGL2",
-      build: __COMMIT__,
-      mode: t("tech.mode", {
-        mode: this.name,
-        n: this.enemies.length,
-        speed: settings.combatSpeed,
-      }),
-      info: combo,
+    const modeLine = t("tech.mode", {
+      mode: this.name,
+      n: this.enemies.length,
+      speed: settings.combatSpeed,
     });
+    this.host.setStatus(combo ? `${modeLine}  ·  ${combo}` : modeLine);
   }
 
   dispose(): void {
     this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
-    this.tech.dispose();
     this.stats.dispose();
     this.sight.dispose();
     this.spawnMenu.dispose();

@@ -1,57 +1,59 @@
-export interface TechView {
-  fps: number;
-  /** Render backend, e.g. "WebGL2" / "WebGPU". */
-  engine: string;
-  /** Deployed build hash. */
-  build: string;
-  /** Active mode name. */
-  mode: string;
-  /** Free-form combat / status line (combo state, last event…). */
-  info: string;
-}
-
 /**
- * Small, separate technical overlay: FPS · backend · build on one line, then the
- * active mode and a combat/status line. Kept compact and out of the way; the
- * player-facing numbers live in the StatsBar.
+ * Small, always-on technical overlay pinned to the very top of the screen:
+ * "fps · backend · build" on the first line (set by the Game every frame), and
+ * an optional mode / combat status line the active mode pushes. Discreet and
+ * non-interactive so it stays out of the way everywhere.
  */
 export class TechOverlay {
   private el: HTMLDivElement;
   private head: HTMLDivElement;
-  private mode: HTMLDivElement;
-  private info: HTMLDivElement;
+  private status: HTMLDivElement;
 
   constructor() {
     this.el = document.createElement("div");
     Object.assign(this.el.style, {
       position: "fixed",
-      top: "calc(env(safe-area-inset-top, 0px) + 120px)",
-      left: "calc(env(safe-area-inset-left, 0px) + 8px)",
-      padding: "5px 8px",
-      borderRadius: "6px",
-      background: "rgba(8,11,17,0.6)",
-      border: "1px solid rgba(120,150,200,0.22)",
-      font: "11px/1.5 ui-monospace, monospace",
-      color: "#9fb3d6",
-      pointerEvents: "none",
+      top: "calc(env(safe-area-inset-top, 0px) + 4px)",
+      left: "50%",
+      transform: "translateX(-50%)",
+      maxWidth: "92vw",
+      padding: "3px 9px",
+      borderRadius: "7px",
+      background: "rgba(0,0,0,0.4)",
+      textAlign: "center",
       whiteSpace: "nowrap",
-      zIndex: "12",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      pointerEvents: "none",
+      zIndex: "50",
     } satisfies Partial<CSSStyleDeclaration>);
 
     this.head = document.createElement("div");
-    this.mode = document.createElement("div");
-    this.mode.style.color = "#cfe3ff";
-    this.info = document.createElement("div");
-    this.info.style.color = "#ffe08a";
-    this.el.append(this.head, this.mode, this.info);
+    Object.assign(this.head.style, {
+      font: "10px/1.4 ui-monospace, monospace",
+      color: "rgba(185,205,235,0.7)",
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    this.status = document.createElement("div");
+    Object.assign(this.status.style, {
+      font: "10px/1.4 ui-monospace, monospace",
+      color: "rgba(255,224,138,0.85)",
+      display: "none",
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    this.el.append(this.head, this.status);
     document.body.appendChild(this.el);
   }
 
-  set(v: TechView): void {
-    this.head.textContent = `${v.fps} fps · ${v.engine} · ${v.build}`;
-    this.mode.textContent = v.mode;
-    this.info.textContent = v.info;
-    this.info.style.display = v.info ? "block" : "none";
+  /** Update the always-on line (fps · backend · build). */
+  setHead(fps: number, engine: string, build: string): void {
+    this.head.textContent = `${fps} fps · ${engine} · ${build}`;
+  }
+
+  /** Set the optional mode/combat status line (empty hides it). */
+  setStatus(text: string): void {
+    this.status.textContent = text;
+    this.status.style.display = text ? "block" : "none";
   }
 
   dispose(): void {

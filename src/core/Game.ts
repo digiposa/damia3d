@@ -10,6 +10,7 @@ import { SurvivalMode } from "../modes/SurvivalMode";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
 import { MainMenu, type ModeId } from "../ui/MainMenu";
 import { SystemMenu } from "../ui/SystemMenu";
+import { TechOverlay } from "../ui/TechOverlay";
 import { Button } from "../ui/Button";
 
 /**
@@ -26,6 +27,7 @@ export class Game implements GameHost {
   private menu: MainMenu;
   private system: SystemMenu;
   private systemBtn: Button;
+  private tech: TechOverlay;
   private paused = false;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -39,6 +41,7 @@ export class Game implements GameHost {
     this.input = new Input();
     this.modes = new ModeManager(this.engine, this.input, this);
 
+    this.tech = new TechOverlay();
     if (hasTouch()) this.joystick = new VirtualJoystick(this.input);
     this.menu = new MainMenu((mode) => this.startMode(mode));
     this.system = new SystemMenu({
@@ -72,15 +75,26 @@ export class Game implements GameHost {
     this.engine.runRenderLoop(() => {
       const dt = this.engine.getDeltaTime() / 1000;
       if (!this.paused) this.modes.update(dt);
+      this.tech.setHead(
+        Math.round(this.engine.getFps()),
+        (this.engine as { isWebGPU?: boolean }).isWebGPU ? "WebGPU" : "WebGL2",
+        __COMMIT__,
+      );
       this.input.endFrame();
       this.modes.currentScene?.render();
     });
+  }
+
+  /** GameHost: push the active mode's status line to the tech overlay. */
+  setStatus(text: string): void {
+    this.tech.setStatus(text);
   }
 
   /** Show the title screen, tearing down any running mode. */
   private openMainMenu(): void {
     this.system.hide();
     this.modes.clear();
+    this.tech.setStatus(""); // no mode running at the title
     this.paused = true;
     this.systemBtn.setVisible(true); // gear stays available on the title screen (Config only)
     this.joystick?.setVisible(false);
