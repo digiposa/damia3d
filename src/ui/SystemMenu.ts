@@ -41,6 +41,8 @@ export class SystemMenu {
   private content: HTMLDivElement;
   private section: Section = "status";
   private compact = hasTouch();
+  /** When opened from the title screen there is no mode: Config only, no "Main menu". */
+  private atMainMenu = false;
 
   constructor(private cb: SystemMenuCallbacks) {
     this.root = document.createElement("div");
@@ -100,7 +102,8 @@ export class SystemMenu {
     return this.root.style.display !== "none";
   }
 
-  show(): void {
+  show(atMainMenu = false): void {
+    this.atMainMenu = atMainMenu;
     this.root.style.display = "flex";
     this.render();
   }
@@ -116,8 +119,12 @@ export class SystemMenu {
   // --- Rendering ------------------------------------------------------------
 
   private render(): void {
-    this.renderNav();
     const data = this.cb.data();
+    // Character tabs only exist once a mode has player state; otherwise Config only.
+    const available = data ? SECTIONS : SECTIONS.filter((s) => s.id === "config");
+    if (!available.some((s) => s.id === this.section)) this.section = available[0].id;
+
+    this.renderNav(available);
     this.content.replaceChildren(
       this.section === "config"
         ? this.renderConfig()
@@ -129,8 +136,8 @@ export class SystemMenu {
     );
   }
 
-  private renderNav(): void {
-    const items: HTMLElement[] = SECTIONS.map((s) =>
+  private renderNav(available: typeof SECTIONS): void {
+    const items: HTMLElement[] = available.map((s) =>
       navButton(s.icon, t(s.labelKey), this.compact, () => {
         this.section = s.id;
         this.render();
@@ -139,12 +146,15 @@ export class SystemMenu {
 
     const spacer = document.createElement("div");
     spacer.style.flex = "1";
-
     items.push(
       spacer,
       navButton("▶", t("common.resume"), this.compact, () => this.cb.onResume(), "#2f6b3e"),
-      navButton("⌂", t("common.mainMenu"), this.compact, () => this.cb.onMainMenu(), "#6b3340"),
     );
+    if (!this.atMainMenu) {
+      items.push(
+        navButton("⌂", t("common.mainMenu"), this.compact, () => this.cb.onMainMenu(), "#6b3340"),
+      );
+    }
     this.nav.replaceChildren(...items);
   }
 

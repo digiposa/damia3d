@@ -79,7 +79,8 @@ export class Game implements GameHost {
     this.system.hide();
     this.modes.clear();
     this.paused = true;
-    this.setHudVisible(false);
+    this.systemBtn.setVisible(true); // gear stays available on the title screen (Config only)
+    this.joystick?.setVisible(false);
     this.menu.show();
   }
 
@@ -98,32 +99,33 @@ export class Game implements GameHost {
     this.menu.hide();
     this.system.hide();
     this.paused = false;
-    this.setHudVisible(true);
+    this.systemBtn.setVisible(true);
+    this.joystick?.setVisible(true);
   }
 
   /** GameHost: open the System menu (also used by the ⚙ button and Escape). */
   openSystemMenu(): void {
-    if (this.paused) return; // already in a menu
-    this.paused = true;
-    this.setHudVisible(false);
-    this.system.show();
+    if (this.system.isOpen) return;
+    const atMainMenu = this.menu.isOpen;
+    if (!atMainMenu) this.paused = true; // pause gameplay (nothing runs at the title)
+    this.systemBtn.setVisible(false);
+    this.joystick?.setVisible(false);
+    this.system.show(atMainMenu);
   }
 
   private closeSystemMenu(): void {
     this.system.hide();
-    this.paused = false;
-    this.setHudVisible(true);
-  }
-
-  private setHudVisible(visible: boolean): void {
-    this.systemBtn.setVisible(visible);
-    this.joystick?.setVisible(visible);
+    this.systemBtn.setVisible(true);
+    // Returning to the title leaves the main menu (still shown) paused.
+    if (!this.menu.isOpen) {
+      this.paused = false;
+      this.joystick?.setVisible(true);
+    }
   }
 
   private handleHotkeys(e: KeyboardEvent): void {
     if (e.code !== "Escape") return;
     e.preventDefault();
-    if (this.menu.isOpen) return;
     if (this.system.isOpen) this.closeSystemMenu();
     else this.openSystemMenu();
   }

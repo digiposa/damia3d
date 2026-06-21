@@ -32,8 +32,11 @@ avec des sous-sections :
 - **Config** : son (placeholder), vitesse de combat, **zoom caméra**, plus
   **Reprendre** et **Menu principal**
 
-Changer de mode passe **obligatoirement** par le menu principal (Config → Menu
-principal).
+Le bouton **⚙** est aussi présent sur l'**écran-titre** : il ouvre alors le menu
+**limité à Config** (langue, son, vitesse, zoom) — les onglets Status / Addition
+/ Équipement n'apparaissent qu'une fois un mode lancé (ils dépendent de l'état du
+personnage). Changer de mode passe **obligatoirement** par le menu principal
+(Config → Menu principal).
 
 ## Modes de jeu
 
