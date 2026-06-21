@@ -9,6 +9,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
 import { DART_ADDITIONS, DART_ADDITION_LIST, type AdditionDef } from "../data/additions";
 import { type EquipDef, type EquipSlot, equipById } from "../data/equipment";
+import type { Element } from "../combat/element";
 
 const SPEED = 6; // world units per second
 const BASE_MAX_MP = 60; // base MP before equipment % bonuses (placeholder)
@@ -31,6 +32,9 @@ export class Player {
   exp: number;
   hp: number;
   stats: DartLevel;
+
+  /** Dart's own element (Red-Eye / Fire Dragoon) — the target element for incoming attacks. */
+  readonly element: Element = "Fire";
 
   /** Equipped Addition performed by the melee combo system. */
   addition: AdditionDef = DART_ADDITIONS.doubleSlash;
@@ -133,6 +137,11 @@ export class Player {
   }
   get mdef(): number {
     return this.stats.mdf + this.bonus("mdf");
+  }
+
+  /** Element imbued on physical attacks by the equipped weapon (Non-Elemental if none). */
+  get attackElement(): Element {
+    return this.equipment.weapon?.element ?? "Non-Elemental";
   }
 
   /** Incoming-damage multiplier from damage-reduction gear (1 = no reduction). */

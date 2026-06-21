@@ -21,6 +21,7 @@ import {
   type AdditionDef,
 } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
+import { elementMultiplier } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { dartNextLevelExp } from "../data/dart";
 import { t } from "../core/i18n";
@@ -326,12 +327,15 @@ export class TrainingMode extends GameMode {
     const atk = { at: this.player.atk, lv: this.player.level };
     const df = target.def.stats.df;
     const mult = additionMultiplier(add, this.player.additionLevel(add));
-    const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult) : 0;
-    const now = additionAttack(atk, df, additionHitsPercent(add, k), mult);
+    // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
+    const element = elementMultiplier(this.player.attackElement, target.def.element);
+    const mods = { element };
+    const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult, mods) : 0;
+    const now = additionAttack(atk, df, additionHitsPercent(add, k), mult, mods);
     const dmg = Math.max(1, now - before);
 
     target.takeDamage(dmg);
-    this.popText(target.headPosition, `${dmg}`, "#ffd86b");
+    this.popText(target.headPosition, `${dmg}`, damageColor(element));
 
     if (!target.alive) {
       this.player.gainExp(target.def.expReward);
@@ -364,8 +368,10 @@ export class TrainingMode extends GameMode {
     // Guarding halves incoming damage (the LoD "Guard" modifier).
     const guard = this.player.guardActive ? 0.5 : 1;
     const magical = action.kind === "magical";
+    // Element only applies to magical attacks (attack element vs Dart's element).
+    const element = magical ? elementMultiplier(action.element ?? "Non-Elemental", this.player.element) : 1;
     const raw = magical
-      ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard })
+      ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard, element })
       : enemyPhysicalAttack(enemy.def.stats.at, this.player.def, action.multiplier, { guard });
     // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…).
     const dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
@@ -515,4 +521,11 @@ export class TrainingMode extends GameMode {
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
   }
+}
+
+/** Floating-damage colour: orange when boosted (weakness), blue-grey when resisted, else gold. */
+function damageColor(elementMult: number): string {
+  if (elementMult > 1) return "#ff9a3c";
+  if (elementMult < 1) return "#9fb3d6";
+  return "#ffd86b";
 }

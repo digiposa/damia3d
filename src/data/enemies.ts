@@ -1,23 +1,18 @@
 import type { Stats } from "../combat/types";
+import type { Element } from "../combat/element";
 
-export type Element =
-  | "Fire"
-  | "Water"
-  | "Wind"
-  | "Earth"
-  | "Light"
-  | "Darkness"
-  | "Thunder"
-  | "Non-Elemental";
+export type { Element };
 
 /**
  * An enemy action. `multiplier` is the hidden Attack Multiplier fed to the
  * damage formula (e.g. Sword Slash = 1× physical, Throw Dagger = 0.5×).
+ * `element` applies to magical attacks (e.g. Burn Out = Fire).
  */
 export interface EnemyAttack {
   name: string;
   kind: "physical" | "magical";
   multiplier: number;
+  element?: Element;
 }
 
 /** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script. */
@@ -114,7 +109,7 @@ export const COMMANDER_SELES: EnemyDef = {
   countersAdditions: false,
   attacks: [
     { name: "Sword Slash", kind: "physical", multiplier: 1 },
-    { name: "Burn Out", kind: "magical", multiplier: 1.2 },
+    { name: "Burn Out", kind: "magical", multiplier: 1.2, element: "Fire" },
     { name: "Slash Twice", kind: "physical", multiplier: 2 },
   ],
   expReward: 20,

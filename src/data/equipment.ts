@@ -8,6 +8,8 @@
  * bonuses are applied to effective stats; `dmgReduce` is applied to incoming
  * damage; `effect` is descriptive text for effects not yet mechanically wired.
  */
+import type { Element } from "../combat/element";
+
 export type EquipSlot = "weapon" | "head" | "body" | "feet" | "accessory";
 
 export type Member =
@@ -48,6 +50,8 @@ export interface EquipDef {
   mpPct?: number;
   /** Fractional reduction of incoming damage (0.5 = −50%). */
   dmgReduce?: { phys?: number; magic?: number };
+  /** Elemental weapons imbue physical attacks with this element. */
+  element?: Element;
   /** Members who can equip it; omitted = all. */
   users?: Member[];
   /** Descriptive effect text (not all are mechanically applied yet). */
@@ -60,7 +64,7 @@ export const EQUIPMENT: EquipDef[] = [
   // --- Dart's weapons -------------------------------------------------------
   { id: "broad_sword", name: "Broad Sword", slot: "weapon", at: 2, users: ["Dart"] },
   { id: "bastard_sword", name: "Bastard Sword", slot: "weapon", at: 7, users: ["Dart"], price: 60 },
-  { id: "heat_blade", name: "Heat Blade", slot: "weapon", at: 18, users: ["Dart"], price: 150, effect: "Additions deal Fire-elemental physical damage." },
+  { id: "heat_blade", name: "Heat Blade", slot: "weapon", at: 18, element: "Fire", users: ["Dart"], price: 150, effect: "Additions deal Fire-elemental physical damage." },
   { id: "falchion", name: "Falchion", slot: "weapon", at: 26, users: ["Dart"], price: 250 },
   { id: "mind_crush", name: "Mind Crush", slot: "weapon", at: 34, users: ["Dart"], price: 350, effect: "20% chance to inflict Confusion." },
   { id: "fairy_sword", name: "Fairy Sword", slot: "weapon", at: 39, users: ["Dart"], price: 400, effect: "Additions accrue 50% more Spirit Points." },
@@ -70,7 +74,7 @@ export const EQUIPMENT: EquipDef[] = [
   // Lavitz / Albert — spears
   { id: "spear", name: "Spear", slot: "weapon", at: 4, users: ["Lavitz", "Albert"] },
   { id: "lance", name: "Lance", slot: "weapon", at: 19, users: ["Lavitz", "Albert"], price: 100 },
-  { id: "twister_glaive", name: "Twister Glaive", slot: "weapon", at: 28, users: ["Lavitz", "Albert"], effect: "Additions deal Wind-elemental physical damage." },
+  { id: "twister_glaive", name: "Twister Glaive", slot: "weapon", at: 28, element: "Wind", users: ["Lavitz", "Albert"], effect: "Additions deal Wind-elemental physical damage." },
   { id: "glaive", name: "Glaive", slot: "weapon", at: 37, users: ["Lavitz", "Albert"], price: 250 },
   { id: "spear_of_terror", name: "Spear of Terror", slot: "weapon", at: 45, users: ["Lavitz", "Albert"], price: 300, effect: "20% chance to inflict Fear." },
   { id: "partisan", name: "Partisan", slot: "weapon", at: 56, users: ["Lavitz", "Albert"], price: 400 },
@@ -78,7 +82,7 @@ export const EQUIPMENT: EquipDef[] = [
 
   // Shana / Miranda — bows
   { id: "short_bow", name: "Short Bow", slot: "weapon", at: 3, aHit: 20, users: ["Shana", "Miranda"] },
-  { id: "sparkle_arrow", name: "Sparkle Arrow", slot: "weapon", at: 9, aHit: 20, users: ["Shana", "Miranda"], price: 50, effect: "Attacks deal Light-elemental physical damage." },
+  { id: "sparkle_arrow", name: "Sparkle Arrow", slot: "weapon", at: 9, aHit: 20, element: "Light", users: ["Shana", "Miranda"], price: 50, effect: "Attacks deal Light-elemental physical damage." },
   { id: "long_bow", name: "Long Bow", slot: "weapon", at: 18, aHit: 30, users: ["Shana", "Miranda"], price: 150 },
   { id: "bemusing_arrow", name: "Bemusing Arrow", slot: "weapon", at: 24, aHit: 20, users: ["Shana", "Miranda"], price: 250, effect: "20% chance to inflict Confusion." },
   { id: "virulent_arrow", name: "Virulent Arrow", slot: "weapon", at: 30, aHit: 20, users: ["Shana", "Miranda"], price: 350, effect: "20% chance to inflict Poison." },
@@ -88,7 +92,7 @@ export const EQUIPMENT: EquipDef[] = [
   // Rose — rapiers / daggers
   { id: "rapier", name: "Rapier", slot: "weapon", at: 13, users: ["Rose"] },
   { id: "demon_stiletto", name: "Demon Stiletto", slot: "weapon", at: 18, users: ["Rose"], effect: "20% chance to inflict Fear." },
-  { id: "shadow_cutter", name: "Shadow Cutter", slot: "weapon", at: 24, users: ["Rose"], price: 200, effect: "Additions deal Darkness-elemental physical damage." },
+  { id: "shadow_cutter", name: "Shadow Cutter", slot: "weapon", at: 24, element: "Darkness", users: ["Rose"], price: 200, effect: "Additions deal Darkness-elemental physical damage." },
   { id: "dancing_dagger", name: "Dancing Dagger", slot: "weapon", at: 30, users: ["Rose"], price: 300 },
   { id: "flamberge", name: "Flamberge", slot: "weapon", at: 35, users: ["Rose"], price: 350, effect: "10% chance to inflict Stun." },
   { id: "gladius", name: "Gladius", slot: "weapon", at: 40, users: ["Rose"], price: 400, effect: "10% chance to inflict Instant Death." },
@@ -99,7 +103,7 @@ export const EQUIPMENT: EquipDef[] = [
   { id: "beast_fang", name: "Beast Fang", slot: "weapon", at: 31, users: ["Haschel"], price: 250, effect: "20% chance to inflict Stun." },
   { id: "diamond_claw", name: "Diamond Claw", slot: "weapon", at: 37, users: ["Haschel"], price: 300 },
   { id: "brass_knuckle", name: "Brass Knuckle", slot: "weapon", at: 43, users: ["Haschel"], effect: "10% chance to inflict Instant Death." },
-  { id: "thunder_fist", name: "Thunder Fist", slot: "weapon", at: 49, users: ["Haschel"], price: 450, effect: "Additions deal Thunder-elemental physical damage." },
+  { id: "thunder_fist", name: "Thunder Fist", slot: "weapon", at: 49, element: "Thunder", users: ["Haschel"], price: 450, effect: "Additions deal Thunder-elemental physical damage." },
   { id: "destroyer_mace", name: "Destroyer Mace", slot: "weapon", at: 55, users: ["Haschel"], price: 500, effect: "1.5× damage at ≤50% HP, 2× at ≤25% HP." },
 
   // Meru — hammers

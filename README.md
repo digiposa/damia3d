@@ -64,6 +64,14 @@ mise en page est responsive.
 **Hack & slash temps réel** (esprit Diablo II) avec des **attaques fidèles à
 *The Legend of Dragoon***.
 
+**Éléments** (Wiki Project) : 8 éléments avec opposés (Feu↔Eau, Vent↔Terre,
+Lumière↔Ténèbres ; Foudre et Non-élém. sans opposé). Attaque vs élément de la
+cible → **×1.5** si opposés, **×0.5** si identiques. Appliqué aux attaques
+magiques ennemies (ex. Burn Out Feu) et aux Additions de Dart **avec une arme
+élémentaire** (Heat Blade = Feu…). Dart est de l'élément **Feu**. Les dégâts
+s'affichent en orange (faiblesse) ou bleu-gris (résistance). Le modificateur
+« champ » (transformation Dragoon) est réservé au futur système Dragoon.
+
 Les formules de dégâts reproduisent exactement celles du jeu PS1
 ([`src/combat/formula.ts`](src/combat/formula.ts)) : troncatures `floor` à chaque
 étape, `round` spécial `(x + y/2) / y`, et les « modifier wrappers » avec leur
@@ -147,6 +155,7 @@ src/
     types.ts           interface Stats (maxHp, at, df, mat, mdf)
     modifiers.ts       modificateurs de dégâts (Fear, Power, Field, Element…)
     formula.ts         formules de dégâts LoD fidèles (floor/round + wrappers)
+    element.ts         éléments (opposés + modificateur ×1.5/×0.5)
     AdditionRunner.ts  timing-sight des Additions (Hit 1 auto + presses)
     *.test.ts          tests des formules et du timing (Vitest)
   data/

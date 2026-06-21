@@ -6,6 +6,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
 import type { EnemyDef } from "../data/enemies";
+import type { Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
 
 /** Movement speed (world units / second) while chasing. */
@@ -18,7 +19,7 @@ const ATTACK_INTERVAL = 1.4;
 /** A resolved enemy action for the mode to apply against the player (or itself). */
 export type EnemyAction =
   | { kind: "physical"; name: string; multiplier: number }
-  | { kind: "magical"; name: string; multiplier: number }
+  | { kind: "magical"; name: string; multiplier: number; element?: Element }
   | { kind: "heal"; name: string; amount: number };
 
 /** Per-frame context the AI needs for conditional behaviour. */
@@ -197,7 +198,7 @@ export class Enemy {
 
     // Burn Out (Fire magic; 1.5× once powered up) or a melee strike.
     if (Math.random() < 0.4) {
-      return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2 };
+      return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2, element: "Fire" };
     }
     return this.poweredUp
       ? { kind: "physical", name: "Slash Twice", multiplier: 2 }
