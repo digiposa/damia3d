@@ -91,6 +91,11 @@ multiplicateur de dégâts.
 > équiper une autre — comme dans LoD, on ne change pas d'Addition en pleine
 > action.
 
+**Défense (Guard)** : bouton **🛡** (tactile) ou touche **Maj** — Dart se met en
+garde ~2 s (immobile), **soigne 10 % des PV max** et **réduit de moitié** les
+dégâts reçus (modificateur `guard = 1/2` des formules LoD), avec un **cooldown de
+6 s**. Un bouclier translucide l'entoure pendant la garde.
+
 Dans **Training** (arène) : un bouton **🐾** (sous l'engrenage ⚙) ouvre un **menu
 de spawn** qui **met le jeu en pause** (comme les Options) ; on y fait apparaître
 un **Knight of Sandora** ou le **Commander** (boss). Les ennemis poursuivent Dart

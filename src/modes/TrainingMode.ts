@@ -56,6 +56,7 @@ export class TrainingMode extends GameMode {
   private spawnOpenBtn!: Button;
   private spawnMenu!: SpawnMenu;
   private attackBtn?: ActionButton;
+  private guardBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
   private runner = new AdditionRunner();
@@ -106,8 +107,17 @@ export class TrainingMode extends GameMode {
         padding: "10px 14px",
       },
     });
-    // Touch devices attack with the ⚔ button; desktop attacks by clicking.
-    if (hasTouch()) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
+    // Touch devices attack with the ⚔ button (desktop attacks by clicking) and
+    // guard with the 🛡 button (desktop uses Shift).
+    if (hasTouch()) {
+      this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
+      this.guardBtn = new ActionButton("🛡", () => this.input.pressVirtual("Guard"), {
+        right: "calc(env(safe-area-inset-right, 0px) + 124px)",
+        background: "rgba(40,90,150,0.8)",
+        border: "1px solid rgba(150,190,255,0.6)",
+        color: "#e6f0ff",
+      });
+    }
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
@@ -132,26 +142,46 @@ export class TrainingMode extends GameMode {
     // Game's render loop still calls input.endFrame() after this returns.
     if (this.paused) return;
 
-    // Movement (unaffected by combat speed): joystick on touch, click-to-move otherwise.
-    const axis = this.input.axis();
-    if (axis.x !== 0 || axis.y !== 0) {
-      const dir = this.camera.groundForward.scale(axis.y).add(this.camera.groundRight.scale(axis.x));
-      this.player.move(dir, dt);
-      this.clearNav();
-    } else {
-      this.navigate(dt);
+    // Movement (unaffected by combat speed): joystick on touch, click-to-move
+    // otherwise. Guarding roots Dart in place.
+    if (!this.player.guardActive) {
+      const axis = this.input.axis();
+      if (axis.x !== 0 || axis.y !== 0) {
+        const dir = this.camera.groundForward.scale(axis.y).add(this.camera.groundRight.scale(axis.x));
+        this.player.move(dir, dt);
+        this.clearNav();
+      } else {
+        this.navigate(dt);
+      }
     }
     this.camera.follow(this.player.position);
 
     if (this.input.wasPressed("Space")) this.attack(this.attackTarget);
+    if (this.guardPressed()) this.tryGuard();
 
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
+    this.player.tickGuard(cdt);
     if (this.runner.tick(cdt)) this.comboTarget = undefined;
     this.updateEnemies(cdt);
     this.updateSight();
 
     this.refreshHud();
+  }
+
+  private guardPressed(): boolean {
+    return (
+      this.input.wasPressed("Guard") ||
+      this.input.wasPressed("ShiftLeft") ||
+      this.input.wasPressed("ShiftRight")
+    );
+  }
+
+  /** Enter the Defense stance if it's off cooldown. */
+  private tryGuard(): void {
+    if (!this.player.guardReady) return;
+    const heal = this.player.startGuard();
+    this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
   }
 
   private updateSight(): void {
@@ -325,10 +355,12 @@ export class TrainingMode extends GameMode {
       return;
     }
 
+    // Guarding halves incoming damage (the LoD "Guard" modifier).
+    const guard = this.player.guardActive ? 0.5 : 1;
     const dmg =
       action.kind === "magical"
-        ? enemyMagicalAttack(enemy.def.stats.mat, this.player.stats.mdf, action.multiplier)
-        : enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, action.multiplier);
+        ? enemyMagicalAttack(enemy.def.stats.mat, this.player.stats.mdf, action.multiplier, { guard })
+        : enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, action.multiplier, { guard });
     this.player.hp = Math.max(0, this.player.hp - dmg);
     this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
 
@@ -446,6 +478,8 @@ export class TrainingMode extends GameMode {
       additionName: eq.name,
       additionLevel: p.additionLevel(eq),
     });
+
+    this.guardBtn?.setEnabled(p.guardReady);
   }
 
   dispose(): void {
@@ -457,5 +491,6 @@ export class TrainingMode extends GameMode {
     this.spawnMenu.dispose();
     this.spawnOpenBtn.dispose();
     this.attackBtn?.dispose();
+    this.guardBtn?.dispose();
   }
 }

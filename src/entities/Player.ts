@@ -3,12 +3,18 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
 import { DART_ADDITIONS, DART_ADDITION_LIST, type AdditionDef } from "../data/additions";
 
 const SPEED = 6; // world units per second
+
+/** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
+const GUARD_DURATION = 2; // seconds the stance lasts
+const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activation)
+const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
 
 /**
  * Dart — the player avatar. Placeholder capsule body with a "nose" marker so
@@ -40,6 +46,10 @@ export class Player {
   /** Successful performances per Addition (drives leveling: 20 each, up to Lv 5). */
   private additionPerf = new Map<string, number>();
 
+  private guardTimer = 0;
+  private guardCdTimer = 0;
+  private guardShield!: Mesh;
+
   constructor(scene: Scene, spawn = new Vector3(0, 0, 0), level = 1) {
     this.level = level;
     this.stats = dartStatsForLevel(level);
@@ -63,10 +73,54 @@ export class Player {
     noseMat.diffuseColor = new Color3(0.95, 0.85, 0.3);
     nose.material = noseMat;
     nose.parent = this.root;
+
+    // Translucent barrier shown while guarding.
+    this.guardShield = MeshBuilder.CreateSphere("guardShield", { diameter: 2.3, segments: 12 }, scene);
+    this.guardShield.position.y = 0.9;
+    const shieldMat = new StandardMaterial("guardShieldMat", scene);
+    shieldMat.diffuseColor = new Color3(0.4, 0.7, 1);
+    shieldMat.emissiveColor = new Color3(0.2, 0.5, 0.9);
+    shieldMat.alpha = 0.22;
+    shieldMat.backFaceCulling = false;
+    this.guardShield.material = shieldMat;
+    this.guardShield.isVisible = false;
+    this.guardShield.isPickable = false;
+    this.guardShield.parent = this.root;
   }
 
   get position(): Vector3 {
     return this.root.position;
+  }
+
+  // --- Defense (Guard) ------------------------------------------------------
+
+  /** True while the guard stance is active (movement blocked, damage halved). */
+  get guardActive(): boolean {
+    return this.guardTimer > 0;
+  }
+
+  /** True when guard can be triggered (not active and off cooldown). */
+  get guardReady(): boolean {
+    return this.guardTimer <= 0 && this.guardCdTimer <= 0;
+  }
+
+  /** Begin guarding: heal 10% max HP and halve incoming damage for the duration. Returns HP healed. */
+  startGuard(): number {
+    this.guardTimer = GUARD_DURATION;
+    this.guardCdTimer = GUARD_COOLDOWN;
+    this.guardShield.isVisible = true;
+    const heal = Math.floor(this.stats.maxHp * GUARD_HEAL_FRACTION);
+    this.hp = Math.min(this.stats.maxHp, this.hp + heal);
+    return heal;
+  }
+
+  /** Advance guard timers (use combat-scaled dt). */
+  tickGuard(dt: number): void {
+    if (this.guardTimer > 0) {
+      this.guardTimer = Math.max(0, this.guardTimer - dt);
+      if (this.guardTimer === 0) this.guardShield.isVisible = false;
+    }
+    if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
   }
 
   /**
