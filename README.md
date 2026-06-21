@@ -152,7 +152,7 @@ src/
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
     additions.ts       données d'Additions de Dart (hits, multiplicateurs, SP)
-    equipment.ts       équipements (5 slots, bonus de stats, effets) — set de Dart
+    equipment.ts       équipements complets (armures tous persos + armes Dart + 49 accessoires)
     enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles)
   entities/
     Player.ts          Dart : avatar déplaçable + état de combat + Addition équipée

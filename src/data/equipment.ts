@@ -28,6 +28,8 @@ const MEN: Member[] = ["Dart", "Lavitz", "Albert", "Haschel", "Kongol"];
 const WOMEN: Member[] = ["Shana", "Miranda", "Rose", "Meru"];
 /** Dart / Lavitz / Albert, who share most heavy armor. */
 const HEAVY = ["Dart", "Lavitz", "Albert"] as Member[];
+/** Members who have Additions (everyone except Shana / Miranda). */
+const ADDITION_USERS: Member[] = ["Dart", "Lavitz", "Albert", "Rose", "Haschel", "Meru", "Kongol"];
 
 export interface EquipDef {
   id: string;
@@ -138,27 +140,60 @@ export const EQUIPMENT: EquipDef[] = [
 
   // --- Accessories ----------------------------------------------------------
   { id: "bracelet", name: "Bracelet", slot: "accessory" },
+  // Stat boosters
   { id: "fake_power_wrist", name: "Fake Power Wrist", slot: "accessory", at: 5, price: 100 },
   { id: "power_wrist", name: "Power Wrist", slot: "accessory", at: 10, price: 200 },
-  { id: "attack_badge", name: "Attack Badge", slot: "accessory", at: 20, mat: 20, price: 1000 },
+  { id: "attack_badge", name: "Attack Badge", slot: "accessory", at: 20, mat: 20, price: 1000, effect: "Raises physical & magical attack." },
   { id: "fake_shield", name: "Fake Shield", slot: "accessory", df: 5, price: 100 },
   { id: "knight_shield", name: "Knight Shield", slot: "accessory", df: 10, price: 200 },
-  { id: "guard_badge", name: "Guard Badge", slot: "accessory", df: 20, mdf: 20, price: 1000 },
-  { id: "giganto_ring", name: "Giganto Ring", slot: "accessory", at: 20, df: 20, price: 1000 },
+  { id: "guard_badge", name: "Guard Badge", slot: "accessory", df: 20, mdf: 20, price: 1000, effect: "Raises physical & magical defense." },
+  { id: "giganto_ring", name: "Giganto Ring", slot: "accessory", at: 20, df: 20, price: 1000, effect: "Raises physical attack & defense." },
   { id: "magical_ring", name: "Magical Ring", slot: "accessory", mat: 30, price: 600 },
   { id: "spiritual_ring", name: "Spiritual Ring", slot: "accessory", mdf: 30, price: 600 },
-  { id: "bandit_ring", name: "Bandit's Ring", slot: "accessory", spd: 20, users: MEN },
+  { id: "bandit_ring", name: "Bandit's Ring", slot: "accessory", spd: 20, users: MEN, effect: "+20 Speed (males only)." },
+  { id: "dancers_ring", name: "Dancer's Ring", slot: "accessory", spd: 20, users: WOMEN, effect: "+20 Speed (females only)." },
   { id: "elude_cloak", name: "Elude Cloak", slot: "accessory", aAv: 20, price: 300 },
   { id: "spirit_cloak", name: "Spirit Cloak", slot: "accessory", mAv: 20, price: 300 },
   { id: "sages_cloak", name: "Sage's Cloak", slot: "accessory", aAv: 20, mAv: 20, price: 600 },
-  { id: "wargods_amulet", name: "Wargod's Amulet", slot: "accessory", aHit: 20, mHit: 20 },
+  { id: "wargods_amulet", name: "Wargod's Amulet", slot: "accessory", aHit: 20, mHit: 20, effect: "+20 hit rate." },
   { id: "physical_ring", name: "Physical Ring", slot: "accessory", hpPct: 0.5, effect: "+50% max HP." },
   { id: "amulet", name: "Amulet", slot: "accessory", mpPct: 1, effect: "+100% max MP." },
-  { id: "therapy_ring", name: "Therapy Ring", slot: "accessory", effect: "Recover 10% max HP at the start of each turn." },
-  { id: "spirit_ring", name: "Spirit Ring", slot: "accessory", effect: "Gain 20 SP at the start of each turn." },
+  // Per-turn recovery / SP
+  { id: "therapy_ring", name: "Therapy Ring", slot: "accessory", effect: "Recover 10% max HP each turn." },
+  { id: "mage_ring", name: "Mage Ring", slot: "accessory", effect: "Recover 10% max MP each turn." },
+  { id: "spirit_ring", name: "Spirit Ring", slot: "accessory", effect: "Gain 20 SP each turn." },
+  { id: "wargods_sash", name: "Wargod's Sash", slot: "accessory", effect: "Additions award 50% more SP." },
+  { id: "emerald_earring", name: "Emerald Earring", slot: "accessory", price: 1000, effect: "When physically damaged, gain 20 SP." },
+  { id: "ruby_ring", name: "Ruby Ring", slot: "accessory", price: 1000, effect: "When magically damaged, gain 20 SP." },
+  { id: "platinum_collar", name: "Platinum Collar", slot: "accessory", price: 1000, effect: "When physically damaged, recover 10% max MP." },
+  { id: "sapphire_pin", name: "Sapphire Pin", slot: "accessory", price: 1000, effect: "When magically damaged, recover 10% max MP." },
+  // Damage reduction
   { id: "phantom_shield", name: "Phantom Shield", slot: "accessory", price: 10000, dmgReduce: { phys: 0.5, magic: 0.5 }, effect: "Reduces all damage by 50%." },
   { id: "dragon_shield", name: "Dragon Shield", slot: "accessory", price: 5000, dmgReduce: { phys: 0.5 }, effect: "Reduces physical damage by 50%." },
   { id: "angel_scarf", name: "Angel Scarf", slot: "accessory", price: 5000, dmgReduce: { magic: 0.5 }, effect: "Reduces magical damage by 50%." },
+  // Status protection
+  { id: "active_ring", name: "Active Ring", slot: "accessory", price: 200, effect: "Prevents Dispiriting." },
+  { id: "bravery_amulet", name: "Bravery Amulet", slot: "accessory", price: 300, effect: "Prevents Fear." },
+  { id: "panic_guard", name: "Panic Guard", slot: "accessory", price: 300, effect: "Prevents Confusion." },
+  { id: "poison_guard", name: "Poison Guard", slot: "accessory", price: 300, effect: "Prevents Poison." },
+  { id: "stun_guard", name: "Stun Guard", slot: "accessory", price: 200, effect: "Prevents Stun." },
+  { id: "protector", name: "Protector", slot: "accessory", price: 200, effect: "Prevents Arm-Blocking." },
+  { id: "magic_ego_bell", name: "Magic Ego Bell", slot: "accessory", price: 300, effect: "Prevents Bewitchment." },
+  { id: "destone_amulet", name: "Destone Amulet", slot: "accessory", price: 400, effect: "Prevents Petrification." },
+  { id: "talisman", name: "Talisman", slot: "accessory", effect: "Prevents Instant Death." },
+  { id: "rainbow_earring", name: "Rainbow Earring", slot: "accessory", effect: "Prevents all status ailments." },
+  { id: "holy_ankh", name: "Holy Ankh", slot: "accessory", effect: "~45% chance to revive with half HP on KO." },
+  // Element stones (halve magic damage of one element)
+  { id: "red_eye_stone", name: "Red-Eye Stone", slot: "accessory", effect: "Reduces Fire-elemental magic damage by 50%." },
+  { id: "blue_sea_stone", name: "Blue Sea Stone", slot: "accessory", effect: "Reduces Water-elemental magic damage by 50%." },
+  { id: "jade_stone", name: "Jade Stone", slot: "accessory", effect: "Reduces Wind-elemental magic damage by 50%." },
+  { id: "golden_stone", name: "Golden Stone", slot: "accessory", effect: "Reduces Earth-elemental magic damage by 50%." },
+  { id: "violet_stone", name: "Violet Stone", slot: "accessory", effect: "Reduces Thunder-elemental magic damage by 50%." },
+  { id: "silver_stone", name: "Silver Stone", slot: "accessory", effect: "Reduces Light-elemental magic damage by 50%." },
+  { id: "darkness_stone", name: "Darkness Stone", slot: "accessory", effect: "Reduces Darkness-elemental magic damage by 50%." },
+  // Addition automation
+  { id: "wargod_calling", name: "Wargod Calling", slot: "accessory", price: 1000, users: ADDITION_USERS, effect: "Auto Additions — half damage & SP, no level-up." },
+  { id: "ultimate_wargod", name: "Ultimate Wargod", slot: "accessory", price: 10000, users: ADDITION_USERS, effect: "Auto Additions — full damage & SP." },
 ];
 
 const BY_ID = new Map(EQUIPMENT.map((e) => [e.id, e]));

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { equipById, equipmentForSlot, canEquip, equipSummary } from "./equipment";
+import { EQUIPMENT, equipById, equipmentForSlot, canEquip, equipSummary } from "./equipment";
 
 describe("equipment data", () => {
   it("looks items up by id", () => {
@@ -25,6 +25,15 @@ describe("equipment data", () => {
     expect(dartHeads).toContain("dragon_helm");
     expect(dartHeads).not.toContain("felt_hat");
     expect(dartHeads).not.toContain("jeweled_crown");
+  });
+
+  it("has all 49 accessories; Dart gets all but the women-only Dancer's Ring", () => {
+    const accessories = EQUIPMENT.filter((e) => e.slot === "accessory");
+    expect(accessories).toHaveLength(49);
+    const dart = equipmentForSlot("accessory", "Dart").map((d) => d.id);
+    expect(dart).toHaveLength(48);
+    expect(dart).not.toContain("dancers_ring");
+    expect(dart).toContain("wargod_calling");
   });
 
   it("summarises bonuses and effects", () => {
