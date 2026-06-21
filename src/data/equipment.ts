@@ -2,9 +2,10 @@
  * Equipment data from *The Legend of Dragoon*. Five slots; a character may have
  * one of each equipped. Many items are restricted to specific members.
  *
- * Currently populated with everything Dart can equip (the only playable
- * character so far) plus shared accessories. Other members' gear can be added
- * with the same shape. Flat stat bonuses (at/df/mat/mdf/…) and the HP/MP percent
+ * Populated with the full headwear / body armor / footwear set for every member
+ * (restricted via `users`), Dart's weapons, and a broad set of accessories.
+ * Other members' weapons can be added with the same shape. Flat stat bonuses
+ * (at/df/mat/mdf/…) and the HP/MP percent
  * bonuses are applied to effective stats; `dmgReduce` is applied to incoming
  * damage; `effect` is descriptive text for effects not yet mechanically wired.
  */
@@ -23,6 +24,9 @@ export type Member =
 
 /** Members who can wear "Men" gear. */
 const MEN: Member[] = ["Dart", "Lavitz", "Albert", "Haschel", "Kongol"];
+/** Members who can wear "Women" gear. */
+const WOMEN: Member[] = ["Shana", "Miranda", "Rose", "Meru"];
+/** Dart / Lavitz / Albert, who share most heavy armor. */
 const HEAVY = ["Dart", "Lavitz", "Albert"] as Member[];
 
 export interface EquipDef {
@@ -62,31 +66,74 @@ export const EQUIPMENT: EquipDef[] = [
   { id: "claymore", name: "Claymore", slot: "weapon", at: 44, users: ["Dart"], price: 500 },
   { id: "soul_eater", name: "Soul Eater", slot: "weapon", at: 75, users: ["Dart"], effect: "Dart loses 10% max HP at the start of each turn." },
 
-  // --- Headwear (Dart-equippable) ------------------------------------------
+  // --- Headwear -------------------------------------------------------------
+  // Male
   { id: "bandana", name: "Bandana", slot: "head", mat: 3, users: MEN },
-  { id: "sallet", name: "Sallet", slot: "head", mat: 8, aHit: 10, users: MEN, price: 40 },
+  { id: "sallet", name: "Sallet", slot: "head", mat: 8, aHit: 10, users: MEN, price: 40, effect: "+10% physical hit rate." },
   { id: "armet", name: "Armet", slot: "head", mat: 23, mdf: 5, users: MEN, price: 100 },
-  { id: "knight_helm", name: "Knight Helm", slot: "head", mat: 37, df: 5, users: HEAVY, price: 150, effect: "When magically damaged, gain 20 SP." },
+  { id: "knight_helm", name: "Knight Helm", slot: "head", mat: 37, df: 5, users: ["Dart", "Lavitz", "Albert", "Kongol"], price: 150, effect: "When magically damaged, gain 20 SP." },
+  { id: "giganto_helm", name: "Giganto Helm", slot: "head", mat: 14, df: 10, mdf: 5, users: ["Kongol"], price: 200, effect: "When magically damaged, gain 20 SP." },
+  { id: "soul_headband", name: "Soul Headband", slot: "head", mat: 25, df: 5, mdf: 5, users: ["Haschel"], price: 200, effect: "When magically damaged, gain 20 SP." },
+  // Female
+  { id: "felt_hat", name: "Felt Hat", slot: "head", mat: 5, users: WOMEN },
+  { id: "cape", name: "Cape", slot: "head", mat: 17, users: WOMEN, price: 60 },
+  { id: "tiara", name: "Tiara", slot: "head", mat: 29, df: 5, mAv: 10, users: WOMEN, price: 150 },
+  { id: "jeweled_crown", name: "Jeweled Crown", slot: "head", mat: 24, mdf: 5, users: ["Shana", "Miranda", "Meru"], price: 200, effect: "When magically damaged, gain 20 SP." },
+  { id: "roses_hairband", name: "Rose's Hairband", slot: "head", mat: 36, users: ["Rose"], effect: "Prevents Instant Death." },
+  // All
   { id: "legend_casque", name: "Legend Casque", slot: "head", mat: 50, mdf: 127, mAv: 50, price: 10000, dmgReduce: { magic: 0.5 }, effect: "Halves incoming magic damage." },
-  { id: "dragon_helm", name: "Dragon Helm", slot: "head", mat: 50, df: 10, hpPct: 0.5, effect: "Raises maximum HP by 50%." },
-  { id: "phoenix_plume", name: "Phoenix Plume", slot: "head", mat: 30, mdf: 10, effect: "Prevents Fear, Bewitchment, Confusion and Dispiriting." },
+  { id: "dragon_helm", name: "Dragon Helm", slot: "head", mat: 50, df: 12, hpPct: 0.5, effect: "Raises maximum HP by 50%." },
+  { id: "phoenix_plume", name: "Phoenix Plume", slot: "head", mat: 30, mdf: 10, effect: "Prevents Fear, Confusion, Bewitchment and Dispiriting." },
   { id: "magical_hat", name: "Magical Hat", slot: "head", mat: 50, mdf: 10, mpPct: 0.5, effect: "Raises maximum MP by 50%." },
 
-  // --- Body armor (Dart-equippable) ----------------------------------------
+  // --- Body armor -----------------------------------------------------------
+  // Dart / Lavitz / Albert
   { id: "leather_armor", name: "Leather Armor", slot: "body", df: 2, mdf: 2, users: HEAVY },
   { id: "scale_armor", name: "Scale Armor", slot: "body", df: 8, mdf: 8, users: HEAVY, price: 50 },
   { id: "chain_mail", name: "Chain Mail", slot: "body", df: 20, mdf: 24, users: HEAVY, price: 150 },
   { id: "plate_mail", name: "Plate Mail", slot: "body", df: 27, mdf: 20, users: HEAVY, price: 200 },
   { id: "saint_armor", name: "Saint Armor", slot: "body", df: 34, mdf: 34, users: HEAVY, price: 300, effect: "When physically damaged, gain 20 SP." },
   { id: "armor_of_yore", name: "Armor of Yore", slot: "body", df: 35, mdf: 35, users: ["Dart", "Lavitz", "Albert", "Kongol"], effect: "Prevents Poison, Stun and Arm-Blocking." },
+  { id: "jade_dg_armor", name: "Jade DG Armor", slot: "body", df: 54, mdf: 27, users: ["Lavitz", "Albert"], price: 800, effect: "Reduces Wind-elemental magic damage to 0." },
   { id: "red_dg_armor", name: "Red DG Armor", slot: "body", df: 41, mdf: 40, users: ["Dart"], price: 800, effect: "Reduces Fire-elemental magic damage to 0." },
+  // Haschel
+  { id: "disciple_vest", name: "Disciple Vest", slot: "body", df: 13, mdf: 8, users: ["Haschel"] },
+  { id: "warrior_dress", name: "Warrior Dress", slot: "body", df: 25, mdf: 23, users: ["Haschel"], price: 150, effect: "Defense +5%." },
+  { id: "masters_vest", name: "Master's Vest", slot: "body", df: 30, mdf: 29, users: ["Haschel"], price: 250, effect: "When physically damaged, gain 20 SP." },
+  { id: "energy_girdle", name: "Energy Girdle", slot: "body", df: 37, mdf: 26, users: ["Haschel"], price: 300, effect: "Additions accrue 50% more Spirit Points." },
+  { id: "satori_vest", name: "Satori Vest", slot: "body", df: 40, mdf: 31, users: ["Haschel"], effect: "Prevents Poison, Stun and Arm-Blocking." },
+  { id: "violet_dg_armor", name: "Violet DG Armor", slot: "body", df: 45, mdf: 40, users: ["Haschel"], price: 800, effect: "Reduces Thunder-elemental magic damage to 0." },
+  // Kongol
+  { id: "lion_fur", name: "Lion Fur", slot: "body", df: 46, mdf: 20, users: ["Kongol"] },
+  { id: "breastplate", name: "Breastplate", slot: "body", df: 59, mdf: 14, users: ["Kongol"], price: 250 },
+  { id: "giganto_armor", name: "Giganto Armor", slot: "body", df: 75, mdf: 25, users: ["Kongol"], price: 400, effect: "When physically damaged, gain 20 SP." },
+  { id: "golden_dg_armor", name: "Golden DG Armor", slot: "body", df: 88, mdf: 23, users: ["Kongol"], price: 800, effect: "Reduces Earth-elemental magic damage to 0." },
+  // Female
+  { id: "clothes", name: "Clothes", slot: "body", df: 4, mdf: 5, users: WOMEN },
+  { id: "leather_jacket", name: "Leather Jacket", slot: "body", df: 7, mdf: 12, users: ["Shana", "Miranda", "Rose"], price: 50 },
+  { id: "angel_robe", name: "Angel Robe", slot: "body", users: ["Shana", "Miranda", "Meru"], price: 500, effect: "~45% chance to revive with half HP on KO." },
+  { id: "silver_vest", name: "Silver Vest", slot: "body", df: 13, mdf: 17, users: WOMEN, price: 150 },
+  { id: "sparkle_dress", name: "Sparkle Dress", slot: "body", df: 19, mdf: 45, users: WOMEN, price: 200, effect: "When physically damaged, gain 20 SP." },
+  { id: "robe", name: "Robe", slot: "body", df: 25, mdf: 35, users: WOMEN, price: 500, effect: "When magically damaged, gain 20 SP." },
+  { id: "rainbow_dress", name: "Rainbow Dress", slot: "body", df: 32, mdf: 55, users: WOMEN, effect: "Prevents Poison, Stun and Arm-Blocking." },
+  { id: "blue_dg_armor", name: "Blue DG Armor", slot: "body", df: 30, mdf: 54, users: ["Meru"], price: 800, effect: "Reduces Water-elemental magic damage to 0." },
+  { id: "dark_dg_armor", name: "Dark DG Armor", slot: "body", df: 41, mdf: 42, users: ["Rose"], price: 800, effect: "Reduces Darkness-elemental magic damage to 0." },
+  { id: "silver_dg_armor", name: "Silver DG Armor", slot: "body", df: 27, mdf: 80, users: ["Shana", "Miranda"], price: 800, effect: "Reduces Light-elemental magic damage to 0." },
+  // All
   { id: "armor_of_legend", name: "Armor of Legend", slot: "body", df: 127, aAv: 50, price: 10000, dmgReduce: { phys: 0.5 }, effect: "Halves incoming physical damage." },
 
-  // --- Footwear (Dart-equippable) ------------------------------------------
+  // --- Footwear -------------------------------------------------------------
+  // Male
   { id: "leather_boots", name: "Leather Boots", slot: "feet", users: MEN },
   { id: "iron_kneepiece", name: "Iron Kneepiece", slot: "feet", df: 5, users: MEN, price: 100 },
   { id: "combat_shoes", name: "Combat Shoes", slot: "feet", df: 5, aAv: 5, users: MEN, price: 150 },
   { id: "bandit_shoes", name: "Bandit's Shoes", slot: "feet", spd: 20, users: MEN },
+  // Female
+  { id: "leather_shoes", name: "Leather Shoes", slot: "feet", users: WOMEN },
+  { id: "soft_boots", name: "Soft Boots", slot: "feet", df: 5, users: WOMEN, price: 100 },
+  { id: "stardust_boots", name: "Stardust Boots", slot: "feet", df: 5, mAv: 5, users: WOMEN, price: 150 },
+  { id: "dancers_shoes", name: "Dancer's Shoes", slot: "feet", spd: 20, users: WOMEN },
+  // All
   { id: "magical_greaves", name: "Magical Greaves", slot: "feet", spd: 10, aAv: 5, mAv: 5, price: 300 },
 
   // --- Accessories ----------------------------------------------------------

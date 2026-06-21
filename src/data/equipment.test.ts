@@ -20,6 +20,13 @@ describe("equipment data", () => {
     expect(canEquip(ring, "Shana")).toBe(false);
   });
 
+  it("filters gear per character (Dart can't wear female headwear)", () => {
+    const dartHeads = equipmentForSlot("head", "Dart").map((d) => d.id);
+    expect(dartHeads).toContain("dragon_helm");
+    expect(dartHeads).not.toContain("felt_hat");
+    expect(dartHeads).not.toContain("jeweled_crown");
+  });
+
   it("summarises bonuses and effects", () => {
     expect(equipSummary(equipById("heat_blade")!)).toContain("+18 AT");
     expect(equipSummary(equipById("heat_blade")!)).toContain("Fire");
