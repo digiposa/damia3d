@@ -49,6 +49,15 @@ const en: Dict = {
 
   // Equipment
   "equip.placeholder": "No equipment yet — weapon, armor and accessories coming.",
+  "equip.unavailable": "Equipment unavailable in this mode.",
+  "equip.slot.weapon": "Weapon",
+  "equip.slot.head": "Headwear",
+  "equip.slot.body": "Body Armor",
+  "equip.slot.feet": "Footwear",
+  "equip.slot.accessory": "Accessory",
+  "equip.empty": "(empty)",
+  "equip.none": "— None",
+  "equip.back": "‹ Back",
 
   // Addition
   "addition.unavailable": "Additions unavailable in this mode.",
@@ -127,6 +136,15 @@ const fr: Dict = {
   "status.unavailable": "Statut indisponible dans ce mode.",
 
   "equip.placeholder": "Aucun équipement pour l'instant — arme, armure et accessoires à venir.",
+  "equip.unavailable": "Équipement indisponible dans ce mode.",
+  "equip.slot.weapon": "Arme",
+  "equip.slot.head": "Tête",
+  "equip.slot.body": "Armure",
+  "equip.slot.feet": "Bottes",
+  "equip.slot.accessory": "Accessoire",
+  "equip.empty": "(vide)",
+  "equip.none": "— Aucun",
+  "equip.back": "‹ Retour",
 
   "addition.unavailable": "Additions indisponibles dans ce mode.",
   "addition.sub": "{presses} appui(s) · Niv {level}/5 · {dam}% · SP {sp}",

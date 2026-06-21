@@ -8,8 +8,10 @@ import type { Scene } from "@babylonjs/core/scene";
 
 import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
 import { DART_ADDITIONS, DART_ADDITION_LIST, type AdditionDef } from "../data/additions";
+import { type EquipDef, type EquipSlot, equipById } from "../data/equipment";
 
 const SPEED = 6; // world units per second
+const BASE_MAX_MP = 60; // base MP before equipment % bonuses (placeholder)
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
 const GUARD_DURATION = 2; // seconds the stance lasts
@@ -39,9 +41,17 @@ export class Player {
   readonly maxSp = 100;
   /** Magic points (placeholder — Dart uses items/SP in LoD; tune later). */
   mp = 0;
-  readonly maxMp = 60;
   /** Gold carried (awarded from defeated enemies). */
   gold = 0;
+
+  /** Equipped item per slot (Dart's initial loadout). */
+  readonly equipment: Record<EquipSlot, EquipDef | undefined> = {
+    weapon: equipById("broad_sword"),
+    head: equipById("bandana"),
+    body: equipById("leather_armor"),
+    feet: equipById("leather_boots"),
+    accessory: equipById("bracelet"),
+  };
 
   /** Successful performances per Addition (drives leveling: 20 each, up to Lv 5). */
   private additionPerf = new Map<string, number>();
@@ -92,6 +102,61 @@ export class Player {
     return this.root.position;
   }
 
+  // --- Effective stats (base table + equipment) -----------------------------
+
+  private get equipped(): EquipDef[] {
+    return Object.values(this.equipment).filter((e): e is EquipDef => !!e);
+  }
+
+  private bonus(key: "at" | "df" | "mat" | "mdf"): number {
+    return this.equipped.reduce((sum, e) => sum + (e[key] ?? 0), 0);
+  }
+
+  private bonusPct(key: "hpPct" | "mpPct"): number {
+    return this.equipped.reduce((sum, e) => sum + (e[key] ?? 0), 0);
+  }
+
+  get maxHp(): number {
+    return Math.floor(this.stats.maxHp * (1 + this.bonusPct("hpPct")));
+  }
+  get maxMp(): number {
+    return Math.floor(BASE_MAX_MP * (1 + this.bonusPct("mpPct")));
+  }
+  get atk(): number {
+    return this.stats.at + this.bonus("at");
+  }
+  get def(): number {
+    return this.stats.df + this.bonus("df");
+  }
+  get matk(): number {
+    return this.stats.mat + this.bonus("mat");
+  }
+  get mdef(): number {
+    return this.stats.mdf + this.bonus("mdf");
+  }
+
+  /** Incoming-damage multiplier from damage-reduction gear (1 = no reduction). */
+  incomingMultiplier(kind: "phys" | "magic"): number {
+    let m = 1;
+    for (const e of this.equipped) {
+      const r = e.dmgReduce?.[kind];
+      if (r) m *= 1 - r;
+    }
+    return m;
+  }
+
+  /** Equip an item into its slot (re-clamping HP to the new maximum). */
+  equip(def: EquipDef): void {
+    this.equipment[def.slot] = def;
+    this.hp = Math.min(this.hp, this.maxHp);
+  }
+
+  /** Remove the item in a slot. */
+  unequip(slot: EquipSlot): void {
+    this.equipment[slot] = undefined;
+    this.hp = Math.min(this.hp, this.maxHp);
+  }
+
   // --- Defense (Guard) ------------------------------------------------------
 
   /** True while the guard stance is active (movement blocked, damage halved). */
@@ -109,8 +174,8 @@ export class Player {
     this.guardTimer = GUARD_DURATION;
     this.guardCdTimer = GUARD_COOLDOWN;
     this.guardShield.isVisible = true;
-    const heal = Math.floor(this.stats.maxHp * GUARD_HEAL_FRACTION);
-    this.hp = Math.min(this.stats.maxHp, this.hp + heal);
+    const heal = Math.floor(this.maxHp * GUARD_HEAL_FRACTION);
+    this.hp = Math.min(this.maxHp, this.hp + heal);
     return heal;
   }
 
@@ -135,7 +200,7 @@ export class Player {
     const prevMax = this.stats.maxHp;
     this.level = newLevel;
     this.stats = dartStatsForLevel(newLevel);
-    this.hp = Math.min(this.hp + (this.stats.maxHp - prevMax), this.stats.maxHp);
+    this.hp = Math.min(this.hp + (this.stats.maxHp - prevMax), this.maxHp);
   }
 
   /**

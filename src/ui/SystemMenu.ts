@@ -2,6 +2,7 @@ import { settings } from "../core/settings";
 import { hasTouch } from "../core/device";
 import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry, SystemSection } from "../core/menu";
+import type { EquipSlot } from "../data/equipment";
 import {
   type AdditionDef,
   additionPresses,
@@ -43,6 +44,8 @@ export class SystemMenu {
   private compact = hasTouch();
   /** When opened from the title screen there is no mode: Config only, no "Main menu". */
   private atMainMenu = false;
+  /** Equipment tab sub-state: which slot is being chosen (undefined = slot list). */
+  private equipSlot?: EquipSlot;
 
   constructor(private cb: SystemMenuCallbacks) {
     this.root = document.createElement("div");
@@ -124,6 +127,7 @@ export class SystemMenu {
     // Character tabs only exist once a mode has player state; otherwise Config only.
     const available = data ? SECTIONS : SECTIONS.filter((s) => s.id === "config");
     if (!available.some((s) => s.id === this.section)) this.section = available[0].id;
+    if (this.section !== "equip") this.equipSlot = undefined;
 
     this.renderNav(available);
     this.content.replaceChildren(
@@ -132,7 +136,7 @@ export class SystemMenu {
         : this.section === "addition"
           ? this.renderAddition(data)
           : this.section === "equip"
-            ? this.renderEquip()
+            ? this.renderEquip(data)
             : this.renderStatus(data),
     );
   }
@@ -182,9 +186,54 @@ export class SystemMenu {
     return box;
   }
 
-  private renderEquip(): HTMLElement {
+  private renderEquip(data?: ModeMenuData): HTMLElement {
     const box = section(t("section.equip"));
-    box.appendChild(note(t("equip.placeholder")));
+    if (!data) {
+      box.appendChild(note(t("equip.unavailable")));
+      return box;
+    }
+
+    // Slot list.
+    if (!this.equipSlot) {
+      for (const s of data.equipment.slots) {
+        box.appendChild(
+          listRow(
+            t(`equip.slot.${s.slot}`),
+            s.equippedName ?? t("equip.empty"),
+            false,
+            true,
+            () => {
+              this.equipSlot = s.slot;
+              this.render();
+            },
+          ),
+        );
+      }
+      return box;
+    }
+
+    // Item list for the chosen slot.
+    box.appendChild(
+      navButton("‹", t("equip.back"), false, () => {
+        this.equipSlot = undefined;
+        this.render();
+      }),
+    );
+    const slot = this.equipSlot;
+    box.appendChild(
+      listRow(t("equip.none"), "", false, true, () => {
+        data.equipment.equip(slot, undefined);
+        this.render();
+      }),
+    );
+    for (const opt of data.equipment.options(slot)) {
+      box.appendChild(
+        listRow(opt.name, opt.detail, opt.equipped, true, () => {
+          data.equipment.equip(slot, opt.id);
+          this.render();
+        }),
+      );
+    }
     return box;
   }
 
@@ -317,6 +366,52 @@ function navButton(
     onClick();
   });
   return btn;
+}
+
+/** A two-line selectable row (title + sub-detail), highlighted when active. */
+function listRow(
+  title: string,
+  sub: string,
+  highlighted: boolean,
+  enabled: boolean,
+  onClick: () => void,
+): HTMLButtonElement {
+  const el = document.createElement("button");
+  el.disabled = !enabled;
+  Object.assign(el.style, {
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+    width: "100%",
+    textAlign: "left",
+    font: "700 15px/1.2 system-ui, sans-serif",
+    color: "#f0e6cf",
+    background: highlighted ? "rgba(200,162,74,0.85)" : "rgba(40,34,16,0.7)",
+    border: `1px solid ${highlighted ? "#ffe08a" : "#6b551f"}`,
+    borderRadius: "8px",
+    padding: "10px 12px",
+    marginBottom: "7px",
+    cursor: enabled ? "pointer" : "default",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+  const top = document.createElement("span");
+  top.textContent = title + (highlighted ? "  ✓" : "");
+  el.appendChild(top);
+  if (sub) {
+    const s = document.createElement("span");
+    s.textContent = sub;
+    Object.assign(s.style, {
+      font: "400 12px/1.3 ui-monospace, monospace",
+      opacity: "0.85",
+      color: highlighted ? "#2a2310" : "inherit",
+    } satisfies Partial<CSSStyleDeclaration>);
+    el.appendChild(s);
+  }
+  el.addEventListener("pointerup", (e) => {
+    e.preventDefault();
+    onClick();
+  });
+  return el;
 }
 
 function section(title: string): HTMLDivElement {

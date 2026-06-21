@@ -25,6 +25,12 @@ import { AdditionRunner } from "../combat/AdditionRunner";
 import { dartNextLevelExp } from "../data/dart";
 import { t } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry } from "../core/menu";
+import {
+  type EquipSlot,
+  equipById,
+  equipmentForSlot,
+  equipSummary,
+} from "../data/equipment";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
@@ -317,7 +323,7 @@ export class TrainingMode extends GameMode {
    */
   private applyHit(target: Enemy, k: number): void {
     const add = this.player.addition;
-    const atk = { at: this.player.stats.at, lv: this.player.level };
+    const atk = { at: this.player.atk, lv: this.player.level };
     const df = target.def.stats.df;
     const mult = additionMultiplier(add, this.player.additionLevel(add));
     const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult) : 0;
@@ -357,15 +363,17 @@ export class TrainingMode extends GameMode {
 
     // Guarding halves incoming damage (the LoD "Guard" modifier).
     const guard = this.player.guardActive ? 0.5 : 1;
-    const dmg =
-      action.kind === "magical"
-        ? enemyMagicalAttack(enemy.def.stats.mat, this.player.stats.mdf, action.multiplier, { guard })
-        : enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, action.multiplier, { guard });
+    const magical = action.kind === "magical";
+    const raw = magical
+      ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard })
+      : enemyPhysicalAttack(enemy.def.stats.at, this.player.def, action.multiplier, { guard });
+    // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…).
+    const dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
     this.player.hp = Math.max(0, this.player.hp - dmg);
     this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
 
     if (this.player.hp === 0) {
-      this.player.hp = this.player.stats.maxHp; // sandbox: revive instead of game-over
+      this.player.hp = this.player.maxHp; // sandbox: revive instead of game-over
     }
   }
 
@@ -393,7 +401,7 @@ export class TrainingMode extends GameMode {
     enemy.dispose();
   }
 
-  /** Data for the System menu's Status / Addition tabs. */
+  /** Data for the System menu's Status / Addition / Equipment tabs. */
   menuData(): ModeMenuData {
     const p = this.player;
     return {
@@ -403,19 +411,33 @@ export class TrainingMode extends GameMode {
         exp: p.exp,
         nextExp: dartNextLevelExp(p.level),
         hp: p.hp,
-        maxHp: p.stats.maxHp,
+        maxHp: p.maxHp,
         sp: p.sp,
         maxSp: p.maxSp,
         mp: p.mp,
         maxMp: p.maxMp,
-        at: p.stats.at,
-        df: p.stats.df,
-        mat: p.stats.mat,
-        mdf: p.stats.mdf,
+        at: p.atk,
+        df: p.def,
+        mat: p.matk,
+        mdf: p.mdef,
         gold: p.gold,
       },
       additions: this.additionEntries(),
       equipAddition: (def) => this.equipAddition(def),
+      equipment: {
+        slots: (["weapon", "head", "body", "feet", "accessory"] as EquipSlot[]).map((slot) => ({
+          slot,
+          equippedName: p.equipment[slot]?.name,
+        })),
+        options: (slot) =>
+          equipmentForSlot(slot, "Dart").map((def) => ({
+            id: def.id,
+            name: def.name,
+            detail: equipSummary(def),
+            equipped: p.equipment[slot]?.id === def.id,
+          })),
+        equip: (slot, id) => (id ? p.equip(equipById(id)!) : p.unequip(slot)),
+      },
     };
   }
 
@@ -467,7 +489,7 @@ export class TrainingMode extends GameMode {
       name: HERO_NAME,
       level: p.level,
       hp: p.hp,
-      maxHp: p.stats.maxHp,
+      maxHp: p.maxHp,
       sp: p.sp,
       maxSp: p.maxSp,
       mp: p.mp,

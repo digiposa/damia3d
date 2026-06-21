@@ -26,8 +26,8 @@ Au démarrage, un écran-titre permet de **choisir un mode**. En jeu, le bouton
 ouvre le **menu système** (style écran PS1 de LoD) qui **met le jeu en pause**,
 avec des sous-sections :
 
-- **Status** : niveau, EXP, HP/SP/MP, AT/DF/MAT/MDF, Gold
-- **Équipement** : à venir
+- **Status** : niveau, EXP, HP/SP/MP, AT/DF/MAT/MDF (stats **effectives**, équipement inclus), Gold
+- **Équipement** : 5 emplacements (arme / tête / armure / bottes / accessoire) ; choix par emplacement parmi l'attirail équipable par Dart
 - **Addition** : détail et équipement des Additions débloquées
 - **Config** : son (placeholder), vitesse de combat, **zoom caméra**, plus
   **Reprendre** et **Menu principal**
@@ -152,6 +152,7 @@ src/
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
     additions.ts       données d'Additions de Dart (hits, multiplicateurs, SP)
+    equipment.ts       équipements (5 slots, bonus de stats, effets) — set de Dart
     enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles)
   entities/
     Player.ts          Dart : avatar déplaçable + état de combat + Addition équipée

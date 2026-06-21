@@ -1,4 +1,5 @@
 import type { AdditionDef } from "../data/additions";
+import type { EquipSlot } from "../data/equipment";
 
 /** Character status shown in the System menu's Status tab. */
 export interface StatusView {
@@ -27,11 +28,35 @@ export interface AdditionEntry {
   equipped: boolean;
 }
 
-/** Per-mode data the System menu reads to populate the Status / Addition tabs. */
+/** State of one equipment slot for the Equipment tab. */
+export interface EquipSlotState {
+  slot: EquipSlot;
+  equippedName?: string;
+}
+
+/** A selectable item when choosing equipment for a slot. */
+export interface EquipOption {
+  id: string;
+  name: string;
+  /** One-line bonuses / effect summary. */
+  detail: string;
+  equipped: boolean;
+}
+
+/** Equipment data + actions exposed to the System menu's Equipment tab. */
+export interface EquipView {
+  slots: EquipSlotState[];
+  options: (slot: EquipSlot) => EquipOption[];
+  /** Equip an item by id, or unequip the slot when id is omitted. */
+  equip: (slot: EquipSlot, id?: string) => void;
+}
+
+/** Per-mode data the System menu reads to populate the Status / Addition / Equipment tabs. */
 export interface ModeMenuData {
   status: StatusView;
   additions: AdditionEntry[];
   equipAddition: (def: AdditionDef) => void;
+  equipment: EquipView;
 }
 
 /** A section of the in-game System menu. */
