@@ -2,10 +2,9 @@
  * Equipment data from *The Legend of Dragoon*. Five slots; a character may have
  * one of each equipped. Many items are restricted to specific members.
  *
- * Populated with the full headwear / body armor / footwear set for every member
- * (restricted via `users`), Dart's weapons, and a broad set of accessories.
- * Other members' weapons can be added with the same shape. Flat stat bonuses
- * (at/df/mat/mdf/…) and the HP/MP percent
+ * Populated with the full equipment list for every member (weapons, headwear,
+ * body armor, footwear — restricted via `users`) and all 49 accessories. Flat
+ * stat bonuses (at/df/mat/mdf/…) and the HP/MP percent
  * bonuses are applied to effective stats; `dmgReduce` is applied to incoming
  * damage; `effect` is descriptive text for effects not yet mechanically wired.
  */
@@ -67,6 +66,56 @@ export const EQUIPMENT: EquipDef[] = [
   { id: "fairy_sword", name: "Fairy Sword", slot: "weapon", at: 39, users: ["Dart"], price: 400, effect: "Additions accrue 50% more Spirit Points." },
   { id: "claymore", name: "Claymore", slot: "weapon", at: 44, users: ["Dart"], price: 500 },
   { id: "soul_eater", name: "Soul Eater", slot: "weapon", at: 75, users: ["Dart"], effect: "Dart loses 10% max HP at the start of each turn." },
+
+  // Lavitz / Albert — spears
+  { id: "spear", name: "Spear", slot: "weapon", at: 4, users: ["Lavitz", "Albert"] },
+  { id: "lance", name: "Lance", slot: "weapon", at: 19, users: ["Lavitz", "Albert"], price: 100 },
+  { id: "twister_glaive", name: "Twister Glaive", slot: "weapon", at: 28, users: ["Lavitz", "Albert"], effect: "Additions deal Wind-elemental physical damage." },
+  { id: "glaive", name: "Glaive", slot: "weapon", at: 37, users: ["Lavitz", "Albert"], price: 250 },
+  { id: "spear_of_terror", name: "Spear of Terror", slot: "weapon", at: 45, users: ["Lavitz", "Albert"], price: 300, effect: "20% chance to inflict Fear." },
+  { id: "partisan", name: "Partisan", slot: "weapon", at: 56, users: ["Lavitz", "Albert"], price: 400 },
+  { id: "halberd", name: "Halberd", slot: "weapon", at: 65, users: ["Lavitz", "Albert"], price: 500 },
+
+  // Shana / Miranda — bows
+  { id: "short_bow", name: "Short Bow", slot: "weapon", at: 3, aHit: 20, users: ["Shana", "Miranda"] },
+  { id: "sparkle_arrow", name: "Sparkle Arrow", slot: "weapon", at: 9, aHit: 20, users: ["Shana", "Miranda"], price: 50, effect: "Attacks deal Light-elemental physical damage." },
+  { id: "long_bow", name: "Long Bow", slot: "weapon", at: 18, aHit: 30, users: ["Shana", "Miranda"], price: 150 },
+  { id: "bemusing_arrow", name: "Bemusing Arrow", slot: "weapon", at: 24, aHit: 20, users: ["Shana", "Miranda"], price: 250, effect: "20% chance to inflict Confusion." },
+  { id: "virulent_arrow", name: "Virulent Arrow", slot: "weapon", at: 30, aHit: 20, users: ["Shana", "Miranda"], price: 350, effect: "20% chance to inflict Poison." },
+  { id: "arrow_of_force", name: "Arrow of Force", slot: "weapon", at: 40, aHit: 20, users: ["Shana", "Miranda"], price: 500, effect: "Attacks accrue 50% more Spirit Points." },
+  { id: "detonate_arrow", name: "Detonate Arrow", slot: "weapon", at: 50, aHit: 20, users: ["Shana", "Miranda"], effect: "Attacks all enemies at once." },
+
+  // Rose — rapiers / daggers
+  { id: "rapier", name: "Rapier", slot: "weapon", at: 13, users: ["Rose"] },
+  { id: "demon_stiletto", name: "Demon Stiletto", slot: "weapon", at: 18, users: ["Rose"], effect: "20% chance to inflict Fear." },
+  { id: "shadow_cutter", name: "Shadow Cutter", slot: "weapon", at: 24, users: ["Rose"], price: 200, effect: "Additions deal Darkness-elemental physical damage." },
+  { id: "dancing_dagger", name: "Dancing Dagger", slot: "weapon", at: 30, users: ["Rose"], price: 300 },
+  { id: "flamberge", name: "Flamberge", slot: "weapon", at: 35, users: ["Rose"], price: 350, effect: "10% chance to inflict Stun." },
+  { id: "gladius", name: "Gladius", slot: "weapon", at: 40, users: ["Rose"], price: 400, effect: "10% chance to inflict Instant Death." },
+  { id: "dragon_buster", name: "Dragon Buster", slot: "weapon", at: 100, users: ["Rose"] },
+
+  // Haschel — fists
+  { id: "iron_knuckle", name: "Iron Knuckle", slot: "weapon", at: 20, users: ["Haschel"] },
+  { id: "beast_fang", name: "Beast Fang", slot: "weapon", at: 31, users: ["Haschel"], price: 250, effect: "20% chance to inflict Stun." },
+  { id: "diamond_claw", name: "Diamond Claw", slot: "weapon", at: 37, users: ["Haschel"], price: 300 },
+  { id: "brass_knuckle", name: "Brass Knuckle", slot: "weapon", at: 43, users: ["Haschel"], effect: "10% chance to inflict Instant Death." },
+  { id: "thunder_fist", name: "Thunder Fist", slot: "weapon", at: 49, users: ["Haschel"], price: 450, effect: "Additions deal Thunder-elemental physical damage." },
+  { id: "destroyer_mace", name: "Destroyer Mace", slot: "weapon", at: 55, users: ["Haschel"], price: 500, effect: "1.5× damage at ≤50% HP, 2× at ≤25% HP." },
+
+  // Meru — hammers
+  { id: "mace", name: "Mace", slot: "weapon", at: 15, users: ["Meru"] },
+  { id: "morning_star", name: "Morning Star", slot: "weapon", at: 20, users: ["Meru"], price: 250 },
+  { id: "war_hammer", name: "War Hammer", slot: "weapon", at: 25, users: ["Meru"], price: 300 },
+  { id: "heavy_mace", name: "Heavy Mace", slot: "weapon", at: 30, users: ["Meru"], price: 400, effect: "20% chance to inflict Stun." },
+  { id: "pretty_hammer", name: "Pretty Hammer", slot: "weapon", at: 15, users: ["Meru"], effect: "Additions accrue 50% more Spirit Points." },
+  { id: "basher", name: "Basher", slot: "weapon", at: 40, users: ["Meru"], price: 500 },
+
+  // Kongol — axes
+  { id: "axe", name: "Axe", slot: "weapon", at: 45, users: ["Kongol"] },
+  { id: "tomahawk", name: "Tomahawk", slot: "weapon", at: 59, users: ["Kongol"], price: 300 },
+  { id: "battle_axe", name: "Battle Axe", slot: "weapon", at: 67, users: ["Kongol"], price: 350 },
+  { id: "great_axe", name: "Great Axe", slot: "weapon", at: 79, users: ["Kongol"], price: 400, effect: "20% chance to inflict Stun." },
+  { id: "indoras_axe", name: "Indora's Axe", slot: "weapon", at: 88, users: ["Kongol"], effect: "10% chance to inflict Instant Death." },
 
   // --- Headwear -------------------------------------------------------------
   // Male

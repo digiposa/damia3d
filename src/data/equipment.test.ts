@@ -14,6 +14,13 @@ describe("equipment data", () => {
     expect(weapons.every((w) => canEquip(w, "Dart"))).toBe(true);
   });
 
+  it("includes the other members' weapons (exclusive to them)", () => {
+    expect(equipById("dragon_buster")?.at).toBe(100); // Rose
+    expect(equipmentForSlot("weapon", "Rose")).toHaveLength(7);
+    expect(equipmentForSlot("weapon", "Kongol")).toHaveLength(5);
+    expect(canEquip(equipById("dragon_buster")!, "Dart")).toBe(false);
+  });
+
   it("respects user restrictions (Bandit's Ring is men-only)", () => {
     const ring = equipById("bandit_ring")!;
     expect(canEquip(ring, "Dart")).toBe(true);
