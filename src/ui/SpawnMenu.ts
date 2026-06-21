@@ -33,7 +33,7 @@ export class SpawnMenu {
       boxSizing: "border-box",
       background: "radial-gradient(120% 120% at 50% 30%, #141d2ecc 0%, #0b0d12f2 70%)",
       color: "#cfe3ff",
-      zIndex: "31",
+      zIndex: "40",
     } satisfies Partial<CSSStyleDeclaration>);
 
     this.title = document.createElement("div");

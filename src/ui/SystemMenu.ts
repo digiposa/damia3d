@@ -56,7 +56,7 @@ export class SystemMenu {
       boxSizing: "border-box",
       background: "radial-gradient(120% 120% at 50% 30%, #161106e0 0%, #0b0d12f5 72%)",
       color: "#f0e6cf",
-      zIndex: "31",
+      zIndex: "40",
     } satisfies Partial<CSSStyleDeclaration>);
 
     const panel = document.createElement("div");

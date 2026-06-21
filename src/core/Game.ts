@@ -54,6 +54,9 @@ export class Game implements GameHost {
         right: "calc(env(safe-area-inset-right, 0px) + 10px)",
         font: "600 18px/1 system-ui, sans-serif",
         padding: "10px 14px",
+        // Above the main menu (z30) so it's reachable on the title screen, but
+        // below the system/spawn overlays (z40) which cover it when open.
+        zIndex: "32",
       },
     });
 
