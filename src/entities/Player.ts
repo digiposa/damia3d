@@ -120,6 +120,11 @@ export class Player {
     return this.equipped.reduce((sum, e) => sum + (e[key] ?? 0), 0);
   }
 
+  /** Total of a flat equipment-only stat across equipped gear (0 if none). */
+  gearTotal(key: "spd" | "aHit" | "mHit" | "aAv" | "mAv"): number {
+    return this.equipped.reduce((sum, e) => sum + (e[key] ?? 0), 0);
+  }
+
   get maxHp(): number {
     return Math.floor(this.stats.maxHp * (1 + this.bonusPct("hpPct")));
   }
@@ -176,6 +181,16 @@ export class Player {
   /** True when guard can be triggered (not active and off cooldown). */
   get guardReady(): boolean {
     return this.guardTimer <= 0 && this.guardCdTimer <= 0;
+  }
+
+  /** Combat-time seconds left before guard is ready again. */
+  get guardCooldownRemaining(): number {
+    return this.guardCdTimer;
+  }
+
+  /** Cooldown remaining as a fraction of the full cooldown (1 → 0). */
+  get guardCooldownFraction(): number {
+    return GUARD_COOLDOWN > 0 ? Math.max(0, this.guardCdTimer / GUARD_COOLDOWN) : 0;
   }
 
   /** Begin guarding: heal 10% max HP and halve incoming damage for the duration. Returns HP healed. */

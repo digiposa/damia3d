@@ -1,7 +1,7 @@
 import { settings } from "../core/settings";
 import { hasTouch } from "../core/device";
 import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
-import type { ModeMenuData, AdditionEntry, SystemSection } from "../core/menu";
+import type { ModeMenuData, AdditionEntry, SystemSection, StatBreakdown } from "../core/menu";
 import type { EquipSlot } from "../data/equipment";
 import {
   type AdditionDef,
@@ -175,12 +175,11 @@ export class SystemMenu {
       [t("stat.exp"), `${s.exp} / ${s.nextExp}`],
     ]));
     box.appendChild(divider());
-    box.appendChild(statLines([
-      [t("stat.at"), String(s.at)],
-      [t("stat.df"), String(s.df)],
-      [t("stat.mat"), String(s.mat)],
-      [t("stat.mdf"), String(s.mdf)],
-    ]));
+    box.appendChild(breakdownTable(s.combat));
+    if (s.gearExtras.length) {
+      box.appendChild(divider());
+      box.appendChild(statLines(s.gearExtras.map((e) => [e.label, `+${e.value}`])));
+    }
     box.appendChild(divider());
     box.appendChild(statLines([[t("stat.gold"), `${s.gold} G`]]));
     return box;
@@ -457,6 +456,41 @@ function statLines(rows: [string, string][]): HTMLDivElement {
     box.append(key, val);
   }
   return box;
+}
+
+/** A Body | Gear | Total breakdown grid for the combat stats. */
+function breakdownTable(rows: StatBreakdown[]): HTMLDivElement {
+  const grid = document.createElement("div");
+  Object.assign(grid.style, {
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto auto",
+    rowGap: "5px",
+    columnGap: "16px",
+    font: "13px/1.3 ui-monospace, monospace",
+  } satisfies Partial<CSSStyleDeclaration>);
+
+  const cell = (text: string, opts: { align?: string; color?: string; dim?: boolean } = {}) => {
+    const el = document.createElement("div");
+    el.textContent = text;
+    el.style.textAlign = opts.align ?? "left";
+    if (opts.color) el.style.color = opts.color;
+    if (opts.dim) el.style.opacity = "0.7";
+    grid.appendChild(el);
+  };
+
+  // Header
+  cell("", { dim: true });
+  cell(t("stat.base"), { align: "right", dim: true });
+  cell(t("stat.gear"), { align: "right", dim: true });
+  cell(t("stat.total"), { align: "right", dim: true });
+
+  for (const r of rows) {
+    cell(r.label, { dim: true });
+    cell(String(r.base), { align: "right" });
+    cell(r.gear ? `+${r.gear}` : "·", { align: "right", color: r.gear ? "#9fe6a0" : undefined, dim: !r.gear });
+    cell(String(r.total), { align: "right", color: "#ffe08a" });
+  }
+  return grid;
 }
 
 function divider(): HTMLDivElement {

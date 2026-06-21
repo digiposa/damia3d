@@ -26,7 +26,7 @@ Au démarrage, un écran-titre permet de **choisir un mode**. En jeu, le bouton
 ouvre le **menu système** (style écran PS1 de LoD) qui **met le jeu en pause**,
 avec des sous-sections :
 
-- **Status** : niveau, EXP, HP/SP/MP, AT/DF/MAT/MDF (stats **effectives**, équipement inclus), Gold
+- **Status** : niveau, EXP, HP/SP/MP, Gold, et AT/DF/MAT/MDF **décomposés** en Corps (base) + Équip. = Total (comme l'écran PS1), plus les bonus d'équipement secondaires (SPD, A-HIT, A-AV, M-AV)
 - **Équipement** : 5 emplacements (arme / tête / armure / bottes / accessoire) ; choix par emplacement parmi l'attirail équipable par Dart
 - **Addition** : détail et équipement des Additions débloquées
 - **Config** : son (placeholder), vitesse de combat, **zoom caméra**, plus
@@ -99,10 +99,11 @@ multiplicateur de dégâts.
 > équiper une autre — comme dans LoD, on ne change pas d'Addition en pleine
 > action.
 
-**Défense (Guard)** : bouton **🛡** (tactile) ou touche **Maj** — Dart se met en
-garde ~2 s (immobile), **soigne 10 % des PV max** et **réduit de moitié** les
-dégâts reçus (modificateur `guard = 1/2` des formules LoD), avec un **cooldown de
-6 s**. Un bouclier translucide l'entoure pendant la garde.
+**Défense (Guard)** : bouton **🛡** ou touche **Maj** — Dart se met en garde ~2 s
+(immobile), **soigne 10 % des PV max** et **réduit de moitié** les dégâts reçus
+(modificateur `guard = 1/2` des formules LoD), avec un **cooldown de 6 s** affiché
+sur le bouton (anneau qui se vide + décompte) et **affecté par la vitesse de
+combat**. Un bouclier translucide l'entoure pendant la garde.
 
 Dans **Training** (arène) : un bouton **🐾** (sous l'engrenage ⚙) ouvre un **menu
 de spawn** qui **met le jeu en pause** (comme les Options) ; on y fait apparaître

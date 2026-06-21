@@ -1,6 +1,14 @@
 import type { AdditionDef } from "../data/additions";
 import type { EquipSlot } from "../data/equipment";
 
+/** One combat stat broken down into its base (Body) and equipment (Gear) parts. */
+export interface StatBreakdown {
+  label: string;
+  base: number;
+  gear: number;
+  total: number;
+}
+
 /** Character status shown in the System menu's Status tab. */
 export interface StatusView {
   name: string;
@@ -13,11 +21,11 @@ export interface StatusView {
   maxSp: number;
   mp: number;
   maxMp: number;
-  at: number;
-  df: number;
-  mat: number;
-  mdf: number;
   gold: number;
+  /** AT / DF / MAT / MDF with Body + Gear = Total. */
+  combat: StatBreakdown[];
+  /** Equipment-only stats that are non-zero (SPD, A-HIT, A-AV, M-AV). */
+  gearExtras: { label: string; value: number }[];
 }
 
 /** One Addition row in the System menu, with the player's unlock/level state. */

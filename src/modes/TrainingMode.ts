@@ -114,17 +114,17 @@ export class TrainingMode extends GameMode {
         padding: "10px 14px",
       },
     });
-    // Touch devices attack with the ⚔ button (desktop attacks by clicking) and
-    // guard with the 🛡 button (desktop uses Shift).
-    if (hasTouch()) {
-      this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
-      this.guardBtn = new ActionButton("🛡", () => this.input.pressVirtual("Guard"), {
-        right: "calc(env(safe-area-inset-right, 0px) + 124px)",
-        background: "rgba(40,90,150,0.8)",
-        border: "1px solid rgba(150,190,255,0.6)",
-        color: "#e6f0ff",
-      });
-    }
+    // Touch devices attack with the ⚔ button (desktop attacks by clicking). The
+    // 🛡 guard button is shown on both (also bound to Shift) so its cooldown is
+    // always visible; it sits left of the attack button on touch.
+    const touch = hasTouch();
+    if (touch) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
+    this.guardBtn = new ActionButton("🛡", () => this.input.pressVirtual("Guard"), {
+      right: touch ? "calc(env(safe-area-inset-right, 0px) + 124px)" : "calc(env(safe-area-inset-right, 0px) + 26px)",
+      background: "rgba(40,90,150,0.8)",
+      border: "1px solid rgba(150,190,255,0.6)",
+      color: "#e6f0ff",
+    });
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
@@ -422,11 +422,24 @@ export class TrainingMode extends GameMode {
         maxSp: p.maxSp,
         mp: p.mp,
         maxMp: p.maxMp,
-        at: p.atk,
-        df: p.def,
-        mat: p.matk,
-        mdf: p.mdef,
         gold: p.gold,
+        combat: [
+          { label: t("stat.at"), base: p.stats.at, gear: p.atk - p.stats.at, total: p.atk },
+          { label: t("stat.df"), base: p.stats.df, gear: p.def - p.stats.df, total: p.def },
+          { label: t("stat.mat"), base: p.stats.mat, gear: p.matk - p.stats.mat, total: p.matk },
+          { label: t("stat.mdf"), base: p.stats.mdf, gear: p.mdef - p.stats.mdf, total: p.mdef },
+        ],
+        gearExtras: (
+          [
+            ["SPD", p.gearTotal("spd")],
+            ["A-HIT", p.gearTotal("aHit")],
+            ["M-HIT", p.gearTotal("mHit")],
+            ["A-AV", p.gearTotal("aAv")],
+            ["M-AV", p.gearTotal("mAv")],
+          ] as [string, number][]
+        )
+          .filter(([, v]) => v !== 0)
+          .map(([label, value]) => ({ label, value })),
       },
       additions: this.additionEntries(),
       equipAddition: (def) => this.equipAddition(def),
@@ -507,7 +520,8 @@ export class TrainingMode extends GameMode {
       additionLevel: p.additionLevel(eq),
     });
 
-    this.guardBtn?.setEnabled(p.guardReady);
+    // Cooldown readout. Timers run on combat time, so convert to real seconds.
+    this.guardBtn?.setCooldown(p.guardCooldownRemaining / settings.combatSpeed, p.guardCooldownFraction);
   }
 
   dispose(): void {

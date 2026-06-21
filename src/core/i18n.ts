@@ -45,6 +45,9 @@ const en: Dict = {
   "stat.mat": "M. Attack",
   "stat.mdf": "M. Defense",
   "stat.gold": "Gold",
+  "stat.base": "Body",
+  "stat.gear": "Gear",
+  "stat.total": "Total",
   "status.unavailable": "Status unavailable in this mode.",
 
   // Equipment
@@ -133,6 +136,9 @@ const fr: Dict = {
   "stat.mat": "Attaque M.",
   "stat.mdf": "Défense M.",
   "stat.gold": "Or",
+  "stat.base": "Corps",
+  "stat.gear": "Équip.",
+  "stat.total": "Total",
   "status.unavailable": "Statut indisponible dans ce mode.",
 
   "equip.placeholder": "Aucun équipement pour l'instant — arme, armure et accessoires à venir.",
