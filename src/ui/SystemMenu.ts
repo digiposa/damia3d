@@ -1,4 +1,5 @@
 import { settings } from "../core/settings";
+import { hasTouch } from "../core/device";
 import type { ModeMenuData, AdditionEntry } from "../core/menu";
 import {
   type AdditionDef,
@@ -9,11 +10,11 @@ import {
 
 type Section = "status" | "equip" | "addition" | "config";
 
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: "status", label: "Status" },
-  { id: "equip", label: "Équipement" },
-  { id: "addition", label: "Addition" },
-  { id: "config", label: "Config" },
+const SECTIONS: { id: Section; label: string; icon: string }[] = [
+  { id: "status", label: "Status", icon: "📊" },
+  { id: "equip", label: "Équipement", icon: "🛡️" },
+  { id: "addition", label: "Addition", icon: "💥" },
+  { id: "config", label: "Config", icon: "⚙" },
 ];
 
 const COMBAT_SPEEDS = [0.5, 1, 1.5, 2];
@@ -37,6 +38,8 @@ export class SystemMenu {
   private content: HTMLDivElement;
   private section: Section = "status";
   private navButtons = new Map<Section, HTMLButtonElement>();
+  /** On mobile the nav shows icons only to save width. */
+  private compact = hasTouch();
 
   constructor(private cb: SystemMenuCallbacks) {
     this.root = document.createElement("div");
@@ -73,12 +76,12 @@ export class SystemMenu {
       display: "flex",
       flexDirection: "column",
       gap: "6px",
-      width: "168px",
+      width: this.compact ? "58px" : "168px",
       flex: "0 0 auto",
     } satisfies Partial<CSSStyleDeclaration>);
 
     for (const s of SECTIONS) {
-      const btn = navButton(s.label, () => {
+      const btn = navButton(s.icon, s.label, this.compact, () => {
         this.section = s.id;
         this.render();
       });
@@ -90,10 +93,10 @@ export class SystemMenu {
     spacer.style.flex = "1";
     this.nav.appendChild(spacer);
     this.nav.appendChild(
-      navButton("▶ Reprendre", () => this.cb.onResume(), "#2f6b3e"),
+      navButton("▶", "Reprendre", this.compact, () => this.cb.onResume(), "#2f6b3e"),
     );
     this.nav.appendChild(
-      navButton("⌂ Menu principal", () => this.cb.onMainMenu(), "#6b3340"),
+      navButton("⌂", "Menu principal", this.compact, () => this.cb.onMainMenu(), "#6b3340"),
     );
 
     // --- Right content --------------------------------------------------
@@ -269,17 +272,24 @@ export class SystemMenu {
 
 // --- DOM helpers ------------------------------------------------------------
 
-function navButton(text: string, onClick: () => void, bg = "rgba(40,34,16,0.85)"): HTMLButtonElement {
+function navButton(
+  icon: string,
+  label: string,
+  compact: boolean,
+  onClick: () => void,
+  bg = "rgba(40,34,16,0.85)",
+): HTMLButtonElement {
   const btn = document.createElement("button");
-  btn.textContent = text;
+  btn.textContent = compact ? icon : `${icon}  ${label}`;
+  btn.title = label;
   Object.assign(btn.style, {
-    font: "700 15px/1 system-ui, sans-serif",
+    font: compact ? "20px/1 system-ui, sans-serif" : "700 15px/1 system-ui, sans-serif",
     color: "#f0e6cf",
     background: bg,
     border: "1px solid #6b551f",
     borderRadius: "8px",
-    padding: "11px 12px",
-    textAlign: "left",
+    padding: compact ? "12px 0" : "11px 12px",
+    textAlign: compact ? "center" : "left",
     cursor: "pointer",
     touchAction: "manipulation",
   } satisfies Partial<CSSStyleDeclaration>);
