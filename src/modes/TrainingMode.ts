@@ -33,8 +33,8 @@ import { TimingSight } from "../ui/TimingSight";
 import { SpawnMenu } from "../ui/SpawnMenu";
 import { floatingText } from "../ui/FloatingText";
 
-/** Display name of the party leader (the project's 2D protagonist). */
-const HERO_NAME = "Damia";
+/** Display name of the party leader. */
+const HERO_NAME = "Dart";
 
 /** How close Dart must be to land a combo hit on an enemy. */
 const PLAYER_REACH = 2.3;

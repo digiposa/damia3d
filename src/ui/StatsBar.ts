@@ -1,4 +1,5 @@
 import { t } from "../core/i18n";
+import dartPortrait from "../assets/portraits/dart.jpg";
 
 /** Snapshot of the values the stats bar renders. */
 export interface StatsView {
@@ -66,24 +67,13 @@ export class StatsBar {
       borderRadius: "6px",
       border: "3px solid #caa24a",
       outline: "1px solid #6b551f",
-      background:
-        "radial-gradient(120% 120% at 50% 25%, #3a4a72 0%, #1b2236 60%, #0e1320 100%)",
+      backgroundColor: "#0e1320",
+      backgroundImage: `url(${dartPortrait})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center top",
       boxShadow: "inset 0 0 10px rgba(0,0,0,0.6)",
       overflow: "hidden",
     } satisfies Partial<CSSStyleDeclaration>);
-
-    const glyph = document.createElement("div");
-    glyph.textContent = "🗡️";
-    Object.assign(glyph.style, {
-      position: "absolute",
-      inset: "0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: "34px",
-      opacity: "0.85",
-    } satisfies Partial<CSSStyleDeclaration>);
-    this.portrait.appendChild(glyph);
 
     this.lvBadge = document.createElement("div");
     Object.assign(this.lvBadge.style, {
