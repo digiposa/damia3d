@@ -1,9 +1,10 @@
 import { t } from "../core/i18n";
-import dartPortrait from "../assets/portraits/dart.jpg";
 
 /** Snapshot of the values the stats bar renders. */
 export interface StatsView {
   name: string;
+  /** Portrait image URL; falls back to the name's initial when absent. */
+  portrait?: string;
   level: number;
   hp: number;
   maxHp: number;
@@ -32,6 +33,7 @@ interface Gauge {
 export class StatsBar {
   private root: HTMLDivElement;
   private portrait: HTMLDivElement;
+  private portraitInitial: HTMLDivElement;
   private lvBadge: HTMLDivElement;
   private nameLabel: HTMLDivElement;
   private hp: Gauge;
@@ -67,13 +69,25 @@ export class StatsBar {
       borderRadius: "6px",
       border: "3px solid #caa24a",
       outline: "1px solid #6b551f",
-      backgroundColor: "#0e1320",
-      backgroundImage: `url(${dartPortrait})`,
+      background: "radial-gradient(120% 120% at 50% 25%, #3a4a72 0%, #1b2236 60%, #0e1320 100%)",
       backgroundSize: "cover",
       backgroundPosition: "center top",
       boxShadow: "inset 0 0 10px rgba(0,0,0,0.6)",
       overflow: "hidden",
     } satisfies Partial<CSSStyleDeclaration>);
+
+    // Fallback when a bearer has no portrait asset: their initial.
+    this.portraitInitial = document.createElement("div");
+    Object.assign(this.portraitInitial.style, {
+      position: "absolute",
+      inset: "0",
+      display: "none",
+      alignItems: "center",
+      justifyContent: "center",
+      font: "800 36px/1 system-ui, sans-serif",
+      color: "rgba(207,227,255,0.85)",
+    } satisfies Partial<CSSStyleDeclaration>);
+    this.portrait.appendChild(this.portraitInitial);
 
     this.lvBadge = document.createElement("div");
     Object.assign(this.lvBadge.style, {
@@ -165,6 +179,14 @@ export class StatsBar {
   set(v: StatsView): void {
     this.lvBadge.textContent = `LV ${v.level}`;
     this.nameLabel.textContent = v.name;
+    if (v.portrait) {
+      this.portrait.style.backgroundImage = `url(${v.portrait})`;
+      this.portraitInitial.style.display = "none";
+    } else {
+      this.portrait.style.backgroundImage = "none";
+      this.portraitInitial.textContent = v.name.charAt(0);
+      this.portraitInitial.style.display = "flex";
+    }
     fill(this.hp, v.hp, v.maxHp, t("stat.hp"));
     fill(this.sp, v.sp, v.maxSp, t("stat.sp"));
     fill(this.mp, v.mp, v.maxMp, t("stat.mp"));

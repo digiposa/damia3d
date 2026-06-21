@@ -17,13 +17,11 @@ import {
   additionHitsPercent,
   additionMultiplier,
   additionPresses,
-  DART_ADDITION_LIST,
   type AdditionDef,
 } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { elementMultiplier } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
-import { dartNextLevelExp } from "../data/dart";
 import { t } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry } from "../core/menu";
 import {
@@ -32,17 +30,16 @@ import {
   equipmentForSlot,
   equipSummary,
 } from "../data/equipment";
+import { type Bearer, DEFAULT_BEARER } from "../data/bearers";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
 import { SpawnMenu } from "../ui/SpawnMenu";
+import { CharacterMenu } from "../ui/CharacterMenu";
 import { floatingText } from "../ui/FloatingText";
 
-/** Display name of the party leader. */
-const HERO_NAME = "Dart";
-
-/** How close Dart must be to land a combo hit on an enemy. */
+/** How close the player must be to land a combo hit on an enemy. */
 const PLAYER_REACH = 2.3;
 
 /**
@@ -62,6 +59,9 @@ export class TrainingMode extends GameMode {
   private sight!: TimingSight;
   private spawnOpenBtn!: Button;
   private spawnMenu!: SpawnMenu;
+  private charBtn!: Button;
+  private charMenu!: CharacterMenu;
+  private bearer: Bearer = DEFAULT_BEARER;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
 
@@ -91,7 +91,7 @@ export class TrainingMode extends GameMode {
 
     createGround(this.scene, 40);
 
-    this.player = new Player(this.scene, new Vector3(0, 0, 0));
+    this.player = new Player(this.scene, this.bearer, new Vector3(0, 0, 0));
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
     // The equipped-Addition chip in the stats bar opens the System menu on Addition.
@@ -109,6 +109,21 @@ export class TrainingMode extends GameMode {
       onClick: () => this.openSpawnMenu(),
       style: {
         top: "calc(env(safe-area-inset-top, 0px) + 58px)",
+        right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+        font: "600 18px/1 system-ui, sans-serif",
+        padding: "10px 14px",
+      },
+    });
+    // Character picker (Training/Survival): re-skin the player to another bearer.
+    this.charMenu = new CharacterMenu({
+      onSelect: (b) => this.setBearer(b),
+      onResume: () => this.closeCharacterMenu(),
+    });
+    this.charBtn = new Button({
+      label: "👤",
+      onClick: () => this.openCharacterMenu(),
+      style: {
+        top: "calc(env(safe-area-inset-top, 0px) + 106px)",
         right: "calc(env(safe-area-inset-right, 0px) + 10px)",
         font: "600 18px/1 system-ui, sans-serif",
         padding: "10px 14px",
@@ -142,6 +157,37 @@ export class TrainingMode extends GameMode {
     this.spawnMenu.hide();
     this.spawnOpenBtn.setVisible(true);
     this.paused = false;
+  }
+
+  private openCharacterMenu(): void {
+    this.paused = true;
+    this.charBtn.setVisible(false);
+    this.charMenu.show(this.bearer.id);
+  }
+
+  private closeCharacterMenu(): void {
+    this.charMenu.hide();
+    this.charBtn.setVisible(true);
+    this.paused = false;
+  }
+
+  /**
+   * Re-skin the player to another bearer: rebuild the avatar in place (same
+   * position) on the new bearer's Dragoon class, resetting transient combat
+   * state. Selecting the current bearer just resumes.
+   */
+  private setBearer(b: Bearer): void {
+    if (b.id !== this.bearer.id) {
+      const pos = this.player.position.clone();
+      const level = this.player.level;
+      this.player.dispose();
+      this.bearer = b;
+      this.player = new Player(this.scene, b, pos, level);
+      this.runner.cancel();
+      this.comboTarget = undefined;
+      this.clearNav();
+    }
+    this.closeCharacterMenu();
   }
 
   update(dt: number): void {
@@ -412,10 +458,11 @@ export class TrainingMode extends GameMode {
     const p = this.player;
     return {
       status: {
-        name: HERO_NAME,
+        name: p.bearer.name,
+        portrait: p.bearer.portrait,
         level: p.level,
         exp: p.exp,
-        nextExp: dartNextLevelExp(p.level),
+        nextExp: p.nextExp,
         hp: p.hp,
         maxHp: p.maxHp,
         sp: p.sp,
@@ -449,7 +496,7 @@ export class TrainingMode extends GameMode {
           equippedName: p.equipment[slot]?.name,
         })),
         options: (slot) =>
-          equipmentForSlot(slot, "Dart").map((def) => ({
+          equipmentForSlot(slot, p.equipmentUser).map((def) => ({
             id: def.id,
             name: def.name,
             detail: equipSummary(def),
@@ -468,7 +515,7 @@ export class TrainingMode extends GameMode {
   /** Build the Addition rows from the player's unlock/level state. */
   private additionEntries(): AdditionEntry[] {
     const unlocked = this.player.unlockedAdditions();
-    return DART_ADDITION_LIST.map((def) => ({
+    return this.player.additions.map((def) => ({
       def,
       unlocked: unlocked.includes(def),
       level: this.player.additionLevel(def),
@@ -505,7 +552,8 @@ export class TrainingMode extends GameMode {
     const p = this.player;
     const eq = p.addition;
     this.stats.set({
-      name: HERO_NAME,
+      name: p.bearer.name,
+      portrait: p.bearer.portrait,
       level: p.level,
       hp: p.hp,
       maxHp: p.maxHp,
@@ -514,7 +562,7 @@ export class TrainingMode extends GameMode {
       mp: p.mp,
       maxMp: p.maxMp,
       exp: p.exp,
-      nextExp: dartNextLevelExp(p.level),
+      nextExp: p.nextExp,
       gold: p.gold,
       additionName: eq.name,
       additionLevel: p.additionLevel(eq),
@@ -532,6 +580,8 @@ export class TrainingMode extends GameMode {
     this.sight.dispose();
     this.spawnMenu.dispose();
     this.spawnOpenBtn.dispose();
+    this.charMenu.dispose();
+    this.charBtn.dispose();
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
   }

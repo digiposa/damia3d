@@ -12,6 +12,8 @@ export interface StatBreakdown {
 /** Character status shown in the System menu's Status tab. */
 export interface StatusView {
   name: string;
+  /** Portrait image URL; falls back to the name's initial when absent. */
+  portrait?: string;
   level: number;
   exp: number;
   nextExp: number;

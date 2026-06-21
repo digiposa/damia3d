@@ -79,6 +79,9 @@ const en: Dict = {
   "config.zoom": "Camera zoom",
   "config.language": "Language",
 
+  // Character menu
+  "char.title": "Character",
+
   // Spawn menu
   "spawn.title": "Spawn enemies",
   "spawn.knight": "🛡  Knight of Sandora",
@@ -167,6 +170,7 @@ const fr: Dict = {
   "config.zoom": "Zoom caméra",
   "config.language": "Langue",
 
+  "char.title": "Personnage",
   "spawn.title": "Apparition d'ennemis",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",

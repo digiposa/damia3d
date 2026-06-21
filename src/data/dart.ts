@@ -1,11 +1,14 @@
 import type { Stats } from "../combat/types";
 
-/** One row of Dart's growth table: cumulative EXP and the stats at that level. */
+/** One row of a character growth table: cumulative EXP and the stats at that level. */
 export interface DartLevel extends Stats {
   level: number;
   /** Total cumulative EXP required to reach this level. */
   exp: number;
 }
+
+/** Generic alias — a growth-table row for any character. */
+export type CharacterLevel = DartLevel;
 
 export const DART_MAX_LEVEL = 60;
 
@@ -75,6 +78,28 @@ export const DART_LEVELS: DartLevel[] = [
   { level: 59, exp: 360758, maxHp: 7340, at: 147, df: 147, mat: 147, mdf: 147 },
   { level: 60, exp: 382000, maxHp: 7500, at: 150, df: 150, mat: 150, mdf: 150 },
 ];
+
+/** Stats at a level from any growth table (clamped to its range). */
+export function statsForLevel(levels: CharacterLevel[], level: number): CharacterLevel {
+  const i = Math.min(Math.max(Math.floor(level), 1), levels.length);
+  return levels[i - 1];
+}
+
+/** Highest level in a table whose cumulative EXP requirement is met by `exp`. */
+export function levelForExp(levels: CharacterLevel[], exp: number): number {
+  let lvl = 1;
+  for (const row of levels) {
+    if (exp >= row.exp) lvl = row.level;
+    else break;
+  }
+  return lvl;
+}
+
+/** Cumulative EXP needed to reach the next level in a table (capped at the max). */
+export function nextLevelExp(levels: CharacterLevel[], level: number): number {
+  if (level >= levels.length) return levels[levels.length - 1].exp;
+  return levels[level].exp;
+}
 
 /** Stats for a given level, clamped to the valid 1–60 range. */
 export function dartStatsForLevel(level: number): DartLevel {

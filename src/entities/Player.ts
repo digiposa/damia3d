@@ -6,9 +6,11 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
-import { dartStatsForLevel, dartLevelForExp, type DartLevel } from "../data/dart";
-import { DART_ADDITIONS, DART_ADDITION_LIST, type AdditionDef } from "../data/additions";
-import { type EquipDef, type EquipSlot, equipById } from "../data/equipment";
+import { statsForLevel, levelForExp, nextLevelExp, type CharacterLevel } from "../data/dart";
+import type { AdditionDef } from "../data/additions";
+import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/equipment";
+import { type DragoonClass, dragoonClass } from "../data/dragoonClasses";
+import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
 
 const SPEED = 6; // world units per second
@@ -20,42 +22,38 @@ const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activatio
 const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
 
 /**
- * Dart — the player avatar. Placeholder capsule body with a "nose" marker so
- * facing direction is visible; swap for a rigged glTF model later. Carries the
- * party-leader battle state (level, EXP, HP) driven by the canonical stat table,
- * plus the currently equipped Addition used by the real-time combo system.
+ * The player avatar. Placeholder capsule body with a "nose" marker so facing is
+ * visible; swap for a rigged glTF model later. Driven by a {@link Bearer} (the
+ * identity/skin) which resolves to a Dragoon class providing the stat table,
+ * element, Additions and equipment line. Carries the live battle state.
  */
 export class Player {
   readonly root: TransformNode;
+  readonly bearer: Bearer;
+  private cls: DragoonClass;
 
   level: number;
   exp: number;
   hp: number;
-  stats: DartLevel;
+  stats: CharacterLevel;
 
-  /** Dart's own element (Red-Eye / Fire Dragoon) — the target element for incoming attacks. */
-  readonly element: Element = "Fire";
+  /** Dragoon element — the target element for incoming attacks. */
+  readonly element: Element;
 
-  /** Equipped Addition performed by the melee combo system. */
-  addition: AdditionDef = DART_ADDITIONS.doubleSlash;
+  /** Equipped Addition performed by the real-time combo system. */
+  addition: AdditionDef;
 
   /** Dragoon Spirit Points accumulated from landing Addition hits. */
   sp = 0;
   /** SP gauge cap (one Dragoon level early on; rises later). */
   readonly maxSp = 100;
-  /** Magic points (placeholder — Dart uses items/SP in LoD; tune later). */
+  /** Magic points (placeholder — uses items/SP in LoD; tune later). */
   mp = 0;
   /** Gold carried (awarded from defeated enemies). */
   gold = 0;
 
-  /** Equipped item per slot (Dart's initial loadout). */
-  readonly equipment: Record<EquipSlot, EquipDef | undefined> = {
-    weapon: equipById("broad_sword"),
-    head: equipById("bandana"),
-    body: equipById("leather_armor"),
-    feet: equipById("leather_boots"),
-    accessory: equipById("bracelet"),
-  };
+  /** Equipped item per slot. */
+  readonly equipment: Record<EquipSlot, EquipDef | undefined>;
 
   /** Successful performances per Addition (drives leveling: 20 each, up to Lv 5). */
   private additionPerf = new Map<string, number>();
@@ -64,9 +62,23 @@ export class Player {
   private guardCdTimer = 0;
   private guardShield!: Mesh;
 
-  constructor(scene: Scene, spawn = new Vector3(0, 0, 0), level = 1) {
+  constructor(scene: Scene, bearer: Bearer, spawn = new Vector3(0, 0, 0), level = 1) {
+    const cls = dragoonClass(bearer.classId);
+    if (!cls) throw new Error(`Dragoon class not implemented: ${bearer.classId}`);
+    this.bearer = bearer;
+    this.cls = cls;
+    this.element = cls.element;
+    this.addition = cls.additions[0];
+    this.equipment = {
+      weapon: cls.loadout.weapon ? equipById(cls.loadout.weapon) : undefined,
+      head: cls.loadout.head ? equipById(cls.loadout.head) : undefined,
+      body: cls.loadout.body ? equipById(cls.loadout.body) : undefined,
+      feet: cls.loadout.feet ? equipById(cls.loadout.feet) : undefined,
+      accessory: cls.loadout.accessory ? equipById(cls.loadout.accessory) : undefined,
+    };
+
     this.level = level;
-    this.stats = dartStatsForLevel(level);
+    this.stats = statsForLevel(cls.levels, level);
     this.exp = this.stats.exp;
     this.hp = this.stats.maxHp;
 
@@ -104,6 +116,21 @@ export class Player {
 
   get position(): Vector3 {
     return this.root.position;
+  }
+
+  /** Equipment `users` tag this character draws from. */
+  get equipmentUser(): Member {
+    return this.cls.equipmentUser;
+  }
+
+  /** Cumulative EXP needed to reach the next level. */
+  get nextExp(): number {
+    return nextLevelExp(this.cls.levels, this.level);
+  }
+
+  /** Remove the avatar's meshes (e.g. when switching bearer). */
+  dispose(): void {
+    this.root.dispose();
   }
 
   // --- Effective stats (base table + equipment) -----------------------------
@@ -218,12 +245,12 @@ export class Player {
    */
   gainExp(amount: number): void {
     this.exp += Math.max(0, amount);
-    const newLevel = dartLevelForExp(this.exp);
+    const newLevel = levelForExp(this.cls.levels, this.exp);
     if (newLevel === this.level) return;
 
     const prevMax = this.stats.maxHp;
     this.level = newLevel;
-    this.stats = dartStatsForLevel(newLevel);
+    this.stats = statsForLevel(this.cls.levels, newLevel);
     this.hp = Math.min(this.hp + (this.stats.maxHp - prevMax), this.maxHp);
   }
 
@@ -246,9 +273,14 @@ export class Player {
     this.root.rotation.y = Math.atan2(dir.x, dir.z);
   }
 
-  /** Additions Dart has learned at his current level, in acquisition order. */
+  /** Every Addition in this Dragoon class's repertoire (locked or not). */
+  get additions(): AdditionDef[] {
+    return this.cls.additions;
+  }
+
+  /** Additions learned at the current level, in acquisition order. */
   unlockedAdditions(): AdditionDef[] {
-    return DART_ADDITION_LIST.filter((a) => a.acquireLevel <= this.level);
+    return this.cls.additions.filter((a) => a.acquireLevel <= this.level);
   }
 
   /** Current level (1–5) of an Addition: +1 every 20 successful performances. */

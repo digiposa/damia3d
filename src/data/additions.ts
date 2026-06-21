@@ -70,6 +70,46 @@ export const DART_ADDITIONS = {
   },
 } satisfies Record<string, AdditionDef>;
 
+/** Lavitz / Albert Additions (Jade line). */
+export const LAVITZ_ADDITIONS = {
+  harpoon: {
+    name: "Harpoon",
+    hits: [75, 25],
+    multiplier: [100, 110, 120, 130, 150],
+    spMax: 50,
+    acquireLevel: 1,
+  },
+  spinningCane: {
+    name: "Spinning Cane",
+    hits: [50, 25, 25],
+    multiplier: [100, 125, 150, 175, 200],
+    spMax: 35,
+    acquireLevel: 5,
+  },
+  rodTyphoon: {
+    name: "Rod Typhoon",
+    hits: [30, 30, 30, 30, 30],
+    multiplier: [100, 108, 116, 124, 135],
+    spMax: 100,
+    acquireLevel: 7,
+  },
+  gustOfWindDance: {
+    name: "Gust of Wind Dance",
+    hits: [30, 30, 30, 30, 30, 30, 20],
+    multiplier: [100, 120, 140, 160, 175],
+    spMax: 35,
+    acquireLevel: 11,
+  },
+  flowerStorm: {
+    name: "Flower Storm",
+    hits: [30, 30, 30, 40, 40, 40, 40, 50],
+    multiplier: [100, 108, 116, 124, 135],
+    spMax: 202,
+    // Real condition: perform all prior Additions 80 times. Gated high for now.
+    acquireLevel: 99,
+  },
+} satisfies Record<string, AdditionDef>;
+
 /** Dart's Additions in acquisition order. */
 export const DART_ADDITION_LIST: AdditionDef[] = [
   DART_ADDITIONS.doubleSlash,
@@ -79,6 +119,15 @@ export const DART_ADDITION_LIST: AdditionDef[] = [
   DART_ADDITIONS.madnessHero,
   DART_ADDITIONS.moonStrike,
   DART_ADDITIONS.blazingDynamo,
+];
+
+/** Lavitz / Albert Additions in acquisition order. */
+export const LAVITZ_ADDITION_LIST: AdditionDef[] = [
+  LAVITZ_ADDITIONS.harpoon,
+  LAVITZ_ADDITIONS.spinningCane,
+  LAVITZ_ADDITIONS.rodTyphoon,
+  LAVITZ_ADDITIONS.gustOfWindDance,
+  LAVITZ_ADDITIONS.flowerStorm,
 ];
 
 /**

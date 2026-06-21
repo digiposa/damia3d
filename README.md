@@ -130,6 +130,25 @@ Le jeu est en **anglais par défaut**, avec une **traduction française**
 est persistée. Toute autre langue s'ajoute en complétant un dictionnaire ; les
 clés manquantes retombent sur l'anglais.
 
+## Personnages (multi-personnages)
+
+L'architecture sépare **l'archétype** (la *classe Dragoon* : élément, table de
+niveaux, Additions, ligne d'équipement) de **l'identité** (le *porteur* : nom,
+portrait, lore).
+
+- [`data/dragoonClasses.ts`](src/data/dragoonClasses.ts) — les classes Dragoon
+  implémentées : **Red-Eye** (Feu, table de Dart) et **Jade** (Vent, table de
+  Lavitz). Les autres lignes s'ajoutent dès que leurs données arrivent.
+- [`data/bearers.ts`](src/data/bearers.ts) — les porteurs : Dart/Zieg (Red-Eye),
+  Lavitz/Albert/Greham/Syuveil (Jade). Les porteurs canon de l'**histoire**
+  ont leurs stats propres ; les autres sont des **reskins purs** (mêmes
+  stats / Additions / élément que la classe, seuls le nom et le portrait
+  changent), jouables en Training/Survival.
+
+En Training, le bouton **👤** (sous le menu de spawn) ouvre le sélecteur de
+personnage : choisir un porteur reconstruit l'avatar sur sa classe, au même
+niveau et à la même position.
+
 ## Architecture
 
 ```
@@ -160,12 +179,15 @@ src/
     AdditionRunner.ts  timing-sight des Additions (Hit 1 auto + presses)
     *.test.ts          tests des formules et du timing (Vitest)
   data/
-    dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau
-    additions.ts       données d'Additions de Dart (hits, multiplicateurs, SP)
+    dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau génériques
+    lavitz.ts          table de niveaux de Lavitz/Albert (1→60, ligne Jade)
+    additions.ts       données d'Additions (Dart Red-Eye + Lavitz Jade)
+    dragoonClasses.ts  archétypes Dragoon (élément, table, Additions, équipement)
+    bearers.ts         porteurs jouables (Dart/Zieg, Lavitz/Albert/… reskins)
     equipment.ts       équipements complets (armures tous persos + armes Dart + 49 accessoires)
     enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles)
   entities/
-    Player.ts          Dart : avatar déplaçable + état de combat + Addition équipée
+    Player.ts          avatar piloté par un porteur : état de combat + Addition équipée
     Enemy.ts           ennemi : HP, IA (actions phys/magie/soin), boss, barre de vie
   world/
     project.ts         projection monde→écran pour les overlays DOM
@@ -173,6 +195,7 @@ src/
     MainMenu.ts        écran-titre / sélection de mode
     SystemMenu.ts      menu système à onglets (Status/Équipement/Addition/Config)
     SpawnMenu.ts       menu de spawn d'ennemis (Training, met en pause)
+    CharacterMenu.ts   sélecteur de personnage (Training/Survival, met en pause)
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)
