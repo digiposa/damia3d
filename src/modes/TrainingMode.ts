@@ -69,7 +69,6 @@ export class TrainingMode extends GameMode {
   private attackTarget?: Enemy;
   private pendingAttack = false;
 
-  private log = "";
   private canvas?: HTMLCanvasElement;
 
   enter(): void {
@@ -148,10 +147,7 @@ export class TrainingMode extends GameMode {
 
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
-    if (this.runner.tick(cdt)) {
-      this.log = t("log.additionMiss", { name: this.player.addition.name });
-      this.comboTarget = undefined;
-    }
+    if (this.runner.tick(cdt)) this.comboTarget = undefined;
     this.updateEnemies(cdt);
     this.updateSight();
 
@@ -268,7 +264,6 @@ export class TrainingMode extends GameMode {
     const res = this.runner.press(add);
 
     if (res.kind === "miss") {
-      this.log = t("log.additionMiss", { name: add.name });
       this.comboTarget = undefined;
       return;
     }
@@ -281,7 +276,6 @@ export class TrainingMode extends GameMode {
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), "#ffffff");
     if (res.completed) {
       this.player.recordAddition(add);
-      this.log = t("log.additionPerfect", { name: add.name });
       this.comboTarget = undefined;
     }
   }
@@ -306,11 +300,7 @@ export class TrainingMode extends GameMode {
     if (!target.alive) {
       this.player.gainExp(target.def.expReward);
       this.player.gold += target.def.goldReward;
-      this.log = t("log.defeated", {
-        name: target.def.name,
-        exp: target.def.expReward,
-        gold: target.def.goldReward,
-      });
+      this.popText(target.headPosition, `+${target.def.expReward} EXP`, "#9fe6a0");
       this.removeEnemy(target);
       this.runner.cancel();
       this.comboTarget = undefined;
@@ -332,7 +322,6 @@ export class TrainingMode extends GameMode {
     if (action.kind === "heal") {
       enemy.heal(action.amount);
       this.popText(enemy.headPosition, `+${action.amount}`, "#7CFC7C");
-      this.log = t("log.enemyHeal", { name: enemy.def.name, action: action.name });
       return;
     }
 
@@ -342,11 +331,9 @@ export class TrainingMode extends GameMode {
         : enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, action.multiplier);
     this.player.hp = Math.max(0, this.player.hp - dmg);
     this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
-    this.log = t("log.enemyAction", { name: enemy.def.name, action: action.name, dmg });
 
     if (this.player.hp === 0) {
       this.player.hp = this.player.stats.maxHp; // sandbox: revive instead of game-over
-      this.log = t("log.fell", { hero: HERO_NAME });
     }
   }
 
@@ -403,7 +390,6 @@ export class TrainingMode extends GameMode {
   private equipAddition(def: AdditionDef): void {
     this.player.addition = def;
     this.runner.cancel(); // never keep a running combo on the old Addition
-    this.log = t("log.equipped", { name: def.name });
   }
 
   /** Build the Addition rows from the player's unlock/level state. */
@@ -419,7 +405,6 @@ export class TrainingMode extends GameMode {
 
   private spawnKnight(): void {
     this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
-    this.log = t("log.knightSpawned", { n: this.enemies.length });
   }
 
   /**
@@ -429,7 +414,6 @@ export class TrainingMode extends GameMode {
    */
   private spawnCommander(): void {
     this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
-    this.log = t("log.commanderSpawned");
   }
 
   /** A random spawn position on a ring around the player. */
@@ -462,17 +446,6 @@ export class TrainingMode extends GameMode {
       additionName: eq.name,
       additionLevel: p.additionLevel(eq),
     });
-
-    const run = this.runner.current;
-    const combo = run
-      ? `${run.name} ${this.runner.hits}/${run.hits.length}${this.runner.inWindow ? "  " + t("combat.press") : ""}`
-      : this.log;
-    const modeLine = t("tech.mode", {
-      mode: this.name,
-      n: this.enemies.length,
-      speed: settings.combatSpeed,
-    });
-    this.host.setStatus(combo ? `${modeLine}  ·  ${combo}` : modeLine);
   }
 
   dispose(): void {

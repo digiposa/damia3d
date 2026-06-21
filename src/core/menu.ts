@@ -38,6 +38,4 @@ export interface ModeMenuData {
 export interface GameHost {
   /** Open the in-game System menu (pauses the game). */
   openSystemMenu(): void;
-  /** Push a short status line to the global tech overlay (mode / combat info). */
-  setStatus(text: string): void;
 }

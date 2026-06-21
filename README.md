@@ -161,7 +161,7 @@ src/
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)
     StatsBar.ts        barre de stats (portrait, LV, HP/SP/MP, Gold, EXP)
-    TechOverlay.ts     bandeau technique discret en haut, visible partout (FPS · moteur · build)
+    TechOverlay.ts     tag de build discret en haut à gauche (hash du commit), visible partout
     TimingSight.ts     carré de visée des Additions (timing LoD)
     FloatingText.ts    nombres de dégâts flottants
 ```
