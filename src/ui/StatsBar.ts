@@ -1,3 +1,5 @@
+import { t } from "../core/i18n";
+
 /** Snapshot of the values the stats bar renders. */
 export interface StatsView {
   name: string;
@@ -173,9 +175,9 @@ export class StatsBar {
   set(v: StatsView): void {
     this.lvBadge.textContent = `LV ${v.level}`;
     this.nameLabel.textContent = v.name;
-    fill(this.hp, v.hp, v.maxHp, "HP");
-    fill(this.sp, v.sp, v.maxSp, "SP");
-    fill(this.mp, v.mp, v.maxMp, "MP");
+    fill(this.hp, v.hp, v.maxHp, t("stat.hp"));
+    fill(this.sp, v.sp, v.maxSp, t("stat.sp"));
+    fill(this.mp, v.mp, v.maxMp, t("stat.mp"));
     this.goldEl.textContent = `${v.gold} G`;
     this.expEl.textContent = `EXP ${v.exp} / ${v.nextExp}`;
     this.addition.textContent = `⚔ ${v.additionName}  Lv ${v.additionLevel} ▸`;

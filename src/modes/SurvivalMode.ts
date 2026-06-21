@@ -6,6 +6,6 @@ import { StubMode } from "./StubMode";
  */
 export class SurvivalMode extends StubMode {
   readonly name = "Survival";
-  protected title = "Mode Survie";
-  protected subtitle = "Vagues d'ennemis sans fin — à venir";
+  protected titleKey = "stub.survival.title";
+  protected subtitleKey = "stub.survival.subtitle";
 }

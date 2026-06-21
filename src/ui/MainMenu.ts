@@ -1,26 +1,24 @@
 import { hasTouch } from "../core/device";
+import { t, onLocaleChange } from "../core/i18n";
 
 export type ModeId = "Training" | "Story" | "Survival";
 
-interface MenuEntry {
-  mode: ModeId;
-  label: string;
-  blurb: string;
-}
-
-const ENTRIES: MenuEntry[] = [
-  { mode: "Training", label: "Training", blurb: "Bac à sable jouable" },
-  { mode: "Story", label: "Story", blurb: "Campagne (bientôt)" },
-  { mode: "Survival", label: "Survival", blurb: "Vagues d'ennemis (bientôt)" },
+const ENTRIES: { mode: ModeId; labelKey: string; blurbKey: string }[] = [
+  { mode: "Training", labelKey: "mode.training", blurbKey: "mode.training.blurb" },
+  { mode: "Story", labelKey: "mode.story", blurbKey: "mode.story.blurb" },
+  { mode: "Survival", labelKey: "mode.survival", blurbKey: "mode.survival.blurb" },
 ];
 
 /**
  * Full-screen title screen shown at boot. Lets the player choose a mode to
  * start. Works with mouse and touch; the active game HUD is hidden while it is
- * visible (the Game toggles it).
+ * visible (the Game toggles it). Refreshes its text on a language change.
  */
 export class MainMenu {
   private root: HTMLDivElement;
+  private subtitle: HTMLDivElement;
+  private hint: HTMLDivElement;
+  private entryNodes: { label: HTMLSpanElement; blurb: HTMLSpanElement; labelKey: string; blurbKey: string }[] = [];
 
   constructor(private onSelect: (mode: ModeId) => void) {
     this.root = document.createElement("div");
@@ -34,8 +32,7 @@ export class MainMenu {
       gap: "10px",
       padding: "24px",
       boxSizing: "border-box",
-      background:
-        "radial-gradient(120% 120% at 50% 30%, #141d2e 0%, #0b0d12 70%)",
+      background: "radial-gradient(120% 120% at 50% 30%, #141d2e 0%, #0b0d12 70%)",
       color: "#cfe3ff",
       textAlign: "center",
       zIndex: "30",
@@ -49,15 +46,14 @@ export class MainMenu {
       textShadow: "0 4px 24px rgba(60,110,200,0.45)",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    const subtitle = document.createElement("div");
-    subtitle.textContent = "Hommage à The Legend of Dragoon";
-    Object.assign(subtitle.style, {
+    this.subtitle = document.createElement("div");
+    Object.assign(this.subtitle.style, {
       font: "400 clamp(13px, 3.5vw, 16px)/1.4 system-ui, sans-serif",
       opacity: "0.7",
       marginBottom: "18px",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    this.root.append(title, subtitle);
+    this.root.append(title, this.subtitle);
 
     const list = document.createElement("div");
     Object.assign(list.style, {
@@ -84,9 +80,13 @@ export class MainMenu {
         textAlign: "left",
       } satisfies Partial<CSSStyleDeclaration>);
       btn.style.setProperty("-webkit-tap-highlight-color", "transparent");
-      btn.innerHTML =
-        `<span>${entry.label}</span>` +
-        `<span style="font:400 12px/1.3 system-ui;opacity:0.65">${entry.blurb}</span>`;
+
+      const label = document.createElement("span");
+      const blurb = document.createElement("span");
+      Object.assign(blurb.style, { font: "400 12px/1.3 system-ui", opacity: "0.65" } satisfies Partial<CSSStyleDeclaration>);
+      btn.append(label, blurb);
+      this.entryNodes.push({ label, blurb, labelKey: entry.labelKey, blurbKey: entry.blurbKey });
+
       btn.addEventListener("pointerup", (e) => {
         e.preventDefault();
         this.onSelect(entry.mode);
@@ -95,18 +95,26 @@ export class MainMenu {
     }
     this.root.appendChild(list);
 
-    const hint = document.createElement("div");
-    hint.textContent = hasTouch()
-      ? "Touchez un mode pour commencer"
-      : "Cliquez un mode — ou F1 / F2 / F3 · Échap pour rouvrir ce menu";
-    Object.assign(hint.style, {
+    this.hint = document.createElement("div");
+    Object.assign(this.hint.style, {
       font: "12px/1.4 ui-monospace, monospace",
       opacity: "0.5",
       marginTop: "20px",
     } satisfies Partial<CSSStyleDeclaration>);
-    this.root.appendChild(hint);
+    this.root.appendChild(this.hint);
 
     document.body.appendChild(this.root);
+    this.applyTexts();
+    onLocaleChange(() => this.applyTexts());
+  }
+
+  private applyTexts(): void {
+    this.subtitle.textContent = t("menu.subtitle");
+    this.hint.textContent = hasTouch() ? t("menu.hint.touch") : t("menu.hint.desktop");
+    for (const e of this.entryNodes) {
+      e.label.textContent = t(e.labelKey);
+      e.blurb.textContent = t(e.blurbKey);
+    }
   }
 
   get isOpen(): boolean {
@@ -114,6 +122,7 @@ export class MainMenu {
   }
 
   show(): void {
+    this.applyTexts();
     this.root.style.display = "flex";
   }
 

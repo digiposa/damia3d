@@ -1,3 +1,5 @@
+import { t } from "../core/i18n";
+
 export interface SpawnCallbacks {
   onKnight: () => void;
   onCommander: () => void;
@@ -5,12 +7,17 @@ export interface SpawnCallbacks {
 }
 
 /**
- * Training-only spawn menu. A pausing overlay (like the Options menu) that lets
+ * Training-only spawn menu. A pausing overlay (like the System menu) that lets
  * the developer drop enemies into the arena one kind at a time. Stays open after
- * a spawn so several can be added; "Reprendre" closes it.
+ * a spawn so several can be added; Resume closes it. Rebuilt on each open so it
+ * follows the current language.
  */
 export class SpawnMenu {
   private root: HTMLDivElement;
+  private title: HTMLDivElement;
+  private knightBtn: HTMLButtonElement;
+  private commanderBtn: HTMLButtonElement;
+  private resumeBtn: HTMLButtonElement;
 
   constructor(cb: SpawnCallbacks) {
     this.root = document.createElement("div");
@@ -29,24 +36,22 @@ export class SpawnMenu {
       zIndex: "31",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    const title = document.createElement("div");
-    title.textContent = "Apparition d'ennemis";
-    Object.assign(title.style, {
+    this.title = document.createElement("div");
+    Object.assign(this.title.style, {
       font: "800 clamp(24px, 7vw, 40px)/1 system-ui, sans-serif",
       marginBottom: "6px",
     } satisfies Partial<CSSStyleDeclaration>);
-    this.root.appendChild(title);
 
-    this.root.appendChild(this.button("🛡  Knight of Sandora", "rgba(40,70,110,0.9)", cb.onKnight));
-    this.root.appendChild(this.button("👑  Commander (boss)", "rgba(90,55,120,0.9)", cb.onCommander));
-    this.root.appendChild(this.button("▶  Reprendre", "rgba(40,90,60,0.9)", cb.onResume));
+    this.knightBtn = this.button("rgba(40,70,110,0.9)", cb.onKnight);
+    this.commanderBtn = this.button("rgba(90,55,120,0.9)", cb.onCommander);
+    this.resumeBtn = this.button("rgba(40,90,60,0.9)", cb.onResume);
 
+    this.root.append(this.title, this.knightBtn, this.commanderBtn, this.resumeBtn);
     document.body.appendChild(this.root);
   }
 
-  private button(label: string, bg: string, onClick: () => void): HTMLButtonElement {
+  private button(bg: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
-    btn.textContent = label;
     Object.assign(btn.style, {
       font: "700 16px/1 system-ui, sans-serif",
       color: "#eaf2ff",
@@ -71,6 +76,10 @@ export class SpawnMenu {
   }
 
   show(): void {
+    this.title.textContent = t("spawn.title");
+    this.knightBtn.textContent = t("spawn.knight");
+    this.commanderBtn.textContent = t("spawn.commander");
+    this.resumeBtn.textContent = `▶  ${t("common.resume")}`;
     this.root.style.display = "flex";
   }
 
@@ -82,3 +91,4 @@ export class SpawnMenu {
     this.root.remove();
   }
 }
+

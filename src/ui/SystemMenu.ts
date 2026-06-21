@@ -1,5 +1,6 @@
 import { settings } from "../core/settings";
 import { hasTouch } from "../core/device";
+import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry } from "../core/menu";
 import {
   type AdditionDef,
@@ -10,11 +11,11 @@ import {
 
 type Section = "status" | "equip" | "addition" | "config";
 
-const SECTIONS: { id: Section; label: string; icon: string }[] = [
-  { id: "status", label: "Status", icon: "📊" },
-  { id: "equip", label: "Équipement", icon: "🛡️" },
-  { id: "addition", label: "Addition", icon: "💥" },
-  { id: "config", label: "Config", icon: "⚙" },
+const SECTIONS: { id: Section; labelKey: string; icon: string }[] = [
+  { id: "status", labelKey: "section.status", icon: "📊" },
+  { id: "equip", labelKey: "section.equip", icon: "🛡️" },
+  { id: "addition", labelKey: "section.addition", icon: "💥" },
+  { id: "config", labelKey: "section.config", icon: "⚙" },
 ];
 
 const COMBAT_SPEEDS = [0.5, 1, 1.5, 2];
@@ -29,16 +30,16 @@ export interface SystemMenuCallbacks {
 
 /**
  * In-game System menu in the LoD PS1 style: a left section list (Status,
- * Équipement, Addition, Config) and a right content panel. It pauses the game
- * and is the single hub for character info, equipping Additions and settings.
+ * Equipment, Addition, Config) and a right content panel. It pauses the game and
+ * is the single hub for character info, equipping Additions and settings. The
+ * nav shows icons only on mobile. Nav and content are rebuilt on each render so
+ * a language change applies live.
  */
 export class SystemMenu {
   private root: HTMLDivElement;
   private nav: HTMLDivElement;
   private content: HTMLDivElement;
   private section: Section = "status";
-  private navButtons = new Map<Section, HTMLButtonElement>();
-  /** On mobile the nav shows icons only to save width. */
   private compact = hasTouch();
 
   constructor(private cb: SystemMenuCallbacks) {
@@ -70,7 +71,6 @@ export class SystemMenu {
       boxSizing: "border-box",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    // --- Left nav -------------------------------------------------------
     this.nav = document.createElement("div");
     Object.assign(this.nav.style, {
       display: "flex",
@@ -80,26 +80,6 @@ export class SystemMenu {
       flex: "0 0 auto",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    for (const s of SECTIONS) {
-      const btn = navButton(s.icon, s.label, this.compact, () => {
-        this.section = s.id;
-        this.render();
-      });
-      this.navButtons.set(s.id, btn);
-      this.nav.appendChild(btn);
-    }
-
-    const spacer = document.createElement("div");
-    spacer.style.flex = "1";
-    this.nav.appendChild(spacer);
-    this.nav.appendChild(
-      navButton("▶", "Reprendre", this.compact, () => this.cb.onResume(), "#2f6b3e"),
-    );
-    this.nav.appendChild(
-      navButton("⌂", "Menu principal", this.compact, () => this.cb.onMainMenu(), "#6b3340"),
-    );
-
-    // --- Right content --------------------------------------------------
     this.content = document.createElement("div");
     Object.assign(this.content.style, {
       flex: "1",
@@ -136,12 +116,7 @@ export class SystemMenu {
   // --- Rendering ------------------------------------------------------------
 
   private render(): void {
-    for (const [id, btn] of this.navButtons) {
-      const on = id === this.section;
-      btn.style.background = on ? "rgba(200,162,74,0.92)" : "rgba(40,34,16,0.85)";
-      btn.style.color = on ? "#1a1608" : "#f0e6cf";
-    }
-
+    this.renderNav();
     const data = this.cb.data();
     this.content.replaceChildren(
       this.section === "config"
@@ -154,39 +129,58 @@ export class SystemMenu {
     );
   }
 
+  private renderNav(): void {
+    const items: HTMLElement[] = SECTIONS.map((s) =>
+      navButton(s.icon, t(s.labelKey), this.compact, () => {
+        this.section = s.id;
+        this.render();
+      }, s.id === this.section ? "rgba(200,162,74,0.92)" : undefined, s.id === this.section),
+    );
+
+    const spacer = document.createElement("div");
+    spacer.style.flex = "1";
+
+    items.push(
+      spacer,
+      navButton("▶", t("common.resume"), this.compact, () => this.cb.onResume(), "#2f6b3e"),
+      navButton("⌂", t("common.mainMenu"), this.compact, () => this.cb.onMainMenu(), "#6b3340"),
+    );
+    this.nav.replaceChildren(...items);
+  }
+
   private renderStatus(data?: ModeMenuData): HTMLElement {
-    if (!data) return note("Status indisponible dans ce mode.");
+    if (!data) return note(t("status.unavailable"));
     const s = data.status;
-    const box = section("Status");
+    const box = section(t("section.status"));
     box.appendChild(heading(`${s.name}   LV ${s.level}`));
     box.appendChild(statLines([
-      ["HP", `${s.hp} / ${s.maxHp}`],
-      ["SP", `${s.sp} / ${s.maxSp}`],
-      ["MP", `${s.mp} / ${s.maxMp}`],
-      ["EXP", `${s.exp} / ${s.nextExp}`],
+      [t("stat.hp"), `${s.hp} / ${s.maxHp}`],
+      [t("stat.sp"), `${s.sp} / ${s.maxSp}`],
+      [t("stat.mp"), `${s.mp} / ${s.maxMp}`],
+      [t("stat.exp"), `${s.exp} / ${s.nextExp}`],
     ]));
     box.appendChild(divider());
     box.appendChild(statLines([
-      ["Attaque", String(s.at)],
-      ["Défense", String(s.df)],
-      ["Attaque M.", String(s.mat)],
-      ["Défense M.", String(s.mdf)],
+      [t("stat.at"), String(s.at)],
+      [t("stat.df"), String(s.df)],
+      [t("stat.mat"), String(s.mat)],
+      [t("stat.mdf"), String(s.mdf)],
     ]));
     box.appendChild(divider());
-    box.appendChild(statLines([["Gold", `${s.gold} G`]]));
+    box.appendChild(statLines([[t("stat.gold"), `${s.gold} G`]]));
     return box;
   }
 
   private renderEquip(): HTMLElement {
-    const box = section("Équipement");
-    box.appendChild(note("Aucun équipement pour l'instant — arme, armure et accessoires à venir."));
+    const box = section(t("section.equip"));
+    box.appendChild(note(t("equip.placeholder")));
     return box;
   }
 
   private renderAddition(data?: ModeMenuData): HTMLElement {
-    const box = section("Addition");
+    const box = section(t("section.addition"));
     if (!data) {
-      box.appendChild(note("Additions indisponibles dans ce mode."));
+      box.appendChild(note(t("addition.unavailable")));
       return box;
     }
     for (const entry of data.additions) {
@@ -219,8 +213,8 @@ export class SystemMenu {
 
     const dam = Math.floor((additionHitsPercent(def) * additionMultiplier(def, level)) / 100);
     const sub = unlocked
-      ? `${additionPresses(def)} press · Lv ${level}/5 · ${dam}% · SP ${def.spMax}`
-      : `🔒 Niveau ${def.acquireLevel}`;
+      ? t("addition.sub", { presses: additionPresses(def), level, dam, sp: def.spMax })
+      : t("addition.locked", { level: def.acquireLevel });
     el.innerHTML =
       `<span>${def.name}${equipped ? "  ✓" : ""}</span>` +
       `<span style="font:400 12px/1.3 ui-monospace,monospace;opacity:0.85;color:${equipped ? "#2a2310" : "inherit"}">${sub}</span>`;
@@ -236,30 +230,42 @@ export class SystemMenu {
   }
 
   private renderConfig(): HTMLElement {
-    const box = section("Config");
+    const box = section(t("section.config"));
 
-    const soundBtn = pill(
-      settings.soundEnabled ? "🔊 Son : Activé" : "🔇 Son : Coupé",
-      () => {
+    box.append(label(t("config.language")));
+    box.append(
+      choiceRow(
+        LOCALES.map((l) => l.id),
+        getLocale(),
+        (id) => {
+          setLocale(id);
+          this.render();
+        },
+        (id) => LOCALES.find((l) => l.id === id)!.label,
+      ),
+    );
+
+    box.append(divider(), label(t("config.sound")));
+    box.append(
+      pill(settings.soundEnabled ? t("config.sound.on") : t("config.sound.off"), () => {
         settings.soundEnabled = !settings.soundEnabled;
         this.render();
-      },
+      }),
     );
-    box.append(label("Son"), soundBtn);
-    box.append(slider("Musique", settings.musicVolume, (v) => (settings.musicVolume = v)));
-    box.append(slider("Effets", settings.sfxVolume, (v) => (settings.sfxVolume = v)));
-    box.append(hint("(aucun son pour l'instant — réglages prêts)"));
+    box.append(slider(t("config.music"), settings.musicVolume, (v) => (settings.musicVolume = v)));
+    box.append(slider(t("config.sfx"), settings.sfxVolume, (v) => (settings.sfxVolume = v)));
+    box.append(hint(t("config.sound.note")));
 
-    box.append(divider(), label("Vitesse de combat"));
+    box.append(divider(), label(t("config.combatSpeed")));
     box.append(
       choiceRow(COMBAT_SPEEDS, settings.combatSpeed, (v) => {
         settings.combatSpeed = v;
         this.render();
       }, (v) => `${v}×`),
     );
-    box.append(hint("La vitesse de déplacement n'est pas affectée."));
+    box.append(hint(t("config.combatSpeed.note")));
 
-    box.append(divider(), label("Zoom caméra"));
+    box.append(divider(), label(t("config.zoom")));
     box.append(
       choiceRow(ZOOM_LEVELS, settings.cameraZoom, (v) => {
         settings.cameraZoom = v;
@@ -274,17 +280,18 @@ export class SystemMenu {
 
 function navButton(
   icon: string,
-  label: string,
+  labelText: string,
   compact: boolean,
   onClick: () => void,
   bg = "rgba(40,34,16,0.85)",
+  active = false,
 ): HTMLButtonElement {
   const btn = document.createElement("button");
-  btn.textContent = compact ? icon : `${icon}  ${label}`;
-  btn.title = label;
+  btn.textContent = compact ? icon : `${icon}  ${labelText}`;
+  btn.title = labelText;
   Object.assign(btn.style, {
     font: compact ? "20px/1 system-ui, sans-serif" : "700 15px/1 system-ui, sans-serif",
-    color: "#f0e6cf",
+    color: active ? "#1a1608" : "#f0e6cf",
     background: bg,
     border: "1px solid #6b551f",
     borderRadius: "8px",
@@ -408,11 +415,11 @@ function pill(text: string, onClick: () => void): HTMLButtonElement {
   return btn;
 }
 
-function choiceRow(
-  values: number[],
-  active: number,
-  onPick: (v: number) => void,
-  fmt: (v: number) => string,
+function choiceRow<T extends string | number>(
+  values: T[],
+  active: T,
+  onPick: (v: T) => void,
+  fmt: (v: T) => string,
 ): HTMLDivElement {
   const row = document.createElement("div");
   Object.assign(row.style, { display: "flex", gap: "8px", flexWrap: "wrap" } satisfies Partial<CSSStyleDeclaration>);

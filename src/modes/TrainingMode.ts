@@ -23,6 +23,7 @@ import {
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { dartNextLevelExp } from "../data/dart";
+import { t } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry } from "../core/menu";
 import { TechOverlay } from "../ui/TechOverlay";
 import { ActionButton } from "../ui/ActionButton";
@@ -151,7 +152,7 @@ export class TrainingMode extends GameMode {
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
     if (this.runner.tick(cdt)) {
-      this.log = `${this.player.addition.name} raté`;
+      this.log = t("log.additionMiss", { name: this.player.addition.name });
       this.comboTarget = undefined;
     }
     this.updateEnemies(cdt);
@@ -270,7 +271,7 @@ export class TrainingMode extends GameMode {
     const res = this.runner.press(add);
 
     if (res.kind === "miss") {
-      this.log = `${add.name} raté`;
+      this.log = t("log.additionMiss", { name: add.name });
       this.comboTarget = undefined;
       return;
     }
@@ -280,10 +281,10 @@ export class TrainingMode extends GameMode {
     // SP accrues per landed input (hit 1 is free); award an even share of spMax.
     const share = Math.floor(add.spMax / additionPresses(add));
     this.player.sp = Math.min(this.player.maxSp, this.player.sp + share);
-    if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), "PERFECT", "#ffffff");
+    if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), "#ffffff");
     if (res.completed) {
       this.player.recordAddition(add);
-      this.log = `${add.name} — Addition réussie !`;
+      this.log = t("log.additionPerfect", { name: add.name });
       this.comboTarget = undefined;
     }
   }
@@ -308,7 +309,11 @@ export class TrainingMode extends GameMode {
     if (!target.alive) {
       this.player.gainExp(target.def.expReward);
       this.player.gold += target.def.goldReward;
-      this.log = `${target.def.name} vaincu · +${target.def.expReward} EXP · +${target.def.goldReward} G`;
+      this.log = t("log.defeated", {
+        name: target.def.name,
+        exp: target.def.expReward,
+        gold: target.def.goldReward,
+      });
       this.removeEnemy(target);
       this.runner.cancel();
       this.comboTarget = undefined;
@@ -330,7 +335,7 @@ export class TrainingMode extends GameMode {
     if (action.kind === "heal") {
       enemy.heal(action.amount);
       this.popText(enemy.headPosition, `+${action.amount}`, "#7CFC7C");
-      this.log = `${enemy.def.name} : ${action.name}`;
+      this.log = t("log.enemyHeal", { name: enemy.def.name, action: action.name });
       return;
     }
 
@@ -340,11 +345,11 @@ export class TrainingMode extends GameMode {
         : enemyPhysicalAttack(enemy.def.stats.at, this.player.stats.df, action.multiplier);
     this.player.hp = Math.max(0, this.player.hp - dmg);
     this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
-    this.log = `${enemy.def.name} : ${action.name} (${dmg})`;
+    this.log = t("log.enemyAction", { name: enemy.def.name, action: action.name, dmg });
 
     if (this.player.hp === 0) {
       this.player.hp = this.player.stats.maxHp; // sandbox: revive instead of game-over
-      this.log = "Dart est tombé — PV restaurés";
+      this.log = t("log.fell", { hero: HERO_NAME });
     }
   }
 
@@ -401,7 +406,7 @@ export class TrainingMode extends GameMode {
   private equipAddition(def: AdditionDef): void {
     this.player.addition = def;
     this.runner.cancel(); // never keep a running combo on the old Addition
-    this.log = `Addition équipée : ${def.name}`;
+    this.log = t("log.equipped", { name: def.name });
   }
 
   /** Build the Addition rows from the player's unlock/level state. */
@@ -417,7 +422,7 @@ export class TrainingMode extends GameMode {
 
   private spawnKnight(): void {
     this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
-    this.log = `Knight of Sandora apparu (${this.enemies.length} en jeu)`;
+    this.log = t("log.knightSpawned", { n: this.enemies.length });
   }
 
   /**
@@ -427,7 +432,7 @@ export class TrainingMode extends GameMode {
    */
   private spawnCommander(): void {
     this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
-    this.log = "Commander (Seles) apparu";
+    this.log = t("log.commanderSpawned");
   }
 
   /** A random spawn position on a ring around the player. */
@@ -463,14 +468,18 @@ export class TrainingMode extends GameMode {
 
     const run = this.runner.current;
     const combo = run
-      ? `${run.name} ${this.runner.hits}/${run.hits.length}${this.runner.inWindow ? " ▸ APPUIE !" : ""}`
+      ? `${run.name} ${this.runner.hits}/${run.hits.length}${this.runner.inWindow ? "  " + t("combat.press") : ""}`
       : this.log;
     const engine = this.scene.getEngine();
     this.tech.set({
       fps: Math.round(engine.getFps()),
       engine: (engine as { isWebGPU?: boolean }).isWebGPU ? "WebGPU" : "WebGL2",
       build: __COMMIT__,
-      mode: `${this.name} · ${this.enemies.length} ennemi(s) · ${settings.combatSpeed}× combat`,
+      mode: t("tech.mode", {
+        mode: this.name,
+        n: this.enemies.length,
+        speed: settings.combatSpeed,
+      }),
       info: combo,
     });
   }

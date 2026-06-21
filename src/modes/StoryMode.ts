@@ -6,6 +6,6 @@ import { StubMode } from "./StubMode";
  */
 export class StoryMode extends StubMode {
   readonly name = "Story";
-  protected title = "Mode Histoire";
-  protected subtitle = "Campagne scénarisée — à venir";
+  protected titleKey = "stub.story.title";
+  protected subtitleKey = "stub.story.subtitle";
 }

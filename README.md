@@ -105,6 +105,14 @@ escortes vaincus** — Sword Slash devient **Slash Twice** (2×) et Burn Out pas
 1.5×. Pour voir le Power Up, faites aussi apparaître quelques Knights avant de
 les battre. Rendu de boss distinct (plus grand, couronne, barre de vie + nom).
 
+## Langues (i18n)
+
+Le jeu est en **anglais par défaut**, avec une **traduction française**
+([`src/core/i18n.ts`](src/core/i18n.ts)). La langue se détecte au démarrage
+(localStorage puis langue du navigateur), se change dans **Config → Langue**, et
+est persistée. Toute autre langue s'ajoute en complétant un dictionnaire ; les
+clés manquantes retombent sur l'anglais.
+
 ## Architecture
 
 ```
@@ -117,6 +125,7 @@ src/
     Input.ts           état d'entrée (axe virtuel + presses)
     settings.ts        réglages partagés (son, vitesse de combat, zoom)
     menu.ts            types du menu système (GameHost, données de mode)
+    i18n.ts            traductions (anglais par défaut + français)
     device.ts          détection tactile
   modes/
     TrainingMode.ts    arène hack & slash jouable
