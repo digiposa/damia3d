@@ -3,7 +3,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { Input } from "./Input";
 import { ModeManager } from "./ModeManager";
 import { hasTouch } from "./device";
-import type { GameHost } from "./menu";
+import type { GameHost, SystemSection } from "./menu";
 import { TrainingMode } from "../modes/TrainingMode";
 import { StoryMode } from "../modes/StoryMode";
 import { SurvivalMode } from "../modes/SurvivalMode";
@@ -110,13 +110,13 @@ export class Game implements GameHost {
   }
 
   /** GameHost: open the System menu (also used by the ⚙ button and Escape). */
-  openSystemMenu(): void {
+  openSystemMenu(section?: SystemSection): void {
     if (this.system.isOpen) return;
     const atMainMenu = this.menu.isOpen;
     if (!atMainMenu) this.paused = true; // pause gameplay (nothing runs at the title)
     this.systemBtn.setVisible(false);
     this.joystick?.setVisible(false);
-    this.system.show(atMainMenu);
+    this.system.show(atMainMenu, section);
   }
 
   private closeSystemMenu(): void {

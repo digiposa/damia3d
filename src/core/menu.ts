@@ -34,8 +34,11 @@ export interface ModeMenuData {
   equipAddition: (def: AdditionDef) => void;
 }
 
+/** A section of the in-game System menu. */
+export type SystemSection = "status" | "equip" | "addition" | "config";
+
 /** Services the running game exposes to its modes (e.g. opening the System menu). */
 export interface GameHost {
-  /** Open the in-game System menu (pauses the game). */
-  openSystemMenu(): void;
+  /** Open the in-game System menu (pauses the game), optionally on a section. */
+  openSystemMenu(section?: SystemSection): void;
 }

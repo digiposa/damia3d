@@ -1,7 +1,7 @@
 import { settings } from "../core/settings";
 import { hasTouch } from "../core/device";
 import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
-import type { ModeMenuData, AdditionEntry } from "../core/menu";
+import type { ModeMenuData, AdditionEntry, SystemSection } from "../core/menu";
 import {
   type AdditionDef,
   additionPresses,
@@ -9,7 +9,7 @@ import {
   additionMultiplier,
 } from "../data/additions";
 
-type Section = "status" | "equip" | "addition" | "config";
+type Section = SystemSection;
 
 const SECTIONS: { id: Section; labelKey: string; icon: string }[] = [
   { id: "status", labelKey: "section.status", icon: "📊" },
@@ -102,8 +102,9 @@ export class SystemMenu {
     return this.root.style.display !== "none";
   }
 
-  show(atMainMenu = false): void {
+  show(atMainMenu = false, section?: Section): void {
     this.atMainMenu = atMainMenu;
+    if (section) this.section = section; // clamped in render() if unavailable
     this.root.style.display = "flex";
     this.render();
   }

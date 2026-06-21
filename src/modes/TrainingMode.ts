@@ -86,8 +86,8 @@ export class TrainingMode extends GameMode {
     this.player = new Player(this.scene, new Vector3(0, 0, 0));
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
-    // The equipped-Addition chip in the stats bar opens the System menu.
-    this.stats = new StatsBar(() => this.host.openSystemMenu());
+    // The equipped-Addition chip in the stats bar opens the System menu on Addition.
+    this.stats = new StatsBar(() => this.host.openSystemMenu("addition"));
     this.sight = new TimingSight();
 
     // Spawn menu (Training only), opened from a button just below the gear (⚙).
