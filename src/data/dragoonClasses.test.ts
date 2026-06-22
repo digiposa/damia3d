@@ -4,6 +4,7 @@ import {
   RED_EYE,
   JADE,
   WHITE_SILVER,
+  DARKNESS,
   dragoonClass,
   isClassImplemented,
 } from "./dragoonClasses";
@@ -11,12 +12,15 @@ import { BEARERS, DEFAULT_BEARER, bearerById, selectableBearers } from "./bearer
 import { statsForLevel, levelForExp, nextLevelExp } from "./dart";
 import { LAVITZ_LEVELS } from "./lavitz";
 import { SHANA_LEVELS } from "./shana";
+import { ROSE_LEVELS } from "./rose";
+import { ROSE_ADDITION_LIST } from "./additions";
 
 describe("dragoon classes", () => {
   it("resolves implemented classes and reports unimplemented ones", () => {
     expect(dragoonClass("redEye")).toBe(RED_EYE);
     expect(dragoonClass("jade")).toBe(JADE);
     expect(dragoonClass("whiteSilver")).toBe(WHITE_SILVER);
+    expect(dragoonClass("darkness")).toBe(DARKNESS);
     expect(isClassImplemented("redEye")).toBe(true);
     expect(isClassImplemented("thunder")).toBe(false);
     expect(dragoonClass("thunder")).toBeUndefined();
@@ -29,6 +33,9 @@ describe("dragoon classes", () => {
     expect(JADE.equipmentUser).toBe("Lavitz");
     expect(WHITE_SILVER.element).toBe("Light");
     expect(WHITE_SILVER.equipmentUser).toBe("Shana");
+    expect(DARKNESS.element).toBe("Darkness");
+    expect(DARKNESS.equipmentUser).toBe("Rose");
+    expect(DARKNESS.additions).toBe(ROSE_ADDITION_LIST);
   });
 
   it("models the White-Silver line as Additionless (Shana / Miranda)", () => {
@@ -74,6 +81,7 @@ describe("bearers", () => {
       "syuveil",
       "shana",
       "miranda",
+      "rose",
     ]);
   });
 
@@ -115,6 +123,7 @@ describe("growth tables", () => {
   for (const [name, table] of [
     ["Jade (Lavitz)", LAVITZ_LEVELS],
     ["White-Silver (Shana)", SHANA_LEVELS],
+    ["Darkness (Rose)", ROSE_LEVELS],
   ] as const) {
     describe(name, () => {
       it("covers levels 1-60 in order", () => {

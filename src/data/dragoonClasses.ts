@@ -4,7 +4,13 @@ import type { CharacterLevel } from "./dart";
 import { DART_LEVELS } from "./dart";
 import { LAVITZ_LEVELS } from "./lavitz";
 import { SHANA_LEVELS } from "./shana";
-import { DART_ADDITION_LIST, LAVITZ_ADDITION_LIST, type AdditionDef } from "./additions";
+import { ROSE_LEVELS } from "./rose";
+import {
+  DART_ADDITION_LIST,
+  LAVITZ_ADDITION_LIST,
+  ROSE_ADDITION_LIST,
+  type AdditionDef,
+} from "./additions";
 
 /** A Dragoon line's mechanical identity (stats / element / Additions / gear). */
 export type DragoonClassId =
@@ -59,11 +65,22 @@ export const WHITE_SILVER: DragoonClass = {
   loadout: { weapon: "short_bow", head: "felt_hat", body: "leather_jacket", feet: "leather_shoes", accessory: "bracelet" },
 };
 
+export const DARKNESS: DragoonClass = {
+  id: "darkness",
+  dragoonName: "Darkness Dragoon",
+  element: "Darkness",
+  equipmentUser: "Rose",
+  levels: ROSE_LEVELS,
+  additions: ROSE_ADDITION_LIST,
+  loadout: { weapon: "rapier", head: "felt_hat", body: "leather_jacket", feet: "leather_shoes", accessory: "bracelet" },
+};
+
 /** Implemented Dragoon classes (others filled in as their data arrives). */
 const CLASSES: Partial<Record<DragoonClassId, DragoonClass>> = {
   redEye: RED_EYE,
   jade: JADE,
   whiteSilver: WHITE_SILVER,
+  darkness: DARKNESS,
 };
 
 export function dragoonClass(id: DragoonClassId): DragoonClass | undefined {
