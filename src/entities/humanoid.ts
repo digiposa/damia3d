@@ -4,13 +4,15 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { WeaponKind } from "../data/bearers";
+import type { WeaponKind, HairStyle } from "../data/bearers";
 
 export interface HumanoidOptions {
   /** Primary body colour (RGB 0–1). */
   color: [number, number, number];
   /** Weapon silhouette to carry (default "sword"). */
   weapon?: WeaponKind;
+  /** Distinctive hairstyle (e.g. Meru's high ponytail). */
+  hair?: HairStyle;
   /** Uniform scale (default 1). */
   scale?: number;
 }
@@ -49,6 +51,8 @@ export class Humanoid {
   private rightLeg: TransformNode;
   /** The arm that performs the strike (right for melee, right draws the bow). */
   private strikeArm: TransformNode;
+  /** Long ponytail (if any) — swayed by motion. */
+  private ponytail?: TransformNode;
   private style: StrikeStyle;
   private phase = 0;
   private strikeT = 0;
@@ -112,6 +116,11 @@ export class Humanoid {
     const weaponNode = buildWeapon(weapon, main, scene);
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
+
+    if (opts.hair === "ponytail") {
+      this.ponytail = buildPonytail(scene);
+      this.ponytail.parent = this.body; // bobs with the head
+    }
   }
 
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
@@ -142,6 +151,12 @@ export class Humanoid {
       this.leftLeg.rotation.x *= decay;
       this.rightLeg.rotation.x *= decay;
       this.body.position.y = 0.02 + Math.sin(this.phase) * 0.015;
+    }
+
+    // The ponytail lags the body's motion — a wider sway on the move, a faint one at rest.
+    if (this.ponytail) {
+      const amp = moving ? 0.2 : 0.05;
+      this.ponytail.rotation.x = 0.12 + Math.sin(this.phase) * amp;
     }
 
     // A strike overrides the wielding arm for its duration (player is usually
@@ -212,6 +227,39 @@ function limb(name: string, length: number, thick: number, material: StandardMat
   seg.material = material;
   seg.isPickable = false;
   seg.parent = pivot;
+  return pivot;
+}
+
+/**
+ * Meru's signature: a high silver ponytail with a blue bow, gathered at the back
+ * of the crown and falling down the back (−Z). Built around a pivot at the crown
+ * so the whole tail can sway from {@link Humanoid.update}.
+ */
+function buildPonytail(scene: Scene): TransformNode {
+  const pivot = new TransformNode("ponytail", scene);
+  pivot.position = new Vector3(0, 1.74, -0.13); // back-top of the head
+  const silver = mat("hairSilver", 0.84, 0.86, 0.93, scene);
+  const bow = mat("hairBow", 0.18, 0.26, 0.62, scene);
+
+  // Hair gathered at the crown, then a long tail in two tapering segments.
+  const gather = box("hairGather", 0.18, 0.2, 0.18, silver, scene);
+  gather.position = new Vector3(0, 0.05, 0);
+  gather.parent = pivot;
+
+  const tail1 = box("hairTail1", 0.18, 0.6, 0.15, silver, scene);
+  tail1.position = new Vector3(0, -0.28, -0.06);
+  tail1.parent = pivot;
+
+  const tail2 = box("hairTail2", 0.13, 0.55, 0.11, silver, scene);
+  tail2.position = new Vector3(0, -0.78, -0.1);
+  tail2.parent = pivot;
+
+  // Blue bow flanking the tie.
+  for (const dx of [-0.12, 0.12]) {
+    const loop = box("hairBow", 0.12, 0.16, 0.1, bow, scene);
+    loop.position = new Vector3(dx, 0.13, 0.0);
+    loop.parent = pivot;
+  }
   return pivot;
 }
 

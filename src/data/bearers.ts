@@ -8,6 +8,9 @@ import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
 export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer" | "axe";
 
+/** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
+export type HairStyle = "ponytail";
+
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
  * The base bearer of each class is the canonical Story character; previous
@@ -23,6 +26,8 @@ export interface Bearer {
   model?: string;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
+  /** Distinctive hairstyle on the placeholder figure (e.g. Meru's high ponytail). */
+  hair?: HairStyle;
   /** Placeholder avatar body colour (RGB 0–1) — distinguishes each bearer until art lands. */
   color: [number, number, number];
   /** Part of the canonical Story party. */
@@ -46,7 +51,7 @@ export const BEARERS: Bearer[] = [
   // Violet (Thunder) — martial artist (fists)
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: [0.85, 0.5, 0.18], storyPlayable: true },
   // Blue-Sea (Water) — hammer
-  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", color: [0.3, 0.72, 0.85], storyPlayable: true },
+  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", color: [0.3, 0.72, 0.85], storyPlayable: true },
   // Golden (Earth) — axe
   { id: "kongol", name: "Kongol", classId: "golden", weapon: "axe", color: [0.72, 0.56, 0.26], storyPlayable: true },
 ];
