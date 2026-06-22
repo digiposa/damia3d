@@ -6,11 +6,13 @@ import { LAVITZ_LEVELS } from "./lavitz";
 import { SHANA_LEVELS } from "./shana";
 import { ROSE_LEVELS } from "./rose";
 import { HASCHEL_LEVELS } from "./haschel";
+import { MERU_LEVELS } from "./meru";
 import {
   DART_ADDITION_LIST,
   LAVITZ_ADDITION_LIST,
   ROSE_ADDITION_LIST,
   HASCHEL_ADDITION_LIST,
+  MERU_ADDITION_LIST,
   type AdditionDef,
 } from "./additions";
 
@@ -87,6 +89,16 @@ export const VIOLET: DragoonClass = {
   loadout: { weapon: "iron_knuckle", head: "bandana", body: "disciple_vest", feet: "leather_boots", accessory: "bracelet" },
 };
 
+export const BLUE_SEA: DragoonClass = {
+  id: "blueSea",
+  dragoonName: "Blue-Sea Dragoon",
+  element: "Water",
+  equipmentUser: "Meru",
+  levels: MERU_LEVELS,
+  additions: MERU_ADDITION_LIST,
+  loadout: { weapon: "mace", head: "felt_hat", body: "clothes", feet: "leather_shoes", accessory: "bracelet" },
+};
+
 /** Implemented Dragoon classes (others filled in as their data arrives). */
 const CLASSES: Partial<Record<DragoonClassId, DragoonClass>> = {
   redEye: RED_EYE,
@@ -94,6 +106,7 @@ const CLASSES: Partial<Record<DragoonClassId, DragoonClass>> = {
   whiteSilver: WHITE_SILVER,
   darkness: DARKNESS,
   thunder: VIOLET,
+  blueSea: BLUE_SEA,
 };
 
 export function dragoonClass(id: DragoonClassId): DragoonClass | undefined {

@@ -6,6 +6,7 @@ import {
   WHITE_SILVER,
   DARKNESS,
   VIOLET,
+  BLUE_SEA,
   dragoonClass,
   isClassImplemented,
 } from "./dragoonClasses";
@@ -15,7 +16,8 @@ import { LAVITZ_LEVELS } from "./lavitz";
 import { SHANA_LEVELS } from "./shana";
 import { ROSE_LEVELS } from "./rose";
 import { HASCHEL_LEVELS } from "./haschel";
-import { ROSE_ADDITION_LIST, HASCHEL_ADDITION_LIST } from "./additions";
+import { MERU_LEVELS } from "./meru";
+import { ROSE_ADDITION_LIST, HASCHEL_ADDITION_LIST, MERU_ADDITION_LIST } from "./additions";
 
 describe("dragoon classes", () => {
   it("resolves implemented classes and reports unimplemented ones", () => {
@@ -24,10 +26,11 @@ describe("dragoon classes", () => {
     expect(dragoonClass("whiteSilver")).toBe(WHITE_SILVER);
     expect(dragoonClass("darkness")).toBe(DARKNESS);
     expect(dragoonClass("thunder")).toBe(VIOLET);
+    expect(dragoonClass("blueSea")).toBe(BLUE_SEA);
     expect(isClassImplemented("redEye")).toBe(true);
-    expect(isClassImplemented("thunder")).toBe(true);
-    expect(isClassImplemented("blueSea")).toBe(false);
-    expect(dragoonClass("blueSea")).toBeUndefined();
+    expect(isClassImplemented("blueSea")).toBe(true);
+    expect(isClassImplemented("golden")).toBe(false);
+    expect(dragoonClass("golden")).toBeUndefined();
   });
 
   it("carries the canonical element and equipment user per line", () => {
@@ -43,6 +46,9 @@ describe("dragoon classes", () => {
     expect(VIOLET.element).toBe("Thunder");
     expect(VIOLET.equipmentUser).toBe("Haschel");
     expect(VIOLET.additions).toBe(HASCHEL_ADDITION_LIST);
+    expect(BLUE_SEA.element).toBe("Water");
+    expect(BLUE_SEA.equipmentUser).toBe("Meru");
+    expect(BLUE_SEA.additions).toBe(MERU_ADDITION_LIST);
   });
 
   it("models the White-Silver line as Additionless (Shana / Miranda)", () => {
@@ -90,6 +96,7 @@ describe("bearers", () => {
       "miranda",
       "rose",
       "haschel",
+      "meru",
     ]);
   });
 
@@ -133,6 +140,7 @@ describe("growth tables", () => {
     ["White-Silver (Shana)", SHANA_LEVELS],
     ["Darkness (Rose)", ROSE_LEVELS],
     ["Violet (Haschel)", HASCHEL_LEVELS],
+    ["Blue-Sea (Meru)", MERU_LEVELS],
   ] as const) {
     describe(name, () => {
       it("covers levels 1-60 in order", () => {
