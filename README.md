@@ -106,12 +106,13 @@ sur le bouton (anneau qui se vide + décompte) et **affecté par la vitesse de
 combat**. Un bouclier translucide l'entoure pendant la garde.
 
 Dans **Training** (arène) : un bouton **🛠** (sous l'engrenage ⚙) ouvre le **menu
-de débogage** qui **met le jeu en pause** (comme les Options). Il regroupe trois
-outils : **changer de personnage** (n'importe quel porteur jouable), **régler le
-niveau instantanément** (−10/−1/+1/+10 + raccourcis 1/20/40/max, soin complet),
-et **faire apparaître** un **Mannequin d'entraînement** (cible inerte et
-indestructible pour tester Additions/dégâts), un **Knight of Sandora** ou le
-**Commander** (boss). Les ennemis (hors mannequin) poursuivent le héros et
+de débogage** qui **met le jeu en pause** (comme les Options). Présenté **en
+onglets** (rail de gauche, un panneau à la fois — pas de scroll) à la manière du
+menu système : **👤 Personnage** (changer pour n'importe quel porteur jouable),
+**📈 Niveau** (régler le niveau instantanément — −10/−1/+1/+10 + raccourcis
+1/20/40/max, soin complet) et **👾 Apparition** (faire surgir un **Mannequin
+d'entraînement** — cible inerte et indestructible pour tester Additions/dégâts —,
+un **Knight of Sandora** ou le **Commander** boss). Les ennemis (hors mannequin) poursuivent le héros et
 ripostent (physique ou magie) ; vaincre un ennemi octroie EXP et Gold. Barres de
 vie flottantes et nombres de dégâts à l'écran. La **vitesse de combat** (Options)
 accélère l'IA, la cadence et les fenêtres de timing — sans toucher au déplacement.
@@ -210,7 +211,7 @@ src/
   ui/
     MainMenu.ts        écran-titre / sélection de mode
     SystemMenu.ts      menu système à onglets (Status/Équipement/Addition/Config)
-    TrainingMenu.ts    menu de débogage Training (perso + niveau + spawn, met en pause)
+    TrainingMenu.ts    menu de débogage Training à onglets (perso/niveau/spawn, met en pause)
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)

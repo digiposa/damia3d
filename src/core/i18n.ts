@@ -87,6 +87,7 @@ const en: Dict = {
   "debug.title": "Training",
   "debug.level": "Level",
   "debug.spawn": "Spawn",
+  "debug.preset": "Presets",
 
   // Spawn menu
   "spawn.title": "Spawn enemies",
@@ -182,6 +183,7 @@ const fr: Dict = {
   "debug.title": "Entraînement",
   "debug.level": "Niveau",
   "debug.spawn": "Apparition",
+  "debug.preset": "Préréglages",
   "spawn.title": "Apparition d'ennemis",
   "spawn.dummy": "🎯  Mannequin d'entraînement",
   "spawn.knight": "🛡  Knight of Sandora",
