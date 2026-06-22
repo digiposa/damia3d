@@ -272,7 +272,11 @@ export class TrainingMode extends GameMode {
         this.player.move(to, dt);
       } else {
         this.player.face(to);
-        if (this.pendingAttack) {
+        // Multi-hit Additions advance via clicks / timing presses. A basic
+        // attacker (Shana/Miranda — no Additions) has nothing to chain, so
+        // auto-repeat the strike while the target stays in reach; the runner's
+        // recovery lockout paces it. Otherwise one click = one idle hit.
+        if (this.pendingAttack || this.isBasicAttacker()) {
           this.pendingAttack = false;
           this.attack(this.attackTarget);
         }
@@ -420,6 +424,11 @@ export class TrainingMode extends GameMode {
 
   private inReach(e: Enemy): boolean {
     return Vector3.Distance(this.player.position, e.position) <= PLAYER_REACH;
+  }
+
+  /** A bearer with no Additions (single-hit "Attack", e.g. Shana/Miranda): it auto-repeats in reach. */
+  private isBasicAttacker(): boolean {
+    return additionPresses(this.player.addition) === 0;
   }
 
   private nearestInReach(): Enemy | undefined {
