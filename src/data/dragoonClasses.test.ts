@@ -7,6 +7,7 @@ import {
   DARKNESS,
   VIOLET,
   BLUE_SEA,
+  GOLDEN,
   dragoonClass,
   isClassImplemented,
 } from "./dragoonClasses";
@@ -17,7 +18,13 @@ import { SHANA_LEVELS } from "./shana";
 import { ROSE_LEVELS } from "./rose";
 import { HASCHEL_LEVELS } from "./haschel";
 import { MERU_LEVELS } from "./meru";
-import { ROSE_ADDITION_LIST, HASCHEL_ADDITION_LIST, MERU_ADDITION_LIST } from "./additions";
+import { KONGOL_LEVELS } from "./kongol";
+import {
+  ROSE_ADDITION_LIST,
+  HASCHEL_ADDITION_LIST,
+  MERU_ADDITION_LIST,
+  KONGOL_ADDITION_LIST,
+} from "./additions";
 
 describe("dragoon classes", () => {
   it("resolves implemented classes and reports unimplemented ones", () => {
@@ -27,10 +34,10 @@ describe("dragoon classes", () => {
     expect(dragoonClass("darkness")).toBe(DARKNESS);
     expect(dragoonClass("thunder")).toBe(VIOLET);
     expect(dragoonClass("blueSea")).toBe(BLUE_SEA);
+    expect(dragoonClass("golden")).toBe(GOLDEN);
+    // All eight party archetypes are now implemented.
     expect(isClassImplemented("redEye")).toBe(true);
-    expect(isClassImplemented("blueSea")).toBe(true);
-    expect(isClassImplemented("golden")).toBe(false);
-    expect(dragoonClass("golden")).toBeUndefined();
+    expect(isClassImplemented("golden")).toBe(true);
   });
 
   it("carries the canonical element and equipment user per line", () => {
@@ -49,6 +56,9 @@ describe("dragoon classes", () => {
     expect(BLUE_SEA.element).toBe("Water");
     expect(BLUE_SEA.equipmentUser).toBe("Meru");
     expect(BLUE_SEA.additions).toBe(MERU_ADDITION_LIST);
+    expect(GOLDEN.element).toBe("Earth");
+    expect(GOLDEN.equipmentUser).toBe("Kongol");
+    expect(GOLDEN.additions).toBe(KONGOL_ADDITION_LIST);
   });
 
   it("models the White-Silver line as Additionless (Shana / Miranda)", () => {
@@ -97,6 +107,7 @@ describe("bearers", () => {
       "rose",
       "haschel",
       "meru",
+      "kongol",
     ]);
   });
 
@@ -141,6 +152,7 @@ describe("growth tables", () => {
     ["Darkness (Rose)", ROSE_LEVELS],
     ["Violet (Haschel)", HASCHEL_LEVELS],
     ["Blue-Sea (Meru)", MERU_LEVELS],
+    ["Golden (Kongol)", KONGOL_LEVELS],
   ] as const) {
     describe(name, () => {
       it("covers levels 1-60 in order", () => {
@@ -163,5 +175,15 @@ describe("growth tables", () => {
     const lv60 = statsForLevel(SHANA_LEVELS, 60);
     expect(lv60.mat).toBeGreaterThan(lv60.at);
     expect(lv60.maxHp).toBe(6000);
+  });
+
+  it("Golden is the tank: highest HP, AT >> MAT", () => {
+    const lv60 = statsForLevel(KONGOL_LEVELS, 60);
+    expect(lv60.maxHp).toBe(9750);
+    expect(lv60.at).toBeGreaterThan(lv60.mat);
+    // Beefiest party member at max level.
+    for (const table of [LAVITZ_LEVELS, SHANA_LEVELS, ROSE_LEVELS, HASCHEL_LEVELS, MERU_LEVELS]) {
+      expect(lv60.maxHp).toBeGreaterThan(statsForLevel(table, 60).maxHp);
+    }
   });
 });
