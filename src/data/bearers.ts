@@ -1,5 +1,5 @@
 import dartPortrait from "../assets/portraits/dart.jpg";
-import albertPortrait from "../assets/portraits/albert.jpg";
+import albertPortrait from "../assets/portraits/albert.png";
 import meruPortrait from "../assets/portraits/meru.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
