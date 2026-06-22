@@ -182,6 +182,7 @@ export class TrainingMode extends GameMode {
 
     // Movement (unaffected by combat speed): joystick on touch, click-to-move
     // otherwise. Guarding roots Dart in place.
+    const before = this.player.position.clone();
     if (!this.player.guardActive) {
       const axis = this.input.axis();
       if (axis.x !== 0 || axis.y !== 0) {
@@ -193,6 +194,8 @@ export class TrainingMode extends GameMode {
       }
     }
     this.camera.follow(this.player.position);
+    // Procedural walk/idle animation (visual only, uses real time).
+    this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6);
 
     if (this.input.wasPressed("Space")) this.attack(this.attackTarget);
     if (this.guardPressed()) this.tryGuard();

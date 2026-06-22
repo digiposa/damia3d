@@ -156,6 +156,18 @@ Les personnages **sans Additions** (Shana / Miranda) utilisent une attaque de
 base à coup unique ([`BASIC_ATTACK`](src/data/additions.ts)) ; leur onglet
 Addition l'indique au lieu de lister des combos.
 
+### Modèles 3D des personnages
+
+Pas de sprites : les entités sont des **meshes 3D**. Par défaut, le héros est une
+**figurine low-poly procédurale** ([`humanoid.ts`](src/entities/humanoid.ts) —
+tête/torse/bras/jambes, teintée à la couleur du porteur, avec une animation
+marche/idle), en attendant de l'art. Pour brancher un vrai personnage, il suffit
+de renseigner `model` (URL d'un `.glb`/`.gltf` riggé) sur le porteur dans
+[`bearers.ts`](src/data/bearers.ts) : `Player` charge le modèle (loader glTF
+chargé à la demande) et **remplace** la figurine, sinon il garde le placeholder.
+Des modèles gratuits prêts à l'emploi se trouvent sur Mixamo (riggés + animés),
+Quaternius ou Kenney (CC0).
+
 En Training, le **menu de débogage** (bouton 🛠) permet de changer de porteur :
 choisir un personnage reconstruit l'avatar sur sa classe, au même niveau et à la
 même position.
@@ -205,6 +217,7 @@ src/
     enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles) + Mannequin
   entities/
     Player.ts          avatar piloté par un porteur : état de combat + Addition équipée
+    humanoid.ts        figurine low-poly procédurale (placeholder, anim marche/idle)
     Enemy.ts           ennemi : HP, IA (actions phys/magie/soin), boss, barre de vie
   world/
     project.ts         projection monde→écran pour les overlays DOM

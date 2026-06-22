@@ -12,6 +12,8 @@ export interface Bearer {
   name: string;
   classId: DragoonClassId;
   portrait?: string;
+  /** Optional rigged glTF/GLB model URL; falls back to the procedural placeholder when absent. */
+  model?: string;
   /** Placeholder avatar body colour (RGB 0–1) — distinguishes each bearer until art lands. */
   color: [number, number, number];
   /** Part of the canonical Story party. */

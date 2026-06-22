@@ -12,6 +12,7 @@ import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/e
 import { type DragoonClass, dragoonClass } from "../data/dragoonClasses";
 import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
+import { Humanoid } from "./humanoid";
 
 const SPEED = 6; // world units per second
 const BASE_MAX_MP = 60; // base MP before equipment % bonuses (placeholder)
@@ -61,6 +62,7 @@ export class Player {
   private guardTimer = 0;
   private guardCdTimer = 0;
   private guardShield!: Mesh;
+  private humanoid: Humanoid;
 
   constructor(scene: Scene, bearer: Bearer, spawn = new Vector3(0, 0, 0), level = 1) {
     const cls = dragoonClass(bearer.classId);
@@ -86,22 +88,11 @@ export class Player {
     this.root = new TransformNode("player", scene);
     this.root.position = spawn.clone();
 
-    const body = MeshBuilder.CreateCapsule("playerBody", { height: 1.6, radius: 0.4 }, scene);
-    body.position.y = 0.8;
-    const bodyMat = new StandardMaterial("playerMat", scene);
-    const [cr, cg, cb] = bearer.color;
-    bodyMat.diffuseColor = new Color3(cr, cg, cb);
-    bodyMat.specularColor = new Color3(0.1, 0.1, 0.1);
-    body.material = bodyMat;
-    body.parent = this.root;
-
-    const nose = MeshBuilder.CreateBox("playerNose", { width: 0.25, height: 0.25, depth: 0.4 }, scene);
-    nose.position = new Vector3(0, 0.9, 0.45);
-    const noseMat = new StandardMaterial("noseMat", scene);
-    // A lightened tint of the body colour so facing is visible on any skin.
-    noseMat.diffuseColor = new Color3(0.5 + cr * 0.5, 0.5 + cg * 0.5, 0.5 + cb * 0.5);
-    nose.material = noseMat;
-    nose.parent = this.root;
+    // Low-poly humanoid placeholder, tinted to the bearer. Replaced by a glTF
+    // model if the bearer supplies one (loaded asynchronously below).
+    this.humanoid = new Humanoid(scene, { color: bearer.color });
+    this.humanoid.rig.parent = this.root;
+    if (bearer.model) void this.loadModel(bearer.model, scene);
 
     // Translucent barrier shown while guarding.
     this.guardShield = MeshBuilder.CreateSphere("guardShield", { diameter: 2.3, segments: 12 }, scene);
@@ -288,6 +279,36 @@ export class Player {
   face(dir: Vector3): void {
     if (dir.lengthSquared() < 1e-4) return;
     this.root.rotation.y = Math.atan2(dir.x, dir.z);
+  }
+
+  /** Advance the placeholder's walk/idle animation (visual only). */
+  animate(dt: number, moving: boolean): void {
+    this.humanoid.update(dt, moving);
+  }
+
+  /**
+   * Load a rigged glTF/GLB model for the bearer and swap out the procedural
+   * placeholder. Best-effort: any failure keeps the placeholder. The glTF loader
+   * is imported lazily so it only weighs in when a model is actually used.
+   */
+  private async loadModel(url: string, scene: Scene): Promise<void> {
+    try {
+      await import("@babylonjs/loaders/glTF");
+      const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
+      const i = url.lastIndexOf("/") + 1;
+      const res = await SceneLoader.ImportMeshAsync("", url.slice(0, i), url.slice(i), scene);
+      if (this.root.isDisposed()) {
+        for (const m of res.meshes) m.dispose();
+        return;
+      }
+      const modelRoot = res.meshes[0];
+      if (modelRoot) {
+        modelRoot.parent = this.root;
+        this.humanoid.setEnabled(false); // hide the placeholder
+      }
+    } catch (e) {
+      console.warn(`Player model failed to load (${url}); keeping placeholder.`, e);
+    }
   }
 
   /** Every Addition in this Dragoon class's repertoire (locked or not). */
