@@ -161,9 +161,11 @@ export class Humanoid {
     piece("collar", 0.3, 0.22, 0.26, new Vector3(0, 1.42, 0), strap, this.body);
     // Chest plate, slightly proud of the torso.
     piece("chestplate", 0.42, 0.46, 0.08, new Vector3(0, 1.12, 0.15), plate, this.body);
-    // Asymmetric pauldrons (larger left, like the artwork).
-    piece("pauldronL", 0.3, 0.22, 0.34, new Vector3(-0.35, 1.45, 0), plate, this.body);
-    piece("pauldronR", 0.22, 0.16, 0.28, new Vector3(0.34, 1.42, 0), plate, this.body);
+    // Strongly asymmetric shoulders — Dart's signature: a big two-tier pauldron on
+    // the left (non-sword) shoulder, just a thin guard on the right.
+    piece("pauldronL", 0.34, 0.22, 0.44, new Vector3(-0.38, 1.44, 0), plate, this.body);
+    piece("pauldronLTop", 0.28, 0.16, 0.36, new Vector3(-0.36, 1.6, 0), plate, this.body);
+    piece("pauldronR", 0.16, 0.1, 0.26, new Vector3(0.33, 1.4, 0), plate, this.body);
     // Belt with a metal buckle.
     piece("belt", 0.47, 0.11, 0.31, new Vector3(0, 0.82, 0), strap, this.body);
     piece("buckle", 0.1, 0.09, 0.04, new Vector3(0, 0.82, 0.16), metal, this.body);
