@@ -90,7 +90,12 @@ export class Player {
 
     // Low-poly humanoid placeholder, tinted to the bearer. Replaced by a glTF
     // model if the bearer supplies one (loaded asynchronously below).
-    this.humanoid = new Humanoid(scene, { color: bearer.color, weapon: bearer.weapon, hair: bearer.hair });
+    this.humanoid = new Humanoid(scene, {
+      color: bearer.color,
+      weapon: bearer.weapon,
+      hair: bearer.hair,
+      outfit: bearer.outfit,
+    });
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);
 

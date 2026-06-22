@@ -11,6 +11,9 @@ export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer
 /** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
 export type HairStyle = "ponytail" | "spiky";
 
+/** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
+export type OutfitStyle = "armored";
+
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
  * The base bearer of each class is the canonical Story character; previous
@@ -28,6 +31,8 @@ export interface Bearer {
   weapon?: WeaponKind;
   /** Distinctive hairstyle on the placeholder figure (e.g. Meru's high ponytail). */
   hair?: HairStyle;
+  /** Outfit overlaid on the placeholder figure (e.g. Dart's red Dragoon armour). */
+  outfit?: OutfitStyle;
   /** Placeholder avatar body colour (RGB 0–1) — distinguishes each bearer until art lands. */
   color: [number, number, number];
   /** Part of the canonical Story party. */
@@ -36,7 +41,7 @@ export interface Bearer {
 
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", color: [0.85, 0.2, 0.22], storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: [0.85, 0.2, 0.22], storyPlayable: true },
   { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", color: [0.78, 0.36, 0.12], storyPlayable: false },
   // Jade (Wind) — spears
   { id: "lavitz", name: "Lavitz", classId: "jade", weapon: "spear", color: [0.27, 0.6, 0.32], storyPlayable: true },

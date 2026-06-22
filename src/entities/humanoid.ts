@@ -4,7 +4,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { WeaponKind, HairStyle } from "../data/bearers";
+import type { WeaponKind, HairStyle, OutfitStyle } from "../data/bearers";
 
 export interface HumanoidOptions {
   /** Primary body colour (RGB 0–1). */
@@ -13,6 +13,8 @@ export interface HumanoidOptions {
   weapon?: WeaponKind;
   /** Distinctive hairstyle (e.g. Meru's high ponytail). */
   hair?: HairStyle;
+  /** Outfit overlaid on the figure (e.g. Dart's red Dragoon armour). */
+  outfit?: OutfitStyle;
   /** Uniform scale (default 1). */
   scale?: number;
 }
@@ -117,11 +119,62 @@ export class Humanoid {
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
 
+    if (opts.outfit === "armored") this.addArmor(scene, opts.color);
+
     if (opts.hair === "ponytail") {
       this.ponytail = buildPonytail(scene);
       this.ponytail.parent = this.body; // bobs with the head
     } else if (opts.hair === "spiky") {
       buildSpikyHair(scene).parent = this.body; // rigid, just bobs with the head
+    }
+  }
+
+  /**
+   * Overlay armour plates on the figure: asymmetric shoulder pauldrons, a chest
+   * plate, a dark high collar, a belt with a buckle, gauntlets, and boots with
+   * knee guards. Plates take the bearer's colour; straps/boots are neutral. Pieces
+   * parent to the body (static) or to a limb (so they swing with it).
+   */
+  private addArmor(scene: Scene, color: [number, number, number]): void {
+    const [r, g, b] = color;
+    const plate = mat("armPlate", r, g, b, scene);
+    const strap = mat("armStrap", r * 0.3, g * 0.3, b * 0.3, scene); // near-black undersuit
+    const boot = mat("armBoot", 0.32, 0.22, 0.12, scene);
+    const metal = mat("armMetal", 0.72, 0.74, 0.8, scene);
+
+    const piece = (
+      name: string,
+      w: number,
+      h: number,
+      d: number,
+      pos: Vector3,
+      material: StandardMaterial,
+      parent: TransformNode,
+    ) => {
+      const m = box(name, w, h, d, material, scene);
+      m.position = pos;
+      m.parent = parent;
+      return m;
+    };
+
+    // Dark high collar / undersuit at the neck.
+    piece("collar", 0.3, 0.22, 0.26, new Vector3(0, 1.42, 0), strap, this.body);
+    // Chest plate, slightly proud of the torso.
+    piece("chestplate", 0.42, 0.46, 0.08, new Vector3(0, 1.12, 0.15), plate, this.body);
+    // Asymmetric pauldrons (larger left, like the artwork).
+    piece("pauldronL", 0.3, 0.22, 0.34, new Vector3(-0.35, 1.45, 0), plate, this.body);
+    piece("pauldronR", 0.22, 0.16, 0.28, new Vector3(0.34, 1.42, 0), plate, this.body);
+    // Belt with a metal buckle.
+    piece("belt", 0.47, 0.11, 0.31, new Vector3(0, 0.82, 0), strap, this.body);
+    piece("buckle", 0.1, 0.09, 0.04, new Vector3(0, 0.82, 0.16), metal, this.body);
+
+    // Gauntlets swing with the arms; boots + knee guards with the legs.
+    for (const arm of [this.leftArm, this.rightArm]) {
+      piece("gauntlet", 0.2, 0.24, 0.2, new Vector3(0, -0.48, 0), strap, arm);
+    }
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), boot, leg);
+      piece("knee", 0.21, 0.13, 0.23, new Vector3(0, -0.34, 0.01), plate, leg);
     }
   }
 
