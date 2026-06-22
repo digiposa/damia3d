@@ -9,7 +9,7 @@ import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer" | "axe";
 
 /** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
-export type HairStyle = "ponytail";
+export type HairStyle = "ponytail" | "spiky";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -36,7 +36,7 @@ export interface Bearer {
 
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", color: [0.85, 0.2, 0.22], storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", color: [0.85, 0.2, 0.22], storyPlayable: true },
   { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", color: [0.78, 0.36, 0.12], storyPlayable: false },
   // Jade (Wind) — spears
   { id: "lavitz", name: "Lavitz", classId: "jade", weapon: "spear", color: [0.27, 0.6, 0.32], storyPlayable: true },

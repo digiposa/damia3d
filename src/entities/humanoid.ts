@@ -120,6 +120,8 @@ export class Humanoid {
     if (opts.hair === "ponytail") {
       this.ponytail = buildPonytail(scene);
       this.ponytail.parent = this.body; // bobs with the head
+    } else if (opts.hair === "spiky") {
+      buildSpikyHair(scene).parent = this.body; // rigid, just bobs with the head
     }
   }
 
@@ -261,6 +263,52 @@ function buildPonytail(scene: Scene): TransformNode {
     loop.parent = pivot;
   }
   return pivot;
+}
+
+/**
+ * Dart's signature: a head of spiky auburn hair — a thin scalp cap plus a fan of
+ * low-poly 4-sided spikes radiating up and outward from the crown, for that PS1
+ * "anime spike" silhouette. Rigid (no sway); just bobs with the head.
+ */
+function buildSpikyHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairSpiky", scene);
+  const hair = mat("hairAuburn", 0.46, 0.3, 0.16, scene);
+
+  // A low cap so the scalp reads as hair, not skin, under the spikes.
+  const cap = box("hairCap", 0.37, 0.16, 0.36, hair, scene);
+  cap.position.y = 1.74;
+  cap.parent = group;
+
+  // One spike: a 4-sided cone on a pivot at its base, so it can lean outward.
+  const spike = (x: number, y: number, z: number, rotX: number, rotZ: number, len = 0.28) => {
+    const pivot = new TransformNode("hairSpikePivot", scene);
+    pivot.position = new Vector3(x, y, z);
+    pivot.rotation.x = rotX;
+    pivot.rotation.z = rotZ;
+    pivot.parent = group;
+    const cone = MeshBuilder.CreateCylinder(
+      "hairSpike",
+      { height: len, diameterTop: 0, diameterBottom: 0.13, tessellation: 4 },
+      scene,
+    );
+    cone.position.y = len / 2; // base at the pivot, tip outward
+    cone.material = hair;
+    cone.isPickable = false;
+    cone.parent = pivot;
+  };
+
+  // Front (sweeping forward), top, back, and sides — a messy radiating fan.
+  spike(0, 1.78, 0.15, 0.8, 0);
+  spike(-0.11, 1.76, 0.13, 0.6, -0.25);
+  spike(0.11, 1.76, 0.13, 0.6, 0.25);
+  spike(-0.08, 1.82, 0, 0, -0.3);
+  spike(0.08, 1.82, 0, 0, 0.3);
+  spike(0, 1.83, -0.04, -0.15, 0, 0.3);
+  spike(-0.11, 1.77, -0.14, -0.6, -0.25);
+  spike(0.11, 1.77, -0.14, -0.6, 0.25);
+  spike(-0.17, 1.72, 0, 0, -0.9, 0.24);
+  spike(0.17, 1.72, 0, 0, 0.9, 0.24);
+  return group;
 }
 
 /**
