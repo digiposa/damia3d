@@ -184,6 +184,7 @@ src/
     formula.ts         formules de dégâts LoD fidèles (floor/round + wrappers)
     element.ts         éléments (opposés + modificateur ×1.5/×0.5)
     AdditionRunner.ts  timing-sight des Additions (Hit 1 auto + presses)
+    moveset.test.ts    intégration combat : run parfait de chaque moveset (runner + dégâts)
     *.test.ts          tests des formules et du timing (Vitest)
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau génériques
