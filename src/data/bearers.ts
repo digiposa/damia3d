@@ -1,6 +1,7 @@
-import dartPortrait from "../assets/portraits/dart.jpg";
+import dartPortrait from "../assets/portraits/dart.png";
 import albertPortrait from "../assets/portraits/albert.png";
 import meruPortrait from "../assets/portraits/meru.png";
+import rosePortrait from "../assets/portraits/rose.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -40,7 +41,7 @@ export const BEARERS: Bearer[] = [
   { id: "shana", name: "Shana", classId: "whiteSilver", weapon: "bow", color: [0.92, 0.62, 0.72], storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", color: [0.82, 0.82, 0.9], storyPlayable: true },
   // Darkness — rapier
-  { id: "rose", name: "Rose", classId: "darkness", weapon: "rapier", color: [0.34, 0.22, 0.4], storyPlayable: true },
+  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", color: [0.34, 0.22, 0.4], storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "haschel", name: "Haschel", classId: "thunder", weapon: "fist", color: [0.85, 0.5, 0.18], storyPlayable: true },
   // Blue-Sea (Water) — hammer
