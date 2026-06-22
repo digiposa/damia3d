@@ -137,13 +137,18 @@ niveaux, Additions, ligne d'équipement) de **l'identité** (le *porteur* : nom,
 portrait, lore).
 
 - [`data/dragoonClasses.ts`](src/data/dragoonClasses.ts) — les classes Dragoon
-  implémentées : **Red-Eye** (Feu, table de Dart) et **Jade** (Vent, table de
-  Lavitz). Les autres lignes s'ajoutent dès que leurs données arrivent.
+  implémentées : **Red-Eye** (Feu, table de Dart), **Jade** (Vent, table de
+  Lavitz) et **White-Silver** (Lumière, table de Shana — sans Additions, attaque
+  à l'arc). Les autres lignes s'ajoutent dès que leurs données arrivent.
 - [`data/bearers.ts`](src/data/bearers.ts) — les porteurs : Dart/Zieg (Red-Eye),
-  Lavitz/Albert/Greham/Syuveil (Jade). Les porteurs canon de l'**histoire**
-  ont leurs stats propres ; les autres sont des **reskins purs** (mêmes
-  stats / Additions / élément que la classe, seuls le nom et le portrait
-  changent), jouables en Training/Survival.
+  Lavitz/Albert/Greham/Syuveil (Jade), Shana/Miranda (White-Silver). Les porteurs
+  canon de l'**histoire** ont leurs stats propres ; les autres sont des **reskins
+  purs** (mêmes stats / Additions / élément que la classe, seuls le nom et le
+  portrait changent), jouables en Training/Survival.
+
+Les personnages **sans Additions** (Shana / Miranda) utilisent une attaque de
+base à coup unique ([`BASIC_ATTACK`](src/data/additions.ts)) ; leur onglet
+Addition l'indique au lieu de lister des combos.
 
 En Training, le bouton **👤** (sous le menu de spawn) ouvre le sélecteur de
 personnage : choisir un porteur reconstruit l'avatar sur sa classe, au même
@@ -181,6 +186,7 @@ src/
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau génériques
     lavitz.ts          table de niveaux de Lavitz/Albert (1→60, ligne Jade)
+    shana.ts           table de niveaux de Shana/Miranda (1→60, ligne White-Silver)
     additions.ts       Additions des 8 personnages (hits/multiplicateurs/SP, valeurs canon wiki)
     dragoonClasses.ts  archétypes Dragoon (élément, table, Additions, équipement)
     bearers.ts         porteurs jouables (Dart/Zieg, Lavitz/Albert/… reskins)

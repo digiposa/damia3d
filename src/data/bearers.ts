@@ -25,6 +25,9 @@ export const BEARERS: Bearer[] = [
   { id: "albert", name: "Albert", classId: "jade", storyPlayable: true },
   { id: "greham", name: "Greham", classId: "jade", storyPlayable: false },
   { id: "syuveil", name: "Syuveil", classId: "jade", storyPlayable: false },
+  // White-Silver (Light) — no Additions (bow attack)
+  { id: "shana", name: "Shana", classId: "whiteSilver", storyPlayable: true },
+  { id: "miranda", name: "Miranda", classId: "whiteSilver", storyPlayable: true },
 ];
 
 /** Default playable bearer (Dart). */

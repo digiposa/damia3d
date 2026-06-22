@@ -19,6 +19,20 @@ export interface AdditionDef {
   acquireLevel: number;
 }
 
+/**
+ * Fallback "attack" for party members with no Additions (Shana / Miranda — the
+ * White-Silver line). A single guaranteed hit with no timed presses: the runner
+ * completes it instantly, and the Addition formula at hit 1 / multiplier 100
+ * reduces to LoD's archer attack. Never shown in the Additions menu.
+ */
+export const BASIC_ATTACK: AdditionDef = {
+  name: "Attack",
+  hits: [100],
+  multiplier: [100, 100, 100, 100, 100],
+  spMax: 0,
+  acquireLevel: 1,
+};
+
 export const DART_ADDITIONS = {
   doubleSlash: {
     name: "Double Slash",

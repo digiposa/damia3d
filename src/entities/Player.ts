@@ -7,7 +7,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { statsForLevel, levelForExp, nextLevelExp, type CharacterLevel } from "../data/dart";
-import type { AdditionDef } from "../data/additions";
+import { BASIC_ATTACK, type AdditionDef } from "../data/additions";
 import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/equipment";
 import { type DragoonClass, dragoonClass } from "../data/dragoonClasses";
 import type { Bearer } from "../data/bearers";
@@ -68,7 +68,8 @@ export class Player {
     this.bearer = bearer;
     this.cls = cls;
     this.element = cls.element;
-    this.addition = cls.additions[0];
+    // Members with no Additions (Shana / Miranda) fight with the basic attack.
+    this.addition = cls.additions[0] ?? BASIC_ATTACK;
     this.equipment = {
       weapon: cls.loadout.weapon ? equipById(cls.loadout.weapon) : undefined,
       head: cls.loadout.head ? equipById(cls.loadout.head) : undefined,

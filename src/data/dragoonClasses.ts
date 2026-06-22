@@ -3,6 +3,7 @@ import type { Member, EquipSlot } from "./equipment";
 import type { CharacterLevel } from "./dart";
 import { DART_LEVELS } from "./dart";
 import { LAVITZ_LEVELS } from "./lavitz";
+import { SHANA_LEVELS } from "./shana";
 import { DART_ADDITION_LIST, LAVITZ_ADDITION_LIST, type AdditionDef } from "./additions";
 
 /** A Dragoon line's mechanical identity (stats / element / Additions / gear). */
@@ -47,10 +48,22 @@ export const JADE: DragoonClass = {
   loadout: { weapon: "spear", head: "sallet", body: "scale_armor", feet: "leather_boots", accessory: "bracelet" },
 };
 
+export const WHITE_SILVER: DragoonClass = {
+  id: "whiteSilver",
+  dragoonName: "White-Silver Dragoon",
+  element: "Light",
+  equipmentUser: "Shana",
+  levels: SHANA_LEVELS,
+  // Shana / Miranda have no Additions — they fight with a plain bow attack.
+  additions: [],
+  loadout: { weapon: "short_bow", head: "felt_hat", body: "leather_jacket", feet: "leather_shoes", accessory: "bracelet" },
+};
+
 /** Implemented Dragoon classes (others filled in as their data arrives). */
 const CLASSES: Partial<Record<DragoonClassId, DragoonClass>> = {
   redEye: RED_EYE,
   jade: JADE,
+  whiteSilver: WHITE_SILVER,
 };
 
 export function dragoonClass(id: DragoonClassId): DragoonClass | undefined {

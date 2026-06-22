@@ -3,17 +3,20 @@ import { describe, expect, it } from "vitest";
 import {
   RED_EYE,
   JADE,
+  WHITE_SILVER,
   dragoonClass,
   isClassImplemented,
 } from "./dragoonClasses";
 import { BEARERS, DEFAULT_BEARER, bearerById, selectableBearers } from "./bearers";
 import { statsForLevel, levelForExp, nextLevelExp } from "./dart";
 import { LAVITZ_LEVELS } from "./lavitz";
+import { SHANA_LEVELS } from "./shana";
 
 describe("dragoon classes", () => {
   it("resolves implemented classes and reports unimplemented ones", () => {
     expect(dragoonClass("redEye")).toBe(RED_EYE);
     expect(dragoonClass("jade")).toBe(JADE);
+    expect(dragoonClass("whiteSilver")).toBe(WHITE_SILVER);
     expect(isClassImplemented("redEye")).toBe(true);
     expect(isClassImplemented("thunder")).toBe(false);
     expect(dragoonClass("thunder")).toBeUndefined();
@@ -24,6 +27,12 @@ describe("dragoon classes", () => {
     expect(RED_EYE.equipmentUser).toBe("Dart");
     expect(JADE.element).toBe("Wind");
     expect(JADE.equipmentUser).toBe("Lavitz");
+    expect(WHITE_SILVER.element).toBe("Light");
+    expect(WHITE_SILVER.equipmentUser).toBe("Shana");
+  });
+
+  it("models the White-Silver line as Additionless (Shana / Miranda)", () => {
+    expect(WHITE_SILVER.additions).toEqual([]);
   });
 });
 
@@ -63,7 +72,21 @@ describe("bearers", () => {
       "albert",
       "greham",
       "syuveil",
+      "shana",
+      "miranda",
     ]);
+  });
+
+  it("treats Shana and Miranda as White-Silver bearers", () => {
+    const shana = bearerById("shana")!;
+    const miranda = bearerById("miranda")!;
+    expect(shana.classId).toBe("whiteSilver");
+    expect(miranda.classId).toBe("whiteSilver");
+    expect(dragoonClass(shana.classId)).toBe(dragoonClass(miranda.classId));
+    // Both are selectable now that the class is implemented.
+    const ids = selectableBearers().map((b) => b.id);
+    expect(ids).toContain("shana");
+    expect(ids).toContain("miranda");
   });
 });
 
@@ -85,5 +108,34 @@ describe("generic leveling over the Jade table", () => {
     expect(nextLevelExp(LAVITZ_LEVELS, 1)).toBe(35);
     expect(nextLevelExp(LAVITZ_LEVELS, 59)).toBe(387730);
     expect(nextLevelExp(LAVITZ_LEVELS, 60)).toBe(387730);
+  });
+});
+
+describe("growth tables", () => {
+  for (const [name, table] of [
+    ["Jade (Lavitz)", LAVITZ_LEVELS],
+    ["White-Silver (Shana)", SHANA_LEVELS],
+  ] as const) {
+    describe(name, () => {
+      it("covers levels 1-60 in order", () => {
+        expect(table).toHaveLength(60);
+        expect(table.map((r) => r.level)).toEqual(
+          Array.from({ length: 60 }, (_, i) => i + 1),
+        );
+      });
+
+      it("has non-decreasing cumulative EXP and Max HP", () => {
+        for (let i = 1; i < table.length; i++) {
+          expect(table[i].exp).toBeGreaterThanOrEqual(table[i - 1].exp);
+          expect(table[i].maxHp).toBeGreaterThanOrEqual(table[i - 1].maxHp);
+        }
+      });
+    });
+  }
+
+  it("White-Silver is a magic archetype: MAT outgrows AT", () => {
+    const lv60 = statsForLevel(SHANA_LEVELS, 60);
+    expect(lv60.mat).toBeGreaterThan(lv60.at);
+    expect(lv60.maxHp).toBe(6000);
   });
 });

@@ -64,6 +64,7 @@ const en: Dict = {
 
   // Addition
   "addition.unavailable": "Additions unavailable in this mode.",
+  "addition.none": "This character has no Additions — they attack directly.",
   "addition.sub": "{presses} press · Lv {level}/5 · {dam}% · SP {sp}",
   "addition.locked": "🔒 Level {level}",
 
@@ -156,6 +157,7 @@ const fr: Dict = {
   "equip.back": "‹ Retour",
 
   "addition.unavailable": "Additions indisponibles dans ce mode.",
+  "addition.none": "Ce personnage n'a pas d'Additions — il attaque directement.",
   "addition.sub": "{presses} appui(s) · Niv {level}/5 · {dam}% · SP {sp}",
   "addition.locked": "🔒 Niveau {level}",
 

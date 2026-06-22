@@ -242,6 +242,10 @@ export class SystemMenu {
       box.appendChild(note(t("addition.unavailable")));
       return box;
     }
+    if (data.additions.length === 0) {
+      box.appendChild(note(t("addition.none")));
+      return box;
+    }
     for (const entry of data.additions) {
       box.appendChild(this.additionRow(entry, data.equipAddition));
     }
