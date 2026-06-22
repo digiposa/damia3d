@@ -13,7 +13,9 @@ export interface AdditionDef {
   multiplier: [number, number, number, number, number];
   /** SP awarded at max level for a perfect performance (Dragoon gauge). */
   spMax: number;
-  /** Dart level at which the Addition is learned (Blazing Dynamo has a special quest condition). */
+  /** Character level at which the Addition is learned. The final Addition of each
+   *  character instead requires performing all prior ones 80 times; we gate it
+   *  high (99) until that progression rule is implemented. */
   acquireLevel: number;
 }
 
@@ -110,6 +112,152 @@ export const LAVITZ_ADDITIONS = {
   },
 } satisfies Record<string, AdditionDef>;
 
+/** Rose Additions (Darkness line). */
+export const ROSE_ADDITIONS = {
+  whipSmack: {
+    name: "Whip Smack",
+    hits: [75, 25],
+    multiplier: [100, 125, 150, 175, 200],
+    spMax: 35,
+    acquireLevel: 1,
+  },
+  moreAndMore: {
+    name: "More & More",
+    hits: [50, 50, 50],
+    multiplier: [100, 100, 100, 100, 100],
+    spMax: 102,
+    acquireLevel: 14,
+  },
+  hardBlade: {
+    name: "Hard Blade",
+    hits: [20, 20, 20, 20, 10, 10],
+    multiplier: [100, 150, 200, 250, 300],
+    spMax: 35,
+    acquireLevel: 19,
+  },
+  demonsDance: {
+    name: "Demon's Dance",
+    hits: [30, 30, 30, 30, 20, 20, 20, 20],
+    multiplier: [100, 140, 180, 220, 250],
+    spMax: 100,
+    // Real condition: perform all prior Additions 80 times. Gated high for now.
+    acquireLevel: 99,
+  },
+} satisfies Record<string, AdditionDef>;
+
+/** Haschel Additions (Violet line). */
+export const HASCHEL_ADDITIONS = {
+  doublePunch: {
+    name: "Double Punch",
+    hits: [75, 25],
+    multiplier: [100, 110, 120, 130, 150],
+    spMax: 50,
+    acquireLevel: 1,
+  },
+  flurryOfStyx: {
+    name: "Flurry of Styx",
+    hits: [100, 25, 25],
+    multiplier: [100, 108, 116, 124, 135],
+    spMax: 20,
+    acquireLevel: 14,
+  },
+  summon4Gods: {
+    name: "Summon 4 Gods",
+    hits: [25, 25, 25, 25],
+    multiplier: [100, 100, 100, 100, 100],
+    spMax: 100,
+    acquireLevel: 18,
+  },
+  fiveRingShattering: {
+    name: "5 Ring Shattering",
+    hits: [30, 30, 30, 30, 30],
+    multiplier: [100, 125, 150, 175, 200],
+    spMax: 50,
+    acquireLevel: 22,
+  },
+  hexHammer: {
+    name: "Hex Hammer",
+    hits: [30, 30, 30, 30, 30, 30, 20],
+    multiplier: [100, 125, 150, 175, 200],
+    spMax: 15,
+    acquireLevel: 27,
+  },
+  omniSweep: {
+    name: "Omni-Sweep",
+    hits: [30, 30, 30, 40, 40, 40, 40, 50],
+    multiplier: [100, 115, 130, 145, 167],
+    spMax: 150,
+    // Real condition: perform all prior Additions 80 times. Gated high for now.
+    acquireLevel: 99,
+  },
+} satisfies Record<string, AdditionDef>;
+
+/** Meru Additions (Blue-Sea line). */
+export const MERU_ADDITIONS = {
+  doubleSmack: {
+    name: "Double Smack",
+    hits: [75, 25],
+    multiplier: [100, 110, 120, 130, 150],
+    spMax: 34,
+    acquireLevel: 1,
+  },
+  hammerSpin: {
+    name: "Hammer Spin",
+    hits: [50, 50, 25, 25],
+    multiplier: [100, 108, 116, 124, 135],
+    spMax: 70,
+    acquireLevel: 21,
+  },
+  coolBoogie: {
+    name: "Cool Boogie",
+    hits: [20, 20, 20, 20, 20],
+    multiplier: [100, 100, 100, 100, 100],
+    spMax: 200,
+    acquireLevel: 26,
+  },
+  catsCradle: {
+    name: "Cat's Cradle",
+    hits: [30, 20, 20, 20, 20, 20, 20],
+    multiplier: [100, 130, 160, 190, 234],
+    spMax: 20,
+    acquireLevel: 30,
+  },
+  perkyStep: {
+    name: "Perky Step",
+    hits: [30, 30, 30, 30, 20, 20, 20, 20],
+    multiplier: [100, 150, 200, 250, 300],
+    spMax: 100,
+    // Real condition: perform all prior Additions 80 times. Gated high for now.
+    acquireLevel: 99,
+  },
+} satisfies Record<string, AdditionDef>;
+
+/** Kongol Additions (Golden line). */
+export const KONGOL_ADDITIONS = {
+  pursuit: {
+    name: "Pursuit",
+    hits: [75, 25],
+    multiplier: [100, 110, 120, 130, 150],
+    spMax: 50,
+    acquireLevel: 1,
+  },
+  inferno: {
+    name: "Inferno",
+    hits: [40, 20, 20, 20],
+    multiplier: [100, 125, 150, 175, 200],
+    spMax: 20,
+    acquireLevel: 23,
+  },
+  boneCrush: {
+    name: "Bone Crush",
+    hits: [50, 30, 30, 30, 30, 30],
+    multiplier: [100, 110, 120, 130, 150],
+    spMax: 100,
+    // Real condition: perform all prior Additions 80 times. Gated high for now.
+    acquireLevel: 99,
+  },
+} satisfies Record<string, AdditionDef>;
+
 /** Dart's Additions in acquisition order. */
 export const DART_ADDITION_LIST: AdditionDef[] = [
   DART_ADDITIONS.doubleSlash,
@@ -129,6 +277,50 @@ export const LAVITZ_ADDITION_LIST: AdditionDef[] = [
   LAVITZ_ADDITIONS.gustOfWindDance,
   LAVITZ_ADDITIONS.flowerStorm,
 ];
+
+/** Rose Additions in acquisition order. */
+export const ROSE_ADDITION_LIST: AdditionDef[] = [
+  ROSE_ADDITIONS.whipSmack,
+  ROSE_ADDITIONS.moreAndMore,
+  ROSE_ADDITIONS.hardBlade,
+  ROSE_ADDITIONS.demonsDance,
+];
+
+/** Haschel Additions in acquisition order. */
+export const HASCHEL_ADDITION_LIST: AdditionDef[] = [
+  HASCHEL_ADDITIONS.doublePunch,
+  HASCHEL_ADDITIONS.flurryOfStyx,
+  HASCHEL_ADDITIONS.summon4Gods,
+  HASCHEL_ADDITIONS.fiveRingShattering,
+  HASCHEL_ADDITIONS.hexHammer,
+  HASCHEL_ADDITIONS.omniSweep,
+];
+
+/** Meru Additions in acquisition order. */
+export const MERU_ADDITION_LIST: AdditionDef[] = [
+  MERU_ADDITIONS.doubleSmack,
+  MERU_ADDITIONS.hammerSpin,
+  MERU_ADDITIONS.coolBoogie,
+  MERU_ADDITIONS.catsCradle,
+  MERU_ADDITIONS.perkyStep,
+];
+
+/** Kongol Additions in acquisition order. */
+export const KONGOL_ADDITION_LIST: AdditionDef[] = [
+  KONGOL_ADDITIONS.pursuit,
+  KONGOL_ADDITIONS.inferno,
+  KONGOL_ADDITIONS.boneCrush,
+];
+
+/** Every character's Addition list, keyed for lookup/iteration. */
+export const ADDITION_LISTS = {
+  dart: DART_ADDITION_LIST,
+  lavitz: LAVITZ_ADDITION_LIST,
+  rose: ROSE_ADDITION_LIST,
+  haschel: HASCHEL_ADDITION_LIST,
+  meru: MERU_ADDITION_LIST,
+  kongol: KONGOL_ADDITION_LIST,
+} as const;
 
 /**
  * Number of timed button presses an Addition needs. Hit 1 is free (the Attack

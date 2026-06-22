@@ -181,7 +181,7 @@ src/
   data/
     dart.ts            table de niveaux de Dart (1→60) + helpers EXP/niveau génériques
     lavitz.ts          table de niveaux de Lavitz/Albert (1→60, ligne Jade)
-    additions.ts       données d'Additions (Dart Red-Eye + Lavitz Jade)
+    additions.ts       Additions des 8 personnages (hits/multiplicateurs/SP, valeurs canon wiki)
     dragoonClasses.ts  archétypes Dragoon (élément, table, Additions, équipement)
     bearers.ts         porteurs jouables (Dart/Zieg, Lavitz/Albert/… reskins)
     equipment.ts       équipements complets (armures tous persos + armes Dart + 49 accessoires)
