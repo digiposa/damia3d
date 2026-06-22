@@ -357,6 +357,7 @@ export class TrainingMode extends GameMode {
    * perfect Addition. Handles the target dying.
    */
   private applyHit(target: Enemy, k: number): void {
+    this.player.strike(); // play the weapon's strike animation on every landed blow
     const add = this.player.addition;
     const atk = { at: this.player.atk, lv: this.player.level };
     const df = target.def.stats.df;

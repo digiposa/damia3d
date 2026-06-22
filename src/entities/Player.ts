@@ -90,7 +90,7 @@ export class Player {
 
     // Low-poly humanoid placeholder, tinted to the bearer. Replaced by a glTF
     // model if the bearer supplies one (loaded asynchronously below).
-    this.humanoid = new Humanoid(scene, { color: bearer.color });
+    this.humanoid = new Humanoid(scene, { color: bearer.color, weapon: bearer.weapon });
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);
 
@@ -284,6 +284,11 @@ export class Player {
   /** Advance the placeholder's walk/idle animation (visual only). */
   animate(dt: number, moving: boolean): void {
     this.humanoid.update(dt, moving);
+  }
+
+  /** Play a one-shot strike animation (call when a blow lands). */
+  strike(): void {
+    this.humanoid.strike();
   }
 
   /**

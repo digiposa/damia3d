@@ -160,8 +160,12 @@ Addition l'indique au lieu de lister des combos.
 
 Pas de sprites : les entités sont des **meshes 3D**. Par défaut, le héros est une
 **figurine low-poly procédurale** ([`humanoid.ts`](src/entities/humanoid.ts) —
-tête/torse/bras/jambes, teintée à la couleur du porteur, avec une animation
-marche/idle), en attendant de l'art. Pour brancher un vrai personnage, il suffit
+tête (avec yeux), torse, bras, jambes, teintée à la couleur du porteur, avec une
+animation marche/idle et une frappe jouée à chaque coup porté). Chaque porteur
+porte aussi une **arme** selon son `weapon` ([`bearers.ts`](src/data/bearers.ts) :
+épée, lance, arc, rapière, poings, marteau, hache), et le style de frappe en
+découle (taille à la verticale, estoc, ou tir à l'arc). Tout ça en attendant de
+l'art. Pour brancher un vrai personnage, il suffit
 de renseigner `model` (URL d'un `.glb`/`.gltf` riggé) sur le porteur dans
 [`bearers.ts`](src/data/bearers.ts) : `Player` charge le modèle (loader glTF
 chargé à la demande) et **remplace** la figurine, sinon il garde le placeholder.
