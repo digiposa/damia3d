@@ -30,6 +30,8 @@ export const BEARERS: Bearer[] = [
   { id: "miranda", name: "Miranda", classId: "whiteSilver", storyPlayable: true },
   // Darkness
   { id: "rose", name: "Rose", classId: "darkness", storyPlayable: true },
+  // Violet (Thunder)
+  { id: "haschel", name: "Haschel", classId: "thunder", storyPlayable: true },
 ];
 
 /** Default playable bearer (Dart). */

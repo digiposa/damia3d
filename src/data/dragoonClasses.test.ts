@@ -5,6 +5,7 @@ import {
   JADE,
   WHITE_SILVER,
   DARKNESS,
+  VIOLET,
   dragoonClass,
   isClassImplemented,
 } from "./dragoonClasses";
@@ -13,7 +14,8 @@ import { statsForLevel, levelForExp, nextLevelExp } from "./dart";
 import { LAVITZ_LEVELS } from "./lavitz";
 import { SHANA_LEVELS } from "./shana";
 import { ROSE_LEVELS } from "./rose";
-import { ROSE_ADDITION_LIST } from "./additions";
+import { HASCHEL_LEVELS } from "./haschel";
+import { ROSE_ADDITION_LIST, HASCHEL_ADDITION_LIST } from "./additions";
 
 describe("dragoon classes", () => {
   it("resolves implemented classes and reports unimplemented ones", () => {
@@ -21,9 +23,11 @@ describe("dragoon classes", () => {
     expect(dragoonClass("jade")).toBe(JADE);
     expect(dragoonClass("whiteSilver")).toBe(WHITE_SILVER);
     expect(dragoonClass("darkness")).toBe(DARKNESS);
+    expect(dragoonClass("thunder")).toBe(VIOLET);
     expect(isClassImplemented("redEye")).toBe(true);
-    expect(isClassImplemented("thunder")).toBe(false);
-    expect(dragoonClass("thunder")).toBeUndefined();
+    expect(isClassImplemented("thunder")).toBe(true);
+    expect(isClassImplemented("blueSea")).toBe(false);
+    expect(dragoonClass("blueSea")).toBeUndefined();
   });
 
   it("carries the canonical element and equipment user per line", () => {
@@ -36,6 +40,9 @@ describe("dragoon classes", () => {
     expect(DARKNESS.element).toBe("Darkness");
     expect(DARKNESS.equipmentUser).toBe("Rose");
     expect(DARKNESS.additions).toBe(ROSE_ADDITION_LIST);
+    expect(VIOLET.element).toBe("Thunder");
+    expect(VIOLET.equipmentUser).toBe("Haschel");
+    expect(VIOLET.additions).toBe(HASCHEL_ADDITION_LIST);
   });
 
   it("models the White-Silver line as Additionless (Shana / Miranda)", () => {
@@ -82,6 +89,7 @@ describe("bearers", () => {
       "shana",
       "miranda",
       "rose",
+      "haschel",
     ]);
   });
 
@@ -124,6 +132,7 @@ describe("growth tables", () => {
     ["Jade (Lavitz)", LAVITZ_LEVELS],
     ["White-Silver (Shana)", SHANA_LEVELS],
     ["Darkness (Rose)", ROSE_LEVELS],
+    ["Violet (Haschel)", HASCHEL_LEVELS],
   ] as const) {
     describe(name, () => {
       it("covers levels 1-60 in order", () => {

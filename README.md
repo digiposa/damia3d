@@ -139,11 +139,11 @@ portrait, lore).
 - [`data/dragoonClasses.ts`](src/data/dragoonClasses.ts) — les classes Dragoon
   implémentées : **Red-Eye** (Feu, table de Dart), **Jade** (Vent, table de
   Lavitz), **White-Silver** (Lumière, table de Shana — sans Additions, attaque
-  à l'arc) et **Darkness** (Ténèbres, table de Rose). Les autres lignes
-  s'ajoutent dès que leurs données arrivent.
+  à l'arc), **Darkness** (Ténèbres, table de Rose) et **Violet** (Foudre, table
+  de Haschel). Les autres lignes s'ajoutent dès que leurs données arrivent.
 - [`data/bearers.ts`](src/data/bearers.ts) — les porteurs : Dart/Zieg (Red-Eye),
   Lavitz/Albert/Greham/Syuveil (Jade), Shana/Miranda (White-Silver), Rose
-  (Darkness). Les porteurs
+  (Darkness), Haschel (Violet). Les porteurs
   canon de l'**histoire** ont leurs stats propres ; les autres sont des **reskins
   purs** (mêmes stats / Additions / élément que la classe, seuls le nom et le
   portrait changent), jouables en Training/Survival.
@@ -190,6 +190,7 @@ src/
     lavitz.ts          table de niveaux de Lavitz/Albert (1→60, ligne Jade)
     shana.ts           table de niveaux de Shana/Miranda (1→60, ligne White-Silver)
     rose.ts            table de niveaux de Rose (1→60, ligne Darkness)
+    haschel.ts         table de niveaux de Haschel (1→60, ligne Violet)
     additions.ts       Additions des 8 personnages (hits/multiplicateurs/SP, valeurs canon wiki)
     dragoonClasses.ts  archétypes Dragoon (élément, table, Additions, équipement)
     bearers.ts         porteurs jouables (Dart/Zieg, Lavitz/Albert/… reskins)
