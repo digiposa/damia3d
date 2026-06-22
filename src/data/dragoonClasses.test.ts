@@ -72,6 +72,11 @@ describe("bearers", () => {
     expect(DEFAULT_BEARER.classId).toBe("redEye");
   });
 
+  it("gives every bearer a distinct placeholder colour", () => {
+    const keys = BEARERS.map((b) => b.color.join(","));
+    expect(new Set(keys).size).toBe(BEARERS.length);
+  });
+
   it("looks bearers up by id", () => {
     expect(bearerById("lavitz")?.classId).toBe("jade");
     expect(bearerById("nobody")).toBeUndefined();

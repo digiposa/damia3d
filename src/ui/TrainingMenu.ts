@@ -168,8 +168,8 @@ export class TrainingMenu {
     const el = document.createElement("button");
     Object.assign(el.style, {
       display: "flex",
-      flexDirection: "column",
-      gap: "2px",
+      alignItems: "center",
+      gap: "9px",
       textAlign: "left",
       font: "700 15px/1.2 system-ui, sans-serif",
       color: current ? "#1a1608" : "#f0e6cf",
@@ -180,9 +180,15 @@ export class TrainingMenu {
       cursor: "pointer",
       touchAction: "manipulation",
     } satisfies Partial<CSSStyleDeclaration>);
+    const [r, g, b] = bearer.color;
     el.innerHTML =
+      `<span style="flex:0 0 auto;width:14px;height:14px;border-radius:50%;` +
+      `background:rgb(${(r * 255) | 0},${(g * 255) | 0},${(b * 255) | 0});` +
+      `border:1px solid rgba(0,0,0,0.5);box-shadow:0 0 4px rgba(0,0,0,0.4)"></span>` +
+      `<span style="display:flex;flex-direction:column;gap:2px;min-width:0">` +
       `<span>${bearer.name}${current ? "  ✓" : ""}</span>` +
-      `<span style="font:400 11px/1.3 ui-monospace,monospace;opacity:0.8">${cls?.element ?? ""}${bearer.storyPlayable ? "" : " · skin"}</span>`;
+      `<span style="font:400 11px/1.3 ui-monospace,monospace;opacity:0.8">${cls?.element ?? ""}${bearer.storyPlayable ? "" : " · skin"}</span>` +
+      `</span>`;
     tap(el, () => this.cb.onSelectBearer(bearer));
     return el;
   }

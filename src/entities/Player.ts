@@ -89,7 +89,8 @@ export class Player {
     const body = MeshBuilder.CreateCapsule("playerBody", { height: 1.6, radius: 0.4 }, scene);
     body.position.y = 0.8;
     const bodyMat = new StandardMaterial("playerMat", scene);
-    bodyMat.diffuseColor = new Color3(0.85, 0.2, 0.25);
+    const [cr, cg, cb] = bearer.color;
+    bodyMat.diffuseColor = new Color3(cr, cg, cb);
     bodyMat.specularColor = new Color3(0.1, 0.1, 0.1);
     body.material = bodyMat;
     body.parent = this.root;
@@ -97,7 +98,8 @@ export class Player {
     const nose = MeshBuilder.CreateBox("playerNose", { width: 0.25, height: 0.25, depth: 0.4 }, scene);
     nose.position = new Vector3(0, 0.9, 0.45);
     const noseMat = new StandardMaterial("noseMat", scene);
-    noseMat.diffuseColor = new Color3(0.95, 0.85, 0.3);
+    // A lightened tint of the body colour so facing is visible on any skin.
+    noseMat.diffuseColor = new Color3(0.5 + cr * 0.5, 0.5 + cg * 0.5, 0.5 + cb * 0.5);
     nose.material = noseMat;
     nose.parent = this.root;
 
