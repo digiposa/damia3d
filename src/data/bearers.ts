@@ -31,7 +31,7 @@ export interface Bearer {
   weapon?: WeaponKind;
   /** Distinctive hairstyle on the placeholder figure (e.g. Meru's high ponytail). */
   hair?: HairStyle;
-  /** Outfit overlaid on the placeholder figure (e.g. Dart's red Dragoon armour). */
+  /** Outfit overlaid on the placeholder figure (e.g. Dart's red adventuring armour). */
   outfit?: OutfitStyle;
   /** Placeholder avatar body colour (RGB 0–1) — distinguishes each bearer until art lands. */
   color: [number, number, number];

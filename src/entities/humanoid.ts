@@ -13,7 +13,7 @@ export interface HumanoidOptions {
   weapon?: WeaponKind;
   /** Distinctive hairstyle (e.g. Meru's high ponytail). */
   hair?: HairStyle;
-  /** Outfit overlaid on the figure (e.g. Dart's red Dragoon armour). */
+  /** Outfit overlaid on the figure (e.g. Dart's red adventuring armour — human form). */
   outfit?: OutfitStyle;
   /** Uniform scale (default 1). */
   scale?: number;
