@@ -12,7 +12,7 @@ import { createGround } from "../world/Ground";
 import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -35,8 +35,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
-import { SpawnMenu } from "../ui/SpawnMenu";
-import { CharacterMenu } from "../ui/CharacterMenu";
+import { TrainingMenu } from "../ui/TrainingMenu";
 import { floatingText } from "../ui/FloatingText";
 
 /** How close the player must be to land a combo hit on an enemy. */
@@ -57,10 +56,8 @@ export class TrainingMode extends GameMode {
   private player!: Player;
   private stats!: StatsBar;
   private sight!: TimingSight;
-  private spawnOpenBtn!: Button;
-  private spawnMenu!: SpawnMenu;
-  private charBtn!: Button;
-  private charMenu!: CharacterMenu;
+  private debugBtn!: Button;
+  private debugMenu!: TrainingMenu;
   private bearer: Bearer = DEFAULT_BEARER;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
@@ -69,7 +66,7 @@ export class TrainingMode extends GameMode {
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
 
-  /** True while the spawn menu is open — pauses gameplay like the Options menu. */
+  /** True while the debug menu is open — pauses gameplay like the Options menu. */
   private paused = false;
 
   // Click-to-move intent (desktop).
@@ -98,32 +95,26 @@ export class TrainingMode extends GameMode {
     this.stats = new StatsBar(() => this.host.openSystemMenu("addition"));
     this.sight = new TimingSight();
 
-    // Spawn menu (Training only), opened from a button just below the gear (⚙).
-    this.spawnMenu = new SpawnMenu({
-      onKnight: () => this.spawnKnight(),
-      onCommander: () => this.spawnCommander(),
-      onResume: () => this.closeSpawnMenu(),
+    // Training debug menu (Training only): switch character, set level, spawn
+    // enemies. Opened from a button just below the gear (⚙); pauses gameplay.
+    this.debugMenu = new TrainingMenu({
+      state: () => ({
+        bearerId: this.bearer.id,
+        level: this.player.level,
+        maxLevel: this.player.maxLevel,
+      }),
+      onSelectBearer: (b) => this.setBearer(b),
+      onSetLevel: (lv) => this.setLevel(lv),
+      onSpawnDummy: () => this.spawnDummy(),
+      onSpawnKnight: () => this.spawnKnight(),
+      onSpawnCommander: () => this.spawnCommander(),
+      onResume: () => this.closeDebugMenu(),
     });
-    this.spawnOpenBtn = new Button({
-      label: "🐾",
-      onClick: () => this.openSpawnMenu(),
+    this.debugBtn = new Button({
+      label: "🛠",
+      onClick: () => this.openDebugMenu(),
       style: {
         top: "calc(env(safe-area-inset-top, 0px) + 58px)",
-        right: "calc(env(safe-area-inset-right, 0px) + 10px)",
-        font: "600 18px/1 system-ui, sans-serif",
-        padding: "10px 14px",
-      },
-    });
-    // Character picker (Training/Survival): re-skin the player to another bearer.
-    this.charMenu = new CharacterMenu({
-      onSelect: (b) => this.setBearer(b),
-      onResume: () => this.closeCharacterMenu(),
-    });
-    this.charBtn = new Button({
-      label: "👤",
-      onClick: () => this.openCharacterMenu(),
-      style: {
-        top: "calc(env(safe-area-inset-top, 0px) + 106px)",
         right: "calc(env(safe-area-inset-right, 0px) + 10px)",
         font: "600 18px/1 system-ui, sans-serif",
         padding: "10px 14px",
@@ -147,34 +138,22 @@ export class TrainingMode extends GameMode {
     this.spawnKnight();
   }
 
-  private openSpawnMenu(): void {
+  private openDebugMenu(): void {
     this.paused = true;
-    this.spawnOpenBtn.setVisible(false);
-    this.spawnMenu.show();
+    this.debugBtn.setVisible(false);
+    this.debugMenu.show();
   }
 
-  private closeSpawnMenu(): void {
-    this.spawnMenu.hide();
-    this.spawnOpenBtn.setVisible(true);
-    this.paused = false;
-  }
-
-  private openCharacterMenu(): void {
-    this.paused = true;
-    this.charBtn.setVisible(false);
-    this.charMenu.show(this.bearer.id);
-  }
-
-  private closeCharacterMenu(): void {
-    this.charMenu.hide();
-    this.charBtn.setVisible(true);
+  private closeDebugMenu(): void {
+    this.debugMenu.hide();
+    this.debugBtn.setVisible(true);
     this.paused = false;
   }
 
   /**
    * Re-skin the player to another bearer: rebuild the avatar in place (same
-   * position) on the new bearer's Dragoon class, resetting transient combat
-   * state. Selecting the current bearer just resumes.
+   * position and level) on the new bearer's Dragoon class, resetting transient
+   * combat state. Selecting the current bearer just resumes.
    */
   private setBearer(b: Bearer): void {
     if (b.id !== this.bearer.id) {
@@ -187,7 +166,13 @@ export class TrainingMode extends GameMode {
       this.comboTarget = undefined;
       this.clearNav();
     }
-    this.closeCharacterMenu();
+    this.closeDebugMenu();
+  }
+
+  /** Jump the player to a level (debug). Keeps the menu open. */
+  private setLevel(level: number): void {
+    this.player.setLevel(level);
+    this.refreshHud();
   }
 
   update(dt: number): void {
@@ -523,6 +508,11 @@ export class TrainingMode extends GameMode {
     }));
   }
 
+  /** Spawn a non-canon training dummy: an immortal, inert damage-test target. */
+  private spawnDummy(): void {
+    this.enemies.push(new Enemy(this.scene, TRAINING_DUMMY, this.ringPosition(4)));
+  }
+
   private spawnKnight(): void {
     this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
   }
@@ -578,10 +568,8 @@ export class TrainingMode extends GameMode {
     this.enemies = [];
     this.stats.dispose();
     this.sight.dispose();
-    this.spawnMenu.dispose();
-    this.spawnOpenBtn.dispose();
-    this.charMenu.dispose();
-    this.charBtn.dispose();
+    this.debugMenu.dispose();
+    this.debugBtn.dispose();
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
   }

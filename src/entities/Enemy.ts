@@ -145,7 +145,8 @@ export class Enemy {
   }
 
   takeDamage(amount: number): void {
-    this.hp = Math.max(0, this.hp - amount);
+    // Immortal targets (the training dummy) clamp at 1 HP so they never die.
+    this.hp = Math.max(this.def.immortal ? 1 : 0, this.hp - amount);
   }
 
   heal(amount: number): void {
@@ -157,6 +158,9 @@ export class Enemy {
    * perform this turn (or null when just moving / waiting).
    */
   aiUpdate(dt: number, targetPos: Vector3, ctx: EnemyContext): EnemyAction | null {
+    // The training dummy just stands there: no chasing, no attacks.
+    if (this.def.behavior === "dummy") return null;
+
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
 
     const to = targetPos.subtract(this.position);

@@ -240,6 +240,20 @@ export class Player {
     if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
   }
 
+  /** Jump straight to a level (debug/training): set stats & EXP and fully heal. */
+  setLevel(level: number): void {
+    const clamped = Math.min(Math.max(Math.floor(level), 1), this.cls.levels.length);
+    this.level = clamped;
+    this.stats = statsForLevel(this.cls.levels, clamped);
+    this.exp = this.stats.exp;
+    this.hp = this.maxHp;
+  }
+
+  /** Highest level in this class's growth table. */
+  get maxLevel(): number {
+    return this.cls.levels.length;
+  }
+
   /**
    * Award EXP and apply any resulting level-ups. Current HP grows by the Max HP
    * gained so a level-up never lowers effective health.

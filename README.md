@@ -105,13 +105,16 @@ multiplicateur de dégâts.
 sur le bouton (anneau qui se vide + décompte) et **affecté par la vitesse de
 combat**. Un bouclier translucide l'entoure pendant la garde.
 
-Dans **Training** (arène) : un bouton **🐾** (sous l'engrenage ⚙) ouvre un **menu
-de spawn** qui **met le jeu en pause** (comme les Options) ; on y fait apparaître
-un **Knight of Sandora** ou le **Commander** (boss). Les ennemis poursuivent Dart
-et ripostent (physique ou magie) ; vaincre un ennemi octroie EXP et Gold. Barres
-de vie flottantes et nombres de dégâts à l'écran. La **vitesse de combat**
-(Options) accélère l'IA, la cadence et les fenêtres de timing — sans toucher au
-déplacement.
+Dans **Training** (arène) : un bouton **🛠** (sous l'engrenage ⚙) ouvre le **menu
+de débogage** qui **met le jeu en pause** (comme les Options). Il regroupe trois
+outils : **changer de personnage** (n'importe quel porteur jouable), **régler le
+niveau instantanément** (−10/−1/+1/+10 + raccourcis 1/20/40/max, soin complet),
+et **faire apparaître** un **Mannequin d'entraînement** (cible inerte et
+indestructible pour tester Additions/dégâts), un **Knight of Sandora** ou le
+**Commander** (boss). Les ennemis (hors mannequin) poursuivent le héros et
+ripostent (physique ou magie) ; vaincre un ennemi octroie EXP et Gold. Barres de
+vie flottantes et nombres de dégâts à l'écran. La **vitesse de combat** (Options)
+accélère l'IA, la cadence et les fenêtres de timing — sans toucher au déplacement.
 
 ### Boss : Commander (Seles)
 
@@ -152,9 +155,9 @@ Les personnages **sans Additions** (Shana / Miranda) utilisent une attaque de
 base à coup unique ([`BASIC_ATTACK`](src/data/additions.ts)) ; leur onglet
 Addition l'indique au lieu de lister des combos.
 
-En Training, le bouton **👤** (sous le menu de spawn) ouvre le sélecteur de
-personnage : choisir un porteur reconstruit l'avatar sur sa classe, au même
-niveau et à la même position.
+En Training, le **menu de débogage** (bouton 🛠) permet de changer de porteur :
+choisir un personnage reconstruit l'avatar sur sa classe, au même niveau et à la
+même position.
 
 ## Architecture
 
@@ -198,7 +201,7 @@ src/
     dragoonClasses.ts  archétypes Dragoon (élément, table, Additions, équipement)
     bearers.ts         porteurs jouables (Dart/Zieg, Lavitz/Albert/… reskins)
     equipment.ts       équipements complets (armures tous persos + armes Dart + 49 accessoires)
-    enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles)
+    enemies.ts         ennemis : Knights of Sandora + Commander (boss Seles) + Mannequin
   entities/
     Player.ts          avatar piloté par un porteur : état de combat + Addition équipée
     Enemy.ts           ennemi : HP, IA (actions phys/magie/soin), boss, barre de vie
@@ -207,8 +210,7 @@ src/
   ui/
     MainMenu.ts        écran-titre / sélection de mode
     SystemMenu.ts      menu système à onglets (Status/Équipement/Addition/Config)
-    SpawnMenu.ts       menu de spawn d'ennemis (Training, met en pause)
-    CharacterMenu.ts   sélecteur de personnage (Training/Survival, met en pause)
+    TrainingMenu.ts    menu de débogage Training (perso + niveau + spawn, met en pause)
     Button.ts          bouton HUD réutilisable
     VirtualJoystick.ts joystick analogique tactile
     ActionButton.ts    bouton d'action tactile (⚔ attaque)

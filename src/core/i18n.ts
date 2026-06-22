@@ -83,8 +83,14 @@ const en: Dict = {
   // Character menu
   "char.title": "Character",
 
+  // Training debug menu
+  "debug.title": "Training",
+  "debug.level": "Level",
+  "debug.spawn": "Spawn",
+
   // Spawn menu
   "spawn.title": "Spawn enemies",
+  "spawn.dummy": "🎯  Training Dummy",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
 
@@ -173,7 +179,11 @@ const fr: Dict = {
   "config.language": "Langue",
 
   "char.title": "Personnage",
+  "debug.title": "Entraînement",
+  "debug.level": "Niveau",
+  "debug.spawn": "Apparition",
   "spawn.title": "Apparition d'ennemis",
+  "spawn.dummy": "🎯  Mannequin d'entraînement",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
 

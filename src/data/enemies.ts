@@ -15,8 +15,8 @@ export interface EnemyAttack {
   element?: Element;
 }
 
-/** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script. */
-export type EnemyBehavior = "basic" | "commander";
+/** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script; "dummy" never acts. */
+export type EnemyBehavior = "basic" | "commander" | "dummy";
 
 /** Static definition of an enemy: identity, element, stats and battle yield. */
 export interface EnemyDef {
@@ -45,7 +45,31 @@ export interface EnemyDef {
   bodyColor?: [number, number, number];
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
+  /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
+  immortal?: boolean;
 }
+
+/**
+ * Training Dummy — a non-canon practice target. Does not move or attack and
+ * cannot be killed (HP clamps at 1), so it stays put as a damage/Addition test
+ * bag. Non-elemental and moderate DF for clean baseline numbers.
+ */
+export const TRAINING_DUMMY: EnemyDef = {
+  id: "training_dummy",
+  name: "Training Dummy",
+  element: "Non-Elemental",
+  stats: { maxHp: 999999, at: 0, df: 50, mat: 0, mdf: 50 },
+  spd: 1,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: false,
+  attacks: [{ name: "—", kind: "physical", multiplier: 0 }],
+  expReward: 0,
+  goldReward: 0,
+  behavior: "dummy",
+  immortal: true,
+  bodyColor: [0.72, 0.58, 0.32],
+};
 
 /**
  * Knight of Sandora — Seles variant. First encountered occupying Seles; a weak,
