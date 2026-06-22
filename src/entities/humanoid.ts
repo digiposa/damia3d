@@ -279,6 +279,24 @@ function buildSpikyHair(scene: Scene): TransformNode {
   cap.position.y = 1.74;
   cap.parent = group;
 
+  // Dart's red bandana: a band around the forehead with a knot and two tails
+  // trailing down the back.
+  const red = mat("bandana", 0.72, 0.12, 0.12, scene);
+  const band = MeshBuilder.CreateTorus("bandana", { diameter: 0.37, thickness: 0.08, tessellation: 10 }, scene);
+  band.position.y = 1.66; // forehead, just above the eyes
+  band.material = red;
+  band.isPickable = false;
+  band.parent = group;
+  const knot = box("bandanaKnot", 0.11, 0.11, 0.1, red, scene);
+  knot.position = new Vector3(0, 1.66, -0.2);
+  knot.parent = group;
+  for (const dx of [-0.04, 0.05]) {
+    const tail = box("bandanaTail", 0.05, 0.28, 0.04, red, scene);
+    tail.position = new Vector3(dx, 1.52, -0.22);
+    tail.rotation.x = -0.25;
+    tail.parent = group;
+  }
+
   // One spike: a 4-sided cone on a pivot at its base, so it can lean outward.
   const spike = (x: number, y: number, z: number, rotX: number, rotZ: number, len = 0.28) => {
     const pivot = new TransformNode("hairSpikePivot", scene);
