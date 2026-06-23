@@ -67,15 +67,16 @@ export class Humanoid {
     this.rig = new TransformNode("humanoid", scene);
     this.rig.scaling.setAll(opts.scale ?? 1);
 
-    // Skin-revealing outfits (the dancer) colour the body in a neutral skin tone so
-    // bare arms/legs/midriff don't read as "painted" in the bearer's colour — that
-    // colour is carried by the clothing instead. Covered figures tint the body.
+    // Exposed skin (the face) always uses a neutral skin tone — the bearer's colour
+    // belongs to their clothing/armour, not their skin (so Lavitz isn't green-faced).
+    // Revealing outfits (the dancer) additionally skin the whole body; covered figures
+    // keep the bearer's colour on the torso and limbs, where it reads as clothing.
     const revealing = opts.outfit === "dancer";
-    const main = revealing ? mat("hSkin", 0.94, 0.79, 0.67, scene) : mat("hMain", r, g, b, scene);
-    const dark = revealing ? mat("hSkinDk", 0.84, 0.68, 0.56, scene) : mat("hDark", r * 0.55, g * 0.55, b * 0.55, scene);
-    const light = revealing
-      ? mat("hSkinHi", 0.96, 0.83, 0.72, scene)
-      : mat("hLight", 0.5 + r * 0.5, 0.5 + g * 0.5, 0.5 + b * 0.5, scene);
+    const skinMain = mat("hSkin", 0.94, 0.79, 0.67, scene);
+    const skinDark = mat("hSkinDk", 0.84, 0.68, 0.56, scene);
+    const skinLight = mat("hSkinHi", 0.96, 0.83, 0.72, scene);
+    const main = revealing ? skinMain : mat("hMain", r, g, b, scene);
+    const dark = revealing ? skinDark : mat("hDark", r * 0.55, g * 0.55, b * 0.55, scene);
     const eyeMat = mat("hEye", 0.08, 0.08, 0.1, scene);
 
     // Torso / head / arms bob together; legs stay planted on the rig.
@@ -90,7 +91,7 @@ export class Humanoid {
     torso.position.y = 1.12;
     torso.parent = this.body;
 
-    const head = box("hHead", 0.34, 0.34, 0.32, light, scene);
+    const head = box("hHead", 0.34, 0.34, 0.32, skinLight, scene);
     head.position.y = 1.6;
     head.parent = this.body;
 
