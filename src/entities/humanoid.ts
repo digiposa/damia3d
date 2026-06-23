@@ -611,10 +611,11 @@ function buildBobHair(scene: Scene): TransformNode {
   back.position = new Vector3(0, 1.54, -0.17);
   back.parent = group;
 
-  // Two locks framing the sides of the face (beside it, not over it), to the shoulders.
+  // Two short locks framing the sides of the face (beside it, not over it), ending
+  // around the jaw rather than at the shoulders.
   for (const dx of [-0.22, 0.22]) {
-    const side = box("hairSide", 0.1, 0.46, 0.34, brown, scene);
-    side.position = new Vector3(dx, 1.42, 0);
+    const side = box("hairSide", 0.1, 0.32, 0.34, brown, scene);
+    side.position = new Vector3(dx, 1.5, 0);
     side.parent = group;
   }
   return group;
