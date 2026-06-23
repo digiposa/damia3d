@@ -119,25 +119,32 @@ export class Humanoid {
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
 
-    if (opts.outfit === "armored") this.addArmor(scene, opts.color);
+    if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
       this.ponytail = buildPonytail(scene);
       this.ponytail.parent = this.body; // bobs with the head
     } else if (opts.hair === "spiky") {
       buildSpikyHair(scene).parent = this.body; // rigid, just bobs with the head
+    } else if (opts.hair === "short") {
+      buildShortHair(scene).parent = this.body;
     }
   }
 
   /**
-   * Overlay armour plates on the figure: asymmetric shoulder pauldrons, a chest
-   * plate, a dark high collar, a belt with a buckle, gauntlets, and boots with
-   * knee guards. Plates take the bearer's colour; straps/boots are neutral. Pieces
-   * parent to the body (static) or to a limb (so they swing with it).
+   * Overlay armour on the figure: pauldrons, a chest plate, a dark high collar, a
+   * belt with a buckle, gauntlets/vambraces, and boots with knee guards. Pieces
+   * parent to the body (static) or to a limb (so they swing with it). Two styles:
+   * "armored" — Dart: bearer-coloured plates, strongly asymmetric shoulders,
+   *   leather gauntlets.
+   * "knight" — Lavitz: steel plates over the bearer-coloured clothing, symmetric
+   *   shoulders, steel vambraces.
    */
-  private addArmor(scene: Scene, color: [number, number, number]): void {
+  private addArmor(scene: Scene, color: [number, number, number], style: OutfitStyle): void {
     const [r, g, b] = color;
-    const plate = mat("armPlate", r, g, b, scene);
+    const knight = style === "knight";
+    const steel = mat("armSteel", 0.76, 0.78, 0.84, scene);
+    const plate = knight ? steel : mat("armPlate", r, g, b, scene);
     const strap = mat("armStrap", r * 0.3, g * 0.3, b * 0.3, scene); // near-black undersuit
     const boot = mat("armBoot", 0.32, 0.22, 0.12, scene);
     const metal = mat("armMetal", 0.72, 0.74, 0.8, scene);
@@ -161,18 +168,28 @@ export class Humanoid {
     piece("collar", 0.3, 0.22, 0.26, new Vector3(0, 1.42, 0), strap, this.body);
     // Chest plate, slightly proud of the torso.
     piece("chestplate", 0.42, 0.46, 0.08, new Vector3(0, 1.12, 0.15), plate, this.body);
-    // Strongly asymmetric shoulders — Dart's signature: a big two-tier pauldron on
-    // the left (non-sword) shoulder, just a thin guard on the right.
-    piece("pauldronL", 0.34, 0.22, 0.44, new Vector3(-0.38, 1.44, 0), plate, this.body);
-    piece("pauldronLTop", 0.28, 0.16, 0.36, new Vector3(-0.36, 1.6, 0), plate, this.body);
-    piece("pauldronR", 0.16, 0.1, 0.26, new Vector3(0.33, 1.4, 0), plate, this.body);
+
+    if (knight) {
+      // Symmetric knight pauldrons.
+      piece("pauldronL", 0.27, 0.2, 0.38, new Vector3(-0.36, 1.44, 0), plate, this.body);
+      piece("pauldronR", 0.27, 0.2, 0.38, new Vector3(0.36, 1.44, 0), plate, this.body);
+    } else {
+      // Dart's signature: a big two-tier pauldron on the left (non-sword) shoulder,
+      // just a thin guard on the right.
+      piece("pauldronL", 0.34, 0.22, 0.44, new Vector3(-0.38, 1.44, 0), plate, this.body);
+      piece("pauldronLTop", 0.28, 0.16, 0.36, new Vector3(-0.36, 1.6, 0), plate, this.body);
+      piece("pauldronR", 0.16, 0.1, 0.26, new Vector3(0.33, 1.4, 0), plate, this.body);
+    }
+
     // Belt with a metal buckle.
     piece("belt", 0.47, 0.11, 0.31, new Vector3(0, 0.82, 0), strap, this.body);
     piece("buckle", 0.1, 0.09, 0.04, new Vector3(0, 0.82, 0.16), metal, this.body);
 
-    // Gauntlets swing with the arms; boots + knee guards with the legs.
+    // Gauntlets/vambraces swing with the arms (steel for a knight, leather else);
+    // boots + knee guards swing with the legs.
+    const gauntlet = knight ? steel : strap;
     for (const arm of [this.leftArm, this.rightArm]) {
-      piece("gauntlet", 0.2, 0.24, 0.2, new Vector3(0, -0.48, 0), strap, arm);
+      piece("gauntlet", 0.2, 0.24, 0.2, new Vector3(0, -0.48, 0), gauntlet, arm);
     }
     for (const leg of [this.leftLeg, this.rightLeg]) {
       piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), boot, leg);
@@ -287,6 +304,51 @@ function limb(name: string, length: number, thick: number, material: StandardMat
   return pivot;
 }
 
+/** A 4-sided cone "hair spike" on a pivot at its base, so it can lean outward. */
+function coneSpike(
+  scene: Scene,
+  material: StandardMaterial,
+  pos: Vector3,
+  rotX: number,
+  rotZ: number,
+  len: number,
+  baseD = 0.13,
+): TransformNode {
+  const pivot = new TransformNode("hairSpikePivot", scene);
+  pivot.position = pos;
+  pivot.rotation.x = rotX;
+  pivot.rotation.z = rotZ;
+  const cone = MeshBuilder.CreateCylinder(
+    "hairSpike",
+    { height: len, diameterTop: 0, diameterBottom: baseD, tessellation: 4 },
+    scene,
+  );
+  cone.position.y = len / 2; // base at the pivot, tip outward
+  cone.material = material;
+  cone.isPickable = false;
+  cone.parent = pivot;
+  return pivot;
+}
+
+/**
+ * Lavitz's hair: short swept-back blond — a snug cap with a few short spikes
+ * sweeping up and forward over the brow. Rigid; bobs with the head.
+ */
+function buildShortHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairShort", scene);
+  const blond = mat("hairBlond", 0.74, 0.56, 0.24, scene);
+
+  const cap = box("hairCap", 0.37, 0.2, 0.37, blond, scene);
+  cap.position.y = 1.72;
+  cap.parent = group;
+
+  coneSpike(scene, blond, new Vector3(0, 1.8, 0.13), 0.9, 0, 0.2, 0.11).parent = group;
+  coneSpike(scene, blond, new Vector3(-0.1, 1.8, 0.11), 0.8, -0.2, 0.18, 0.1).parent = group;
+  coneSpike(scene, blond, new Vector3(0.1, 1.8, 0.11), 0.8, 0.2, 0.18, 0.1).parent = group;
+  coneSpike(scene, blond, new Vector3(0, 1.83, -0.02), 0.1, 0, 0.18, 0.1).parent = group;
+  return group;
+}
+
 /**
  * Meru's signature: a high silver ponytail with a blue bow, gathered at the back
  * of the crown and falling down the back (−Z). Built around a pivot at the crown
@@ -352,23 +414,8 @@ function buildSpikyHair(scene: Scene): TransformNode {
     tail.parent = group;
   }
 
-  // One spike: a 4-sided cone on a pivot at its base, so it can lean outward.
-  const spike = (x: number, y: number, z: number, rotX: number, rotZ: number, len = 0.28) => {
-    const pivot = new TransformNode("hairSpikePivot", scene);
-    pivot.position = new Vector3(x, y, z);
-    pivot.rotation.x = rotX;
-    pivot.rotation.z = rotZ;
-    pivot.parent = group;
-    const cone = MeshBuilder.CreateCylinder(
-      "hairSpike",
-      { height: len, diameterTop: 0, diameterBottom: 0.13, tessellation: 4 },
-      scene,
-    );
-    cone.position.y = len / 2; // base at the pivot, tip outward
-    cone.material = hair;
-    cone.isPickable = false;
-    cone.parent = pivot;
-  };
+  const spike = (x: number, y: number, z: number, rotX: number, rotZ: number, len = 0.28) =>
+    (coneSpike(scene, hair, new Vector3(x, y, z), rotX, rotZ, len).parent = group);
 
   // Front (sweeping forward), top, back, and sides — a messy radiating fan.
   spike(0, 1.78, 0.15, 0.8, 0);
