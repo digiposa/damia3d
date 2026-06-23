@@ -205,11 +205,11 @@ export class Humanoid {
       piece("gauntlet", 0.2, full ? 0.5 : 0.24, 0.2, new Vector3(0, full ? -0.4 : -0.48, 0), gauntletMat, arm);
     }
 
-    // Boots + knee guards swing with the legs; full plate adds plated thighs and
-    // armoured boots for head-to-toe coverage.
+    // Boots + knee guards swing with the legs; the knight and full plate wear steel
+    // boots (matching the rest of their armour), while lighter outfits wear leather.
     for (const leg of [this.leftLeg, this.rightLeg]) {
       if (full) piece("thigh", 0.22, 0.42, 0.26, new Vector3(0, -0.2, 0.01), plate, leg);
-      piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), full ? plate : boot, leg);
+      piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), full || knight ? plate : boot, leg);
       piece("knee", 0.21, 0.13, 0.23, new Vector3(0, -0.34, 0.01), plate, leg);
     }
   }
