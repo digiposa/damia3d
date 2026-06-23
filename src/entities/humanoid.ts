@@ -71,7 +71,7 @@ export class Humanoid {
     // belongs to their clothing/armour, not their skin (so Lavitz isn't green-faced).
     // Revealing outfits (the dancer) additionally skin the whole body; covered figures
     // keep the bearer's colour on the torso and limbs, where it reads as clothing.
-    const revealing = opts.outfit === "dancer";
+    const revealing = opts.outfit === "dancer" || opts.outfit === "archer";
     const skinMain = mat("hSkin", 0.94, 0.79, 0.67, scene);
     const skinDark = mat("hSkinDk", 0.84, 0.68, 0.56, scene);
     const skinLight = mat("hSkinHi", 0.96, 0.83, 0.72, scene);
@@ -127,6 +127,7 @@ export class Humanoid {
     weaponNode.parent = wieldArm;
 
     if (opts.outfit === "dancer") this.addDancerOutfit(scene, opts.color);
+    else if (opts.outfit === "archer") this.addArcherOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -136,6 +137,8 @@ export class Humanoid {
       buildSpikyHair(scene).parent = this.body; // rigid, just bobs with the head
     } else if (opts.hair === "short") {
       buildShortHair(scene).parent = this.body;
+    } else if (opts.hair === "bob") {
+      buildBobHair(scene).parent = this.body;
     }
   }
 
@@ -270,6 +273,97 @@ export class Humanoid {
       const ribbon = box("ribbon", 0.07, 0.16, 0.07, blue, scene);
       ribbon.position = new Vector3(0, -0.4, -0.14);
       ribbon.parent = leg;
+    }
+  }
+
+  /**
+   * Shana's archer outfit: a white short top with blue collar/hem trim over a brown
+   * leather waist corset, short blue shorts, brown wrist guards, a single leather
+   * shoulder pauldron, cream socks with brown boots, and a quiver of arrows on the
+   * back. Built over the skin-toned body (bare arms and legs) — she also carries a bow.
+   */
+  private addArcherOutfit(scene: Scene): void {
+    const white = mat("arWhite", 0.9, 0.92, 0.95, scene);
+    const blue = mat("arBlue", 0.42, 0.55, 0.75, scene);
+    const brown = mat("arBrown", 0.42, 0.28, 0.16, scene);
+    const tan = mat("arTan", 0.6, 0.44, 0.27, scene);
+    const sockMat = mat("arSock", 0.9, 0.9, 0.86, scene);
+    const gold = mat("arBuckle", 0.8, 0.66, 0.3, scene);
+
+    // White top covering the chest to the waist, with blue collar, hem and a
+    // centre placket.
+    const top = box("arTop", 0.48, 0.5, 0.3, white, scene);
+    top.position.y = 1.18;
+    top.parent = this.body;
+    const collar = box("arCollar", 0.49, 0.07, 0.31, blue, scene);
+    collar.position.y = 1.4;
+    collar.parent = this.body;
+    const hem = box("arHem", 0.49, 0.06, 0.31, blue, scene);
+    hem.position.y = 0.96;
+    hem.parent = this.body;
+    const placket = box("arPlacket", 0.06, 0.42, 0.02, blue, scene);
+    placket.position = new Vector3(0, 1.18, 0.16);
+    placket.parent = this.body;
+
+    // Short white sleeve caps on the shoulders.
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const sleeve = box("arSleeve", 0.2, 0.16, 0.22, white, scene);
+      sleeve.position.y = -0.06;
+      sleeve.parent = arm;
+    }
+
+    // Brown leather waist corset with a gold buckle.
+    const corset = box("arCorset", 0.5, 0.22, 0.32, brown, scene);
+    corset.position.y = 0.9;
+    corset.parent = this.body;
+    const buckle = box("arBuckleM", 0.14, 0.12, 0.04, gold, scene);
+    buckle.position = new Vector3(0, 0.9, 0.17);
+    buckle.parent = this.body;
+
+    // Short blue shorts over the hips, with cuffs on the upper thighs.
+    const shorts = box("arShorts", 0.47, 0.26, 0.31, blue, scene);
+    shorts.position.y = 0.78;
+    shorts.parent = this.body;
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const cuff = box("arShortCuff", 0.2, 0.2, 0.2, blue, scene);
+      cuff.position.y = -0.12;
+      cuff.parent = leg;
+    }
+
+    // A single leather pauldron on the left shoulder.
+    const pauldron = box("arPauldron", 0.24, 0.14, 0.3, tan, scene);
+    pauldron.position = new Vector3(-0.34, 1.44, 0);
+    pauldron.parent = this.body;
+
+    // Brown wrist guards (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const guard = box("arWrist", 0.19, 0.16, 0.19, brown, scene);
+      guard.position.y = -0.46;
+      guard.parent = arm;
+    }
+
+    // Cream socks topped over brown boots (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const sock = box("arSockM", 0.2, 0.16, 0.2, sockMat, scene);
+      sock.position.y = -0.5;
+      sock.parent = leg;
+      const boot = box("arBoot", 0.22, 0.26, 0.26, brown, scene);
+      boot.position = new Vector3(0, -0.66, 0.02);
+      boot.parent = leg;
+    }
+
+    // Quiver of arrows slung across the back.
+    const quiver = MeshBuilder.CreateCylinder("arQuiver", { height: 0.5, diameter: 0.12, tessellation: 10 }, scene);
+    quiver.material = tan;
+    quiver.isPickable = false;
+    quiver.rotation.x = 0.35;
+    quiver.position = new Vector3(0.14, 1.18, -0.22);
+    quiver.parent = this.body;
+    for (const dx of [-0.04, 0, 0.04]) {
+      const shaft = box("arArrow", 0.02, 0.26, 0.02, white, scene);
+      shaft.rotation.x = 0.35;
+      shaft.position = new Vector3(0.14 + dx, 1.46, -0.28);
+      shaft.parent = this.body;
     }
   }
 
@@ -422,6 +516,35 @@ function buildShortHair(scene: Scene): TransformNode {
   coneSpike(scene, blond, new Vector3(-0.1, 1.8, 0.11), 0.8, -0.2, 0.18, 0.1).parent = group;
   coneSpike(scene, blond, new Vector3(0.1, 1.8, 0.11), 0.8, 0.2, 0.18, 0.1).parent = group;
   coneSpike(scene, blond, new Vector3(0, 1.83, -0.02), 0.1, 0, 0.18, 0.1).parent = group;
+  return group;
+}
+
+/**
+ * Shana's hair: a shoulder-length brown bob parted over the brow — a crown cap, a
+ * fuller mass at the back, two locks framing the face, and a short fringe. Rigid;
+ * bobs with the head.
+ */
+function buildBobHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairBob", scene);
+  const brown = mat("hairBrown", 0.42, 0.28, 0.15, scene);
+
+  const cap = box("hairCap", 0.38, 0.26, 0.39, brown, scene);
+  cap.position.y = 1.7;
+  cap.parent = group;
+
+  const back = box("hairBack", 0.36, 0.36, 0.18, brown, scene);
+  back.position = new Vector3(0, 1.54, -0.16);
+  back.parent = group;
+
+  for (const dx of [-0.2, 0.2]) {
+    const side = box("hairSide", 0.1, 0.42, 0.34, brown, scene);
+    side.position = new Vector3(dx, 1.44, 0.02);
+    side.parent = group;
+  }
+
+  const fringe = box("hairFringe", 0.36, 0.1, 0.07, brown, scene);
+  fringe.position = new Vector3(0, 1.69, 0.17);
+  fringe.parent = group;
   return group;
 }
 
