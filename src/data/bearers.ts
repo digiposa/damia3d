@@ -8,6 +8,9 @@ import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
 export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer" | "axe";
 
+/** Optional weapon variant overlaid on a {@link WeaponKind} for a signature silhouette. */
+export type WeaponVariant = "spiked";
+
 /** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
 export type HairStyle = "ponytail" | "spiky" | "short" | "bob";
 
@@ -29,6 +32,8 @@ export interface Bearer {
   model?: string;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
+  /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
+  weaponVariant?: WeaponVariant;
   /** Distinctive hairstyle on the placeholder figure (e.g. Meru's high ponytail). */
   hair?: HairStyle;
   /** Outfit overlaid on the placeholder figure (e.g. Dart's red adventuring armour). */
@@ -42,7 +47,7 @@ export interface Bearer {
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
   { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: [0.85, 0.2, 0.22], storyPlayable: true },
-  { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
+  { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
   // Jade (Wind) — spears
   { id: "lavitz", name: "Lavitz", classId: "jade", weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", color: [0.2, 0.46, 0.72], storyPlayable: true },

@@ -93,6 +93,7 @@ export class Player {
     this.humanoid = new Humanoid(scene, {
       color: bearer.color,
       weapon: bearer.weapon,
+      weaponVariant: bearer.weaponVariant,
       hair: bearer.hair,
       outfit: bearer.outfit,
     });

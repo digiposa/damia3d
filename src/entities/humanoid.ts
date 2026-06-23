@@ -4,13 +4,15 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { WeaponKind, HairStyle, OutfitStyle } from "../data/bearers";
+import type { WeaponKind, WeaponVariant, HairStyle, OutfitStyle } from "../data/bearers";
 
 export interface HumanoidOptions {
   /** Primary body colour (RGB 0–1). */
   color: [number, number, number];
   /** Weapon silhouette to carry (default "sword"). */
   weapon?: WeaponKind;
+  /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
+  weaponVariant?: WeaponVariant;
   /** Distinctive hairstyle (e.g. Meru's high ponytail). */
   hair?: HairStyle;
   /** Outfit overlaid on the figure (e.g. Dart's red adventuring armour — human form). */
@@ -122,7 +124,7 @@ export class Humanoid {
     // weapon is wielded in the right hand. Attach it at the hand (bottom of the arm).
     const wieldArm = weapon === "bow" ? this.leftArm : this.rightArm;
     this.strikeArm = this.rightArm;
-    const weaponNode = buildWeapon(weapon, main, scene);
+    const weaponNode = buildWeapon(weapon, main, scene, opts.weaponVariant);
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
 
@@ -635,7 +637,7 @@ function buildSpikyHair(scene: Scene): TransformNode {
  * the business end forward) so it points ahead of a hanging arm and arcs naturally
  * during a strike. `accent` tints character-coloured parts (e.g. the bow grip).
  */
-function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene): TransformNode {
+function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, variant?: WeaponVariant): TransformNode {
   const group = new TransformNode(`weapon_${kind}`, scene);
   const steel = mat("wSteel", 0.72, 0.74, 0.8, scene);
   const wood = mat("wWood", 0.34, 0.22, 0.12, scene);
@@ -656,9 +658,24 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene): 
 
   switch (kind) {
     case "sword":
-      part("blade", 0.07, 0.07, 0.9, 0.5, steel);
-      part("guard", 0.3, 0.07, 0.07, 0.08, accent);
-      part("grip", 0.06, 0.06, 0.2, -0.08, wood);
+      if (variant === "spiked") {
+        // Zieg's heavy broadsword: a wider, longer flat blade with a coloured centre
+        // ridge, tipped with a cluster of steel spikes — a forward point plus two
+        // barbs flaring out near the tip.
+        part("blade", 0.13, 0.05, 1.0, 0.55, steel);
+        part("ridge", 0.035, 0.08, 0.92, 0.55, accent); // coloured fuller, stands proud
+        part("guard", 0.36, 0.09, 0.09, 0.06, accent);
+        part("grip", 0.06, 0.06, 0.22, -0.12, wood);
+        const tipZ = 1.05;
+        coneSpike(scene, steel, new Vector3(0, 0, tipZ), Math.PI / 2, 0, 0.28, 0.1).parent = group;
+        for (const side of [-1, 1]) {
+          coneSpike(scene, steel, new Vector3(side * 0.06, 0, tipZ - 0.12), 0.4, side * 1.15, 0.24, 0.09).parent = group;
+        }
+      } else {
+        part("blade", 0.07, 0.07, 0.9, 0.5, steel);
+        part("guard", 0.3, 0.07, 0.07, 0.08, accent);
+        part("grip", 0.06, 0.06, 0.2, -0.08, wood);
+      }
       break;
     case "rapier": // thinner, longer, small guard
       part("blade", 0.04, 0.04, 1.05, 0.55, steel);
