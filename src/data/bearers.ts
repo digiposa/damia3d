@@ -1,6 +1,6 @@
 import dartPortrait from "../assets/portraits/dart.png";
 import albertPortrait from "../assets/portraits/albert.png";
-import meruPortrait from "../assets/portraits/meru.png";
+import meruPortrait from "../assets/portraits/meru.jpg";
 import rosePortrait from "../assets/portraits/rose.png";
 import haschelPortrait from "../assets/portraits/haschel.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
@@ -12,7 +12,7 @@ export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer
 export type HairStyle = "ponytail" | "spiky" | "short";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
-export type OutfitStyle = "armored" | "knight" | "fullplate";
+export type OutfitStyle = "armored" | "knight" | "fullplate" | "dancer";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -56,7 +56,7 @@ export const BEARERS: Bearer[] = [
   // Violet (Thunder) — martial artist (fists)
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: [0.85, 0.5, 0.18], storyPlayable: true },
   // Blue-Sea (Water) — hammer
-  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", color: [0.3, 0.72, 0.85], storyPlayable: true },
+  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: [0.3, 0.72, 0.85], storyPlayable: true },
   // Golden (Earth) — axe
   { id: "kongol", name: "Kongol", classId: "golden", weapon: "axe", color: [0.72, 0.56, 0.26], storyPlayable: true },
 ];

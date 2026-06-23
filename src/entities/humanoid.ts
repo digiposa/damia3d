@@ -119,7 +119,8 @@ export class Humanoid {
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
 
-    if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
+    if (opts.outfit === "dancer") this.addDancerOutfit(scene, opts.color);
+    else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
       this.ponytail = buildPonytail(scene);
@@ -203,6 +204,57 @@ export class Humanoid {
       if (full) piece("thigh", 0.22, 0.42, 0.26, new Vector3(0, -0.2, 0.01), plate, leg);
       piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), full ? plate : boot, leg);
       piece("knee", 0.21, 0.13, 0.23, new Vector3(0, -0.34, 0.01), plate, leg);
+    }
+  }
+
+  /**
+   * Meru's dancer outfit: a flared "petal" skirt at the hips (a low cone with an
+   * orange hem ring), a coloured waist sash, wrist cuffs, and orange calf wraps
+   * with ribbons. Skirt/wraps in white + the bearer's blue + orange accents, for
+   * her unmistakable colourful silhouette.
+   */
+  private addDancerOutfit(scene: Scene, color: [number, number, number]): void {
+    const [r, g, b] = color;
+    const accent = mat("dnAccent", r, g, b, scene); // her blue
+    const light = mat("dnLight", 0.86, 0.9, 0.97, scene); // white skirt
+    const orange = mat("dnOrange", 0.92, 0.55, 0.2, scene); // orange trim
+
+    // Flared petal skirt (a low cone) with an orange hem ring; planted at the hips.
+    const skirt = MeshBuilder.CreateCylinder(
+      "skirt",
+      { height: 0.5, diameterTop: 0.34, diameterBottom: 0.95, tessellation: 12 },
+      scene,
+    );
+    skirt.material = light;
+    skirt.isPickable = false;
+    skirt.position.y = 0.72;
+    skirt.parent = this.rig;
+
+    const hem = MeshBuilder.CreateTorus("skirtHem", { diameter: 0.92, thickness: 0.09, tessellation: 14 }, scene);
+    hem.material = orange;
+    hem.isPickable = false;
+    hem.position.y = 0.49;
+    hem.parent = this.rig;
+
+    // Blue waist sash just above the skirt.
+    const sash = box("sash", 0.4, 0.12, 0.3, accent, scene);
+    sash.position.y = 0.97;
+    sash.parent = this.body;
+
+    // Orange wrist cuffs (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const cuff = box("cuff", 0.2, 0.16, 0.2, orange, scene);
+      cuff.position.y = -0.5;
+      cuff.parent = arm;
+    }
+    // Orange calf wraps + a blue ribbon (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const wrap = box("wrap", 0.2, 0.24, 0.2, orange, scene);
+      wrap.position.y = -0.5;
+      wrap.parent = leg;
+      const ribbon = box("ribbon", 0.07, 0.18, 0.07, accent, scene);
+      ribbon.position = new Vector3(0, -0.5, -0.13);
+      ribbon.parent = leg;
     }
   }
 
