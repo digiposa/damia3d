@@ -215,9 +215,9 @@ export class Humanoid {
 
   /**
    * Meru's dancer outfit (blue + gold + cream): a bodice top covering the chest
-   * (bare midriff between it and the skirt), an open "petal" skirt of flat panels
-   * radiating from the waist with pointed blue/gold tips, a waist sash, gold/blue
-   * wrist cuffs, and gold/blue calf greaves. Built over the skin-toned body.
+   * (bare midriff between it and the skirt), a three-panel skirt (small front apron
+   * + two big back panels sweeping left/right, like the artwork), a waist sash,
+   * gold/blue wrist cuffs, and gold/blue calf greaves. Built over the skin-toned body.
    */
   private addDancerOutfit(scene: Scene, color: [number, number, number]): void {
     const [r, g, b] = color;
@@ -233,23 +233,22 @@ export class Humanoid {
     topTrim.position.y = 1.07;
     topTrim.parent = this.body;
 
-    // Petal skirt: flat panels radiating from the waist, each leaning clearly
-    // OUTWARD and down so the hem is wider than the hips (negative tilt flares out;
-    // positive would fold them back over the body). Colours alternate cream/blue/gold
-    // and gaps between panels show the legs — her open "petal" skirt.
-    const panelCount = 8;
-    const skirtColors = [cream, blue, gold];
-    for (let i = 0; i < panelCount; i++) {
+    // Skirt: not a full ring — just three cloth panels like the artwork. A small
+    // apron in front, and two large panels at the back that sweep out to the left
+    // and right (the "butterfly" flare). Negative tilt flares them outward & down.
+    const addPanel = (azimuthDeg: number, w: number, h: number, tiltX: number, radius: number, material: StandardMaterial) => {
       const pivot = new TransformNode("skirtPanelPivot", scene);
       pivot.position = new Vector3(0, 0.8, 0);
-      pivot.rotation.y = (i / panelCount) * Math.PI * 2;
+      pivot.rotation.y = (azimuthDeg * Math.PI) / 180;
       pivot.parent = this.rig;
-
-      const panel = box("skirtPanel", 0.26, 0.5, 0.04, skirtColors[i % skirtColors.length], scene);
-      panel.rotation.x = -0.6; // flare outward & down
-      panel.position = new Vector3(0, -0.2, 0.3); // out at hip radius, hanging down
+      const panel = box("skirtPanel", w, h, 0.04, material, scene);
+      panel.rotation.x = tiltX;
+      panel.position = new Vector3(0, -0.2, radius);
       panel.parent = pivot;
-    }
+    };
+    addPanel(0, 0.22, 0.4, -0.4, 0.16, blue); // small front apron
+    addPanel(125, 0.46, 0.62, -0.85, 0.24, cream); // big back-left panel, sweeping left
+    addPanel(-125, 0.46, 0.62, -0.85, 0.24, cream); // big back-right panel, sweeping right
 
     // Blue waist sash capping the tops of the panels.
     const sash = box("sash", 0.44, 0.14, 0.34, blue, scene);
