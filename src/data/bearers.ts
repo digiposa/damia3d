@@ -1,5 +1,6 @@
 import dartPortrait from "../assets/portraits/dart.png";
 import albertPortrait from "../assets/portraits/albert.png";
+import lavitzPortrait from "../assets/portraits/lavitz.png";
 import meruPortrait from "../assets/portraits/meru.jpg";
 import rosePortrait from "../assets/portraits/rose.png";
 import haschelPortrait from "../assets/portraits/haschel.png";
@@ -49,7 +50,7 @@ export const BEARERS: Bearer[] = [
   { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: [0.85, 0.2, 0.22], storyPlayable: true },
   { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
   // Jade (Wind) — spears
-  { id: "lavitz", name: "Lavitz", classId: "jade", weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
+  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", color: [0.2, 0.46, 0.72], storyPlayable: true },
   { id: "greham", name: "Greham", classId: "jade", weapon: "spear", color: [0.38, 0.42, 0.48], storyPlayable: false },
   { id: "syuveil", name: "Syuveil", classId: "jade", weapon: "spear", color: [0.2, 0.56, 0.54], storyPlayable: false },
