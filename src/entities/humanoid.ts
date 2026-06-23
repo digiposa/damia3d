@@ -522,31 +522,30 @@ function buildShortHair(scene: Scene): TransformNode {
 }
 
 /**
- * Shana's hair: a shoulder-length brown bob parted over the brow — a crown cap, a
- * fuller mass at the back, two locks framing the face, and a short fringe. Rigid;
- * bobs with the head.
+ * Shana's hair: a shoulder-length brown bob parted over the brow. A high crown cap
+ * (kept above the eyes so the face reads), a fuller mass at the back/nape, and two
+ * locks framing the sides of the face down to the shoulders. Rigid; bobs with the head.
  */
 function buildBobHair(scene: Scene): TransformNode {
   const group = new TransformNode("hairBob", scene);
   const brown = mat("hairBrown", 0.42, 0.28, 0.15, scene);
 
-  const cap = box("hairCap", 0.38, 0.26, 0.39, brown, scene);
-  cap.position.y = 1.7;
+  // Crown cap sitting high, its front edge above the eyes (the hairline / bangs).
+  const cap = box("hairCap", 0.4, 0.2, 0.38, brown, scene);
+  cap.position.y = 1.8;
   cap.parent = group;
 
-  const back = box("hairBack", 0.36, 0.36, 0.18, brown, scene);
-  back.position = new Vector3(0, 1.54, -0.16);
+  // Fuller mass covering the back of the head and nape.
+  const back = box("hairBack", 0.38, 0.42, 0.2, brown, scene);
+  back.position = new Vector3(0, 1.54, -0.17);
   back.parent = group;
 
-  for (const dx of [-0.2, 0.2]) {
-    const side = box("hairSide", 0.1, 0.42, 0.34, brown, scene);
-    side.position = new Vector3(dx, 1.44, 0.02);
+  // Two locks framing the sides of the face (beside it, not over it), to the shoulders.
+  for (const dx of [-0.22, 0.22]) {
+    const side = box("hairSide", 0.1, 0.46, 0.34, brown, scene);
+    side.position = new Vector3(dx, 1.42, 0);
     side.parent = group;
   }
-
-  const fringe = box("hairFringe", 0.36, 0.1, 0.07, brown, scene);
-  fringe.position = new Vector3(0, 1.69, 0.17);
-  fringe.parent = group;
   return group;
 }
 
