@@ -215,9 +215,9 @@ export class Humanoid {
 
   /**
    * Meru's dancer outfit (blue + gold + cream): a bodice top covering the chest
-   * (bare midriff between it and the skirt), a low flared skirt with a blue mid-band
-   * and a gold hem, a waist sash, gold/blue wrist cuffs, and gold/blue calf greaves.
-   * Built over the skin-toned body for her unmistakable colourful silhouette.
+   * (bare midriff between it and the skirt), an open "petal" skirt of flat panels
+   * radiating from the waist with pointed blue/gold tips, a waist sash, gold/blue
+   * wrist cuffs, and gold/blue calf greaves. Built over the skin-toned body.
    */
   private addDancerOutfit(scene: Scene, color: [number, number, number]): void {
     const [r, g, b] = color;
@@ -233,31 +233,35 @@ export class Humanoid {
     topTrim.position.y = 1.07;
     topTrim.parent = this.body;
 
-    // Low flared skirt sitting on the hips, with a blue mid-band and gold hem.
-    const skirt = MeshBuilder.CreateCylinder(
-      "skirt",
-      { height: 0.42, diameterTop: 0.44, diameterBottom: 1.0, tessellation: 16 },
-      scene,
-    );
-    skirt.material = cream;
-    skirt.isPickable = false;
-    skirt.position.y = 0.6;
-    skirt.parent = this.rig;
+    // Petal skirt: flat panels radiating from the waist, flared outward and down,
+    // each capped with a pointed tip (alternating blue/gold) and with gaps that show
+    // the legs — closer to her open "petal" skirt than a closed cone.
+    const panelCount = 8;
+    for (let i = 0; i < panelCount; i++) {
+      const pivot = new TransformNode("skirtPanelPivot", scene);
+      pivot.position = new Vector3(0, 0.82, 0);
+      pivot.rotation.y = (i / panelCount) * Math.PI * 2;
+      pivot.rotation.x = 0.55; // flare outward (increase to flare more, negate to flip)
+      pivot.parent = this.rig;
 
-    const band = MeshBuilder.CreateTorus("skirtBand", { diameter: 0.74, thickness: 0.07, tessellation: 16 }, scene);
-    band.material = blue;
-    band.isPickable = false;
-    band.position.y = 0.61;
-    band.parent = this.rig;
+      const panel = box("skirtPanel", 0.22, 0.46, 0.04, cream, scene);
+      panel.position = new Vector3(0, -0.23, 0.08);
+      panel.parent = pivot;
 
-    const hem = MeshBuilder.CreateTorus("skirtHem", { diameter: 0.98, thickness: 0.08, tessellation: 18 }, scene);
-    hem.material = gold;
-    hem.isPickable = false;
-    hem.position.y = 0.41;
-    hem.parent = this.rig;
+      const tip = MeshBuilder.CreateCylinder(
+        "skirtTip",
+        { height: 0.16, diameterTop: 0, diameterBottom: 0.22, tessellation: 4 },
+        scene,
+      );
+      tip.material = i % 2 === 0 ? blue : gold;
+      tip.isPickable = false;
+      tip.rotation.x = Math.PI; // point downward
+      tip.position = new Vector3(0, -0.47, 0.08);
+      tip.parent = pivot;
+    }
 
-    // Blue waist sash just above the skirt.
-    const sash = box("sash", 0.42, 0.12, 0.3, blue, scene);
+    // Blue waist sash capping the tops of the panels.
+    const sash = box("sash", 0.44, 0.14, 0.34, blue, scene);
     sash.position.y = 0.82;
     sash.parent = this.body;
 
