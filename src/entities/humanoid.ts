@@ -233,31 +233,22 @@ export class Humanoid {
     topTrim.position.y = 1.07;
     topTrim.parent = this.body;
 
-    // Petal skirt: flat panels radiating from the waist, flared outward and down,
-    // each capped with a pointed tip (alternating blue/gold) and with gaps that show
-    // the legs — closer to her open "petal" skirt than a closed cone.
+    // Petal skirt: flat panels radiating from the waist, each leaning clearly
+    // OUTWARD and down so the hem is wider than the hips (negative tilt flares out;
+    // positive would fold them back over the body). Colours alternate cream/blue/gold
+    // and gaps between panels show the legs — her open "petal" skirt.
     const panelCount = 8;
+    const skirtColors = [cream, blue, gold];
     for (let i = 0; i < panelCount; i++) {
       const pivot = new TransformNode("skirtPanelPivot", scene);
-      pivot.position = new Vector3(0, 0.82, 0);
+      pivot.position = new Vector3(0, 0.8, 0);
       pivot.rotation.y = (i / panelCount) * Math.PI * 2;
-      pivot.rotation.x = 0.55; // flare outward (increase to flare more, negate to flip)
       pivot.parent = this.rig;
 
-      const panel = box("skirtPanel", 0.22, 0.46, 0.04, cream, scene);
-      panel.position = new Vector3(0, -0.23, 0.08);
+      const panel = box("skirtPanel", 0.26, 0.5, 0.04, skirtColors[i % skirtColors.length], scene);
+      panel.rotation.x = -0.6; // flare outward & down
+      panel.position = new Vector3(0, -0.2, 0.3); // out at hip radius, hanging down
       panel.parent = pivot;
-
-      const tip = MeshBuilder.CreateCylinder(
-        "skirtTip",
-        { height: 0.16, diameterTop: 0, diameterBottom: 0.22, tessellation: 4 },
-        scene,
-      );
-      tip.material = i % 2 === 0 ? blue : gold;
-      tip.isPickable = false;
-      tip.rotation.x = Math.PI; // point downward
-      tip.position = new Vector3(0, -0.47, 0.08);
-      tip.parent = pivot;
     }
 
     // Blue waist sash capping the tops of the panels.
