@@ -6,6 +6,7 @@ import meruPortrait from "../assets/portraits/meru.jpg";
 import rosePortrait from "../assets/portraits/rose.png";
 import haschelPortrait from "../assets/portraits/haschel.png";
 import kongolPortrait from "../assets/portraits/kongol.png";
+import ziegPortrait from "../assets/portraits/zieg.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -50,7 +51,7 @@ export interface Bearer {
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
   { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: [0.85, 0.2, 0.22], storyPlayable: true },
-  { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
+  { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
   // Jade (Wind) — spears
   { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: [0.56, 0.62, 0.42], storyPlayable: true },
