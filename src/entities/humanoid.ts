@@ -174,8 +174,8 @@ export class Humanoid {
     piece("chestplate", 0.42, full ? 0.6 : 0.46, 0.08, new Vector3(0, full ? 1.06 : 1.12, 0.15), plate, this.body);
 
     if (symmetric) {
-      const [pw, ph, pd] = full ? [0.3, 0.24, 0.44] : [0.27, 0.2, 0.38];
-      const px = full ? 0.37 : 0.36;
+      const [pw, ph, pd] = full ? [0.25, 0.2, 0.36] : [0.27, 0.2, 0.38];
+      const px = full ? 0.34 : 0.36;
       piece("pauldronL", pw, ph, pd, new Vector3(-px, 1.45, 0), plate, this.body);
       piece("pauldronR", pw, ph, pd, new Vector3(px, 1.45, 0), plate, this.body);
     } else {
