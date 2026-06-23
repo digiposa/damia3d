@@ -16,9 +16,17 @@ export class Arrow {
   private remaining: number;
   private done = false;
 
-  constructor(scene: Scene, from: Vector3, to: Vector3, private speed: number, private onHit: () => void) {
+  constructor(
+    scene: Scene,
+    from: Vector3,
+    to: Vector3,
+    private speed: number,
+    private onHit: () => void,
+    private delay = 0,
+  ) {
     this.root = new TransformNode("arrow", scene);
     this.root.position = from.clone();
+    if (delay > 0) this.root.setEnabled(false); // hidden while the archer draws
 
     const shaftMat = new StandardMaterial("arrowShaftMat", scene);
     shaftMat.diffuseColor = new Color3(0.7, 0.58, 0.36);
@@ -57,6 +65,11 @@ export class Arrow {
   /** Advance the arrow; returns false once it has landed (and disposed). */
   update(dt: number): boolean {
     if (this.done) return false;
+    if (this.delay > 0) {
+      this.delay -= dt;
+      if (this.delay > 0) return true; // still drawing — hold at the hand, hidden
+      this.root.setEnabled(true); // released: appear and fly
+    }
     const step = this.speed * dt;
     if (step >= this.remaining) {
       this.done = true;

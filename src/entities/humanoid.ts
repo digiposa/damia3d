@@ -55,6 +55,10 @@ export class Humanoid {
   private rightLeg: TransformNode;
   /** The arm that performs the strike (right for melee, right draws the bow). */
   private strikeArm: TransformNode;
+  /** For bow bearers: the off-hand arm that holds and presents the bow (left). */
+  private bowArm?: TransformNode;
+  /** The wielded weapon node (counter-rotated to keep the bow upright while aiming). */
+  private weaponNode!: TransformNode;
   /** Long ponytail (if any) — swayed by motion. */
   private ponytail?: TransformNode;
   private style: StrikeStyle;
@@ -124,9 +128,11 @@ export class Humanoid {
     // weapon is wielded in the right hand. Attach it at the hand (bottom of the arm).
     const wieldArm = weapon === "bow" ? this.leftArm : this.rightArm;
     this.strikeArm = this.rightArm;
+    if (weapon === "bow") this.bowArm = this.leftArm;
     const weaponNode = buildWeapon(weapon, main, scene, opts.weaponVariant);
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
+    this.weaponNode = weaponNode;
 
     if (opts.outfit === "dancer") this.addDancerOutfit(scene, opts.color);
     else if (opts.outfit === "archer") this.addArcherOutfit(scene);
@@ -481,7 +487,16 @@ export class Humanoid {
     if (this.strikeT > 0) {
       this.strikeT = Math.max(0, this.strikeT - dt);
       const p = 1 - this.strikeT / STRIKE_DUR; // 0 → 1 progress
-      this.strikeArm.rotation.x = strikeAngle(this.style, p);
+      if (this.bowArm) {
+        // Archery: the left arm presents the bow forward while the right hand draws
+        // the string back and looses it. Counter-rotate the bow so it stays upright.
+        const { bow, draw } = archeryArms(p);
+        this.bowArm.rotation.x = bow;
+        this.strikeArm.rotation.x = draw;
+        this.weaponNode.rotation.x = -bow;
+      } else {
+        this.strikeArm.rotation.x = strikeAngle(this.style, p);
+      }
     }
   }
 
@@ -507,6 +522,26 @@ function strikeAngle(style: StrikeStyle, p: number): number {
       if (p < 0.55) return lerp(0, -0.7, p / 0.55);
       return lerp(-0.7, 0, (p - 0.55) / 0.45);
   }
+}
+
+/**
+ * Two-arm archery pose over progress `p` ∈ [0,1] (rotations about X, positive = arm
+ * forward/+Z). The bow (left) arm snaps up to present the bow and holds it; the draw
+ * (right) arm reaches to the string, pulls back, snaps forward on release, then relaxes.
+ */
+function archeryArms(p: number): { bow: number; draw: number } {
+  let bow: number;
+  if (p < 0.18) bow = lerp(0, 1.35, p / 0.18); // raise to aim
+  else if (p < 0.82) bow = 1.35; // hold steady
+  else bow = lerp(1.35, 0, (p - 0.82) / 0.18); // lower on recovery
+
+  let draw: number;
+  if (p < 0.18) draw = lerp(0, 1.2, p / 0.18); // reach to the string
+  else if (p < 0.5) draw = lerp(1.2, 0.3, (p - 0.18) / 0.32); // draw back
+  else if (p < 0.6) draw = lerp(0.3, 1.45, (p - 0.5) / 0.1); // release: snap forward
+  else draw = lerp(1.45, 0, (p - 0.6) / 0.4); // follow-through, relax
+
+  return { bow, draw };
 }
 
 function lerp(a: number, b: number, t: number): number {

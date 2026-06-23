@@ -143,7 +143,7 @@ export class TrainingMode extends GameMode {
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
 
-    this.spawnKnight();
+    this.spawnDummy();
   }
 
   private openDebugMenu(): void {
@@ -386,12 +386,20 @@ export class TrainingMode extends GameMode {
 
     // Ranged bearers loose an arrow: damage lands when it reaches the target.
     if (this.isRanged()) {
-      const from = this.player.position.add(new Vector3(0, 1.25, 0));
+      const from = this.player.position.add(new Vector3(0, 1.3, 0));
       const to = target.position.add(new Vector3(0, 1.2, 0));
+      // Release the arrow ~0.22s in, syncing with the draw/loose animation.
       this.arrows.push(
-        new Arrow(this.scene, from, to, ARROW_SPEED, () => {
-          if (target.alive) this.landDamage(target, dmg, element);
-        }),
+        new Arrow(
+          this.scene,
+          from,
+          to,
+          ARROW_SPEED,
+          () => {
+            if (target.alive) this.landDamage(target, dmg, element);
+          },
+          0.22,
+        ),
       );
       return;
     }
