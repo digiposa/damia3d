@@ -1,6 +1,7 @@
 import dartPortrait from "../assets/portraits/dart.png";
 import albertPortrait from "../assets/portraits/albert.png";
 import lavitzPortrait from "../assets/portraits/lavitz.png";
+import shanaPortrait from "../assets/portraits/shana.png";
 import meruPortrait from "../assets/portraits/meru.jpg";
 import rosePortrait from "../assets/portraits/rose.png";
 import haschelPortrait from "../assets/portraits/haschel.png";
@@ -55,7 +56,7 @@ export const BEARERS: Bearer[] = [
   { id: "greham", name: "Greham", classId: "jade", weapon: "spear", color: [0.38, 0.42, 0.48], storyPlayable: false },
   { id: "syuveil", name: "Syuveil", classId: "jade", weapon: "spear", color: [0.2, 0.56, 0.54], storyPlayable: false },
   // White-Silver (Light) — bows, no Additions
-  { id: "shana", name: "Shana", classId: "whiteSilver", weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", color: [0.82, 0.82, 0.9], storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", color: [0.34, 0.22, 0.4], storyPlayable: true },
