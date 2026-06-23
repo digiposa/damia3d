@@ -12,6 +12,7 @@ import { createGround } from "../world/Ground";
 import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
+import { Arrow } from "../entities/Arrow";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
@@ -38,8 +39,14 @@ import { TimingSight } from "../ui/TimingSight";
 import { TrainingMenu } from "../ui/TrainingMenu";
 import { floatingText } from "../ui/FloatingText";
 
-/** How close the player must be to land a combo hit on an enemy. */
+/** How close a melee attacker must be to land a combo hit on an enemy. */
 const PLAYER_REACH = 2.3;
+
+/** How close a ranged attacker (bow) must be to loose an arrow. */
+const RANGED_REACH = 9;
+
+/** Arrow flight speed (world units / second). */
+const ARROW_SPEED = 26;
 
 /**
  * Training arena: a Diablo-style real-time hack-and-slash sandbox with
@@ -63,6 +70,7 @@ export class TrainingMode extends GameMode {
   private guardBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
+  private arrows: Arrow[] = [];
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
 
@@ -197,6 +205,9 @@ export class TrainingMode extends GameMode {
     // Procedural walk/idle animation (visual only, uses real time).
     this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6);
 
+    // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
+    if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
+
     if (this.input.wasPressed("Space")) this.attack(this.attackTarget);
     if (this.guardPressed()) this.tryGuard();
 
@@ -268,7 +279,7 @@ export class TrainingMode extends GameMode {
     if (this.attackTarget) {
       const to = this.attackTarget.position.subtract(this.player.position);
       to.y = 0;
-      if (to.length() > PLAYER_REACH) {
+      if (to.length() > this.reach) {
         this.player.move(to, dt);
       } else {
         this.player.face(to);
@@ -361,7 +372,7 @@ export class TrainingMode extends GameMode {
    * perfect Addition. Handles the target dying.
    */
   private applyHit(target: Enemy, k: number): void {
-    this.player.strike(); // play the weapon's strike animation on every landed blow
+    this.player.strike(); // play the weapon's strike/draw animation on every blow
     const add = this.player.addition;
     const atk = { at: this.player.atk, lv: this.player.level };
     const df = target.def.stats.df;
@@ -373,6 +384,23 @@ export class TrainingMode extends GameMode {
     const now = additionAttack(atk, df, additionHitsPercent(add, k), mult, mods);
     const dmg = Math.max(1, now - before);
 
+    // Ranged bearers loose an arrow: damage lands when it reaches the target.
+    if (this.isRanged()) {
+      const from = this.player.position.add(new Vector3(0, 1.25, 0));
+      const to = target.position.add(new Vector3(0, 1.2, 0));
+      this.arrows.push(
+        new Arrow(this.scene, from, to, ARROW_SPEED, () => {
+          if (target.alive) this.landDamage(target, dmg, element);
+        }),
+      );
+      return;
+    }
+
+    this.landDamage(target, dmg, element);
+  }
+
+  /** Apply a computed hit to the target: damage, floating text, and death handling. */
+  private landDamage(target: Enemy, dmg: number, element: number): void {
     target.takeDamage(dmg);
     this.popText(target.headPosition, `${dmg}`, damageColor(element));
 
@@ -422,8 +450,18 @@ export class TrainingMode extends GameMode {
     }
   }
 
+  /** True for bow bearers (Shana/Miranda): they attack from range with arrows. */
+  private isRanged(): boolean {
+    return this.player.bearer.weapon === "bow";
+  }
+
+  /** Attack distance: long for ranged bearers, short for melee. */
+  private get reach(): number {
+    return this.isRanged() ? RANGED_REACH : PLAYER_REACH;
+  }
+
   private inReach(e: Enemy): boolean {
-    return Vector3.Distance(this.player.position, e.position) <= PLAYER_REACH;
+    return Vector3.Distance(this.player.position, e.position) <= this.reach;
   }
 
   /** A bearer with no Additions (single-hit "Attack", e.g. Shana/Miranda): it auto-repeats in reach. */
@@ -433,7 +471,7 @@ export class TrainingMode extends GameMode {
 
   private nearestInReach(): Enemy | undefined {
     let best: Enemy | undefined;
-    let bestDist = PLAYER_REACH;
+    let bestDist = this.reach;
     for (const e of this.enemies) {
       const d = Vector3.Distance(this.player.position, e.position);
       if (d <= bestDist) {
@@ -577,6 +615,8 @@ export class TrainingMode extends GameMode {
 
   dispose(): void {
     this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
+    for (const a of this.arrows) a.dispose();
+    this.arrows = [];
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
     this.stats.dispose();

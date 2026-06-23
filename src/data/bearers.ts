@@ -5,6 +5,7 @@ import shanaPortrait from "../assets/portraits/shana.png";
 import meruPortrait from "../assets/portraits/meru.jpg";
 import rosePortrait from "../assets/portraits/rose.png";
 import haschelPortrait from "../assets/portraits/haschel.png";
+import kongolPortrait from "../assets/portraits/kongol.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -65,7 +66,7 @@ export const BEARERS: Bearer[] = [
   // Blue-Sea (Water) — hammer
   { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: [0.3, 0.72, 0.85], storyPlayable: true },
   // Golden (Earth) — axe
-  { id: "kongol", name: "Kongol", classId: "golden", weapon: "axe", color: [0.72, 0.56, 0.26], storyPlayable: true },
+  { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", color: [0.72, 0.56, 0.26], storyPlayable: true },
 ];
 
 /** Default playable bearer (Dart). */

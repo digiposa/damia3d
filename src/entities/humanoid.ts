@@ -790,11 +790,24 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
       part("head", 0.08, 0.42, 0.34, 0.9, steel);
       break;
     case "bow": {
-      // A vertical stave (along Y) with a thin string in front of it.
-      const stave = box("bowStave", 0.05, 1.1, 0.12, accent, scene);
-      stave.parent = group;
-      const string = box("bowString", 0.02, 1.0, 0.02, steel, scene);
-      string.position.z = 0.07;
+      // A recurve bow: a curved limb (a tube bowing toward the target at the grip)
+      // with a straight string drawn across the tips on the archer's side.
+      const path: Vector3[] = [];
+      const segments = 10;
+      for (let i = 0; i <= segments; i++) {
+        const y = -0.55 + (i / segments) * 1.1; // tip to tip
+        const z = 0.16 * (1 - (y / 0.55) ** 2); // grip bows forward (+Z), tips at z≈0
+        path.push(new Vector3(0, y, z));
+      }
+      const limb = MeshBuilder.CreateTube("bowLimb", { path, radius: 0.022, tessellation: 6 }, scene);
+      limb.material = accent;
+      limb.isPickable = false;
+      limb.parent = group;
+      // String down the belly side, just behind the tips.
+      const string = MeshBuilder.CreateCylinder("bowString", { height: 1.1, diameter: 0.012, tessellation: 5 }, scene);
+      string.material = steel;
+      string.isPickable = false;
+      string.position.z = -0.01;
       string.parent = group;
       break;
     }
