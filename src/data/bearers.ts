@@ -16,10 +16,10 @@ export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer
 export type WeaponVariant = "spiked";
 
 /** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
-export type HairStyle = "ponytail" | "spiky" | "short" | "bob" | "swept";
+export type HairStyle = "ponytail" | "spiky" | "short" | "bob" | "swept" | "long";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
-export type OutfitStyle = "armored" | "knight" | "fullplate" | "dancer" | "archer" | "noble";
+export type OutfitStyle = "armored" | "knight" | "fullplate" | "dancer" | "archer" | "noble" | "darkness";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -61,7 +61,7 @@ export const BEARERS: Bearer[] = [
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", color: [0.82, 0.82, 0.9], storyPlayable: true },
   // Darkness — rapier
-  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", color: [0.34, 0.22, 0.4], storyPlayable: true },
+  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", hair: "long", outfit: "darkness", color: [0.34, 0.22, 0.4], storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: [0.85, 0.5, 0.18], storyPlayable: true },
   // Blue-Sea (Water) — hammer

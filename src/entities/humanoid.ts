@@ -77,7 +77,8 @@ export class Humanoid {
     // belongs to their clothing/armour, not their skin (so Lavitz isn't green-faced).
     // Revealing outfits (the dancer) additionally skin the whole body; covered figures
     // keep the bearer's colour on the torso and limbs, where it reads as clothing.
-    const revealing = opts.outfit === "dancer" || opts.outfit === "archer";
+    const revealing =
+      opts.outfit === "dancer" || opts.outfit === "archer" || opts.outfit === "darkness";
     const skinMain = mat("hSkin", 0.94, 0.79, 0.67, scene);
     const skinDark = mat("hSkinDk", 0.84, 0.68, 0.56, scene);
     const skinLight = mat("hSkinHi", 0.96, 0.83, 0.72, scene);
@@ -137,6 +138,7 @@ export class Humanoid {
     if (opts.outfit === "dancer") this.addDancerOutfit(scene, opts.color);
     else if (opts.outfit === "archer") this.addArcherOutfit(scene);
     else if (opts.outfit === "noble") this.addNobleOutfit(scene);
+    else if (opts.outfit === "darkness") this.addDarknessOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -150,6 +152,8 @@ export class Humanoid {
       buildBobHair(scene).parent = this.body;
     } else if (opts.hair === "swept") {
       buildSweptHair(scene).parent = this.body;
+    } else if (opts.hair === "long") {
+      buildLongHair(scene).parent = this.body;
     }
   }
 
@@ -446,6 +450,70 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Rose's dark outfit: a near-black bodysuit with gold filigree trim, pointed
+   * gold-rimmed pauldrons, a short skirt, full dark sleeves with gold cuffs, and
+   * thigh-high boots with gold trim — the skin between the skirt and the boot tops
+   * reads as her bare thighs. Built over the skin-toned body; she wields a rapier.
+   */
+  private addDarknessOutfit(scene: Scene): void {
+    const dark = mat("dkDark", 0.16, 0.13, 0.22, scene);
+    const gold = mat("dkGold", 0.82, 0.66, 0.28, scene);
+
+    // Dark bodysuit over the torso, with a gold centre trim and collar.
+    const torso = box("dkTorso", 0.48, 0.6, 0.31, dark, scene);
+    torso.position.y = 1.12;
+    torso.parent = this.body;
+    const trim = box("dkTrim", 0.05, 0.5, 0.02, gold, scene);
+    trim.position = new Vector3(0, 1.14, 0.16);
+    trim.parent = this.body;
+    const collar = box("dkCollar", 0.3, 0.1, 0.27, gold, scene);
+    collar.position.y = 1.42;
+    collar.parent = this.body;
+
+    // Pointed pauldrons with a gold rim on both shoulders.
+    for (const sx of [-1, 1]) {
+      const pauldron = box("dkPauldron", 0.26, 0.2, 0.34, dark, scene);
+      pauldron.position = new Vector3(sx * 0.34, 1.46, 0);
+      pauldron.parent = this.body;
+      const rim = box("dkPauldronRim", 0.28, 0.05, 0.36, gold, scene);
+      rim.position = new Vector3(sx * 0.34, 1.36, 0);
+      rim.parent = this.body;
+    }
+
+    // Short dark skirt over the hips with a gold hem.
+    const skirt = box("dkSkirt", 0.48, 0.24, 0.35, dark, scene);
+    skirt.position.y = 0.74;
+    skirt.parent = this.body;
+    const hem = box("dkSkirtHem", 0.49, 0.05, 0.36, gold, scene);
+    hem.position.y = 0.63;
+    hem.parent = this.body;
+
+    // Full dark sleeves with a gold wrist cuff (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const sleeve = box("dkSleeve", 0.19, 0.62, 0.19, dark, scene);
+      sleeve.position.y = -0.3;
+      sleeve.parent = arm;
+      const cuff = box("dkCuff", 0.21, 0.1, 0.21, gold, scene);
+      cuff.position.y = -0.54;
+      cuff.parent = arm;
+    }
+
+    // Thigh-high boots: dark, from the foot up to mid-thigh, with gold trim at the
+    // top and foot (the bare skin above each boot reads as her thigh).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const boot = box("dkBoot", 0.2, 0.48, 0.21, dark, scene);
+      boot.position.y = -0.5;
+      boot.parent = leg;
+      const topTrim = box("dkBootTop", 0.22, 0.05, 0.23, gold, scene);
+      topTrim.position.y = -0.27;
+      topTrim.parent = leg;
+      const footTrim = box("dkBootFoot", 0.22, 0.06, 0.24, gold, scene);
+      footTrim.position.y = -0.7;
+      footTrim.parent = leg;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -655,6 +723,43 @@ function buildBobHair(scene: Scene): TransformNode {
     side.position = new Vector3(dx, 1.5, 0);
     side.parent = group;
   }
+  return group;
+}
+
+/**
+ * Rose's hair: very long straight black hair with a pointed black headdress — a
+ * crown cap, two horn-like tufts framing the top, side bangs to the jaw, and a long
+ * tail falling down the back well past the waist (in tapering segments). Rigid.
+ */
+function buildLongHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairLong", scene);
+  const black = mat("hairBlack", 0.1, 0.09, 0.13, scene);
+
+  const cap = box("hairCap", 0.4, 0.22, 0.4, black, scene);
+  cap.position.y = 1.78;
+  cap.parent = group;
+
+  // Two pointed tufts framing the top of the head, pointing up and out.
+  coneSpike(scene, black, new Vector3(-0.16, 1.86, 0.02), -0.2, -0.5, 0.3, 0.13).parent = group;
+  coneSpike(scene, black, new Vector3(0.16, 1.86, 0.02), -0.2, 0.5, 0.3, 0.13).parent = group;
+
+  // Side bangs framing the face to the jaw.
+  for (const dx of [-0.21, 0.21]) {
+    const side = box("hairSide", 0.09, 0.4, 0.34, black, scene);
+    side.position = new Vector3(dx, 1.48, 0);
+    side.parent = group;
+  }
+
+  // Long straight tail down the back, past the waist, in tapering segments.
+  const t1 = box("hairLong1", 0.34, 0.7, 0.16, black, scene);
+  t1.position = new Vector3(0, 1.35, -0.18);
+  t1.parent = group;
+  const t2 = box("hairLong2", 0.3, 0.7, 0.13, black, scene);
+  t2.position = new Vector3(0, 0.75, -0.2);
+  t2.parent = group;
+  const t3 = box("hairLong3", 0.24, 0.5, 0.1, black, scene);
+  t3.position = new Vector3(0, 0.25, -0.22);
+  t3.parent = group;
   return group;
 }
 
