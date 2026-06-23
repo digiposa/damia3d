@@ -134,15 +134,19 @@ export class Humanoid {
   /**
    * Overlay armour on the figure: pauldrons, a chest plate, a dark high collar, a
    * belt with a buckle, gauntlets/vambraces, and boots with knee guards. Pieces
-   * parent to the body (static) or to a limb (so they swing with it). Two styles:
-   * "armored" — Dart: bearer-coloured plates, strongly asymmetric shoulders,
-   *   leather gauntlets.
-   * "knight" — Lavitz: steel plates over the bearer-coloured clothing, symmetric
-   *   shoulders, steel vambraces.
+   * parent to the body (static) or to a limb (so they swing with it). Three styles:
+   * "armored"   — Dart: bearer-coloured plates, strongly asymmetric shoulders,
+   *               leather gauntlets, cloth showing.
+   * "knight"    — Lavitz: steel plates over bearer-coloured clothing, symmetric
+   *               shoulders, steel vambraces.
+   * "fullplate" — Zieg: heavy bearer-coloured plate covering the whole body —
+   *               symmetric, large pauldrons, plated arms, thighs and boots.
    */
   private addArmor(scene: Scene, color: [number, number, number], style: OutfitStyle): void {
     const [r, g, b] = color;
     const knight = style === "knight";
+    const full = style === "fullplate";
+    const symmetric = knight || full;
     const steel = mat("armSteel", 0.76, 0.78, 0.84, scene);
     const plate = knight ? steel : mat("armPlate", r, g, b, scene);
     const strap = mat("armStrap", r * 0.3, g * 0.3, b * 0.3, scene); // near-black undersuit
@@ -166,13 +170,14 @@ export class Humanoid {
 
     // Dark high collar / undersuit at the neck.
     piece("collar", 0.3, 0.22, 0.26, new Vector3(0, 1.42, 0), strap, this.body);
-    // Chest plate, slightly proud of the torso.
-    piece("chestplate", 0.42, 0.46, 0.08, new Vector3(0, 1.12, 0.15), plate, this.body);
+    // Chest plate, slightly proud of the torso (taller for full plate).
+    piece("chestplate", 0.42, full ? 0.6 : 0.46, 0.08, new Vector3(0, full ? 1.06 : 1.12, 0.15), plate, this.body);
 
-    if (knight) {
-      // Symmetric knight pauldrons.
-      piece("pauldronL", 0.27, 0.2, 0.38, new Vector3(-0.36, 1.44, 0), plate, this.body);
-      piece("pauldronR", 0.27, 0.2, 0.38, new Vector3(0.36, 1.44, 0), plate, this.body);
+    if (symmetric) {
+      const [pw, ph, pd] = full ? [0.3, 0.24, 0.44] : [0.27, 0.2, 0.38];
+      const px = full ? 0.37 : 0.36;
+      piece("pauldronL", pw, ph, pd, new Vector3(-px, 1.45, 0), plate, this.body);
+      piece("pauldronR", pw, ph, pd, new Vector3(px, 1.45, 0), plate, this.body);
     } else {
       // Dart's signature: a big two-tier pauldron on the left (non-sword) shoulder,
       // just a thin guard on the right.
@@ -185,14 +190,18 @@ export class Humanoid {
     piece("belt", 0.47, 0.11, 0.31, new Vector3(0, 0.82, 0), strap, this.body);
     piece("buckle", 0.1, 0.09, 0.04, new Vector3(0, 0.82, 0.16), metal, this.body);
 
-    // Gauntlets/vambraces swing with the arms (steel for a knight, leather else);
-    // boots + knee guards swing with the legs.
-    const gauntlet = knight ? steel : strap;
+    // Gauntlets/vambraces swing with the arms; full plate runs the length of the
+    // forearm in the bearer's colour, a knight's are steel, else leather.
+    const gauntletMat = full ? plate : knight ? steel : strap;
     for (const arm of [this.leftArm, this.rightArm]) {
-      piece("gauntlet", 0.2, 0.24, 0.2, new Vector3(0, -0.48, 0), gauntlet, arm);
+      piece("gauntlet", 0.2, full ? 0.5 : 0.24, 0.2, new Vector3(0, full ? -0.4 : -0.48, 0), gauntletMat, arm);
     }
+
+    // Boots + knee guards swing with the legs; full plate adds plated thighs and
+    // armoured boots for head-to-toe coverage.
     for (const leg of [this.leftLeg, this.rightLeg]) {
-      piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), boot, leg);
+      if (full) piece("thigh", 0.22, 0.42, 0.26, new Vector3(0, -0.2, 0.01), plate, leg);
+      piece("boot", 0.22, 0.34, 0.27, new Vector3(0, -0.62, 0.02), full ? plate : boot, leg);
       piece("knee", 0.21, 0.13, 0.23, new Vector3(0, -0.34, 0.01), plate, leg);
     }
   }
