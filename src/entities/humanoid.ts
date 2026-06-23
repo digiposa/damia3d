@@ -67,9 +67,15 @@ export class Humanoid {
     this.rig = new TransformNode("humanoid", scene);
     this.rig.scaling.setAll(opts.scale ?? 1);
 
-    const main = mat("hMain", r, g, b, scene);
-    const dark = mat("hDark", r * 0.55, g * 0.55, b * 0.55, scene);
-    const light = mat("hLight", 0.5 + r * 0.5, 0.5 + g * 0.5, 0.5 + b * 0.5, scene);
+    // Skin-revealing outfits (the dancer) colour the body in a neutral skin tone so
+    // bare arms/legs/midriff don't read as "painted" in the bearer's colour — that
+    // colour is carried by the clothing instead. Covered figures tint the body.
+    const revealing = opts.outfit === "dancer";
+    const main = revealing ? mat("hSkin", 0.94, 0.79, 0.67, scene) : mat("hMain", r, g, b, scene);
+    const dark = revealing ? mat("hSkinDk", 0.84, 0.68, 0.56, scene) : mat("hDark", r * 0.55, g * 0.55, b * 0.55, scene);
+    const light = revealing
+      ? mat("hSkinHi", 0.96, 0.83, 0.72, scene)
+      : mat("hLight", 0.5 + r * 0.5, 0.5 + g * 0.5, 0.5 + b * 0.5, scene);
     const eyeMat = mat("hEye", 0.08, 0.08, 0.1, scene);
 
     // Torso / head / arms bob together; legs stay planted on the rig.
@@ -208,52 +214,66 @@ export class Humanoid {
   }
 
   /**
-   * Meru's dancer outfit: a flared "petal" skirt at the hips (a low cone with an
-   * orange hem ring), a coloured waist sash, wrist cuffs, and orange calf wraps
-   * with ribbons. Skirt/wraps in white + the bearer's blue + orange accents, for
-   * her unmistakable colourful silhouette.
+   * Meru's dancer outfit (blue + gold + cream): a bodice top covering the chest
+   * (bare midriff between it and the skirt), a low flared skirt with a blue mid-band
+   * and a gold hem, a waist sash, gold/blue wrist cuffs, and gold/blue calf greaves.
+   * Built over the skin-toned body for her unmistakable colourful silhouette.
    */
   private addDancerOutfit(scene: Scene, color: [number, number, number]): void {
     const [r, g, b] = color;
-    const accent = mat("dnAccent", r, g, b, scene); // her blue
-    const light = mat("dnLight", 0.86, 0.9, 0.97, scene); // white skirt
-    const orange = mat("dnOrange", 0.92, 0.55, 0.2, scene); // orange trim
+    const blue = mat("dnBlue", r, g, b, scene); // her blue
+    const gold = mat("dnGold", 0.83, 0.68, 0.22, scene);
+    const cream = mat("dnCream", 0.88, 0.9, 0.95, scene);
 
-    // Flared petal skirt (a low cone) with an orange hem ring; planted at the hips.
+    // Bodice covering the chest, with a gold under-trim (midriff left bare).
+    const top = box("dnTop", 0.44, 0.28, 0.31, blue, scene);
+    top.position.y = 1.22;
+    top.parent = this.body;
+    const topTrim = box("dnTopTrim", 0.45, 0.06, 0.32, gold, scene);
+    topTrim.position.y = 1.07;
+    topTrim.parent = this.body;
+
+    // Low flared skirt sitting on the hips, with a blue mid-band and gold hem.
     const skirt = MeshBuilder.CreateCylinder(
       "skirt",
-      { height: 0.5, diameterTop: 0.34, diameterBottom: 0.95, tessellation: 12 },
+      { height: 0.42, diameterTop: 0.44, diameterBottom: 1.0, tessellation: 16 },
       scene,
     );
-    skirt.material = light;
+    skirt.material = cream;
     skirt.isPickable = false;
-    skirt.position.y = 0.72;
+    skirt.position.y = 0.6;
     skirt.parent = this.rig;
 
-    const hem = MeshBuilder.CreateTorus("skirtHem", { diameter: 0.92, thickness: 0.09, tessellation: 14 }, scene);
-    hem.material = orange;
+    const band = MeshBuilder.CreateTorus("skirtBand", { diameter: 0.74, thickness: 0.07, tessellation: 16 }, scene);
+    band.material = blue;
+    band.isPickable = false;
+    band.position.y = 0.61;
+    band.parent = this.rig;
+
+    const hem = MeshBuilder.CreateTorus("skirtHem", { diameter: 0.98, thickness: 0.08, tessellation: 18 }, scene);
+    hem.material = gold;
     hem.isPickable = false;
-    hem.position.y = 0.49;
+    hem.position.y = 0.41;
     hem.parent = this.rig;
 
     // Blue waist sash just above the skirt.
-    const sash = box("sash", 0.4, 0.12, 0.3, accent, scene);
-    sash.position.y = 0.97;
+    const sash = box("sash", 0.42, 0.12, 0.3, blue, scene);
+    sash.position.y = 0.82;
     sash.parent = this.body;
 
-    // Orange wrist cuffs (swing with the arms).
+    // Gold wrist cuffs with a blue edge (swing with the arms).
     for (const arm of [this.leftArm, this.rightArm]) {
-      const cuff = box("cuff", 0.2, 0.16, 0.2, orange, scene);
+      const cuff = box("cuff", 0.21, 0.18, 0.21, gold, scene);
       cuff.position.y = -0.5;
       cuff.parent = arm;
     }
-    // Orange calf wraps + a blue ribbon (swing with the legs).
+    // Gold calf greaves with a blue ribbon at the back (swing with the legs).
     for (const leg of [this.leftLeg, this.rightLeg]) {
-      const wrap = box("wrap", 0.2, 0.24, 0.2, orange, scene);
-      wrap.position.y = -0.5;
-      wrap.parent = leg;
-      const ribbon = box("ribbon", 0.07, 0.18, 0.07, accent, scene);
-      ribbon.position = new Vector3(0, -0.5, -0.13);
+      const greave = box("greave", 0.21, 0.3, 0.22, gold, scene);
+      greave.position.y = -0.55;
+      greave.parent = leg;
+      const ribbon = box("ribbon", 0.07, 0.16, 0.07, blue, scene);
+      ribbon.position = new Vector3(0, -0.4, -0.14);
       ribbon.parent = leg;
     }
   }
