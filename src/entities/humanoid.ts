@@ -525,21 +525,23 @@ function strikeAngle(style: StrikeStyle, p: number): number {
 }
 
 /**
- * Two-arm archery pose over progress `p` ∈ [0,1] (rotations about X, positive = arm
- * forward/+Z). The bow (left) arm snaps up to present the bow and holds it; the draw
- * (right) arm reaches to the string, pulls back, snaps forward on release, then relaxes.
+ * Two-arm archery pose over progress `p` ∈ [0,1] (rotations about X). The figure
+ * faces the target along +Z, which is a NEGATIVE rotation here, so "aim forward"
+ * is negative. The bow (left) arm extends forward to present the bow and holds it;
+ * the draw (right) arm reaches to the string, pulls back toward the shoulder, snaps
+ * forward on release, then relaxes.
  */
 function archeryArms(p: number): { bow: number; draw: number } {
   let bow: number;
-  if (p < 0.18) bow = lerp(0, 1.35, p / 0.18); // raise to aim
-  else if (p < 0.82) bow = 1.35; // hold steady
-  else bow = lerp(1.35, 0, (p - 0.82) / 0.18); // lower on recovery
+  if (p < 0.18) bow = lerp(0, -1.3, p / 0.18); // raise/extend forward to aim
+  else if (p < 0.82) bow = -1.3; // hold steady
+  else bow = lerp(-1.3, 0, (p - 0.82) / 0.18); // lower on recovery
 
   let draw: number;
-  if (p < 0.18) draw = lerp(0, 1.2, p / 0.18); // reach to the string
-  else if (p < 0.5) draw = lerp(1.2, 0.3, (p - 0.18) / 0.32); // draw back
-  else if (p < 0.6) draw = lerp(0.3, 1.45, (p - 0.5) / 0.1); // release: snap forward
-  else draw = lerp(1.45, 0, (p - 0.6) / 0.4); // follow-through, relax
+  if (p < 0.18) draw = lerp(0, -1.2, p / 0.18); // reach forward to the string
+  else if (p < 0.5) draw = lerp(-1.2, 0.1, (p - 0.18) / 0.32); // draw back toward the shoulder
+  else if (p < 0.6) draw = lerp(0.1, -1.35, (p - 0.5) / 0.1); // release: snap forward
+  else draw = lerp(-1.35, 0, (p - 0.6) / 0.4); // follow-through, relax
 
   return { bow, draw };
 }

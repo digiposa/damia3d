@@ -71,6 +71,8 @@ export class TrainingMode extends GameMode {
 
   private enemies: Enemy[] = [];
   private arrows: Arrow[] = [];
+  /** Ranged fire cooldown (real seconds) so bow bearers don't spray arrows. */
+  private rangedCooldownT = 0;
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
 
@@ -207,6 +209,7 @@ export class TrainingMode extends GameMode {
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
+    if (this.rangedCooldownT > 0) this.rangedCooldownT = Math.max(0, this.rangedCooldownT - dt);
 
     if (this.input.wasPressed("Space")) this.attack(this.attackTarget);
     if (this.guardPressed()) this.tryGuard();
@@ -332,6 +335,9 @@ export class TrainingMode extends GameMode {
       return;
     }
 
+    // Ranged bearers fire on a fixed cadence — one arrow per draw, no spraying.
+    if (this.isRanged() && this.rangedCooldownT > 0) return;
+
     const target =
       preferred && preferred.alive && this.inReach(preferred) ? preferred : this.nearestInReach();
     if (!target) return;
@@ -386,6 +392,7 @@ export class TrainingMode extends GameMode {
 
     // Ranged bearers loose an arrow: damage lands when it reaches the target.
     if (this.isRanged()) {
+      this.rangedCooldownT = 0.7; // pace shots to the draw animation
       const from = this.player.position.add(new Vector3(0, 1.3, 0));
       const to = target.position.add(new Vector3(0, 1.2, 0));
       // Release the arrow ~0.22s in, syncing with the draw/loose animation.
