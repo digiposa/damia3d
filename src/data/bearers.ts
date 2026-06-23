@@ -16,10 +16,18 @@ export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer
 export type WeaponVariant = "spiked";
 
 /** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
-export type HairStyle = "ponytail" | "spiky" | "short" | "bob" | "swept" | "long";
+export type HairStyle = "ponytail" | "spiky" | "short" | "bob" | "swept" | "long" | "flow";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
-export type OutfitStyle = "armored" | "knight" | "fullplate" | "dancer" | "archer" | "noble" | "darkness";
+export type OutfitStyle =
+  | "armored"
+  | "knight"
+  | "fullplate"
+  | "dancer"
+  | "archer"
+  | "noble"
+  | "darkness"
+  | "valkyrie";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -59,7 +67,7 @@ export const BEARERS: Bearer[] = [
   { id: "syuveil", name: "Syuveil", classId: "jade", weapon: "spear", color: [0.2, 0.56, 0.54], storyPlayable: false },
   // White-Silver (Light) — bows, no Additions
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
-  { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", color: [0.82, 0.82, 0.9], storyPlayable: true },
+  { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: [0.82, 0.82, 0.9], storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", hair: "long", outfit: "darkness", color: [0.34, 0.22, 0.4], storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)

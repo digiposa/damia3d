@@ -78,7 +78,10 @@ export class Humanoid {
     // Revealing outfits (the dancer) additionally skin the whole body; covered figures
     // keep the bearer's colour on the torso and limbs, where it reads as clothing.
     const revealing =
-      opts.outfit === "dancer" || opts.outfit === "archer" || opts.outfit === "darkness";
+      opts.outfit === "dancer" ||
+      opts.outfit === "archer" ||
+      opts.outfit === "darkness" ||
+      opts.outfit === "valkyrie";
     const skinMain = mat("hSkin", 0.94, 0.79, 0.67, scene);
     const skinDark = mat("hSkinDk", 0.84, 0.68, 0.56, scene);
     const skinLight = mat("hSkinHi", 0.96, 0.83, 0.72, scene);
@@ -139,6 +142,7 @@ export class Humanoid {
     else if (opts.outfit === "archer") this.addArcherOutfit(scene);
     else if (opts.outfit === "noble") this.addNobleOutfit(scene);
     else if (opts.outfit === "darkness") this.addDarknessOutfit(scene);
+    else if (opts.outfit === "valkyrie") this.addValkyrieOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -154,6 +158,8 @@ export class Humanoid {
       buildSweptHair(scene).parent = this.body;
     } else if (opts.hair === "long") {
       buildLongHair(scene).parent = this.body;
+    } else if (opts.hair === "flow") {
+      buildFlowHair(scene).parent = this.body;
     }
   }
 
@@ -514,6 +520,75 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Miranda's valkyrie archer outfit: a red bustier with silver trim, a white pleated
+   * short skirt, a brown belt with leather pteruges, long elbow gloves with gold cuffs,
+   * and dark thigh-high boots with folded tops over the skin-toned body (bare thighs).
+   * Built over the skin-toned body; she also carries a bow.
+   */
+  private addValkyrieOutfit(scene: Scene): void {
+    const red = mat("vkRed", 0.72, 0.2, 0.16, scene);
+    const white = mat("vkWhite", 0.84, 0.85, 0.9, scene);
+    const brown = mat("vkBrown", 0.46, 0.32, 0.18, scene);
+    const dark = mat("vkBoot", 0.3, 0.22, 0.14, scene);
+    const gold = mat("vkGold", 0.8, 0.66, 0.3, scene);
+
+    // Red bustier over the chest with a silver under-trim and collar line.
+    const bust = box("vkBust", 0.46, 0.42, 0.31, red, scene);
+    bust.position.y = 1.2;
+    bust.parent = this.body;
+    const bustTrim = box("vkBustTrim", 0.47, 0.06, 0.32, white, scene);
+    bustTrim.position.y = 1.0;
+    bustTrim.parent = this.body;
+    const collar = box("vkCollar", 0.48, 0.1, 0.3, white, scene);
+    collar.position.y = 1.4;
+    collar.parent = this.body;
+
+    // White pleated short skirt flaring over the hips.
+    const skirt = MeshBuilder.CreateCylinder(
+      "vkSkirt",
+      { height: 0.3, diameterTop: 0.42, diameterBottom: 0.62, tessellation: 12 },
+      scene,
+    );
+    skirt.material = white;
+    skirt.isPickable = false;
+    skirt.position.y = 0.78;
+    skirt.parent = this.body;
+
+    // Brown belt with a gold buckle and a row of leather pteruges hanging in front.
+    const belt = box("vkBelt", 0.5, 0.1, 0.34, brown, scene);
+    belt.position.y = 0.92;
+    belt.parent = this.body;
+    const buckle = box("vkBuckle", 0.12, 0.1, 0.04, gold, scene);
+    buckle.position = new Vector3(0, 0.92, 0.18);
+    buckle.parent = this.body;
+    for (const dx of [-0.18, -0.06, 0.06, 0.18]) {
+      const strap = box("vkPteruge", 0.08, 0.18, 0.04, brown, scene);
+      strap.position = new Vector3(dx, 0.72, 0.17);
+      strap.parent = this.body;
+    }
+
+    // Long elbow gloves with a gold cuff (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const glove = box("vkGlove", 0.19, 0.4, 0.19, brown, scene);
+      glove.position.y = -0.4;
+      glove.parent = arm;
+      const cuff = box("vkCuff", 0.21, 0.08, 0.21, gold, scene);
+      cuff.position.y = -0.56;
+      cuff.parent = arm;
+    }
+
+    // Dark thigh-high boots with a folded top (bare skin above reads as her thighs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const boot = box("vkBootMesh", 0.2, 0.5, 0.21, dark, scene);
+      boot.position.y = -0.48;
+      boot.parent = leg;
+      const fold = box("vkBootFold", 0.23, 0.08, 0.24, dark, scene);
+      fold.position.y = -0.24;
+      fold.parent = leg;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -760,6 +835,33 @@ function buildLongHair(scene: Scene): TransformNode {
   const t3 = box("hairLong3", 0.24, 0.5, 0.1, black, scene);
   t3.position = new Vector3(0, 0.25, -0.22);
   t3.parent = group;
+  return group;
+}
+
+/**
+ * Miranda's hair: long flowing blonde — a crown cap, side locks framing the face down
+ * to the chest, and a long tail down the back in two tapering segments. Rigid.
+ */
+function buildFlowHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairFlow", scene);
+  const blonde = mat("hairGoldLong", 0.85, 0.72, 0.4, scene);
+
+  const cap = box("hairCap", 0.4, 0.22, 0.4, blonde, scene);
+  cap.position.y = 1.78;
+  cap.parent = group;
+
+  for (const dx of [-0.21, 0.21]) {
+    const side = box("hairSide", 0.1, 0.52, 0.34, blonde, scene);
+    side.position = new Vector3(dx, 1.4, 0.02);
+    side.parent = group;
+  }
+
+  const t1 = box("hairFlow1", 0.36, 0.7, 0.18, blonde, scene);
+  t1.position = new Vector3(0, 1.34, -0.17);
+  t1.parent = group;
+  const t2 = box("hairFlow2", 0.3, 0.62, 0.14, blonde, scene);
+  t2.position = new Vector3(0, 0.82, -0.2);
+  t2.parent = group;
   return group;
 }
 
