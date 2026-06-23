@@ -130,6 +130,7 @@ export class Humanoid {
 
     if (opts.outfit === "dancer") this.addDancerOutfit(scene, opts.color);
     else if (opts.outfit === "archer") this.addArcherOutfit(scene);
+    else if (opts.outfit === "noble") this.addNobleOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -141,6 +142,8 @@ export class Humanoid {
       buildShortHair(scene).parent = this.body;
     } else if (opts.hair === "bob") {
       buildBobHair(scene).parent = this.body;
+    } else if (opts.hair === "swept") {
+      buildSweptHair(scene).parent = this.body;
     }
   }
 
@@ -369,6 +372,74 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Albert's noble outfit: a white breastplate and an olive shoulder mantle over his
+   * green tunic (the body colour carries the tunic/sleeves), a belt with a gold buckle,
+   * a short tunic skirt, brown gloves, tan breeches with boots and gold disc knee
+   * guards, and a long cape down the back. Built over the bearer-coloured body.
+   */
+  private addNobleOutfit(scene: Scene): void {
+    const white = mat("nbWhite", 0.86, 0.85, 0.8, scene);
+    const olive = mat("nbOlive", 0.3, 0.34, 0.2, scene);
+    const brown = mat("nbBrown", 0.5, 0.36, 0.2, scene);
+    const tan = mat("nbTan", 0.66, 0.5, 0.3, scene);
+    const gold = mat("nbGold", 0.8, 0.66, 0.3, scene);
+    const capeMat = mat("nbCape", 0.4, 0.42, 0.44, scene);
+    const green = mat("nbGreen", 0.48, 0.54, 0.34, scene); // tunic skirt (darker than the body)
+
+    // White breastplate over the chest.
+    const plate = box("nbPlate", 0.44, 0.4, 0.1, white, scene);
+    plate.position = new Vector3(0, 1.2, 0.12);
+    plate.parent = this.body;
+
+    // Olive shoulder mantle: a drape over both shoulders plus a short back panel.
+    const mantle = box("nbMantle", 0.56, 0.16, 0.36, olive, scene);
+    mantle.position.y = 1.42;
+    mantle.parent = this.body;
+    const mantleBack = box("nbMantleBack", 0.5, 0.34, 0.06, olive, scene);
+    mantleBack.position = new Vector3(0, 1.24, -0.16);
+    mantleBack.parent = this.body;
+
+    // Belt with a gold buckle.
+    const belt = box("nbBelt", 0.47, 0.1, 0.31, brown, scene);
+    belt.position.y = 0.86;
+    belt.parent = this.body;
+    const buckle = box("nbBuckle", 0.12, 0.1, 0.04, gold, scene);
+    buckle.position = new Vector3(0, 0.86, 0.17);
+    buckle.parent = this.body;
+
+    // Short green tunic skirt hanging over the hips.
+    const skirt = box("nbSkirt", 0.46, 0.28, 0.33, green, scene);
+    skirt.position.y = 0.68;
+    skirt.parent = this.body;
+
+    // Long cape hanging down the back from the shoulders.
+    const cape = box("nbCapeMesh", 0.5, 1.0, 0.06, capeMat, scene);
+    cape.rotation.x = -0.12;
+    cape.position = new Vector3(0, 1.0, -0.2);
+    cape.parent = this.body;
+
+    // Brown gloves on the forearms (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const glove = box("nbGlove", 0.18, 0.26, 0.18, brown, scene);
+      glove.position.y = -0.46;
+      glove.parent = arm;
+    }
+
+    // Tan breeches on the upper legs + boots and gold disc knee guards (swing with legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const breech = box("nbBreech", 0.2, 0.44, 0.2, tan, scene);
+      breech.position.y = -0.22;
+      breech.parent = leg;
+      const boot = box("nbBoot", 0.22, 0.3, 0.26, brown, scene);
+      boot.position = new Vector3(0, -0.62, 0.02);
+      boot.parent = leg;
+      const knee = box("nbKnee", 0.21, 0.12, 0.22, gold, scene);
+      knee.position.y = -0.42;
+      knee.parent = leg;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -546,6 +617,30 @@ function buildBobHair(scene: Scene): TransformNode {
     side.position = new Vector3(dx, 1.42, 0);
     side.parent = group;
   }
+  return group;
+}
+
+/**
+ * Albert's hair: ash-silver swept straight back — a high crown cap (above the eyes),
+ * a few back-swept strands off the top, and a medium mass at the nape. Rigid; bobs
+ * with the head.
+ */
+function buildSweptHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairSwept", scene);
+  const ash = mat("hairAsh", 0.78, 0.78, 0.74, scene);
+
+  const cap = box("hairCap", 0.38, 0.2, 0.4, ash, scene);
+  cap.position.y = 1.78;
+  cap.parent = group;
+
+  const nape = box("hairNape", 0.32, 0.24, 0.16, ash, scene);
+  nape.position = new Vector3(0, 1.5, -0.17);
+  nape.parent = group;
+
+  // Strands swept up and back off the crown (negative tilt points the tips back).
+  coneSpike(scene, ash, new Vector3(0, 1.84, -0.02), -0.5, 0, 0.26, 0.12).parent = group;
+  coneSpike(scene, ash, new Vector3(-0.11, 1.82, -0.03), -0.5, -0.2, 0.24, 0.1).parent = group;
+  coneSpike(scene, ash, new Vector3(0.11, 1.82, -0.03), -0.5, 0.2, 0.24, 0.1).parent = group;
   return group;
 }
 

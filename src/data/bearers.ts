@@ -13,10 +13,10 @@ export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer
 export type WeaponVariant = "spiked";
 
 /** Distinctive hairstyle added to the placeholder figure so a character reads at a glance. */
-export type HairStyle = "ponytail" | "spiky" | "short" | "bob";
+export type HairStyle = "ponytail" | "spiky" | "short" | "bob" | "swept";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
-export type OutfitStyle = "armored" | "knight" | "fullplate" | "dancer" | "archer";
+export type OutfitStyle = "armored" | "knight" | "fullplate" | "dancer" | "archer" | "noble";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -51,7 +51,7 @@ export const BEARERS: Bearer[] = [
   { id: "zieg", name: "Zieg", classId: "redEye", weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
   // Jade (Wind) — spears
   { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
-  { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", color: [0.2, 0.46, 0.72], storyPlayable: true },
+  { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: [0.56, 0.62, 0.42], storyPlayable: true },
   { id: "greham", name: "Greham", classId: "jade", weapon: "spear", color: [0.38, 0.42, 0.48], storyPlayable: false },
   { id: "syuveil", name: "Syuveil", classId: "jade", weapon: "spear", color: [0.2, 0.56, 0.54], storyPlayable: false },
   // White-Silver (Light) — bows, no Additions
