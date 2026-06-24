@@ -850,16 +850,13 @@ function buildLongHair(scene: Scene): TransformNode {
     side.parent = group;
   }
 
-  // Long straight tail down the back, past the waist, in tapering segments.
-  const t1 = box("hairLong1", 0.34, 0.7, 0.16, black, scene);
-  t1.position = new Vector3(0, 1.35, -0.18);
+  // Long straight tail down the back, ending around the lower back, in tapering segments.
+  const t1 = box("hairLong1", 0.34, 0.6, 0.16, black, scene);
+  t1.position = new Vector3(0, 1.4, -0.18);
   t1.parent = group;
-  const t2 = box("hairLong2", 0.3, 0.7, 0.13, black, scene);
-  t2.position = new Vector3(0, 0.75, -0.2);
+  const t2 = box("hairLong2", 0.28, 0.55, 0.12, black, scene);
+  t2.position = new Vector3(0, 0.85, -0.2);
   t2.parent = group;
-  const t3 = box("hairLong3", 0.24, 0.5, 0.1, black, scene);
-  t3.position = new Vector3(0, 0.25, -0.22);
-  t3.parent = group;
   return group;
 }
 
