@@ -45,6 +45,9 @@ const PLAYER_REACH = 2.3;
 /** How close a ranged attacker (bow) must be to loose an arrow. */
 const RANGED_REACH = 9;
 
+/** Pressing Attack with nobody in reach locks onto the nearest enemy within this radius and walks over. */
+const ACQUIRE_RANGE = 20;
+
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
 
@@ -335,12 +338,25 @@ export class TrainingMode extends GameMode {
       return;
     }
 
-    // Ranged bearers fire on a fixed cadence — one arrow per draw, no spraying.
-    if (this.isRanged() && this.rangedCooldownT > 0) return;
-
     const target =
       preferred && preferred.alive && this.inReach(preferred) ? preferred : this.nearestInReach();
-    if (!target) return;
+    if (!target) {
+      // Nobody in reach: lock onto the nearest visible enemy and walk over to attack
+      // it (navigate() handles the approach and lands the first hit in range).
+      const acquire =
+        preferred && preferred.alive && this.withinAcquire(preferred)
+          ? preferred
+          : this.nearestEnemy(ACQUIRE_RANGE);
+      if (acquire) {
+        this.attackTarget = acquire;
+        this.moveTarget = undefined;
+        this.pendingAttack = true;
+      }
+      return;
+    }
+
+    // In reach: ranged bearers fire on a fixed cadence — one arrow per draw, no spraying.
+    if (this.isRanged() && this.rangedCooldownT > 0) return;
 
     const res = this.runner.press(this.player.addition);
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
@@ -482,6 +498,24 @@ export class TrainingMode extends GameMode {
   /** A bearer with no Additions (single-hit "Attack", e.g. Shana/Miranda): it auto-repeats in reach. */
   private isBasicAttacker(): boolean {
     return additionPresses(this.player.addition) === 0;
+  }
+
+  private withinAcquire(e: Enemy): boolean {
+    return Vector3.Distance(this.player.position, e.position) <= ACQUIRE_RANGE;
+  }
+
+  /** Nearest living enemy within `maxDist` (used to auto-approach on an Attack press). */
+  private nearestEnemy(maxDist: number): Enemy | undefined {
+    let best: Enemy | undefined;
+    let bestDist = maxDist;
+    for (const e of this.enemies) {
+      const d = Vector3.Distance(this.player.position, e.position);
+      if (d <= bestDist) {
+        best = e;
+        bestDist = d;
+      }
+    }
+    return best;
   }
 
   private nearestInReach(): Enemy | undefined {
