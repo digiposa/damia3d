@@ -873,16 +873,16 @@ function buildFlowHair(scene: Scene): TransformNode {
   cap.parent = group;
 
   for (const dx of [-0.21, 0.21]) {
-    const side = box("hairSide", 0.1, 0.52, 0.34, blonde, scene);
-    side.position = new Vector3(dx, 1.4, 0.02);
+    const side = box("hairSide", 0.1, 0.42, 0.34, blonde, scene);
+    side.position = new Vector3(dx, 1.45, 0.02);
     side.parent = group;
   }
 
-  const t1 = box("hairFlow1", 0.36, 0.7, 0.18, blonde, scene);
-  t1.position = new Vector3(0, 1.34, -0.17);
+  const t1 = box("hairFlow1", 0.36, 0.55, 0.18, blonde, scene);
+  t1.position = new Vector3(0, 1.4, -0.17);
   t1.parent = group;
-  const t2 = box("hairFlow2", 0.3, 0.62, 0.14, blonde, scene);
-  t2.position = new Vector3(0, 0.82, -0.2);
+  const t2 = box("hairFlow2", 0.3, 0.45, 0.13, blonde, scene);
+  t2.position = new Vector3(0, 0.92, -0.2);
   t2.parent = group;
   return group;
 }
