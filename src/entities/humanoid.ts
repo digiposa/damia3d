@@ -61,6 +61,8 @@ export class Humanoid {
   private weaponNode!: TransformNode;
   /** Long ponytail (if any) — swayed by motion. */
   private ponytail?: TransformNode;
+  /** Cape pivot (if any) — swayed by motion from the shoulders. */
+  private cape?: TransformNode;
   private style: StrikeStyle;
   private phase = 0;
   private strikeT = 0;
@@ -429,22 +431,26 @@ export class Humanoid {
     skirt.position.y = 0.68;
     skirt.parent = this.body;
 
-    // Green cloak: a collar wrapping the shoulders, then a draped back panel that
-    // widens toward a flared hem (three stacked segments give it some flow).
+    // Green cloak on a shoulder pivot so it can sway with motion: a collar wrapping
+    // the shoulders, then a draped back panel that widens toward a flared hem.
+    const cape = new TransformNode("nbCapePivot", scene);
+    cape.position = new Vector3(0, 1.46, -0.05);
+    cape.parent = this.body;
+    this.cape = cape;
     const capeCollar = box("nbCapeCollar", 0.54, 0.16, 0.36, capeMat, scene);
-    capeCollar.position = new Vector3(0, 1.4, -0.04);
-    capeCollar.parent = this.body;
+    capeCollar.position = new Vector3(0, -0.06, 0.01);
+    capeCollar.parent = cape;
     const capeTop = box("nbCapeTop", 0.5, 0.5, 0.05, capeMat, scene);
     capeTop.rotation.x = -0.08;
-    capeTop.position = new Vector3(0, 1.22, -0.2);
-    capeTop.parent = this.body;
+    capeTop.position = new Vector3(0, -0.24, -0.15);
+    capeTop.parent = cape;
     const capeMid = box("nbCapeMid", 0.56, 0.5, 0.05, capeMat, scene);
     capeMid.rotation.x = -0.05;
-    capeMid.position = new Vector3(0, 0.74, -0.24);
-    capeMid.parent = this.body;
+    capeMid.position = new Vector3(0, -0.72, -0.19);
+    capeMid.parent = cape;
     const capeHem = box("nbCapeHem", 0.64, 0.34, 0.05, capeMat, scene);
-    capeHem.position = new Vector3(0, 0.38, -0.27);
-    capeHem.parent = this.body;
+    capeHem.position = new Vector3(0, -1.08, -0.22);
+    capeHem.parent = cape;
 
     // Brown gloves on the forearms (swing with the arms).
     for (const arm of [this.leftArm, this.rightArm]) {
@@ -634,6 +640,14 @@ export class Humanoid {
     if (this.ponytail) {
       const amp = moving ? 0.2 : 0.05;
       this.ponytail.rotation.x = 0.12 + Math.sin(this.phase) * amp;
+    }
+
+    // The cape lifts and sways from the shoulders — trailing back while moving,
+    // a faint drift at rest. Phase-lagged so it follows the body.
+    if (this.cape) {
+      const amp = moving ? 0.16 : 0.035;
+      const bias = moving ? 0.2 : 0.02;
+      this.cape.rotation.x = bias + Math.sin(this.phase - 0.4) * amp;
     }
 
     // A strike overrides the wielding arm for its duration (player is usually
