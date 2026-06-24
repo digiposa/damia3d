@@ -146,6 +146,7 @@ export class Humanoid {
     else if (opts.outfit === "darkness") this.addDarknessOutfit(scene);
     else if (opts.outfit === "valkyrie") this.addValkyrieOutfit(scene);
     else if (opts.outfit === "darkknight") this.addDarkKnightOutfit(scene);
+    else if (opts.outfit === "scholar") this.addScholarOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -165,6 +166,8 @@ export class Humanoid {
       buildFlowHair(scene).parent = this.body;
     } else if (opts.hair === "banded") {
       buildBandedHair(scene).parent = this.body;
+    } else if (opts.hair === "neat") {
+      buildNeatHair(scene).parent = this.body;
     }
   }
 
@@ -610,10 +613,11 @@ export class Humanoid {
   }
 
   /**
-   * Greham's dark-knight outfit: near-black plate with gold filigree, gold-rimmed
-   * pauldrons, a gold belt over green tassets, dark gauntlets and greaves/boots, a
-   * swaying red cape, and a dark helmet with a gold brow band and a red crest. Built
-   * over the (dark) bearer-coloured body; he wields a spear.
+   * Greham's dark-knight outfit: dark-brown plate with ornate gold filigree, gold-rimmed
+   * pauldrons, a dark belt with a round gold buckle over gold-hemmed green tassets, dark
+   * gauntlets and gold-trimmed greaves/boots, and a swaying red cape clasped at his right
+   * shoulder. A scar crosses his right eye. Built over the (dark-brown) bearer-coloured
+   * body; his hair/bandana come from the "banded" style and he wields a spear.
    */
   private addDarkKnightOutfit(scene: Scene): void {
     const dark = mat("dkkDark", 0.26, 0.18, 0.12, scene); // dark brown plate
@@ -628,9 +632,23 @@ export class Humanoid {
     const chest = box("dkkChest", 0.46, 0.48, 0.12, dark, scene);
     chest.position = new Vector3(0, 1.14, 0.13);
     chest.parent = this.body;
-    const filigree = box("dkkFiligree", 0.3, 0.38, 0.04, gold, scene);
-    filigree.position = new Vector3(0, 1.14, 0.2);
-    filigree.parent = this.body;
+    // Ornate gold filigree across the chest: a central band, two angled side scrolls,
+    // and a round emblem near the collar.
+    const filiCenter = box("dkkFiliC", 0.08, 0.4, 0.04, gold, scene);
+    filiCenter.position = new Vector3(0, 1.14, 0.2);
+    filiCenter.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const scroll = box("dkkFiliS", 0.06, 0.3, 0.04, gold, scene);
+      scroll.position = new Vector3(sx * 0.13, 1.16, 0.2);
+      scroll.rotation.z = sx * 0.28;
+      scroll.parent = this.body;
+    }
+    const emblem = MeshBuilder.CreateCylinder("dkkEmblem", { height: 0.04, diameter: 0.16, tessellation: 10 }, scene);
+    emblem.material = gold;
+    emblem.isPickable = false;
+    emblem.rotation.x = Math.PI / 2;
+    emblem.position = new Vector3(0, 1.3, 0.21);
+    emblem.parent = this.body;
 
     // Pointed pauldrons with a gold rim.
     for (const sx of [-1, 1]) {
@@ -642,10 +660,16 @@ export class Humanoid {
       rim.parent = this.body;
     }
 
-    // Gold belt over a flared green tasset skirt.
-    const belt = box("dkkBelt", 0.48, 0.1, 0.32, gold, scene);
+    // Dark belt with a prominent round gold buckle, over a flared green tasset skirt.
+    const belt = box("dkkBelt", 0.48, 0.1, 0.32, dark, scene);
     belt.position.y = 0.86;
     belt.parent = this.body;
+    const buckle = MeshBuilder.CreateCylinder("dkkBuckle", { height: 0.05, diameter: 0.17, tessellation: 10 }, scene);
+    buckle.material = gold;
+    buckle.isPickable = false;
+    buckle.rotation.x = Math.PI / 2;
+    buckle.position = new Vector3(0, 0.86, 0.18);
+    buckle.parent = this.body;
     const tassets = MeshBuilder.CreateCylinder(
       "dkkTassets",
       { height: 0.34, diameterTop: 0.46, diameterBottom: 0.6, tessellation: 12 },
@@ -655,10 +679,19 @@ export class Humanoid {
     tassets.isPickable = false;
     tassets.position.y = 0.7;
     tassets.parent = this.body;
+    const tassetHem = MeshBuilder.CreateTorus("dkkTassetHem", { diameter: 0.6, thickness: 0.04, tessellation: 16 }, scene);
+    tassetHem.material = gold;
+    tassetHem.isPickable = false;
+    tassetHem.position.y = 0.54;
+    tassetHem.parent = this.body;
 
-    // Swaying red cape from a shoulder pivot (driven in update()).
+    // Swaying red cape, clasped at and draping from his right shoulder (offset to one
+    // side rather than centred on the back). Driven in update().
+    const clasp = box("dkkClasp", 0.1, 0.1, 0.12, gold, scene);
+    clasp.position = new Vector3(0.32, 1.5, 0.02);
+    clasp.parent = this.body;
     const cape = new TransformNode("dkkCapePivot", scene);
-    cape.position = new Vector3(0, 1.46, -0.07);
+    cape.position = new Vector3(0.16, 1.5, -0.07);
     cape.parent = this.body;
     this.cape = cape;
     const capeTop = box("dkkCapeTop", 0.52, 0.5, 0.05, red, scene);
@@ -687,6 +720,9 @@ export class Humanoid {
       const greave = box("dkkGreave", 0.21, 0.4, 0.22, dark, scene);
       greave.position.y = -0.42;
       greave.parent = leg;
+      const greaveTrim = box("dkkGreaveTrim", 0.22, 0.04, 0.23, gold, scene);
+      greaveTrim.position.y = -0.24;
+      greaveTrim.parent = leg;
       const boot = box("dkkBoot", 0.22, 0.3, 0.26, dark, scene);
       boot.position = new Vector3(0, -0.62, 0.02);
       boot.parent = leg;
@@ -701,6 +737,63 @@ export class Humanoid {
     scar.position = new Vector3(0.08, 1.63, 0.18);
     scar.rotation.z = 0.22;
     scar.parent = this.body;
+  }
+
+  /**
+   * Syuveil's scholar outfit: a long white tunic (the body colour carries the
+   * tunic/sleeves) with black filigree on the collar, front and hem, a green waist
+   * sash, dark-green breeches, and brown boots. Built over the (white) bearer-coloured
+   * body; his glasses come from the "neat" hairstyle and he wields a spear.
+   */
+  private addScholarOutfit(scene: Scene): void {
+    const white = mat("scWhite", 0.88, 0.89, 0.92, scene);
+    const black = mat("scBlack", 0.1, 0.1, 0.13, scene);
+    const green = mat("scGreen", 0.2, 0.46, 0.28, scene); // sash
+    const pants = mat("scPants", 0.16, 0.3, 0.22, scene); // dark-green breeches
+    const brown = mat("scBoot", 0.4, 0.28, 0.16, scene);
+
+    // Black filigree high collar and a front placket down the tunic.
+    const collar = box("scCollar", 0.42, 0.12, 0.31, black, scene);
+    collar.position.y = 1.4;
+    collar.parent = this.body;
+    const placket = box("scPlacket", 0.05, 0.5, 0.02, black, scene);
+    placket.position = new Vector3(0, 1.14, 0.16);
+    placket.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const scroll = box("scScroll", 0.16, 0.06, 0.02, black, scene);
+      scroll.position = new Vector3(sx * 0.12, 1.3, 0.16);
+      scroll.rotation.z = sx * 0.4;
+      scroll.parent = this.body;
+    }
+
+    // Long white tunic skirt over the hips with a black filigree hem.
+    const skirt = box("scSkirt", 0.46, 0.4, 0.33, white, scene);
+    skirt.position.y = 0.66;
+    skirt.parent = this.body;
+    const hem = box("scHem", 0.47, 0.05, 0.34, black, scene);
+    hem.position.y = 0.47;
+    hem.parent = this.body;
+
+    // Green waist sash with a knotted tail at the side.
+    const sash = box("scSash", 0.48, 0.12, 0.33, green, scene);
+    sash.position.y = 0.86;
+    sash.parent = this.body;
+    const tail = box("scSashTail", 0.1, 0.3, 0.06, green, scene);
+    tail.position = new Vector3(0.22, 0.72, 0.12);
+    tail.parent = this.body;
+
+    // Dark-green breeches on the upper legs + brown boots (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const breech = box("scBreech", 0.2, 0.46, 0.2, pants, scene);
+      breech.position.y = -0.24;
+      breech.parent = leg;
+      const boot = box("scBoot", 0.22, 0.3, 0.26, brown, scene);
+      boot.position = new Vector3(0, -0.62, 0.02);
+      boot.parent = leg;
+      const cuff = box("scBootCuff", 0.23, 0.07, 0.27, brown, scene);
+      cuff.position.y = -0.48;
+      cuff.parent = leg;
+    }
   }
 
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
@@ -954,6 +1047,42 @@ function buildLongHair(scene: Scene): TransformNode {
   const t2 = box("hairLong2", 0.28, 0.55, 0.12, black, scene);
   t2.position = new Vector3(0, 0.85, -0.2);
   t2.parent = group;
+  return group;
+}
+
+/**
+ * Syuveil's hair: neat short brown, side-parted, with round wire glasses over the
+ * eyes (two ring frames + a bridge). A crown cap, soft fringe, and side framing. Rigid.
+ */
+function buildNeatHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairNeat", scene);
+  const brown = mat("hairNeatBrown", 0.34, 0.24, 0.15, scene);
+  const frame = mat("glassFrame", 0.24, 0.24, 0.27, scene);
+
+  const cap = box("hairCap", 0.38, 0.22, 0.4, brown, scene);
+  cap.position.y = 1.77;
+  cap.parent = group;
+  const fringe = box("hairFringe", 0.38, 0.1, 0.1, brown, scene);
+  fringe.position = new Vector3(0.03, 1.72, 0.16);
+  fringe.parent = group;
+  for (const dx of [-0.19, 0.19]) {
+    const side = box("hairSide", 0.07, 0.2, 0.36, brown, scene);
+    side.position = new Vector3(dx, 1.62, -0.02);
+    side.parent = group;
+  }
+
+  // Round wire glasses over the eyes.
+  for (const dx of [-0.08, 0.08]) {
+    const lens = MeshBuilder.CreateTorus("glassLens", { diameter: 0.11, thickness: 0.016, tessellation: 12 }, scene);
+    lens.material = frame;
+    lens.isPickable = false;
+    lens.rotation.x = Math.PI / 2; // ring faces forward (+Z)
+    lens.position = new Vector3(dx, 1.63, 0.18);
+    lens.parent = group;
+  }
+  const bridge = box("glassBridge", 0.06, 0.015, 0.015, frame, scene);
+  bridge.position = new Vector3(0, 1.63, 0.18);
+  bridge.parent = group;
   return group;
 }
 
