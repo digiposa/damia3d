@@ -27,7 +27,8 @@ export type OutfitStyle =
   | "archer"
   | "noble"
   | "darkness"
-  | "valkyrie";
+  | "valkyrie"
+  | "darkknight";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -63,7 +64,7 @@ export const BEARERS: Bearer[] = [
   // Jade (Wind) — spears
   { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: [0.56, 0.62, 0.42], storyPlayable: true },
-  { id: "greham", name: "Greham", classId: "jade", weapon: "spear", color: [0.38, 0.42, 0.48], storyPlayable: false },
+  { id: "greham", name: "Greham", classId: "jade", weapon: "spear", outfit: "darkknight", color: [0.2, 0.22, 0.27], storyPlayable: false },
   { id: "syuveil", name: "Syuveil", classId: "jade", weapon: "spear", color: [0.2, 0.56, 0.54], storyPlayable: false },
   // White-Silver (Light) — bows, no Additions
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },

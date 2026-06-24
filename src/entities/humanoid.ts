@@ -145,6 +145,7 @@ export class Humanoid {
     else if (opts.outfit === "noble") this.addNobleOutfit(scene);
     else if (opts.outfit === "darkness") this.addDarknessOutfit(scene);
     else if (opts.outfit === "valkyrie") this.addValkyrieOutfit(scene);
+    else if (opts.outfit === "darkknight") this.addDarkKnightOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -604,6 +605,105 @@ export class Humanoid {
       fold.position.y = -0.24;
       fold.parent = leg;
     }
+  }
+
+  /**
+   * Greham's dark-knight outfit: near-black plate with gold filigree, gold-rimmed
+   * pauldrons, a gold belt over green tassets, dark gauntlets and greaves/boots, a
+   * swaying red cape, and a dark helmet with a gold brow band and a red crest. Built
+   * over the (dark) bearer-coloured body; he wields a spear.
+   */
+  private addDarkKnightOutfit(scene: Scene): void {
+    const dark = mat("dkkDark", 0.14, 0.14, 0.18, scene);
+    const gold = mat("dkkGold", 0.8, 0.66, 0.3, scene);
+    const red = mat("dkkRed", 0.6, 0.12, 0.12, scene);
+    const green = mat("dkkGreen", 0.22, 0.4, 0.24, scene);
+
+    // Dark high collar and chest plate with a gold filigree centre.
+    const collar = box("dkkCollar", 0.3, 0.2, 0.27, dark, scene);
+    collar.position.y = 1.42;
+    collar.parent = this.body;
+    const chest = box("dkkChest", 0.46, 0.48, 0.12, dark, scene);
+    chest.position = new Vector3(0, 1.14, 0.13);
+    chest.parent = this.body;
+    const filigree = box("dkkFiligree", 0.3, 0.38, 0.04, gold, scene);
+    filigree.position = new Vector3(0, 1.14, 0.2);
+    filigree.parent = this.body;
+
+    // Pointed pauldrons with a gold rim.
+    for (const sx of [-1, 1]) {
+      const pauldron = box("dkkPauldron", 0.27, 0.2, 0.4, dark, scene);
+      pauldron.position = new Vector3(sx * 0.35, 1.46, 0);
+      pauldron.parent = this.body;
+      const rim = box("dkkPauldronRim", 0.29, 0.05, 0.42, gold, scene);
+      rim.position = new Vector3(sx * 0.35, 1.36, 0);
+      rim.parent = this.body;
+    }
+
+    // Gold belt over a flared green tasset skirt.
+    const belt = box("dkkBelt", 0.48, 0.1, 0.32, gold, scene);
+    belt.position.y = 0.86;
+    belt.parent = this.body;
+    const tassets = MeshBuilder.CreateCylinder(
+      "dkkTassets",
+      { height: 0.34, diameterTop: 0.46, diameterBottom: 0.6, tessellation: 12 },
+      scene,
+    );
+    tassets.material = green;
+    tassets.isPickable = false;
+    tassets.position.y = 0.7;
+    tassets.parent = this.body;
+
+    // Swaying red cape from a shoulder pivot (driven in update()).
+    const cape = new TransformNode("dkkCapePivot", scene);
+    cape.position = new Vector3(0, 1.46, -0.07);
+    cape.parent = this.body;
+    this.cape = cape;
+    const capeTop = box("dkkCapeTop", 0.52, 0.5, 0.05, red, scene);
+    capeTop.position = new Vector3(0, -0.24, -0.14);
+    capeTop.rotation.x = -0.08;
+    capeTop.parent = cape;
+    const capeMid = box("dkkCapeMid", 0.58, 0.5, 0.05, red, scene);
+    capeMid.position = new Vector3(0, -0.72, -0.18);
+    capeMid.parent = cape;
+    const capeHem = box("dkkCapeHem", 0.62, 0.3, 0.05, red, scene);
+    capeHem.position = new Vector3(0, -1.04, -0.21);
+    capeHem.parent = cape;
+
+    // Dark gauntlets with a gold cuff (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const gauntlet = box("dkkGauntlet", 0.2, 0.3, 0.2, dark, scene);
+      gauntlet.position.y = -0.45;
+      gauntlet.parent = arm;
+      const cuff = box("dkkCuff", 0.22, 0.08, 0.22, gold, scene);
+      cuff.position.y = -0.31;
+      cuff.parent = arm;
+    }
+
+    // Dark greaves and boots with a gold knee guard (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const greave = box("dkkGreave", 0.21, 0.4, 0.22, dark, scene);
+      greave.position.y = -0.42;
+      greave.parent = leg;
+      const boot = box("dkkBoot", 0.22, 0.3, 0.26, dark, scene);
+      boot.position = new Vector3(0, -0.62, 0.02);
+      boot.parent = leg;
+      const knee = box("dkkKnee", 0.21, 0.1, 0.23, gold, scene);
+      knee.position.y = -0.34;
+      knee.parent = leg;
+    }
+
+    // Dark helmet: a cap over the crown with a gold brow band and a red crest fin;
+    // the face below the band stays visible.
+    const helm = box("dkkHelm", 0.38, 0.24, 0.4, dark, scene);
+    helm.position = new Vector3(0, 1.74, -0.01);
+    helm.parent = this.body;
+    const brow = box("dkkBrow", 0.39, 0.05, 0.41, gold, scene);
+    brow.position.y = 1.66;
+    brow.parent = this.body;
+    const crest = box("dkkCrest", 0.06, 0.16, 0.36, red, scene);
+    crest.position = new Vector3(0, 1.9, -0.02);
+    crest.parent = this.body;
   }
 
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
