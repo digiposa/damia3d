@@ -62,42 +62,56 @@ export interface Bearer {
   hair?: HairStyle;
   /** Outfit overlaid on the placeholder figure (e.g. Dart's red adventuring armour). */
   outfit?: OutfitStyle;
-  /** Placeholder avatar body colour (RGB 0–1) — distinguishes each bearer until art lands. */
+  /** Dragoon archetype (element) colour (RGB 0–1) — shared by all bearers of a class; used for the menu swatch and the default body tint. */
   color: [number, number, number];
+  /** Optional 3D body tint when the figure's costume should differ from the archetype colour (e.g. Syuveil's white tunic, Greham's brown armour). Falls back to {@link color}. */
+  bodyColor?: [number, number, number];
   /** Part of the canonical Story party. */
   storyPlayable: boolean;
 }
 
+// One placeholder colour per Dragoon archetype (element) — shared by every bearer of
+// that class, so the menu swatch reads as the element, not the individual.
+const C_FIRE: [number, number, number] = [0.8, 0.2, 0.2];
+const C_DARK: [number, number, number] = [0.42, 0.26, 0.5];
+const C_WIND: [number, number, number] = [0.3, 0.62, 0.34];
+const C_LIGHT: [number, number, number] = [0.85, 0.86, 0.92];
+const C_THUNDER: [number, number, number] = [0.56, 0.34, 0.7];
+const C_WATER: [number, number, number] = [0.3, 0.66, 0.85];
+const C_EARTH: [number, number, number] = [0.78, 0.6, 0.26];
+
+// Grouped by Dragoon archetype, and within each archetype in order of the Dragoon
+// Spirit's possession (earliest holder first → current bearer last).
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: [0.85, 0.2, 0.22], storyPlayable: true },
-  { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: [0.58, 0.12, 0.1], storyPlayable: false },
-  // Jade (Wind) — spears
-  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
-  { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: [0.56, 0.62, 0.42], storyPlayable: true },
-  { id: "greham", name: "Greham", classId: "jade", weapon: "spear", hair: "banded", outfit: "darkknight", color: [0.26, 0.19, 0.13], storyPlayable: false },
-  { id: "syuveil", name: "Syuveil", classId: "jade", portrait: syuveilPortrait, weapon: "spear", hair: "neat", outfit: "scholar", color: [0.88, 0.89, 0.92], storyPlayable: false },
-  // White-Silver (Light) — bows, no Additions
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
-  { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: [0.82, 0.82, 0.9], storyPlayable: true },
-  { id: "shirley", name: "Shirley", classId: "whiteSilver", weapon: "bow", hair: "flow", color: [0.88, 0.84, 0.7], storyPlayable: false },
+  { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "short", outfit: "fullplate", color: C_FIRE, storyPlayable: false },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
-  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", hair: "long", outfit: "darkness", color: [0.34, 0.22, 0.4], storyPlayable: true },
+  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
+  // Jade (Wind) — spears
+  { id: "syuveil", name: "Syuveil", classId: "jade", portrait: syuveilPortrait, weapon: "spear", hair: "neat", outfit: "scholar", color: C_WIND, bodyColor: [0.88, 0.89, 0.92], storyPlayable: false },
+  { id: "greham", name: "Greham", classId: "jade", weapon: "spear", hair: "banded", outfit: "darkknight", color: C_WIND, bodyColor: [0.26, 0.19, 0.13], storyPlayable: false },
+  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: C_WIND, storyPlayable: true },
+  { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
+  // White-Silver (Light) — bows, no Additions
+  { id: "shirley", name: "Shirley", classId: "whiteSilver", weapon: "bow", hair: "flow", color: C_LIGHT, storyPlayable: false },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
-  { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: [0.85, 0.5, 0.18], storyPlayable: true },
-  { id: "kanzas", name: "Kanzas", classId: "thunder", weapon: "fist", hair: "spiky", color: [0.72, 0.4, 0.14], storyPlayable: false },
-  { id: "doel", name: "Doel", classId: "thunder", weapon: "fist", hair: "short", color: [0.62, 0.34, 0.2], storyPlayable: false },
+  { id: "kanzas", name: "Kanzas", classId: "thunder", weapon: "fist", hair: "spiky", color: C_THUNDER, storyPlayable: false },
+  { id: "doel", name: "Doel", classId: "thunder", weapon: "fist", hair: "short", color: C_THUNDER, storyPlayable: false },
+  { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
-  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: [0.3, 0.72, 0.85], storyPlayable: true },
-  { id: "damia", name: "Damia", classId: "blueSea", weapon: "hammer", hair: "flow", color: [0.24, 0.54, 0.8], storyPlayable: false },
-  { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: [0.42, 0.7, 0.8], storyPlayable: false },
+  { id: "damia", name: "Damia", classId: "blueSea", weapon: "hammer", hair: "flow", color: C_WATER, storyPlayable: false },
+  { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
+  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
   // Golden (Earth) — axe
-  { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", color: [0.72, 0.56, 0.26], storyPlayable: true },
-  { id: "belzac", name: "Belzac", classId: "golden", weapon: "axe", hair: "short", color: [0.6, 0.46, 0.22], storyPlayable: false },
+  { id: "belzac", name: "Belzac", classId: "golden", weapon: "axe", hair: "short", color: C_EARTH, storyPlayable: false },
+  { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", color: C_EARTH, storyPlayable: true },
 ];
 
 /** Default playable bearer (Dart). */
-export const DEFAULT_BEARER: Bearer = BEARERS[0];
+export const DEFAULT_BEARER: Bearer = BEARERS.find((b) => b.id === "dart")!;
 
 export function bearerById(id: string): Bearer | undefined {
   return BEARERS.find((b) => b.id === id);

@@ -7,8 +7,10 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { WeaponKind, WeaponVariant, HairStyle, OutfitStyle } from "../data/bearers";
 
 export interface HumanoidOptions {
-  /** Primary body colour (RGB 0–1). */
+  /** Primary body colour (RGB 0–1) — the bearer's archetype colour, used for the body unless overridden. */
   color: [number, number, number];
+  /** Optional body tint override (when the costume should differ from the archetype colour). */
+  bodyColor?: [number, number, number];
   /** Weapon silhouette to carry (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -68,7 +70,7 @@ export class Humanoid {
   private strikeT = 0;
 
   constructor(scene: Scene, opts: HumanoidOptions) {
-    const [r, g, b] = opts.color;
+    const [r, g, b] = opts.bodyColor ?? opts.color;
     const weapon = opts.weapon ?? "sword";
     this.style = STRIKE_STYLE[weapon];
 

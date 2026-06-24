@@ -151,20 +151,38 @@ export class TrainingMenu {
 
   private renderCharacter(): HTMLElement {
     const box = section(t("char.title"));
-    const grid = document.createElement("div");
-    Object.assign(grid.style, {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: "8px",
-    } satisfies Partial<CSSStyleDeclaration>);
     const s = this.cb.state();
-    for (const b of selectableBearers()) grid.appendChild(this.bearerCard(b, b.id === s.bearerId));
-    box.appendChild(grid);
+    // Grouped by Dragoon archetype (bearers are already ordered by class, then by
+    // possession), with an element header before each group's grid.
+    let currentClass: string | undefined;
+    let grid: HTMLElement | undefined;
+    for (const b of selectableBearers()) {
+      if (b.classId !== currentClass) {
+        currentClass = b.classId;
+        const header = document.createElement("div");
+        Object.assign(header.style, {
+          font: "700 12px/1.4 ui-monospace, monospace",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "#c8a24a",
+          margin: "12px 2px 2px",
+        } satisfies Partial<CSSStyleDeclaration>);
+        header.textContent = dragoonClass(b.classId)?.element ?? b.classId;
+        box.appendChild(header);
+        grid = document.createElement("div");
+        Object.assign(grid.style, {
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "8px",
+        } satisfies Partial<CSSStyleDeclaration>);
+        box.appendChild(grid);
+      }
+      grid!.appendChild(this.bearerCard(b, b.id === s.bearerId));
+    }
     return box;
   }
 
   private bearerCard(bearer: Bearer, current: boolean): HTMLElement {
-    const cls = dragoonClass(bearer.classId);
     const el = document.createElement("button");
     Object.assign(el.style, {
       display: "flex",
@@ -187,7 +205,7 @@ export class TrainingMenu {
       `border:1px solid rgba(0,0,0,0.5);box-shadow:0 0 4px rgba(0,0,0,0.4)"></span>` +
       `<span style="display:flex;flex-direction:column;gap:2px;min-width:0">` +
       `<span>${bearer.name}${current ? "  ✓" : ""}</span>` +
-      `<span style="font:400 11px/1.3 ui-monospace,monospace;opacity:0.8">${cls?.element ?? ""}${bearer.storyPlayable ? "" : " · skin"}</span>` +
+      `<span style="font:400 11px/1.3 ui-monospace,monospace;opacity:0.8">${bearer.storyPlayable ? "party" : "skin"}</span>` +
       `</span>`;
     tap(el, () => this.cb.onSelectBearer(bearer));
     return el;

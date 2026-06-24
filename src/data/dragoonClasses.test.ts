@@ -72,9 +72,18 @@ describe("bearers", () => {
     expect(DEFAULT_BEARER.classId).toBe("redEye");
   });
 
-  it("gives every bearer a distinct placeholder colour", () => {
-    const keys = BEARERS.map((b) => b.color.join(","));
-    expect(new Set(keys).size).toBe(BEARERS.length);
+  it("colours bearers by Dragoon archetype: shared within a class, distinct across classes", () => {
+    const byClass = new Map<string, Set<string>>();
+    for (const b of BEARERS) {
+      const set = byClass.get(b.classId) ?? new Set<string>();
+      set.add(b.color.join(","));
+      byClass.set(b.classId, set);
+    }
+    // Every bearer of a class shares the one archetype colour.
+    for (const set of byClass.values()) expect(set.size).toBe(1);
+    // Each archetype's colour is distinct from the others.
+    const classColours = [...byClass.values()].map((s) => [...s][0]);
+    expect(new Set(classColours).size).toBe(byClass.size);
   });
 
   it("looks bearers up by id", () => {
@@ -101,24 +110,24 @@ describe("bearers", () => {
 
   it("lists exactly the configured bearers", () => {
     expect(BEARERS.map((b) => b.id)).toEqual([
-      "dart",
       "zieg",
+      "dart",
+      "rose",
+      "syuveil",
+      "greham",
       "lavitz",
       "albert",
-      "greham",
-      "syuveil",
+      "shirley",
       "shana",
       "miranda",
-      "shirley",
-      "rose",
-      "haschel",
       "kanzas",
       "doel",
-      "meru",
+      "haschel",
       "damia",
       "lenus",
-      "kongol",
+      "meru",
       "belzac",
+      "kongol",
     ]);
   });
 

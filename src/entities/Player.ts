@@ -92,6 +92,7 @@ export class Player {
     // model if the bearer supplies one (loaded asynchronously below).
     this.humanoid = new Humanoid(scene, {
       color: bearer.color,
+      bodyColor: bearer.bodyColor,
       weapon: bearer.weapon,
       weaponVariant: bearer.weaponVariant,
       hair: bearer.hair,
