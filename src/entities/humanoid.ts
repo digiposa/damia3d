@@ -163,6 +163,8 @@ export class Humanoid {
       buildLongHair(scene).parent = this.body;
     } else if (opts.hair === "flow") {
       buildFlowHair(scene).parent = this.body;
+    } else if (opts.hair === "banded") {
+      buildBandedHair(scene).parent = this.body;
     }
   }
 
@@ -693,17 +695,12 @@ export class Humanoid {
       knee.parent = leg;
     }
 
-    // Dark helmet: a cap over the crown with a gold brow band and a red crest fin;
-    // the face below the band stays visible.
-    const helm = box("dkkHelm", 0.38, 0.24, 0.4, dark, scene);
-    helm.position = new Vector3(0, 1.74, -0.01);
-    helm.parent = this.body;
-    const brow = box("dkkBrow", 0.39, 0.05, 0.41, gold, scene);
-    brow.position.y = 1.66;
-    brow.parent = this.body;
-    const crest = box("dkkCrest", 0.06, 0.16, 0.36, red, scene);
-    crest.position = new Vector3(0, 1.9, -0.02);
-    crest.parent = this.body;
+    // Scar across his right eye (the +X eye, from the front).
+    const scarMat = mat("dkkScar", 0.62, 0.3, 0.26, scene);
+    const scar = box("dkkScar", 0.02, 0.18, 0.02, scarMat, scene);
+    scar.position = new Vector3(0.08, 1.63, 0.18);
+    scar.rotation.z = 0.22;
+    scar.parent = this.body;
   }
 
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
@@ -957,6 +954,45 @@ function buildLongHair(scene: Scene): TransformNode {
   const t2 = box("hairLong2", 0.28, 0.55, 0.12, black, scene);
   t2.position = new Vector3(0, 0.85, -0.2);
   t2.parent = group;
+  return group;
+}
+
+/**
+ * Greham's hair: dark brown, with a red bandana across the brow (a knot and short
+ * tails at the back). A crown cap, side framing, and a short nape. Rigid.
+ */
+function buildBandedHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairBanded", scene);
+  const hair = mat("hairDarkBrown", 0.26, 0.19, 0.13, scene);
+  const red = mat("bandanaGreham", 0.62, 0.12, 0.12, scene);
+
+  const cap = box("hairCap", 0.39, 0.24, 0.41, hair, scene);
+  cap.position.y = 1.76;
+  cap.parent = group;
+  const nape = box("hairNape", 0.34, 0.22, 0.18, hair, scene);
+  nape.position = new Vector3(0, 1.55, -0.16);
+  nape.parent = group;
+  for (const dx of [-0.2, 0.2]) {
+    const side = box("hairSide", 0.08, 0.26, 0.38, hair, scene);
+    side.position = new Vector3(dx, 1.6, -0.02);
+    side.parent = group;
+  }
+
+  // Red bandana across the forehead with a knot and short tails at the back.
+  const band = MeshBuilder.CreateTorus("bandana", { diameter: 0.4, thickness: 0.07, tessellation: 10 }, scene);
+  band.material = red;
+  band.isPickable = false;
+  band.position.y = 1.67;
+  band.parent = group;
+  const knot = box("bandanaKnot", 0.1, 0.1, 0.1, red, scene);
+  knot.position = new Vector3(0, 1.66, -0.2);
+  knot.parent = group;
+  for (const dx of [-0.05, 0.05]) {
+    const tail = box("bandanaTail", 0.05, 0.26, 0.04, red, scene);
+    tail.position = new Vector3(dx, 1.5, -0.22);
+    tail.rotation.x = -0.2;
+    tail.parent = group;
+  }
   return group;
 }
 
