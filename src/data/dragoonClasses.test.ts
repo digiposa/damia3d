@@ -109,10 +109,16 @@ describe("bearers", () => {
       "syuveil",
       "shana",
       "miranda",
+      "shirley",
       "rose",
       "haschel",
+      "kanzas",
+      "doel",
       "meru",
+      "damia",
+      "lenus",
       "kongol",
+      "belzac",
     ]);
   });
 

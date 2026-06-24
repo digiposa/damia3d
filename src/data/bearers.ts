@@ -80,14 +80,20 @@ export const BEARERS: Bearer[] = [
   // White-Silver (Light) — bows, no Additions
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: [0.82, 0.82, 0.9], storyPlayable: true },
+  { id: "shirley", name: "Shirley", classId: "whiteSilver", weapon: "bow", hair: "flow", color: [0.88, 0.84, 0.7], storyPlayable: false },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", hair: "long", outfit: "darkness", color: [0.34, 0.22, 0.4], storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: [0.85, 0.5, 0.18], storyPlayable: true },
+  { id: "kanzas", name: "Kanzas", classId: "thunder", weapon: "fist", hair: "spiky", color: [0.72, 0.4, 0.14], storyPlayable: false },
+  { id: "doel", name: "Doel", classId: "thunder", weapon: "fist", hair: "short", color: [0.62, 0.34, 0.2], storyPlayable: false },
   // Blue-Sea (Water) — hammer
   { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: [0.3, 0.72, 0.85], storyPlayable: true },
+  { id: "damia", name: "Damia", classId: "blueSea", weapon: "hammer", hair: "flow", color: [0.24, 0.54, 0.8], storyPlayable: false },
+  { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: [0.42, 0.7, 0.8], storyPlayable: false },
   // Golden (Earth) — axe
   { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", color: [0.72, 0.56, 0.26], storyPlayable: true },
+  { id: "belzac", name: "Belzac", classId: "golden", weapon: "axe", hair: "short", color: [0.6, 0.46, 0.22], storyPlayable: false },
 ];
 
 /** Default playable bearer (Dart). */
