@@ -616,7 +616,7 @@ export class Humanoid {
    * over the (dark) bearer-coloured body; he wields a spear.
    */
   private addDarkKnightOutfit(scene: Scene): void {
-    const dark = mat("dkkDark", 0.14, 0.14, 0.18, scene);
+    const dark = mat("dkkDark", 0.26, 0.18, 0.12, scene); // dark brown plate
     const gold = mat("dkkGold", 0.8, 0.66, 0.3, scene);
     const red = mat("dkkRed", 0.6, 0.12, 0.12, scene);
     const green = mat("dkkGreen", 0.22, 0.4, 0.24, scene);
