@@ -1315,9 +1315,23 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
           coneSpike(scene, steel, new Vector3(side * 0.06, 0, tipZ - 0.12), 0.4, side * 1.15, 0.24, 0.09).parent = group;
         }
       } else {
-        part("blade", 0.07, 0.07, 0.9, 0.5, steel);
-        part("guard", 0.3, 0.07, 0.07, 0.08, accent);
-        part("grip", 0.06, 0.06, 0.2, -0.08, wood);
+        // A proper blade: flat (wide, thin) with a bevelled point, a crossguard,
+        // a wrapped grip and a pommel.
+        part("blade", 0.11, 0.04, 0.82, 0.46, steel);
+        const tip = MeshBuilder.CreateCylinder(
+          "swordTip",
+          { height: 0.22, diameterTop: 0, diameterBottom: 0.11, tessellation: 4 },
+          scene,
+        );
+        tip.material = steel;
+        tip.isPickable = false;
+        tip.rotation.x = Math.PI / 2; // point toward +Z
+        tip.scaling.z = 0.36; // flatten the point to the blade's thickness
+        tip.position.z = 0.98;
+        tip.parent = group;
+        part("guard", 0.28, 0.08, 0.08, 0.04, accent);
+        part("grip", 0.05, 0.05, 0.2, -0.1, wood);
+        part("pommel", 0.09, 0.09, 0.08, -0.22, accent);
       }
       break;
     case "rapier": // thinner, longer, small guard
