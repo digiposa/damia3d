@@ -1,6 +1,7 @@
 import dartPortrait from "../assets/portraits/dart.png";
 import albertPortrait from "../assets/portraits/albert.png";
 import lavitzPortrait from "../assets/portraits/lavitz.png";
+import syuveilPortrait from "../assets/portraits/syuveil.png";
 import shanaPortrait from "../assets/portraits/shana.png";
 import meruPortrait from "../assets/portraits/meru.jpg";
 import rosePortrait from "../assets/portraits/rose.png";
@@ -75,7 +76,7 @@ export const BEARERS: Bearer[] = [
   { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, weapon: "spear", hair: "short", outfit: "knight", color: [0.27, 0.6, 0.32], storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: [0.56, 0.62, 0.42], storyPlayable: true },
   { id: "greham", name: "Greham", classId: "jade", weapon: "spear", hair: "banded", outfit: "darkknight", color: [0.26, 0.19, 0.13], storyPlayable: false },
-  { id: "syuveil", name: "Syuveil", classId: "jade", weapon: "spear", hair: "neat", outfit: "scholar", color: [0.88, 0.89, 0.92], storyPlayable: false },
+  { id: "syuveil", name: "Syuveil", classId: "jade", portrait: syuveilPortrait, weapon: "spear", hair: "neat", outfit: "scholar", color: [0.88, 0.89, 0.92], storyPlayable: false },
   // White-Silver (Light) — bows, no Additions
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: [0.92, 0.62, 0.72], storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: [0.82, 0.82, 0.9], storyPlayable: true },
