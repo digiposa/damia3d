@@ -149,6 +149,7 @@ export class Humanoid {
     else if (opts.outfit === "valkyrie") this.addValkyrieOutfit(scene);
     else if (opts.outfit === "darkknight") this.addDarkKnightOutfit(scene);
     else if (opts.outfit === "scholar") this.addScholarOutfit(scene);
+    else if (opts.outfit === "priestess") this.addPriestessOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -170,6 +171,8 @@ export class Humanoid {
       buildBandedHair(scene).parent = this.body;
     } else if (opts.hair === "neat") {
       buildNeatHair(scene).parent = this.body;
+    } else if (opts.hair === "wavy") {
+      buildWavyHair(scene).parent = this.body;
     }
   }
 
@@ -798,6 +801,73 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Shirley's priestess gown (her extrapolated human form — the Light Dragoon): a
+   * white bodice with gold filigree, a gold collar necklace with a blue gem, gold
+   * shoulder ornaments and waist band, a floor-length flared white gown with a gold
+   * hem, and long draped sleeves. Built over the (cream) body; she carries a bow.
+   */
+  private addPriestessOutfit(scene: Scene): void {
+    const white = mat("prWhite", 0.92, 0.92, 0.88, scene);
+    const gold = mat("prGold", 0.82, 0.66, 0.3, scene);
+    const blue = mat("prBlue", 0.5, 0.68, 0.85, scene);
+
+    // White bodice with a gold filigree placket.
+    const bodice = box("prBodice", 0.46, 0.5, 0.31, white, scene);
+    bodice.position.y = 1.18;
+    bodice.parent = this.body;
+    const placket = box("prPlacket", 0.06, 0.42, 0.04, gold, scene);
+    placket.position = new Vector3(0, 1.16, 0.16);
+    placket.parent = this.body;
+
+    // Gold collar necklace with a blue gem.
+    const collar = MeshBuilder.CreateTorus("prCollar", { diameter: 0.3, thickness: 0.045, tessellation: 16 }, scene);
+    collar.material = gold;
+    collar.isPickable = false;
+    collar.rotation.x = Math.PI / 2;
+    collar.position.y = 1.38;
+    collar.parent = this.body;
+    const gem = box("prGem", 0.07, 0.07, 0.05, blue, scene);
+    gem.position = new Vector3(0, 1.32, 0.16);
+    gem.parent = this.body;
+
+    // Gold shoulder ornaments and a gold waist band.
+    for (const sx of [-1, 1]) {
+      const orn = box("prShoulder", 0.18, 0.1, 0.3, gold, scene);
+      orn.position = new Vector3(sx * 0.3, 1.42, 0);
+      orn.parent = this.body;
+    }
+    const waist = box("prWaist", 0.47, 0.09, 0.33, gold, scene);
+    waist.position.y = 0.9;
+    waist.parent = this.body;
+
+    // Floor-length flared white gown with a gold hem.
+    const gown = MeshBuilder.CreateCylinder(
+      "prGown",
+      { height: 1.05, diameterTop: 0.44, diameterBottom: 0.96, tessellation: 16 },
+      scene,
+    );
+    gown.material = white;
+    gown.isPickable = false;
+    gown.position.y = 0.52;
+    gown.parent = this.body;
+    const hem = MeshBuilder.CreateTorus("prGownHem", { diameter: 0.96, thickness: 0.04, tessellation: 20 }, scene);
+    hem.material = gold;
+    hem.isPickable = false;
+    hem.position.y = 0.02;
+    hem.parent = this.body;
+
+    // Long draped white sleeves with a gold cuff (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const sleeve = box("prSleeve", 0.21, 0.6, 0.21, white, scene);
+      sleeve.position.y = -0.3;
+      sleeve.parent = arm;
+      const cuff = box("prCuff", 0.22, 0.08, 0.22, gold, scene);
+      cuff.position.y = -0.56;
+      cuff.parent = arm;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -1048,6 +1118,33 @@ function buildLongHair(scene: Scene): TransformNode {
   t1.parent = group;
   const t2 = box("hairLong2", 0.28, 0.55, 0.12, black, scene);
   t2.position = new Vector3(0, 0.85, -0.2);
+  t2.parent = group;
+  return group;
+}
+
+/**
+ * Shirley's hair: long auburn/red — a crown cap, locks framing the face to the chest,
+ * and a long tail down the back in two tapering segments. Rigid.
+ */
+function buildWavyHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairWavy", scene);
+  const auburn = mat("hairAuburnShirley", 0.66, 0.3, 0.18, scene);
+
+  const cap = box("hairCap", 0.4, 0.22, 0.4, auburn, scene);
+  cap.position.y = 1.78;
+  cap.parent = group;
+
+  for (const dx of [-0.21, 0.21]) {
+    const side = box("hairSide", 0.1, 0.46, 0.34, auburn, scene);
+    side.position = new Vector3(dx, 1.43, 0.02);
+    side.parent = group;
+  }
+
+  const t1 = box("hairWavy1", 0.36, 0.6, 0.18, auburn, scene);
+  t1.position = new Vector3(0, 1.38, -0.17);
+  t1.parent = group;
+  const t2 = box("hairWavy2", 0.3, 0.5, 0.13, auburn, scene);
+  t2.position = new Vector3(0, 0.9, -0.2);
   t2.parent = group;
   return group;
 }
