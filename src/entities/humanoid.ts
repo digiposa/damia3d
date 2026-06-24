@@ -1059,15 +1059,15 @@ function buildNeatHair(scene: Scene): TransformNode {
   const brown = mat("hairNeatBrown", 0.34, 0.24, 0.15, scene);
   const frame = mat("glassFrame", 0.24, 0.24, 0.27, scene);
 
-  const cap = box("hairCap", 0.38, 0.22, 0.4, brown, scene);
-  cap.position.y = 1.77;
+  const cap = box("hairCap", 0.37, 0.16, 0.39, brown, scene);
+  cap.position.y = 1.75;
   cap.parent = group;
-  const fringe = box("hairFringe", 0.38, 0.1, 0.1, brown, scene);
-  fringe.position = new Vector3(0.03, 1.72, 0.16);
+  const fringe = box("hairFringe", 0.37, 0.07, 0.08, brown, scene);
+  fringe.position = new Vector3(0.02, 1.71, 0.16);
   fringe.parent = group;
   for (const dx of [-0.19, 0.19]) {
-    const side = box("hairSide", 0.07, 0.2, 0.36, brown, scene);
-    side.position = new Vector3(dx, 1.62, -0.02);
+    const side = box("hairSide", 0.06, 0.16, 0.34, brown, scene);
+    side.position = new Vector3(dx, 1.63, -0.02);
     side.parent = group;
   }
 
