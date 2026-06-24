@@ -400,7 +400,7 @@ export class Humanoid {
     const brown = mat("nbBrown", 0.5, 0.36, 0.2, scene);
     const tan = mat("nbTan", 0.66, 0.5, 0.3, scene);
     const gold = mat("nbGold", 0.8, 0.66, 0.3, scene);
-    const capeMat = mat("nbCape", 0.4, 0.42, 0.44, scene);
+    const capeMat = mat("nbCape", 0.32, 0.46, 0.24, scene); // green cloak
     const green = mat("nbGreen", 0.48, 0.54, 0.34, scene); // tunic skirt (darker than the body)
 
     // White breastplate over the chest.
@@ -429,11 +429,22 @@ export class Humanoid {
     skirt.position.y = 0.68;
     skirt.parent = this.body;
 
-    // Long cape hanging down the back from the shoulders.
-    const cape = box("nbCapeMesh", 0.5, 1.0, 0.06, capeMat, scene);
-    cape.rotation.x = -0.12;
-    cape.position = new Vector3(0, 1.0, -0.2);
-    cape.parent = this.body;
+    // Green cloak: a collar wrapping the shoulders, then a draped back panel that
+    // widens toward a flared hem (three stacked segments give it some flow).
+    const capeCollar = box("nbCapeCollar", 0.54, 0.16, 0.36, capeMat, scene);
+    capeCollar.position = new Vector3(0, 1.4, -0.04);
+    capeCollar.parent = this.body;
+    const capeTop = box("nbCapeTop", 0.5, 0.5, 0.05, capeMat, scene);
+    capeTop.rotation.x = -0.08;
+    capeTop.position = new Vector3(0, 1.22, -0.2);
+    capeTop.parent = this.body;
+    const capeMid = box("nbCapeMid", 0.56, 0.5, 0.05, capeMat, scene);
+    capeMid.rotation.x = -0.05;
+    capeMid.position = new Vector3(0, 0.74, -0.24);
+    capeMid.parent = this.body;
+    const capeHem = box("nbCapeHem", 0.64, 0.34, 0.05, capeMat, scene);
+    capeHem.position = new Vector3(0, 0.38, -0.27);
+    capeHem.parent = this.body;
 
     // Brown gloves on the forearms (swing with the arms).
     for (const arm of [this.leftArm, this.rightArm]) {
@@ -866,26 +877,41 @@ function buildFlowHair(scene: Scene): TransformNode {
 }
 
 /**
- * Albert's hair: ash-silver swept straight back — a high crown cap (above the eyes),
- * a few back-swept strands off the top, and a medium mass at the nape. Rigid; bobs
- * with the head.
+ * Albert's hair: warm strawberry-blond, swept back and a little tousled — a crown
+ * cap, a side-swept fringe kept above the eyes, side volume framing the face, and a
+ * medium nape with two soft back-swept locks. Rigid; bobs with the head.
  */
 function buildSweptHair(scene: Scene): TransformNode {
   const group = new TransformNode("hairSwept", scene);
-  const ash = mat("hairAsh", 0.78, 0.78, 0.74, scene);
+  const blond = mat("hairBlondAlbert", 0.8, 0.62, 0.3, scene);
 
-  const cap = box("hairCap", 0.38, 0.2, 0.4, ash, scene);
-  cap.position.y = 1.78;
+  const cap = box("hairCap", 0.4, 0.24, 0.42, blond, scene);
+  cap.position.y = 1.77;
   cap.parent = group;
 
-  const nape = box("hairNape", 0.32, 0.24, 0.16, ash, scene);
+  // Side-swept fringe over the brow (above the eye line).
+  const fringe = box("hairFringe", 0.42, 0.12, 0.12, blond, scene);
+  fringe.position = new Vector3(0.03, 1.73, 0.16);
+  fringe.rotation.z = -0.15;
+  fringe.parent = group;
+
+  // Volume framing the upper sides of the face.
+  for (const dx of [-0.21, 0.21]) {
+    const side = box("hairSide", 0.08, 0.3, 0.4, blond, scene);
+    side.position = new Vector3(dx, 1.62, -0.02);
+    side.parent = group;
+  }
+
+  // Medium nape mass with two soft back-swept locks (no sharp spikes).
+  const nape = box("hairNape", 0.36, 0.34, 0.2, blond, scene);
   nape.position = new Vector3(0, 1.5, -0.17);
   nape.parent = group;
-
-  // Strands swept up and back off the crown (negative tilt points the tips back).
-  coneSpike(scene, ash, new Vector3(0, 1.84, -0.02), -0.5, 0, 0.26, 0.12).parent = group;
-  coneSpike(scene, ash, new Vector3(-0.11, 1.82, -0.03), -0.5, -0.2, 0.24, 0.1).parent = group;
-  coneSpike(scene, ash, new Vector3(0.11, 1.82, -0.03), -0.5, 0.2, 0.24, 0.1).parent = group;
+  for (const dx of [-0.1, 0.1]) {
+    const lock = box("hairLock", 0.14, 0.34, 0.1, blond, scene);
+    lock.position = new Vector3(dx, 1.52, -0.2);
+    lock.rotation.x = -0.5;
+    lock.parent = group;
+  }
   return group;
 }
 
@@ -1021,10 +1047,22 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
       part("guard", 0.18, 0.05, 0.06, 0.05, accent);
       part("grip", 0.05, 0.05, 0.18, -0.07, wood);
       break;
-    case "spear":
-      part("shaft", 0.05, 0.05, 1.6, 0.5, wood);
-      part("head", 0.1, 0.1, 0.26, 1.4, steel);
+    case "spear": {
+      part("shaft", 0.05, 0.05, 1.5, 0.45, wood);
+      part("ferrule", 0.08, 0.08, 0.14, 1.22, steel); // metal collar where the blade meets the shaft
+      // Leaf-shaped blade: a long 4-sided pyramid pointing forward (+Z).
+      const head = MeshBuilder.CreateCylinder(
+        "spearHead",
+        { height: 0.44, diameterTop: 0, diameterBottom: 0.14, tessellation: 4 },
+        scene,
+      );
+      head.material = steel;
+      head.isPickable = false;
+      head.rotation.x = Math.PI / 2; // tip toward +Z
+      head.position.z = 1.46;
+      head.parent = group;
       break;
+    }
     case "hammer":
       part("shaft", 0.06, 0.06, 0.9, 0.35, wood);
       part("head", 0.3, 0.3, 0.32, 0.85, accent);
