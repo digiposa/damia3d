@@ -1334,11 +1334,31 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
         part("pommel", 0.09, 0.09, 0.08, -0.22, accent);
       }
       break;
-    case "rapier": // thinner, longer, small guard
-      part("blade", 0.04, 0.04, 1.05, 0.55, steel);
-      part("guard", 0.18, 0.05, 0.06, 0.05, accent);
-      part("grip", 0.05, 0.05, 0.18, -0.07, wood);
+    case "rapier": {
+      // A slender blade with a fine point, a ring/cup guard and a quillon, a wrapped
+      // grip and a pommel.
+      part("blade", 0.035, 0.035, 1.0, 0.55, steel);
+      const tip = MeshBuilder.CreateCylinder(
+        "rapierTip",
+        { height: 0.16, diameterTop: 0, diameterBottom: 0.035, tessellation: 6 },
+        scene,
+      );
+      tip.material = steel;
+      tip.isPickable = false;
+      tip.rotation.x = Math.PI / 2; // point toward +Z
+      tip.position.z = 1.13;
+      tip.parent = group;
+      const guard = MeshBuilder.CreateTorus("rapierGuard", { diameter: 0.17, thickness: 0.025, tessellation: 14 }, scene);
+      guard.material = accent;
+      guard.isPickable = false;
+      guard.rotation.x = Math.PI / 2; // ring encircling the blade
+      guard.position.z = 0.06;
+      guard.parent = group;
+      part("quillon", 0.22, 0.025, 0.04, 0.06, accent);
+      part("grip", 0.045, 0.045, 0.2, -0.08, wood);
+      part("pommel", 0.07, 0.07, 0.07, -0.2, accent);
       break;
+    }
     case "spear": {
       part("shaft", 0.05, 0.05, 1.5, 0.45, wood);
       part("ferrule", 0.08, 0.08, 0.14, 1.22, steel); // metal collar where the blade meets the shaft
