@@ -29,7 +29,8 @@ export type HairStyle =
   | "banded"
   | "neat"
   | "wavy"
-  | "wrap";
+  | "wrap"
+  | "topknot";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
 export type OutfitStyle =
@@ -44,7 +45,8 @@ export type OutfitStyle =
   | "darkknight"
   | "scholar"
   | "priestess"
-  | "brawler";
+  | "brawler"
+  | "gigantos";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -73,6 +75,8 @@ export interface Bearer {
   bodyColor?: [number, number, number];
   /** Optional uniform figure scale (e.g. the giants Belzac/Kongol). Default 1. */
   scale?: number;
+  /** Optional skin tone (RGB 0–1) for face and bare skin — e.g. Kongol's tan Gigantos hide. Default a light human tone. */
+  skinTone?: [number, number, number];
   /** Part of the canonical Story party. */
   storyPlayable: boolean;
 }
@@ -114,7 +118,7 @@ export const BEARERS: Bearer[] = [
   { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
   // Golden (Earth) — axe
   { id: "belzac", name: "Belzac", classId: "golden", weapon: "axe", hair: "wrap", outfit: "brawler", color: C_EARTH, scale: 1.2, storyPlayable: false },
-  { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", color: C_EARTH, storyPlayable: true },
+  { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", hair: "topknot", outfit: "gigantos", color: C_EARTH, skinTone: [0.66, 0.5, 0.34], scale: 1.4, storyPlayable: true },
 ];
 
 /** Default playable bearer (Dart). */

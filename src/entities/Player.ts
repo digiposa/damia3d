@@ -98,6 +98,7 @@ export class Player {
       hair: bearer.hair,
       outfit: bearer.outfit,
       scale: bearer.scale,
+      skinTone: bearer.skinTone,
     });
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);

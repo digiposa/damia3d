@@ -11,6 +11,8 @@ export interface HumanoidOptions {
   color: [number, number, number];
   /** Optional body tint override (when the costume should differ from the archetype colour). */
   bodyColor?: [number, number, number];
+  /** Optional skin tone (RGB 0–1) for face and bare skin. Default a light human tone. */
+  skinTone?: [number, number, number];
   /** Weapon silhouette to carry (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -86,10 +88,14 @@ export class Humanoid {
       opts.outfit === "archer" ||
       opts.outfit === "darkness" ||
       opts.outfit === "valkyrie" ||
-      opts.outfit === "brawler";
-    const skinMain = mat("hSkin", 0.94, 0.79, 0.67, scene);
-    const skinDark = mat("hSkinDk", 0.84, 0.68, 0.56, scene);
-    const skinLight = mat("hSkinHi", 0.96, 0.83, 0.72, scene);
+      opts.outfit === "brawler" ||
+      opts.outfit === "gigantos";
+    // Skin tone (face + bare skin) — defaults to a light human tone; shaded/highlighted
+    // variants keep the original ratios so existing characters are unchanged.
+    const [sr, sg, sb] = opts.skinTone ?? [0.94, 0.79, 0.67];
+    const skinMain = mat("hSkin", sr, sg, sb, scene);
+    const skinDark = mat("hSkinDk", sr * 0.89, sg * 0.86, sb * 0.84, scene);
+    const skinLight = mat("hSkinHi", Math.min(1, sr * 1.02), Math.min(1, sg * 1.05), Math.min(1, sb * 1.07), scene);
     const main = revealing ? skinMain : mat("hMain", r, g, b, scene);
     const dark = revealing ? skinDark : mat("hDark", r * 0.55, g * 0.55, b * 0.55, scene);
     const eyeMat = mat("hEye", 0.08, 0.08, 0.1, scene);
@@ -152,6 +158,7 @@ export class Humanoid {
     else if (opts.outfit === "scholar") this.addScholarOutfit(scene);
     else if (opts.outfit === "priestess") this.addPriestessOutfit(scene);
     else if (opts.outfit === "brawler") this.addBrawlerOutfit(scene);
+    else if (opts.outfit === "gigantos") this.addGigantosOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -177,6 +184,8 @@ export class Humanoid {
       buildWavyHair(scene).parent = this.body;
     } else if (opts.hair === "wrap") {
       buildWrapHair(scene).parent = this.body;
+    } else if (opts.hair === "topknot") {
+      buildTopknotHair(scene).parent = this.body;
     }
   }
 
@@ -957,6 +966,75 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Kongol's gigantos outfit: tribal armour over a bare tan torso — large tan/gold
+   * pauldrons, crossed chest straps with a gold emblem, a thick belt and a fur kilt,
+   * big pale armoured boots, and tan/gold forearm bracers. Built over the skin-toned
+   * (tan) body; he wields an axe and is scaled up large.
+   */
+  private addGigantosOutfit(scene: Scene): void {
+    const tan = mat("kgTan", 0.7, 0.56, 0.3, scene);
+    const gold = mat("kgGold", 0.82, 0.66, 0.3, scene);
+    const fur = mat("kgFur", 0.5, 0.42, 0.28, scene);
+    const dark = mat("kgDark", 0.3, 0.26, 0.2, scene);
+    const pale = mat("kgBoot", 0.82, 0.8, 0.72, scene);
+
+    // Large tribal pauldrons with a gold rim.
+    for (const sx of [-1, 1]) {
+      const pauldron = box("kgPauldron", 0.32, 0.24, 0.46, tan, scene);
+      pauldron.position = new Vector3(sx * 0.4, 1.48, 0);
+      pauldron.parent = this.body;
+      const rim = box("kgPauldronRim", 0.34, 0.05, 0.48, gold, scene);
+      rim.position = new Vector3(sx * 0.4, 1.37, 0);
+      rim.parent = this.body;
+    }
+
+    // Crossed chest straps over the bare torso with a gold emblem.
+    for (const sx of [-1, 1]) {
+      const strap = box("kgStrap", 0.06, 0.6, 0.02, dark, scene);
+      strap.position = new Vector3(0, 1.16, 0.18);
+      strap.rotation.z = sx * 0.5;
+      strap.parent = this.body;
+    }
+    const emblem = box("kgEmblem", 0.16, 0.14, 0.05, gold, scene);
+    emblem.position = new Vector3(0, 1.16, 0.19);
+    emblem.parent = this.body;
+
+    // Thick belt + a flared fur kilt over the hips.
+    const belt = box("kgBelt", 0.52, 0.14, 0.36, dark, scene);
+    belt.position.y = 0.84;
+    belt.parent = this.body;
+    const kilt = MeshBuilder.CreateCylinder(
+      "kgKilt",
+      { height: 0.42, diameterTop: 0.52, diameterBottom: 0.72, tessellation: 12 },
+      scene,
+    );
+    kilt.material = fur;
+    kilt.isPickable = false;
+    kilt.position.y = 0.6;
+    kilt.parent = this.body;
+
+    // Big pale armoured boots with a dark cuff (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const boot = box("kgBootM", 0.27, 0.5, 0.31, pale, scene);
+      boot.position.y = -0.5;
+      boot.parent = leg;
+      const cuff = box("kgBootCuff", 0.29, 0.08, 0.33, dark, scene);
+      cuff.position.y = -0.27;
+      cuff.parent = leg;
+    }
+
+    // Tan forearm bracers with a gold band (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const bracer = box("kgBracer", 0.24, 0.26, 0.24, tan, scene);
+      bracer.position.y = -0.46;
+      bracer.parent = arm;
+      const band = box("kgBracerBand", 0.25, 0.05, 0.25, gold, scene);
+      band.position.y = -0.56;
+      band.parent = arm;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -1208,6 +1286,23 @@ function buildLongHair(scene: Scene): TransformNode {
   const t2 = box("hairLong2", 0.28, 0.55, 0.12, black, scene);
   t2.position = new Vector3(0, 0.85, -0.2);
   t2.parent = group;
+  return group;
+}
+
+/**
+ * Kongol's hair: a dark mohawk/topknot crest — a low base on the crown with a row of
+ * three spikes running front-to-back along the centreline. Rigid.
+ */
+function buildTopknotHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairTopknot", scene);
+  const dark = mat("hairKongol", 0.16, 0.13, 0.12, scene);
+
+  const base = box("tkBase", 0.32, 0.12, 0.34, dark, scene);
+  base.position.y = 1.74;
+  base.parent = group;
+  coneSpike(scene, dark, new Vector3(0, 1.84, 0.08), 0.15, 0, 0.24, 0.12).parent = group;
+  coneSpike(scene, dark, new Vector3(0, 1.85, 0), 0, 0, 0.3, 0.13).parent = group;
+  coneSpike(scene, dark, new Vector3(0, 1.84, -0.08), -0.15, 0, 0.24, 0.12).parent = group;
   return group;
 }
 
