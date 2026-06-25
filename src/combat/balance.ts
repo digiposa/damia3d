@@ -5,7 +5,7 @@ import {
   additionPresses,
   type AdditionDef,
 } from "../data/additions";
-import { SIGHT_DURATION, COMPLETE_RECOVERY, MISS_RECOVERY } from "./AdditionRunner";
+import { SIGHT_DURATION, COMPLETE_RECOVERY, MISS_RECOVERY_MAX } from "./AdditionRunner";
 
 /** A timed hit is assumed to land near the window centre (fraction of SIGHT_DURATION). */
 const PRESS_AT = 0.95;
@@ -43,9 +43,9 @@ export function estimateDps(
   const fullDps = fullDamage / fullTime;
 
   const spamDamage = additionAttack(atk, targetDf, additionHitsPercent(def, 1), mult);
-  // Start the Addition (free hit 1) then abort, eating the long whiff recovery; repeat.
-  // A press-less basic attack just completes on the short recovery instead.
-  const spamTime = presses > 0 ? MISS_RECOVERY : COMPLETE_RECOVERY;
+  // Start the Addition (free hit 1) then abort immediately — the worst-case spam, which
+  // eats the MAX whiff recovery. A press-less basic attack just completes (short recovery).
+  const spamTime = presses > 0 ? MISS_RECOVERY_MAX : COMPLETE_RECOVERY;
   const spamDps = spamDamage / spamTime;
 
   return { fullDamage, fullDps, spamDamage, spamDps, ratio: spamDps > 0 ? fullDps / spamDps : 0 };

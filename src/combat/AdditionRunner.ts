@@ -13,12 +13,15 @@ export const PERFECT_LO = 0.93;
 export const PERFECT_HI = 1.05;
 /**
  * Lockout after an Addition ends. Asymmetric on purpose: nailing the chain lets you
- * immediately start the next one (short), but aborting/whiffing it leaves you exposed
- * (long). This kills the real-time exploit of spamming the free, high-% hit 1 and
- * cancelling — completing the Addition is now the higher-DPS line, as in LoD.
+ * immediately start the next one (short), but aborting/whiffing it leaves you exposed.
+ * The whiff lockout scales with how far you got — bailing right after the free hit 1
+ * (the spam exploit) eats the MAX penalty, while slipping on the last input costs only
+ * the MIN. This is the real-time equivalent of LoD's "a flubbed Addition wastes your
+ * turn": pushing deeper is always better, and spamming hit 1 is the worst line.
  */
 export const COMPLETE_RECOVERY = 0.3;
-export const MISS_RECOVERY = 1.0;
+export const MISS_RECOVERY_MAX = 1.8;
+export const MISS_RECOVERY_MIN = 0.5;
 
 export type AttackResult =
   | { kind: "none" }
@@ -69,9 +72,9 @@ export class AdditionRunner {
     return this.recoveryTotal > 0 ? this.recoveryTimer / this.recoveryTotal : 0;
   }
 
-  /** True when the active lockout is the long whiff/abort penalty (worth surfacing). */
+  /** True when the active lockout is a whiff/abort penalty (worth surfacing). */
   get recoveryIsPenalty(): boolean {
-    return this.recoveryTimer > 0 && this.recoveryTotal >= MISS_RECOVERY;
+    return this.recoveryTimer > 0 && this.recoveryTotal > COMPLETE_RECOVERY;
   }
 
   /** Collapse progress of the current sight (0 = wide, 1 = aligned, can exceed). */
@@ -141,12 +144,20 @@ export class AdditionRunner {
   }
 
   private endCombo(failed: boolean): void {
+    if (failed) {
+      // Scale the whiff lockout by how far the chain got: 0 timed hits landed (a
+      // hit-1 spam/abort) → MAX penalty; nearly complete → MIN.
+      const need = this.def ? additionPresses(this.def) : 0;
+      const progress = need > 0 ? this.presses / need : 0;
+      this.recoveryTotal = MISS_RECOVERY_MAX - (MISS_RECOVERY_MAX - MISS_RECOVERY_MIN) * progress;
+    } else {
+      this.recoveryTotal = COMPLETE_RECOVERY;
+    }
+    this.recoveryTimer = this.recoveryTotal;
     this.active = false;
     this.hits = 0;
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
-    this.recoveryTotal = failed ? MISS_RECOVERY : COMPLETE_RECOVERY;
-    this.recoveryTimer = this.recoveryTotal;
   }
 }
