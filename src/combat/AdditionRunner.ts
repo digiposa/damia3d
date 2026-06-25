@@ -97,6 +97,11 @@ export class AdditionRunner {
     return this.recoveryTimer > 0 && this.recoveryTotal > COMPLETE_RECOVERY;
   }
 
+  /** Seconds for the active window to collapse to alignment (adaptive per Addition). */
+  get windowSeconds(): number {
+    return this.sightDuration;
+  }
+
   /** Collapse progress of the current sight (0 = wide, 1 = aligned, can exceed). */
   get sightProgress(): number {
     return this.active ? this.sightTimer / this.sightDuration : 0;

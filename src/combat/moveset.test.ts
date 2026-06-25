@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { AdditionRunner, SIGHT_DURATION } from "./AdditionRunner";
+import { AdditionRunner } from "./AdditionRunner";
 import { additionAttack, physicalAttack, type AttackerStats } from "./formula";
 import type { Modifiers } from "./modifiers";
 import {
@@ -58,7 +58,7 @@ function simulatePerfect(def: AdditionDef, level = 5, mods: Partial<Modifiers> =
   const presses = additionPresses(def);
 
   for (let i = 0; i < presses; i++) {
-    runner.tick(SIGHT_DURATION); // collapse the sight to perfect alignment (progress = 1.0)
+    runner.tick(runner.windowSeconds); // collapse the sight to perfect alignment (progress = 1.0)
     const r = runner.press(def);
     expect(r.kind).toBe("hit");
     if (r.kind === "hit") {

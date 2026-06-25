@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 
-import { AdditionRunner, SIGHT_DURATION } from "./AdditionRunner";
+import { AdditionRunner } from "./AdditionRunner";
 import { DART_ADDITIONS } from "../data/additions";
 
 const ds = DART_ADDITIONS.doubleSlash; // 1 press (2 hits)
 const volcano = DART_ADDITIONS.volcano; // 3 presses (4 hits)
 
-/** Tick the runner to a given sight progress (fraction of SIGHT_DURATION). */
+/** Tick the runner to a given sight progress (fraction of the active window). */
 function tickToProgress(r: AdditionRunner, progress: number): void {
-  r.tick(progress * SIGHT_DURATION);
+  r.tick(progress * r.windowSeconds);
 }
 
 describe("AdditionRunner (timing sight)", () => {
@@ -46,7 +46,7 @@ describe("AdditionRunner (timing sight)", () => {
   it("misses when the sight lapses unpressed", () => {
     const r = new AdditionRunner();
     r.press(ds);
-    const timedOut = r.tick(SIGHT_DURATION * 1.2); // past the window
+    const timedOut = r.tick(r.windowSeconds * 1.2); // past the window
     expect(timedOut).toBe(true);
     expect(r.active).toBe(false);
   });
