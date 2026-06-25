@@ -902,12 +902,13 @@ export class Humanoid {
    */
   private addBrawlerOutfit(scene: Scene): void {
     const leather = mat("bzLeather", 0.42, 0.3, 0.18, scene);
+    const vestMat = mat("bzVestMat", 0.3, 0.3, 0.33, scene); // dark grey upper garment
     const pants = mat("bzPants", 0.3, 0.26, 0.22, scene);
     const gold = mat("bzGold", 0.78, 0.62, 0.28, scene);
     const boot = mat("bzBoot", 0.34, 0.24, 0.14, scene);
 
-    // Sleeveless leather vest (arms left bare) with a gold clasp and crossed straps.
-    const vest = box("bzVest", 0.48, 0.5, 0.32, leather, scene);
+    // Sleeveless dark-grey vest (arms left bare) with a gold clasp and crossed straps.
+    const vest = box("bzVest", 0.48, 0.5, 0.32, vestMat, scene);
     vest.position.y = 1.18;
     vest.parent = this.body;
     const clasp = box("bzClasp", 0.1, 0.44, 0.04, gold, scene);
