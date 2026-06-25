@@ -980,13 +980,14 @@ export class Humanoid {
     const pale = mat("kgBoot", 0.82, 0.8, 0.72, scene);
     const silver = mat("kgSilver", 0.72, 0.74, 0.78, scene);
 
-    // Large rounded golden pauldrons (domes).
+    // Rounded golden pauldrons — flattened domes seated on the shoulders (not floating
+    // balls out to the sides).
     for (const sx of [-1, 1]) {
-      const pauldron = MeshBuilder.CreateSphere("kgPauldron", { diameter: 0.52, segments: 10 }, scene);
+      const pauldron = MeshBuilder.CreateSphere("kgPauldron", { diameter: 0.4, segments: 10 }, scene);
       pauldron.material = gold;
       pauldron.isPickable = false;
-      pauldron.scaling = new Vector3(1, 0.78, 1.05);
-      pauldron.position = new Vector3(sx * 0.42, 1.5, 0);
+      pauldron.scaling = new Vector3(1.05, 0.58, 1.0);
+      pauldron.position = new Vector3(sx * 0.32, 1.45, 0);
       pauldron.parent = this.body;
     }
 
@@ -1327,10 +1328,10 @@ function buildTopknotHair(scene: Scene): TransformNode {
   const base = box("tkBase", 0.28, 0.1, 0.3, dark, scene);
   base.position.y = 1.74;
   base.parent = group;
-  // One tall crest pointing up and slightly back.
-  coneSpike(scene, dark, new Vector3(0, 1.82, -0.02), -0.15, 0, 0.44, 0.2).parent = group;
-  const tie = box("tkTie", 0.13, 0.08, 0.13, dark, scene);
-  tie.position = new Vector3(0, 1.88, -0.02);
+  // One crest tuft pointing up and slightly back (wider/shorter than a thin spike).
+  coneSpike(scene, dark, new Vector3(0, 1.8, -0.02), -0.2, 0, 0.34, 0.24).parent = group;
+  const tie = box("tkTie", 0.14, 0.09, 0.14, dark, scene);
+  tie.position = new Vector3(0, 1.84, -0.02);
   tie.parent = group;
   return group;
 }
