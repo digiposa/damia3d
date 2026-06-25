@@ -973,36 +973,35 @@ export class Humanoid {
    * (tan) body; he wields an axe and is scaled up large.
    */
   private addGigantosOutfit(scene: Scene): void {
-    const tan = mat("kgTan", 0.7, 0.56, 0.3, scene);
     const gold = mat("kgGold", 0.82, 0.66, 0.3, scene);
     const fur = mat("kgFur", 0.5, 0.42, 0.28, scene);
-    const furLight = mat("kgFurLight", 0.8, 0.72, 0.54, scene);
     const wrapCloth = mat("kgWrap", 0.78, 0.7, 0.5, scene);
-    const dark = mat("kgDark", 0.3, 0.26, 0.2, scene);
+    const dark = mat("kgDark", 0.34, 0.26, 0.18, scene); // dark leather straps
     const pale = mat("kgBoot", 0.82, 0.8, 0.72, scene);
+    const silver = mat("kgSilver", 0.72, 0.74, 0.78, scene);
 
-    // Large tribal pauldrons with a gold rim and a fur tuft on top.
+    // Large rounded golden pauldrons (domes).
     for (const sx of [-1, 1]) {
-      const pauldron = box("kgPauldron", 0.32, 0.24, 0.46, tan, scene);
-      pauldron.position = new Vector3(sx * 0.4, 1.48, 0);
+      const pauldron = MeshBuilder.CreateSphere("kgPauldron", { diameter: 0.52, segments: 10 }, scene);
+      pauldron.material = gold;
+      pauldron.isPickable = false;
+      pauldron.scaling = new Vector3(1, 0.78, 1.05);
+      pauldron.position = new Vector3(sx * 0.42, 1.5, 0);
       pauldron.parent = this.body;
-      const rim = box("kgPauldronRim", 0.34, 0.05, 0.48, gold, scene);
-      rim.position = new Vector3(sx * 0.4, 1.37, 0);
-      rim.parent = this.body;
-      const furTuft = box("kgFurTuft", 0.36, 0.16, 0.5, furLight, scene);
-      furTuft.position = new Vector3(sx * 0.4, 1.58, 0);
-      furTuft.parent = this.body;
     }
 
-    // Crossed chest straps over the bare torso with a gold emblem.
+    // Crossed leather chest straps over the bare torso with a silver medallion.
     for (const sx of [-1, 1]) {
-      const strap = box("kgStrap", 0.06, 0.6, 0.02, dark, scene);
+      const strap = box("kgStrap", 0.07, 0.62, 0.02, dark, scene);
       strap.position = new Vector3(0, 1.16, 0.18);
       strap.rotation.z = sx * 0.5;
       strap.parent = this.body;
     }
-    const emblem = box("kgEmblem", 0.16, 0.14, 0.05, gold, scene);
-    emblem.position = new Vector3(0, 1.16, 0.19);
+    const emblem = MeshBuilder.CreateCylinder("kgEmblem", { height: 0.04, diameter: 0.16, tessellation: 12 }, scene);
+    emblem.material = silver;
+    emblem.isPickable = false;
+    emblem.rotation.x = Math.PI / 2;
+    emblem.position = new Vector3(0, 1.14, 0.19);
     emblem.parent = this.body;
 
     // Thick belt + a flared fur kilt over the hips.
@@ -1051,16 +1050,15 @@ export class Humanoid {
       }
     }
 
-    // Red tribal war paint: a diagonal slash on each cheek plus a brow mark.
+    // Red tribal war paint: a vertical streak over each eye and a band across the brow.
     const paint = mat("kgPaint", 0.72, 0.12, 0.1, scene);
     for (const sx of [-1, 1]) {
-      const slash = box("kgPaintCheek", 0.035, 0.14, 0.02, paint, scene);
-      slash.position = new Vector3(sx * 0.1, 1.56, 0.18);
-      slash.rotation.z = sx * 0.5;
-      slash.parent = this.body;
+      const streak = box("kgPaintEye", 0.05, 0.22, 0.02, paint, scene);
+      streak.position = new Vector3(sx * 0.09, 1.61, 0.18);
+      streak.parent = this.body;
     }
-    const brow = box("kgPaintBrow", 0.18, 0.03, 0.02, paint, scene);
-    brow.position = new Vector3(0, 1.69, 0.18);
+    const brow = box("kgPaintBrow", 0.22, 0.03, 0.02, paint, scene);
+    brow.position = new Vector3(0, 1.71, 0.18);
     brow.parent = this.body;
   }
 
@@ -1319,19 +1317,21 @@ function buildLongHair(scene: Scene): TransformNode {
 }
 
 /**
- * Kongol's hair: a dark mohawk/topknot crest — a low base on the crown with a row of
- * three spikes running front-to-back along the centreline. Rigid.
+ * Kongol's hair: a single tall dark topknot crest rising from the crown (shaved
+ * sides), bound at its base. Rigid.
  */
 function buildTopknotHair(scene: Scene): TransformNode {
   const group = new TransformNode("hairTopknot", scene);
   const dark = mat("hairKongol", 0.16, 0.13, 0.12, scene);
 
-  const base = box("tkBase", 0.32, 0.12, 0.34, dark, scene);
+  const base = box("tkBase", 0.28, 0.1, 0.3, dark, scene);
   base.position.y = 1.74;
   base.parent = group;
-  coneSpike(scene, dark, new Vector3(0, 1.84, 0.08), 0.15, 0, 0.24, 0.12).parent = group;
-  coneSpike(scene, dark, new Vector3(0, 1.85, 0), 0, 0, 0.3, 0.13).parent = group;
-  coneSpike(scene, dark, new Vector3(0, 1.84, -0.08), -0.15, 0, 0.24, 0.12).parent = group;
+  // One tall crest pointing up and slightly back.
+  coneSpike(scene, dark, new Vector3(0, 1.82, -0.02), -0.15, 0, 0.44, 0.2).parent = group;
+  const tie = box("tkTie", 0.13, 0.08, 0.13, dark, scene);
+  tie.position = new Vector3(0, 1.88, -0.02);
+  tie.parent = group;
   return group;
 }
 
@@ -1720,10 +1720,16 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
       part("shaft", 0.06, 0.06, 0.9, 0.35, wood);
       part("head", 0.3, 0.3, 0.32, 0.85, accent);
       break;
-    case "axe":
+    case "axe": {
       part("shaft", 0.06, 0.06, 1.0, 0.4, wood);
-      part("head", 0.08, 0.42, 0.34, 0.9, steel);
+      // Single-bit head: a broad blade flaring out to one side of the haft (thin, so
+      // its face reads as the cutting edge), plus a small cap at the top.
+      const head = box("axeHead", 0.3, 0.36, 0.06, steel, scene);
+      head.position = new Vector3(0.18, 0, 0.85);
+      head.parent = group;
+      part("axeCap", 0.05, 0.05, 0.12, 1.18, steel);
       break;
+    }
     case "bow": {
       // A recurve bow: a curved limb (a tube bowing toward the target at the grip)
       // with a straight string drawn across the tips on the archer's side.
