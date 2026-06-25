@@ -976,10 +976,12 @@ export class Humanoid {
     const tan = mat("kgTan", 0.7, 0.56, 0.3, scene);
     const gold = mat("kgGold", 0.82, 0.66, 0.3, scene);
     const fur = mat("kgFur", 0.5, 0.42, 0.28, scene);
+    const furLight = mat("kgFurLight", 0.8, 0.72, 0.54, scene);
+    const wrapCloth = mat("kgWrap", 0.78, 0.7, 0.5, scene);
     const dark = mat("kgDark", 0.3, 0.26, 0.2, scene);
     const pale = mat("kgBoot", 0.82, 0.8, 0.72, scene);
 
-    // Large tribal pauldrons with a gold rim.
+    // Large tribal pauldrons with a gold rim and a fur tuft on top.
     for (const sx of [-1, 1]) {
       const pauldron = box("kgPauldron", 0.32, 0.24, 0.46, tan, scene);
       pauldron.position = new Vector3(sx * 0.4, 1.48, 0);
@@ -987,6 +989,9 @@ export class Humanoid {
       const rim = box("kgPauldronRim", 0.34, 0.05, 0.48, gold, scene);
       rim.position = new Vector3(sx * 0.4, 1.37, 0);
       rim.parent = this.body;
+      const furTuft = box("kgFurTuft", 0.36, 0.16, 0.5, furLight, scene);
+      furTuft.position = new Vector3(sx * 0.4, 1.58, 0);
+      furTuft.parent = this.body;
     }
 
     // Crossed chest straps over the bare torso with a gold emblem.
@@ -1013,6 +1018,16 @@ export class Humanoid {
     kilt.isPickable = false;
     kilt.position.y = 0.6;
     kilt.parent = this.body;
+    // Hanging fur/leather strips below the kilt.
+    for (const a of [-0.7, -0.35, 0, 0.35, 0.7]) {
+      const strip = new TransformNode("kgStripPivot", scene);
+      strip.position = new Vector3(0, 0.5, 0);
+      strip.rotation.y = a;
+      strip.parent = this.body;
+      const s = box("kgStrip", 0.12, 0.34, 0.04, a === 0 ? dark : fur, scene);
+      s.position = new Vector3(0, -0.18, 0.32);
+      s.parent = strip;
+    }
 
     // Big pale armoured boots with a dark cuff (swing with the legs).
     for (const leg of [this.leftLeg, this.rightLeg]) {
@@ -1024,14 +1039,16 @@ export class Humanoid {
       cuff.parent = leg;
     }
 
-    // Tan forearm bracers with a gold band (swing with the arms).
+    // Cloth bandage wraps down the forearms, bound by a couple of darker lines.
     for (const arm of [this.leftArm, this.rightArm]) {
-      const bracer = box("kgBracer", 0.24, 0.26, 0.24, tan, scene);
-      bracer.position.y = -0.46;
-      bracer.parent = arm;
-      const band = box("kgBracerBand", 0.25, 0.05, 0.25, gold, scene);
-      band.position.y = -0.56;
-      band.parent = arm;
+      const wrap = box("kgWrapM", 0.23, 0.42, 0.23, wrapCloth, scene);
+      wrap.position.y = -0.44;
+      wrap.parent = arm;
+      for (const y of [-0.32, -0.46, -0.6]) {
+        const bind = box("kgBind", 0.24, 0.03, 0.24, dark, scene);
+        bind.position.y = y;
+        bind.parent = arm;
+      }
     }
   }
 
