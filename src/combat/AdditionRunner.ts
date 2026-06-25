@@ -11,8 +11,14 @@ export const WINDOW_HI = 1.1;
 /** Tighter "white / perfect" band inside the success window. */
 export const PERFECT_LO = 0.93;
 export const PERFECT_HI = 1.05;
-/** Lockout after an Addition ends (completed or failed). */
-const RECOVERY = 0.4;
+/**
+ * Lockout after an Addition ends. Asymmetric on purpose: nailing the chain lets you
+ * immediately start the next one (short), but aborting/whiffing it leaves you exposed
+ * (long). This kills the real-time exploit of spamming the free, high-% hit 1 and
+ * cancelling — completing the Addition is now the higher-DPS line, as in LoD.
+ */
+const COMPLETE_RECOVERY = 0.3;
+const MISS_RECOVERY = 1.0;
 
 export type AttackResult =
   | { kind: "none" }
@@ -78,13 +84,13 @@ export class AdditionRunner {
       this.sightTimer = 0;
       // A single-hit Addition (no presses) would complete instantly; Dart's all
       // have at least one press, but guard anyway.
-      if (additionPresses(def) === 0) this.endCombo();
+      if (additionPresses(def) === 0) this.endCombo(false);
       return { kind: "started", hits: 1 };
     }
 
     const p = this.sightProgress;
     if (p < WINDOW_LO || p > WINDOW_HI) {
-      this.endCombo();
+      this.endCombo(true); // whiffed — long recovery
       return { kind: "miss" };
     }
 
@@ -94,7 +100,7 @@ export class AdditionRunner {
     const perfect = p >= PERFECT_LO && p <= PERFECT_HI;
     const completed = this.presses >= additionPresses(this.def!);
     const hits = this.hits; // capture before endCombo resets state
-    if (completed) this.endCombo();
+    if (completed) this.endCombo(false); // nailed it — short recovery
     return { kind: "hit", hits, perfect, completed };
   }
 
@@ -107,23 +113,23 @@ export class AdditionRunner {
     if (!this.active) return false;
     this.sightTimer += dt;
     if (this.sightProgress > WINDOW_HI) {
-      this.endCombo();
+      this.endCombo(true); // let the sight lapse — long recovery
       return true;
     }
     return false;
   }
 
-  /** Force-end the Addition (e.g. the target died). */
+  /** Force-end the Addition (e.g. the target died) — no penalty. */
   cancel(): void {
-    if (this.active) this.endCombo();
+    if (this.active) this.endCombo(false);
   }
 
-  private endCombo(): void {
+  private endCombo(failed: boolean): void {
     this.active = false;
     this.hits = 0;
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
-    this.recoveryTimer = RECOVERY;
+    this.recoveryTimer = failed ? MISS_RECOVERY : COMPLETE_RECOVERY;
   }
 }
