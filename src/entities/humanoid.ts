@@ -1722,13 +1722,16 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
       part("head", 0.3, 0.3, 0.32, 0.85, accent);
       break;
     case "axe": {
-      part("shaft", 0.06, 0.06, 1.0, 0.4, wood);
-      // Single-bit head: a broad blade flaring out to one side of the haft (thin, so
-      // its face reads as the cutting edge), plus a small cap at the top.
-      const head = box("axeHead", 0.3, 0.36, 0.06, steel, scene);
-      head.position = new Vector3(0.18, 0, 0.85);
-      head.parent = group;
-      part("axeCap", 0.05, 0.05, 0.12, 1.18, steel);
+      part("shaft", 0.055, 0.055, 1.2, 0.45, wood); // long haft, continues above the head
+      part("axeButt", 0.07, 0.07, 0.07, -0.12, steel);
+      // Single-bit head flaring to one side (thin front-to-back): a narrow neck off the
+      // haft widening into a tall outer cutting edge — a fan/trapezoid, not a block.
+      const neck = box("axeNeck", 0.22, 0.26, 0.06, steel, scene);
+      neck.position = new Vector3(0.13, 0, 0.8);
+      neck.parent = group;
+      const edge = box("axeEdge", 0.1, 0.44, 0.05, steel, scene);
+      edge.position = new Vector3(0.27, 0, 0.8);
+      edge.parent = group;
       break;
     }
     case "bow": {
