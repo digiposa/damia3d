@@ -3,9 +3,29 @@ import { additionPresses } from "../data/additions";
 
 // --- Timing-sight tuning (seconds / progress fractions) --------------------
 
-/** Real-time seconds for the outer square to collapse onto the inner square. */
+/** Default per-window collapse time (fallback / when idle). */
 export const SIGHT_DURATION = 0.85;
-/** Success window, as a fraction of SIGHT_DURATION (1 = perfect alignment). */
+
+/**
+ * Adaptive timing: every Addition's timed portion targets roughly the same total
+ * duration, so each Addition is one "action" of similar length (the real-time analogue
+ * of a turn). That makes sustained DPS track the canon per-execution damage — a
+ * higher-rank damage Addition (more total% × multiplier) out-DPSes a lower-rank one,
+ * with no change to the canon values. Longer Additions therefore have faster individual
+ * windows (harder), clamped for playability.
+ */
+export const ADDITION_COMBO_TIME = 1.2;
+export const MIN_SIGHT = 0.3;
+export const MAX_SIGHT = 1.2;
+
+/** Per-window collapse time for an Addition, so its full combo ≈ ADDITION_COMBO_TIME. */
+export function additionSightDuration(def: AdditionDef): number {
+  const presses = additionPresses(def);
+  if (presses <= 0) return MAX_SIGHT;
+  return Math.min(MAX_SIGHT, Math.max(MIN_SIGHT, ADDITION_COMBO_TIME / presses));
+}
+
+/** Success window, as a fraction of the window duration (1 = perfect alignment). */
 export const WINDOW_LO = 0.8;
 export const WINDOW_HI = 1.1;
 /** Tighter "white / perfect" band inside the success window. */
@@ -101,6 +121,7 @@ export class AdditionRunner {
       this.hits = 1;
       this.presses = 0;
       this.sightTimer = 0;
+      this.sightDuration = additionSightDuration(def); // adaptive: ~constant combo time
       // A single-hit Addition (no presses) would complete instantly; Dart's all
       // have at least one press, but guard anyway.
       if (additionPresses(def) === 0) this.endCombo(false);

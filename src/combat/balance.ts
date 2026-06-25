@@ -3,10 +3,9 @@ import {
   additionHitsPercent,
   additionMultiplier,
   additionPresses,
-  comboRamp,
   type AdditionDef,
 } from "../data/additions";
-import { SIGHT_DURATION, COMPLETE_RECOVERY, MISS_RECOVERY_MAX } from "./AdditionRunner";
+import { additionSightDuration, COMPLETE_RECOVERY, MISS_RECOVERY_MAX } from "./AdditionRunner";
 
 /** A timed hit is assumed to land near the window centre (fraction of SIGHT_DURATION). */
 const PRESS_AT = 0.95;
@@ -39,14 +38,10 @@ export function estimateDps(
   const mult = additionMultiplier(def, level);
   const presses = additionPresses(def);
 
-  // Full damage = sum of each hit's (ramped) damage, matching how the mode applies it.
-  let fullDamage = 0;
-  for (let k = 1; k <= def.hits.length; k++) {
-    const before = k > 1 ? additionAttack(atk, targetDf, additionHitsPercent(def, k - 1), mult) : 0;
-    const now = additionAttack(atk, targetDf, additionHitsPercent(def, k), mult);
-    fullDamage += Math.max(1, Math.floor((now - before) * comboRamp(def, k)));
-  }
-  const fullTime = presses * SIGHT_DURATION * PRESS_AT + COMPLETE_RECOVERY;
+  // Canon per-execution damage (no ramp); adaptive timing keeps each Addition ~one
+  // action long, so DPS tracks this canon damage.
+  const fullDamage = additionAttack(atk, targetDf, additionHitsPercent(def), mult);
+  const fullTime = presses * additionSightDuration(def) * PRESS_AT + COMPLETE_RECOVERY;
   const fullDps = fullDamage / fullTime;
 
   const spamDamage = additionAttack(atk, targetDf, additionHitsPercent(def, 1), mult);

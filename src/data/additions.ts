@@ -352,25 +352,13 @@ export function additionHitsPercent(def: AdditionDef, hitsLanded = def.hits.leng
   return sum;
 }
 
-/** Per-hit combo ramp: each hit after the first deals this much more (cumulative). */
-export const COMBO_RAMP = 0.15;
-
 /**
  * An Addition's role. "sp" Additions have a flat multiplier at every level — they
- * trade damage for SP (Dragoon gauge) and so are exempt from the damage combo ramp;
- * "damage" Additions grow their multiplier and get the ramp, so longer/higher-tier
- * ones out-damage (and out-DPS) earlier ones when completed.
+ * trade damage for SP (the Dragoon gauge); "damage" Additions grow their multiplier
+ * and so deal more (and, with the adaptive combo timing, out-DPS lower-rank ones).
  */
 export function additionFocus(def: AdditionDef): "damage" | "sp" {
   return def.multiplier.every((m) => m === def.multiplier[0]) ? "sp" : "damage";
-}
-
-/**
- * Damage multiplier for hit `k` (1-based) from the combo ramp: 1 for the free hit 1,
- * rising for each later hit on damage Additions; always 1 for SP Additions.
- */
-export function comboRamp(def: AdditionDef, k: number): number {
-  return additionFocus(def) === "damage" ? 1 + COMBO_RAMP * (k - 1) : 1;
 }
 
 /** Multiplier for an Addition at the given level (1–5), clamped. */
