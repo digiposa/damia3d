@@ -1050,6 +1050,18 @@ export class Humanoid {
         bind.parent = arm;
       }
     }
+
+    // Red tribal war paint: a diagonal slash on each cheek plus a brow mark.
+    const paint = mat("kgPaint", 0.72, 0.12, 0.1, scene);
+    for (const sx of [-1, 1]) {
+      const slash = box("kgPaintCheek", 0.035, 0.14, 0.02, paint, scene);
+      slash.position = new Vector3(sx * 0.1, 1.56, 0.18);
+      slash.rotation.z = sx * 0.5;
+      slash.parent = this.body;
+    }
+    const brow = box("kgPaintBrow", 0.18, 0.03, 0.02, paint, scene);
+    brow.position = new Vector3(0, 1.69, 0.18);
+    brow.parent = this.body;
   }
 
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
