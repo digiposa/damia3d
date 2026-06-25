@@ -81,8 +81,9 @@ export const DART_ADDITIONS = {
     hits: [40, 30, 30, 30, 30, 30, 30, 30],
     multiplier: [100, 120, 140, 160, 180],
     spMax: 150,
-    // Real condition: perform all prior Additions 80 times. Gated high for now.
-    acquireLevel: 99,
+    // Real condition: perform all prior Additions 80 times (TODO); for now a high
+    // level gate so the ultimate is reachable (e.g. in Training) instead of locked off.
+    acquireLevel: 40,
   },
 } satisfies Record<string, AdditionDef>;
 
@@ -121,8 +122,9 @@ export const LAVITZ_ADDITIONS = {
     hits: [30, 30, 30, 40, 40, 40, 40, 50],
     multiplier: [100, 108, 116, 124, 135],
     spMax: 202,
-    // Real condition: perform all prior Additions 80 times. Gated high for now.
-    acquireLevel: 99,
+    // Real condition: perform all prior Additions 80 times (TODO); for now a high
+    // level gate so the ultimate is reachable (e.g. in Training) instead of locked off.
+    acquireLevel: 40,
   },
 } satisfies Record<string, AdditionDef>;
 
@@ -154,8 +156,9 @@ export const ROSE_ADDITIONS = {
     hits: [30, 30, 30, 30, 20, 20, 20, 20],
     multiplier: [100, 140, 180, 220, 250],
     spMax: 100,
-    // Real condition: perform all prior Additions 80 times. Gated high for now.
-    acquireLevel: 99,
+    // Real condition: perform all prior Additions 80 times (TODO); for now a high
+    // level gate so the ultimate is reachable (e.g. in Training) instead of locked off.
+    acquireLevel: 40,
   },
 } satisfies Record<string, AdditionDef>;
 
@@ -201,8 +204,9 @@ export const HASCHEL_ADDITIONS = {
     hits: [30, 30, 30, 40, 40, 40, 40, 50],
     multiplier: [100, 115, 130, 145, 167],
     spMax: 150,
-    // Real condition: perform all prior Additions 80 times. Gated high for now.
-    acquireLevel: 99,
+    // Real condition: perform all prior Additions 80 times (TODO); for now a high
+    // level gate so the ultimate is reachable (e.g. in Training) instead of locked off.
+    acquireLevel: 40,
   },
 } satisfies Record<string, AdditionDef>;
 
@@ -241,8 +245,9 @@ export const MERU_ADDITIONS = {
     hits: [30, 30, 30, 30, 20, 20, 20, 20],
     multiplier: [100, 150, 200, 250, 300],
     spMax: 100,
-    // Real condition: perform all prior Additions 80 times. Gated high for now.
-    acquireLevel: 99,
+    // Real condition: perform all prior Additions 80 times (TODO); for now a high
+    // level gate so the ultimate is reachable (e.g. in Training) instead of locked off.
+    acquireLevel: 40,
   },
 } satisfies Record<string, AdditionDef>;
 
@@ -267,8 +272,9 @@ export const KONGOL_ADDITIONS = {
     hits: [50, 30, 30, 30, 30, 30],
     multiplier: [100, 110, 120, 130, 150],
     spMax: 100,
-    // Real condition: perform all prior Additions 80 times. Gated high for now.
-    acquireLevel: 99,
+    // Real condition: perform all prior Additions 80 times (TODO); for now a high
+    // level gate so the ultimate is reachable (e.g. in Training) instead of locked off.
+    acquireLevel: 40,
   },
 } satisfies Record<string, AdditionDef>;
 
