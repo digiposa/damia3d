@@ -47,6 +47,7 @@ export class AdditionRunner {
   private presses = 0;
   private sightTimer = 0;
   private recoveryTimer = 0;
+  private recoveryTotal = 0;
 
   constructor(private sightDuration = SIGHT_DURATION) {}
 
@@ -56,6 +57,21 @@ export class AdditionRunner {
 
   get recovering(): boolean {
     return this.recoveryTimer > 0;
+  }
+
+  /** Seconds of lockout still to run (combat time). */
+  get recoveryRemaining(): number {
+    return this.recoveryTimer;
+  }
+
+  /** Fraction of the current lockout still to go (1 → 0). */
+  get recoveryFraction(): number {
+    return this.recoveryTotal > 0 ? this.recoveryTimer / this.recoveryTotal : 0;
+  }
+
+  /** True when the active lockout is the long whiff/abort penalty (worth surfacing). */
+  get recoveryIsPenalty(): boolean {
+    return this.recoveryTimer > 0 && this.recoveryTotal >= MISS_RECOVERY;
   }
 
   /** Collapse progress of the current sight (0 = wide, 1 = aligned, can exceed). */
@@ -130,6 +146,7 @@ export class AdditionRunner {
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
-    this.recoveryTimer = failed ? MISS_RECOVERY : COMPLETE_RECOVERY;
+    this.recoveryTotal = failed ? MISS_RECOVERY : COMPLETE_RECOVERY;
+    this.recoveryTimer = this.recoveryTotal;
   }
 }

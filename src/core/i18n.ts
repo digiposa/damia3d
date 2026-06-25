@@ -98,6 +98,7 @@ const en: Dict = {
   // HUD / combat
   "combat.press": "▸ PRESS!",
   "combat.perfect": "PERFECT",
+  "combat.miss": "MISS",
   "tech.mode": "{mode} · {n} enemies · {speed}× combat",
 
   // Logs
@@ -191,6 +192,7 @@ const fr: Dict = {
 
   "combat.press": "▸ APPUIE !",
   "combat.perfect": "PARFAIT",
+  "combat.miss": "RATÉ",
   "tech.mode": "{mode} · {n} ennemi(s) · {speed}× combat",
 
   "log.knightSpawned": "Knight of Sandora apparu ({n} en jeu)",

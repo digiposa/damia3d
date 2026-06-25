@@ -220,7 +220,11 @@ export class TrainingMode extends GameMode {
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
     this.player.tickGuard(cdt);
-    if (this.runner.tick(cdt)) this.comboTarget = undefined;
+    if (this.runner.tick(cdt)) {
+      // The timing sight lapsed unpressed — a whiff; show it like a missed press.
+      this.comboTarget = undefined;
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
+    }
     this.updateEnemies(cdt);
     this.updateSight();
 
@@ -373,6 +377,7 @@ export class TrainingMode extends GameMode {
 
     if (res.kind === "miss") {
       this.comboTarget = undefined;
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
       return;
     }
     if (res.kind !== "hit" || !target || !target.alive) return;
@@ -660,6 +665,13 @@ export class TrainingMode extends GameMode {
 
     // Cooldown readout. Timers run on combat time, so convert to real seconds.
     this.guardBtn?.setCooldown(p.guardCooldownRemaining / settings.combatSpeed, p.guardCooldownFraction);
+    // Surface the Addition whiff lockout on the Attack button (the short success
+    // recovery is left silent so clean chains don't flash the button every time).
+    const penalty = this.runner.recoveryIsPenalty;
+    this.attackBtn?.setCooldown(
+      penalty ? this.runner.recoveryRemaining / settings.combatSpeed : 0,
+      penalty ? this.runner.recoveryFraction : 0,
+    );
   }
 
   dispose(): void {
