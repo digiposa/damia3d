@@ -17,8 +17,8 @@ export const PERFECT_HI = 1.05;
  * (long). This kills the real-time exploit of spamming the free, high-% hit 1 and
  * cancelling — completing the Addition is now the higher-DPS line, as in LoD.
  */
-const COMPLETE_RECOVERY = 0.3;
-const MISS_RECOVERY = 1.0;
+export const COMPLETE_RECOVERY = 0.3;
+export const MISS_RECOVERY = 1.0;
 
 export type AttackResult =
   | { kind: "none" }

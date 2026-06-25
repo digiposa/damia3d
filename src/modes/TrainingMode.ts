@@ -21,6 +21,7 @@ import {
   type AdditionDef,
 } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
+import { estimateDps } from "../combat/balance";
 import { elementMultiplier } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { t } from "../core/i18n";
@@ -36,7 +37,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
 import { TimingSight } from "../ui/TimingSight";
-import { TrainingMenu } from "../ui/TrainingMenu";
+import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
 import { floatingText } from "../ui/FloatingText";
 
 /** How close a melee attacker must be to land a combo hit on an enemy. */
@@ -50,6 +51,9 @@ const ACQUIRE_RANGE = 20;
 
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
+
+/** Reference enemy defence used by the Training balance/DPS readout. */
+const BALANCE_REF_DF = 20;
 
 /**
  * Training arena: a Diablo-style real-time hack-and-slash sandbox with
@@ -115,6 +119,8 @@ export class TrainingMode extends GameMode {
         bearerId: this.bearer.id,
         level: this.player.level,
         maxLevel: this.player.maxLevel,
+        refDf: BALANCE_REF_DF,
+        balance: this.balanceRows(),
       }),
       onSelectBearer: (b) => this.setBearer(b),
       onSetLevel: (lv) => this.setLevel(lv),
@@ -496,6 +502,20 @@ export class TrainingMode extends GameMode {
   /** Attack distance: long for ranged bearers, short for melee. */
   private get reach(): number {
     return this.isRanged() ? RANGED_REACH : PLAYER_REACH;
+  }
+
+  /** Per-Addition DPS readout for the Training balance tab (full vs. spam-hit-1). */
+  private balanceRows(): BalanceRow[] {
+    const atk = { at: this.player.atk, lv: this.player.level };
+    return this.player.additions.map((a) => {
+      const e = estimateDps(atk, a, this.player.additionLevel(a), BALANCE_REF_DF);
+      return {
+        name: a.name,
+        fullDps: Math.round(e.fullDps),
+        spamDps: Math.round(e.spamDps),
+        ratio: e.ratio,
+      };
+    });
   }
 
   private inReach(e: Enemy): boolean {

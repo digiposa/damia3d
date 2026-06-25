@@ -3,11 +3,24 @@ import { t } from "../core/i18n";
 import { type Bearer, selectableBearers } from "../data/bearers";
 import { dragoonClass } from "../data/dragoonClasses";
 
+/** One Addition's DPS readout: completing it vs. spamming the free hit 1. */
+export interface BalanceRow {
+  name: string;
+  fullDps: number;
+  spamDps: number;
+  /** fullDps / spamDps — > 1 means completing the Addition out-DPSes spamming. */
+  ratio: number;
+}
+
 /** Live state the menu reads to render the current selection. */
 export interface TrainingState {
   bearerId: string;
   level: number;
   maxLevel: number;
+  /** Reference enemy defence the balance figures are computed against. */
+  refDf: number;
+  /** Per-Addition DPS comparison for the balance tab. */
+  balance: BalanceRow[];
 }
 
 export interface TrainingCallbacks {
@@ -20,12 +33,13 @@ export interface TrainingCallbacks {
   onResume: () => void;
 }
 
-type Tab = "character" | "level" | "spawn";
+type Tab = "character" | "level" | "spawn" | "balance";
 
 const TABS: { id: Tab; labelKey: string; icon: string }[] = [
   { id: "character", labelKey: "char.title", icon: "👤" },
   { id: "level", labelKey: "debug.level", icon: "📈" },
   { id: "spawn", labelKey: "debug.spawn", icon: "👾" },
+  { id: "balance", labelKey: "debug.balance", icon: "⚖️" },
 ];
 
 /**
@@ -122,7 +136,9 @@ export class TrainingMenu {
         ? this.renderCharacter()
         : this.tab === "level"
           ? this.renderLevel()
-          : this.renderSpawn(),
+          : this.tab === "spawn"
+            ? this.renderSpawn()
+            : this.renderBalance(),
     );
   }
 
@@ -261,6 +277,62 @@ export class TrainingMenu {
       bigButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
       bigButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
     );
+    return box;
+  }
+
+  /** DPS readout (Training only): completing each Addition vs spamming the free hit 1. */
+  private renderBalance(): HTMLElement {
+    const s = this.cb.state();
+    const box = section(t("debug.balance"));
+
+    const note = document.createElement("div");
+    Object.assign(note.style, {
+      font: "400 11px/1.5 ui-monospace, monospace",
+      color: "#9a8a66",
+      marginBottom: "12px",
+    } satisfies Partial<CSSStyleDeclaration>);
+    note.textContent = t("balance.note").replace("{df}", String(s.refDf));
+    box.appendChild(note);
+
+    const grid = document.createElement("div");
+    Object.assign(grid.style, {
+      display: "grid",
+      gridTemplateColumns: "1fr auto auto auto",
+      gap: "7px 14px",
+      alignItems: "center",
+      font: "600 13px/1.2 ui-monospace, monospace",
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    const cell = (txt: string, align: string, color: string, bold = false): HTMLDivElement => {
+      const c = document.createElement("div");
+      c.textContent = txt;
+      c.style.textAlign = align;
+      c.style.color = color;
+      if (bold) c.style.fontWeight = "800";
+      return c;
+    };
+
+    grid.append(
+      cell(t("balance.addition"), "left", "#8fb0d8"),
+      cell(t("balance.full"), "right", "#8fb0d8"),
+      cell(t("balance.spam"), "right", "#8fb0d8"),
+      cell(t("balance.ratio"), "right", "#8fb0d8"),
+    );
+    for (const r of s.balance) {
+      grid.append(
+        cell(r.name, "left", "#f0e6cf"),
+        cell(String(r.fullDps), "right", "#cfe3ff"),
+        cell(String(r.spamDps), "right", "#cfc4a8"),
+        cell(`${r.ratio.toFixed(2)}×`, "right", r.ratio >= 1 ? "#9fe6a0" : "#e89090", true),
+      );
+    }
+    box.appendChild(grid);
+    if (s.balance.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.color = "#9a8a66";
+      empty.textContent = t("balance.none");
+      box.appendChild(empty);
+    }
     return box;
   }
 }
