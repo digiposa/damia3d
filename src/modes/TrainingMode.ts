@@ -200,9 +200,13 @@ export class TrainingMode extends GameMode {
     if (this.paused) return;
 
     // Movement (unaffected by combat speed): joystick on touch, click-to-move
-    // otherwise. Guarding roots Dart in place.
+    // otherwise. Attacking roots the player: you can't move while a melee Addition is
+    // running or while a ranged shot is in progress/cooling down (no move-spam/kiting),
+    // and guarding roots in place too. The post-whiff lockout doesn't root (you may
+    // reposition while you can't attack).
+    const rooted = this.player.guardActive || this.runner.active || this.rangedCooldownT > 0;
     const before = this.player.position.clone();
-    if (!this.player.guardActive) {
+    if (!rooted) {
       const axis = this.input.axis();
       if (axis.x !== 0 || axis.y !== 0) {
         const dir = this.camera.groundForward.scale(axis.y).add(this.camera.groundRight.scale(axis.x));
