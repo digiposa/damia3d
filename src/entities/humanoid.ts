@@ -139,6 +139,16 @@ export class Humanoid {
     this.rightLeg.position = new Vector3(0.13, 0.78, 0);
     this.rightLeg.parent = this.rig;
 
+    // A foot at the bottom of each leg, extended forward (+Z) so the figure has a real
+    // foot shape (a sole/toe) under whatever boot an outfit adds — a neutral dark
+    // "shoe" tone reads for bare and booted bearers alike. Swings with the leg.
+    const shoe = mat("hShoe", 0.22, 0.19, 0.16, scene);
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const foot = box("hFoot", 0.19, 0.11, 0.34, shoe, scene);
+      foot.position = new Vector3(0, -0.73, 0.08);
+      foot.parent = leg;
+    }
+
     // The bow is held in the off (left) hand and drawn with the right; every other
     // weapon is wielded in the right hand. Attach it at the hand (bottom of the arm).
     const wieldArm = weapon === "bow" ? this.leftArm : this.rightArm;
