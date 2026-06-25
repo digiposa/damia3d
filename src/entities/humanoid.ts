@@ -808,17 +808,22 @@ export class Humanoid {
    * hem, and long draped sleeves. Built over the (cream) body; she carries a bow.
    */
   private addPriestessOutfit(scene: Scene): void {
-    const white = mat("prWhite", 0.92, 0.92, 0.88, scene);
+    const cloth = mat("prCloth", 0.8, 0.87, 0.96, scene); // very pale icy blue
     const gold = mat("prGold", 0.82, 0.66, 0.3, scene);
     const blue = mat("prBlue", 0.5, 0.68, 0.85, scene);
 
-    // White bodice with a gold filigree placket.
-    const bodice = box("prBodice", 0.46, 0.5, 0.31, white, scene);
+    // Pale-blue bodice with a column of gold medallions down the front.
+    const bodice = box("prBodice", 0.46, 0.5, 0.31, cloth, scene);
     bodice.position.y = 1.18;
     bodice.parent = this.body;
-    const placket = box("prPlacket", 0.06, 0.42, 0.04, gold, scene);
-    placket.position = new Vector3(0, 1.16, 0.16);
-    placket.parent = this.body;
+    for (const y of [1.3, 1.16, 1.02]) {
+      const medal = MeshBuilder.CreateCylinder("prMedal", { height: 0.03, diameter: 0.1, tessellation: 12 }, scene);
+      medal.material = gold;
+      medal.isPickable = false;
+      medal.rotation.x = Math.PI / 2; // faces forward
+      medal.position = new Vector3(0, y, 0.17);
+      medal.parent = this.body;
+    }
 
     // Gold collar necklace with a blue gem.
     const collar = MeshBuilder.CreateTorus("prCollar", { diameter: 0.3, thickness: 0.045, tessellation: 16 }, scene);
@@ -841,13 +846,13 @@ export class Humanoid {
     waist.position.y = 0.9;
     waist.parent = this.body;
 
-    // Floor-length flared white gown with a gold hem.
+    // Floor-length flared gown with a gold hem.
     const gown = MeshBuilder.CreateCylinder(
       "prGown",
       { height: 1.05, diameterTop: 0.44, diameterBottom: 0.96, tessellation: 16 },
       scene,
     );
-    gown.material = white;
+    gown.material = cloth;
     gown.isPickable = false;
     gown.position.y = 0.52;
     gown.parent = this.body;
@@ -857,13 +862,16 @@ export class Humanoid {
     hem.position.y = 0.02;
     hem.parent = this.body;
 
-    // Long draped white sleeves with a gold cuff (swing with the arms).
+    // Long bell sleeves (flaring at the wrist) with a gold cuff (swing with the arms).
     for (const arm of [this.leftArm, this.rightArm]) {
-      const sleeve = box("prSleeve", 0.21, 0.6, 0.21, white, scene);
-      sleeve.position.y = -0.3;
+      const sleeve = box("prSleeve", 0.21, 0.5, 0.21, cloth, scene);
+      sleeve.position.y = -0.26;
       sleeve.parent = arm;
-      const cuff = box("prCuff", 0.22, 0.08, 0.22, gold, scene);
-      cuff.position.y = -0.56;
+      const bell = box("prBell", 0.29, 0.2, 0.29, cloth, scene);
+      bell.position.y = -0.54;
+      bell.parent = arm;
+      const cuff = box("prCuff", 0.3, 0.06, 0.3, gold, scene);
+      cuff.position.y = -0.63;
       cuff.parent = arm;
     }
   }
