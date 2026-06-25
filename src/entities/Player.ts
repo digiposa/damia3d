@@ -97,6 +97,7 @@ export class Player {
       weaponVariant: bearer.weaponVariant,
       hair: bearer.hair,
       outfit: bearer.outfit,
+      scale: bearer.scale,
     });
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);

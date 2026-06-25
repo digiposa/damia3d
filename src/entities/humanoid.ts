@@ -85,7 +85,8 @@ export class Humanoid {
       opts.outfit === "dancer" ||
       opts.outfit === "archer" ||
       opts.outfit === "darkness" ||
-      opts.outfit === "valkyrie";
+      opts.outfit === "valkyrie" ||
+      opts.outfit === "brawler";
     const skinMain = mat("hSkin", 0.94, 0.79, 0.67, scene);
     const skinDark = mat("hSkinDk", 0.84, 0.68, 0.56, scene);
     const skinLight = mat("hSkinHi", 0.96, 0.83, 0.72, scene);
@@ -150,6 +151,7 @@ export class Humanoid {
     else if (opts.outfit === "darkknight") this.addDarkKnightOutfit(scene);
     else if (opts.outfit === "scholar") this.addScholarOutfit(scene);
     else if (opts.outfit === "priestess") this.addPriestessOutfit(scene);
+    else if (opts.outfit === "brawler") this.addBrawlerOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -173,6 +175,8 @@ export class Humanoid {
       buildNeatHair(scene).parent = this.body;
     } else if (opts.hair === "wavy") {
       buildWavyHair(scene).parent = this.body;
+    } else if (opts.hair === "wrap") {
+      buildWrapHair(scene).parent = this.body;
     }
   }
 
@@ -889,6 +893,69 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Belzac's brawler outfit (his extrapolated human form — the giant Earth Dragoon):
+   * a sleeveless brown leather vest with crossed straps over a bare muscular torso,
+   * leather pauldrons, a thick belt with a gold buckle, brown trousers and boots, and
+   * leather forearm bracers with gold bands. Built over the skin-toned body; he wields
+   * an axe and is scaled up to read as a giant.
+   */
+  private addBrawlerOutfit(scene: Scene): void {
+    const leather = mat("bzLeather", 0.42, 0.3, 0.18, scene);
+    const pants = mat("bzPants", 0.3, 0.26, 0.22, scene);
+    const gold = mat("bzGold", 0.78, 0.62, 0.28, scene);
+    const boot = mat("bzBoot", 0.34, 0.24, 0.14, scene);
+
+    // Sleeveless leather vest (arms left bare) with a gold clasp and crossed straps.
+    const vest = box("bzVest", 0.48, 0.5, 0.32, leather, scene);
+    vest.position.y = 1.18;
+    vest.parent = this.body;
+    const clasp = box("bzClasp", 0.1, 0.44, 0.04, gold, scene);
+    clasp.position = new Vector3(0, 1.16, 0.17);
+    clasp.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const strap = box("bzStrap", 0.05, 0.56, 0.02, leather, scene);
+      strap.position = new Vector3(0, 1.18, 0.18);
+      strap.rotation.z = sx * 0.5;
+      strap.parent = this.body;
+    }
+
+    // Leather pauldrons (broad shoulders).
+    for (const sx of [-1, 1]) {
+      const pauldron = box("bzPauldron", 0.22, 0.16, 0.36, leather, scene);
+      pauldron.position = new Vector3(sx * 0.34, 1.45, 0);
+      pauldron.parent = this.body;
+    }
+
+    // Thick belt with a gold buckle.
+    const belt = box("bzBelt", 0.5, 0.14, 0.34, leather, scene);
+    belt.position.y = 0.84;
+    belt.parent = this.body;
+    const buckle = box("bzBuckle", 0.14, 0.12, 0.04, gold, scene);
+    buckle.position = new Vector3(0, 0.84, 0.18);
+    buckle.parent = this.body;
+
+    // Brown trousers + boots (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const pant = box("bzPant", 0.21, 0.62, 0.21, pants, scene);
+      pant.position.y = -0.3;
+      pant.parent = leg;
+      const bootMesh = box("bzBootM", 0.23, 0.3, 0.27, boot, scene);
+      bootMesh.position = new Vector3(0, -0.62, 0.02);
+      bootMesh.parent = leg;
+    }
+
+    // Leather forearm bracers with a gold band (upper arms bare; swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const bracer = box("bzBracer", 0.21, 0.24, 0.21, leather, scene);
+      bracer.position.y = -0.46;
+      bracer.parent = arm;
+      const band = box("bzBracerBand", 0.22, 0.05, 0.22, gold, scene);
+      band.position.y = -0.55;
+      band.parent = arm;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -1140,6 +1207,32 @@ function buildLongHair(scene: Scene): TransformNode {
   const t2 = box("hairLong2", 0.28, 0.55, 0.12, black, scene);
   t2.position = new Vector3(0, 0.85, -0.2);
   t2.parent = group;
+  return group;
+}
+
+/**
+ * Belzac's head: bald under a yellow bandana worn do-rag style — a cloth cap over the
+ * crown, a band across the brow, and a knot with two tails at the back. Rigid.
+ */
+function buildWrapHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairWrap", scene);
+  const yellow = mat("bandanaYellow", 0.85, 0.72, 0.2, scene);
+
+  const cap = box("wrapCap", 0.37, 0.2, 0.4, yellow, scene);
+  cap.position.y = 1.76;
+  cap.parent = group;
+  const band = box("wrapBand", 0.38, 0.06, 0.41, yellow, scene);
+  band.position.y = 1.66;
+  band.parent = group;
+  const knot = box("wrapKnot", 0.1, 0.1, 0.1, yellow, scene);
+  knot.position = new Vector3(0, 1.66, -0.2);
+  knot.parent = group;
+  for (const dx of [-0.05, 0.05]) {
+    const tail = box("wrapTail", 0.05, 0.3, 0.04, yellow, scene);
+    tail.position = new Vector3(dx, 1.5, -0.22);
+    tail.rotation.x = -0.2;
+    tail.parent = group;
+  }
   return group;
 }
 
