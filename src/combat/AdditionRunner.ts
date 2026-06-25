@@ -19,8 +19,8 @@ export const PERFECT_HI = 1.05;
  * the MIN. This is the real-time equivalent of LoD's "a flubbed Addition wastes your
  * turn": pushing deeper is always better, and spamming hit 1 is the worst line.
  */
-export const COMPLETE_RECOVERY = 0.3;
-export const MISS_RECOVERY_MAX = 1.8;
+export const COMPLETE_RECOVERY = 0.25;
+export const MISS_RECOVERY_MAX = 2.4;
 export const MISS_RECOVERY_MIN = 0.5;
 
 export type AttackResult =
