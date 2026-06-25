@@ -1318,21 +1318,19 @@ function buildLongHair(scene: Scene): TransformNode {
 }
 
 /**
- * Kongol's hair: a single tall dark topknot crest rising from the crown (shaved
- * sides), bound at its base. Rigid.
+ * Kongol's hair: bald head (the tan scalp shows) with just a small dark mohawk — a
+ * narrow ridge down the centreline topped by a few short spikes. Rigid.
  */
 function buildTopknotHair(scene: Scene): TransformNode {
   const group = new TransformNode("hairTopknot", scene);
   const dark = mat("hairKongol", 0.16, 0.13, 0.12, scene);
 
-  const base = box("tkBase", 0.28, 0.1, 0.3, dark, scene);
-  base.position.y = 1.74;
-  base.parent = group;
-  // One crest tuft pointing up and slightly back (wider/shorter than a thin spike).
-  coneSpike(scene, dark, new Vector3(0, 1.8, -0.02), -0.2, 0, 0.34, 0.24).parent = group;
-  const tie = box("tkTie", 0.14, 0.09, 0.14, dark, scene);
-  tie.position = new Vector3(0, 1.84, -0.02);
-  tie.parent = group;
+  const ridge = box("mohawkRidge", 0.09, 0.1, 0.34, dark, scene);
+  ridge.position = new Vector3(0, 1.8, -0.02);
+  ridge.parent = group;
+  for (const z of [0.11, 0, -0.11]) {
+    coneSpike(scene, dark, new Vector3(0, 1.83, z), 0, 0, 0.16, 0.09).parent = group;
+  }
   return group;
 }
 
