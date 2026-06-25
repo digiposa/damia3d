@@ -5,7 +5,7 @@ import {
   additionPresses,
   type AdditionDef,
 } from "../data/additions";
-import { additionSightDuration, COMPLETE_RECOVERY, MISS_RECOVERY_MAX } from "./AdditionRunner";
+import { SIGHT_DURATION, ATTACK_INTERVAL, MIN_RECOVERY } from "./AdditionRunner";
 
 /** A timed hit is assumed to land near the window centre (fraction of SIGHT_DURATION). */
 const PRESS_AT = 0.95;
@@ -38,16 +38,17 @@ export function estimateDps(
   const mult = additionMultiplier(def, level);
   const presses = additionPresses(def);
 
-  // Canon per-execution damage (no ramp); adaptive timing keeps each Addition ~one
-  // action long, so DPS tracks this canon damage.
+  // Canon per-execution damage. Each attack occupies one ~ATTACK_INTERVAL cycle (a long
+  // combo that overruns it costs its own length instead), so DPS tracks the canon damage.
   const fullDamage = additionAttack(atk, targetDf, additionHitsPercent(def), mult);
-  const fullTime = presses * additionSightDuration(def) * PRESS_AT + COMPLETE_RECOVERY;
+  const comboTime = presses * SIGHT_DURATION * PRESS_AT;
+  const fullTime = Math.max(ATTACK_INTERVAL, comboTime + MIN_RECOVERY);
   const fullDps = fullDamage / fullTime;
 
+  // Spam: start the Addition (free hit 1) then abort — that still burns a whole attack
+  // interval for just hit 1's damage (a pure opportunity cost).
   const spamDamage = additionAttack(atk, targetDf, additionHitsPercent(def, 1), mult);
-  // Start the Addition (free hit 1) then abort immediately — the worst-case spam, which
-  // eats the MAX whiff recovery. A press-less basic attack just completes (short recovery).
-  const spamTime = presses > 0 ? MISS_RECOVERY_MAX : COMPLETE_RECOVERY;
+  const spamTime = presses > 0 ? ATTACK_INTERVAL : fullTime;
   const spamDps = spamDamage / spamTime;
 
   return { fullDamage, fullDps, spamDamage, spamDps, ratio: spamDps > 0 ? fullDps / spamDps : 0 };

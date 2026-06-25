@@ -46,6 +46,9 @@ const PLAYER_REACH = 2.3;
 /** How close a ranged attacker (bow) must be to loose an arrow. */
 const RANGED_REACH = 9;
 
+/** Seconds between a ranged bearer's shots (their attack cadence). */
+const RANGED_COOLDOWN = 0.7;
+
 /** Pressing Attack with nobody in reach locks onto the nearest enemy within this radius and walks over. */
 const ACQUIRE_RANGE = 20;
 
@@ -425,7 +428,7 @@ export class TrainingMode extends GameMode {
 
     // Ranged bearers loose an arrow: damage lands when it reaches the target.
     if (this.isRanged()) {
-      this.rangedCooldownT = 0.7; // pace shots to the draw animation
+      this.rangedCooldownT = RANGED_COOLDOWN; // pace shots to the draw animation
       const from = this.player.position.add(new Vector3(0, 1.3, 0));
       const to = target.position.add(new Vector3(0, 1.2, 0));
       // Release the arrow ~0.22s in, syncing with the draw/loose animation.
@@ -691,13 +694,14 @@ export class TrainingMode extends GameMode {
 
     // Cooldown readout. Timers run on combat time, so convert to real seconds.
     this.guardBtn?.setCooldown(p.guardCooldownRemaining / settings.combatSpeed, p.guardCooldownFraction);
-    // Attack-button lockout readout: while guarding, attacking is disabled for the
-    // stance's duration; otherwise surface the Addition whiff lockout (the short
-    // success recovery stays silent so clean chains don't flash the button).
+    // Attack-button lockout readout: guard disables attacking for the stance; otherwise
+    // show the attack-interval "swing timer" (Addition recovery), or the ranged cadence.
     if (p.guardActive) {
       this.attackBtn?.setCooldown(p.guardRemaining / settings.combatSpeed, p.guardFraction);
-    } else if (this.runner.recoveryIsPenalty) {
+    } else if (this.runner.recovering) {
       this.attackBtn?.setCooldown(this.runner.recoveryRemaining / settings.combatSpeed, this.runner.recoveryFraction);
+    } else if (this.rangedCooldownT > 0) {
+      this.attackBtn?.setCooldown(this.rangedCooldownT / settings.combatSpeed, this.rangedCooldownT / RANGED_COOLDOWN);
     } else {
       this.attackBtn?.setCooldown(0, 0);
     }

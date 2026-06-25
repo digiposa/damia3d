@@ -3,27 +3,8 @@ import { additionPresses } from "../data/additions";
 
 // --- Timing-sight tuning (seconds / progress fractions) --------------------
 
-/** Default per-window collapse time (fallback / when idle). */
-export const SIGHT_DURATION = 0.85;
-
-/**
- * Adaptive timing: every Addition's timed portion targets roughly the same total
- * duration, so each Addition is one "action" of similar length (the real-time analogue
- * of a turn). That makes sustained DPS track the canon per-execution damage — a
- * higher-rank damage Addition (more total% × multiplier) out-DPSes a lower-rank one,
- * with no change to the canon values. Longer Additions therefore have faster individual
- * windows (harder), clamped for playability.
- */
-export const ADDITION_COMBO_TIME = 1.2;
-export const MIN_SIGHT = 0.3;
-export const MAX_SIGHT = 1.2;
-
-/** Per-window collapse time for an Addition, so its full combo ≈ ADDITION_COMBO_TIME. */
-export function additionSightDuration(def: AdditionDef): number {
-  const presses = additionPresses(def);
-  if (presses <= 0) return MAX_SIGHT;
-  return Math.min(MAX_SIGHT, Math.max(MIN_SIGHT, ADDITION_COMBO_TIME / presses));
-}
+/** Per-window collapse time — comfortable and fixed for every Addition. */
+export const SIGHT_DURATION = 0.5;
 
 /** Success window, as a fraction of the window duration (1 = perfect alignment). */
 export const WINDOW_LO = 0.8;
@@ -31,17 +12,20 @@ export const WINDOW_HI = 1.1;
 /** Tighter "white / perfect" band inside the success window. */
 export const PERFECT_LO = 0.93;
 export const PERFECT_HI = 1.05;
+
 /**
- * Lockout after an Addition ends. Asymmetric on purpose: nailing the chain lets you
- * immediately start the next one (short), but aborting/whiffing it leaves you exposed.
- * The whiff lockout scales with how far you got — bailing right after the free hit 1
- * (the spam exploit) eats the MAX penalty, while slipping on the last input costs only
- * the MIN. This is the real-time equivalent of LoD's "a flubbed Addition wastes your
- * turn": pushing deeper is always better, and spamming hit 1 is the worst line.
+ * Attack-interval model. Each Addition is one "attack" that occupies roughly
+ * ATTACK_INTERVAL seconds (the real-time analogue of a turn): after it starts, the next
+ * attack can't begin until the interval elapses. A short combo waits out the remainder;
+ * a long combo that overruns the interval gets only MIN_RECOVERY. Because attacks come
+ * at a fixed rate, sustained DPS tracks the canon per-execution damage (higher-rank
+ * damage Additions out-DPS lower-rank ones, canon values untouched), and whiffing wastes
+ * the whole interval — a pure opportunity cost, exactly like fumbling a turn.
  */
-export const COMPLETE_RECOVERY = 0.25;
-export const MISS_RECOVERY_MAX = 2.4;
-export const MISS_RECOVERY_MIN = 0.5;
+export const ATTACK_INTERVAL = 2.6;
+export const MIN_RECOVERY = 0.2;
+/** Press-less basic attack (Shana/Miranda); their cadence is paced by the mode instead. */
+export const BASIC_RECOVERY = 0.25;
 
 export type AttackResult =
   | { kind: "none" }
@@ -71,6 +55,8 @@ export class AdditionRunner {
   private sightTimer = 0;
   private recoveryTimer = 0;
   private recoveryTotal = 0;
+  /** Real seconds elapsed since the current attack (Addition) started. */
+  private elapsed = 0;
 
   constructor(private sightDuration = SIGHT_DURATION) {}
 
@@ -92,12 +78,7 @@ export class AdditionRunner {
     return this.recoveryTotal > 0 ? this.recoveryTimer / this.recoveryTotal : 0;
   }
 
-  /** True when the active lockout is a whiff/abort penalty (worth surfacing). */
-  get recoveryIsPenalty(): boolean {
-    return this.recoveryTimer > 0 && this.recoveryTotal > COMPLETE_RECOVERY;
-  }
-
-  /** Seconds for the active window to collapse to alignment (adaptive per Addition). */
+  /** Seconds for the active window to collapse to alignment. */
   get windowSeconds(): number {
     return this.sightDuration;
   }
@@ -126,16 +107,15 @@ export class AdditionRunner {
       this.hits = 1;
       this.presses = 0;
       this.sightTimer = 0;
-      this.sightDuration = additionSightDuration(def); // adaptive: ~constant combo time
-      // A single-hit Addition (no presses) would complete instantly; Dart's all
-      // have at least one press, but guard anyway.
-      if (additionPresses(def) === 0) this.endCombo(false);
+      this.elapsed = 0;
+      // A single-hit Addition (no presses) completes instantly (e.g. the basic attack).
+      if (additionPresses(def) === 0) this.endCombo();
       return { kind: "started", hits: 1 };
     }
 
     const p = this.sightProgress;
     if (p < WINDOW_LO || p > WINDOW_HI) {
-      this.endCombo(true); // whiffed — long recovery
+      this.endCombo();
       return { kind: "miss" };
     }
 
@@ -145,7 +125,7 @@ export class AdditionRunner {
     const perfect = p >= PERFECT_LO && p <= PERFECT_HI;
     const completed = this.presses >= additionPresses(this.def!);
     const hits = this.hits; // capture before endCombo resets state
-    if (completed) this.endCombo(false); // nailed it — short recovery
+    if (completed) this.endCombo();
     return { kind: "hit", hits, perfect, completed };
   }
 
@@ -157,33 +137,35 @@ export class AdditionRunner {
     }
     if (!this.active) return false;
     this.sightTimer += dt;
+    this.elapsed += dt;
     if (this.sightProgress > WINDOW_HI) {
-      this.endCombo(true); // let the sight lapse — long recovery
+      this.endCombo();
       return true;
     }
     return false;
   }
 
-  /** Force-end the Addition (e.g. the target died) — no penalty. */
+  /** Force-end the Addition (e.g. the target died). */
   cancel(): void {
-    if (this.active) this.endCombo(false);
+    if (this.active) this.endCombo();
   }
 
-  private endCombo(failed: boolean): void {
-    if (failed) {
-      // Scale the whiff lockout by how far the chain got: 0 timed hits landed (a
-      // hit-1 spam/abort) → MAX penalty; nearly complete → MIN.
-      const need = this.def ? additionPresses(this.def) : 0;
-      const progress = need > 0 ? this.presses / need : 0;
-      this.recoveryTotal = MISS_RECOVERY_MAX - (MISS_RECOVERY_MAX - MISS_RECOVERY_MIN) * progress;
-    } else {
-      this.recoveryTotal = COMPLETE_RECOVERY;
-    }
+  /**
+   * End the attack and set the lockout so the whole attack occupies ~ATTACK_INTERVAL
+   * from its start: a short combo waits out the remainder, a long one that overran the
+   * interval gets only MIN_RECOVERY. A press-less basic attack uses BASIC_RECOVERY.
+   * Whether it completed or whiffed doesn't change the cost — that's the point.
+   */
+  private endCombo(): void {
+    const presses = this.def ? additionPresses(this.def) : 0;
+    this.recoveryTotal =
+      presses === 0 ? BASIC_RECOVERY : Math.max(MIN_RECOVERY, ATTACK_INTERVAL - this.elapsed);
     this.recoveryTimer = this.recoveryTotal;
     this.active = false;
     this.hits = 0;
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
+    this.elapsed = 0;
   }
 }
