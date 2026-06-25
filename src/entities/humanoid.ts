@@ -1048,7 +1048,8 @@ export class Humanoid {
       s.parent = strip;
     }
 
-    // Big pale armoured boots (knee-down, leaving the thigh bare) with a dark cuff.
+    // Big pale armoured boots (knee-down, leaving the thigh bare) with a dark cuff,
+    // and a pale foot cap so the toe matches the iron boots (over the neutral foot).
     for (const leg of [this.leftLeg, this.rightLeg]) {
       const boot = box("kgBootM", 0.27, 0.4, 0.31, pale, scene);
       boot.position.y = -0.56;
@@ -1056,6 +1057,9 @@ export class Humanoid {
       const cuff = box("kgBootCuff", 0.29, 0.08, 0.33, dark, scene);
       cuff.position.y = -0.37;
       cuff.parent = leg;
+      const footCap = box("kgFoot", 0.23, 0.14, 0.38, pale, scene);
+      footCap.position = new Vector3(0, -0.73, 0.09);
+      footCap.parent = leg;
     }
 
     // Cloth bandage wraps down the forearms, bound by a couple of darker lines.
