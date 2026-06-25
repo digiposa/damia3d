@@ -991,12 +991,21 @@ export class Humanoid {
       pauldron.parent = this.body;
     }
 
-    // Crossed leather chest straps over the bare torso with a silver medallion.
+    // Crossed leather straps over the bare torso, front and back, with a silver
+    // medallion at the front cross.
     for (const sx of [-1, 1]) {
       const strap = box("kgStrap", 0.07, 0.62, 0.02, dark, scene);
       strap.position = new Vector3(0, 1.16, 0.18);
       strap.rotation.z = sx * 0.5;
       strap.parent = this.body;
+      const back = box("kgStrapBack", 0.07, 0.62, 0.02, dark, scene);
+      back.position = new Vector3(0, 1.16, -0.18);
+      back.rotation.z = sx * 0.5;
+      back.parent = this.body;
+      // a shoulder link joining front and back over the top of each shoulder
+      const link = box("kgStrapLink", 0.07, 0.02, 0.4, dark, scene);
+      link.position = new Vector3(sx * 0.16, 1.42, 0);
+      link.parent = this.body;
     }
     const emblem = MeshBuilder.CreateCylinder("kgEmblem", { height: 0.04, diameter: 0.16, tessellation: 12 }, scene);
     emblem.material = silver;
@@ -1720,15 +1729,15 @@ function buildWeapon(kind: WeaponKind, accent: StandardMaterial, scene: Scene, v
       part("head", 0.3, 0.3, 0.32, 0.85, accent);
       break;
     case "axe": {
-      part("shaft", 0.055, 0.055, 1.2, 0.45, wood); // long haft, continues above the head
+      part("shaft", 0.055, 0.055, 1.2, 0.45, wood);
       part("axeButt", 0.07, 0.07, 0.07, -0.12, steel);
-      // Single-bit head flaring to one side (thin front-to-back): a narrow neck off the
-      // haft widening into a tall outer cutting edge — a fan/trapezoid, not a block.
-      const neck = box("axeNeck", 0.22, 0.26, 0.06, steel, scene);
-      neck.position = new Vector3(0.13, 0, 0.8);
-      neck.parent = group;
-      const edge = box("axeEdge", 0.1, 0.44, 0.05, steel, scene);
-      edge.position = new Vector3(0.27, 0, 0.8);
+      // Single-bit head hanging below the haft near the front, its broad faces to the
+      // sides (so it reads from the iso camera), widening into a longer cutting edge.
+      const head = box("axeHead", 0.07, 0.34, 0.32, steel, scene);
+      head.position = new Vector3(0, -0.16, 0.82);
+      head.parent = group;
+      const edge = box("axeEdge", 0.05, 0.13, 0.44, steel, scene);
+      edge.position = new Vector3(0, -0.33, 0.82);
       edge.parent = group;
       break;
     }
