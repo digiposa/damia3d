@@ -1020,31 +1020,31 @@ export class Humanoid {
     belt.parent = this.body;
     const kilt = MeshBuilder.CreateCylinder(
       "kgKilt",
-      { height: 0.42, diameterTop: 0.52, diameterBottom: 0.72, tessellation: 12 },
+      { height: 0.28, diameterTop: 0.5, diameterBottom: 0.62, tessellation: 12 },
       scene,
     );
     kilt.material = fur;
     kilt.isPickable = false;
-    kilt.position.y = 0.6;
+    kilt.position.y = 0.72; // short, sitting at the hips (not draping to the legs)
     kilt.parent = this.body;
-    // Hanging fur/leather strips below the kilt.
+    // Short hanging fur/leather strips just below the kilt.
     for (const a of [-0.7, -0.35, 0, 0.35, 0.7]) {
       const strip = new TransformNode("kgStripPivot", scene);
-      strip.position = new Vector3(0, 0.5, 0);
+      strip.position = new Vector3(0, 0.66, 0);
       strip.rotation.y = a;
       strip.parent = this.body;
-      const s = box("kgStrip", 0.12, 0.34, 0.04, a === 0 ? dark : fur, scene);
-      s.position = new Vector3(0, -0.18, 0.32);
+      const s = box("kgStrip", 0.12, 0.22, 0.04, a === 0 ? dark : fur, scene);
+      s.position = new Vector3(0, -0.1, 0.31);
       s.parent = strip;
     }
 
-    // Big pale armoured boots with a dark cuff (swing with the legs).
+    // Big pale armoured boots (knee-down, leaving the thigh bare) with a dark cuff.
     for (const leg of [this.leftLeg, this.rightLeg]) {
-      const boot = box("kgBootM", 0.27, 0.5, 0.31, pale, scene);
-      boot.position.y = -0.5;
+      const boot = box("kgBootM", 0.27, 0.4, 0.31, pale, scene);
+      boot.position.y = -0.56;
       boot.parent = leg;
       const cuff = box("kgBootCuff", 0.29, 0.08, 0.33, dark, scene);
-      cuff.position.y = -0.27;
+      cuff.position.y = -0.37;
       cuff.parent = leg;
     }
 
