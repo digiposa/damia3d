@@ -4,7 +4,7 @@ import { additionPresses } from "../data/additions";
 // --- Timing-sight tuning (seconds / progress fractions) --------------------
 
 /** Per-window collapse time — comfortable and fixed for every Addition. */
-export const SIGHT_DURATION = 0.5;
+export const SIGHT_DURATION = 0.7;
 
 /** Success window, as a fraction of the window duration (1 = perfect alignment). */
 export const WINDOW_LO = 0.8;
@@ -22,7 +22,7 @@ export const PERFECT_HI = 1.05;
  * damage Additions out-DPS lower-rank ones, canon values untouched), and whiffing wastes
  * the whole interval — a pure opportunity cost, exactly like fumbling a turn.
  */
-export const ATTACK_INTERVAL = 2.6;
+export const ATTACK_INTERVAL = 2.8;
 export const MIN_RECOVERY = 0.2;
 /** Press-less basic attack (Shana/Miranda); their cadence is paced by the mode instead. */
 export const BASIC_RECOVERY = 0.25;
