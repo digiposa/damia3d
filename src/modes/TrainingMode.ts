@@ -214,7 +214,9 @@ export class TrainingMode extends GameMode {
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
     if (this.rangedCooldownT > 0) this.rangedCooldownT = Math.max(0, this.rangedCooldownT - dt);
 
-    if (this.input.wasPressed("Space")) this.attack(this.attackTarget);
+    // Guarding roots the player and locks out attacking (you can't strike while
+    // holding the stance); the Attack press is ignored until the guard ends.
+    if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget);
     if (this.guardPressed()) this.tryGuard();
 
     // Combat time scales with the Options "combat speed" setting.
@@ -665,13 +667,16 @@ export class TrainingMode extends GameMode {
 
     // Cooldown readout. Timers run on combat time, so convert to real seconds.
     this.guardBtn?.setCooldown(p.guardCooldownRemaining / settings.combatSpeed, p.guardCooldownFraction);
-    // Surface the Addition whiff lockout on the Attack button (the short success
-    // recovery is left silent so clean chains don't flash the button every time).
-    const penalty = this.runner.recoveryIsPenalty;
-    this.attackBtn?.setCooldown(
-      penalty ? this.runner.recoveryRemaining / settings.combatSpeed : 0,
-      penalty ? this.runner.recoveryFraction : 0,
-    );
+    // Attack-button lockout readout: while guarding, attacking is disabled for the
+    // stance's duration; otherwise surface the Addition whiff lockout (the short
+    // success recovery stays silent so clean chains don't flash the button).
+    if (p.guardActive) {
+      this.attackBtn?.setCooldown(p.guardRemaining / settings.combatSpeed, p.guardFraction);
+    } else if (this.runner.recoveryIsPenalty) {
+      this.attackBtn?.setCooldown(this.runner.recoveryRemaining / settings.combatSpeed, this.runner.recoveryFraction);
+    } else {
+      this.attackBtn?.setCooldown(0, 0);
+    }
   }
 
   dispose(): void {

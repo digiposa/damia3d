@@ -208,6 +208,16 @@ export class Player {
     return this.guardTimer > 0;
   }
 
+  /** Combat-time seconds left in the active guard stance. */
+  get guardRemaining(): number {
+    return this.guardTimer;
+  }
+
+  /** Active guard stance remaining as a fraction of its full duration (1 → 0). */
+  get guardFraction(): number {
+    return GUARD_DURATION > 0 ? Math.max(0, this.guardTimer / GUARD_DURATION) : 0;
+  }
+
   /** True when guard can be triggered (not active and off cooldown). */
   get guardReady(): boolean {
     return this.guardTimer <= 0 && this.guardCdTimer <= 0;
