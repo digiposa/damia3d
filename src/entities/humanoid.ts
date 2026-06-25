@@ -825,16 +825,29 @@ export class Humanoid {
       medal.parent = this.body;
     }
 
-    // Gold collar necklace with a blue gem.
-    const collar = MeshBuilder.CreateTorus("prCollar", { diameter: 0.3, thickness: 0.045, tessellation: 16 }, scene);
+    // Layered gold collar draping over the shoulders + a neck ring, with a hanging
+    // blue pendant; and a gold brow circlet with a small gem.
+    const yoke = MeshBuilder.CreateTorus("prYoke", { diameter: 0.5, thickness: 0.05, tessellation: 18 }, scene);
+    yoke.material = gold;
+    yoke.isPickable = false;
+    yoke.position.y = 1.36; // horizontal, draped over the shoulders
+    yoke.parent = this.body;
+    const collar = MeshBuilder.CreateTorus("prCollar", { diameter: 0.34, thickness: 0.035, tessellation: 16 }, scene);
     collar.material = gold;
     collar.isPickable = false;
-    collar.rotation.x = Math.PI / 2;
-    collar.position.y = 1.38;
+    collar.position.y = 1.42; // around the neck base
     collar.parent = this.body;
-    const gem = box("prGem", 0.07, 0.07, 0.05, blue, scene);
-    gem.position = new Vector3(0, 1.32, 0.16);
-    gem.parent = this.body;
+    const pendant = box("prPendant", 0.06, 0.1, 0.05, blue, scene);
+    pendant.position = new Vector3(0, 1.3, 0.17);
+    pendant.parent = this.body;
+    const circlet = MeshBuilder.CreateTorus("prCirclet", { diameter: 0.37, thickness: 0.022, tessellation: 18 }, scene);
+    circlet.material = gold;
+    circlet.isPickable = false;
+    circlet.position.y = 1.69; // around the brow
+    circlet.parent = this.body;
+    const browGem = box("prBrowGem", 0.05, 0.05, 0.04, blue, scene);
+    browGem.position = new Vector3(0, 1.69, 0.19);
+    browGem.parent = this.body;
 
     // Gold shoulder ornaments and a gold waist band.
     for (const sx of [-1, 1]) {
@@ -1154,6 +1167,11 @@ function buildWavyHair(scene: Scene): TransformNode {
   const t2 = box("hairWavy2", 0.3, 0.5, 0.13, auburn, scene);
   t2.position = new Vector3(0, 0.9, -0.2);
   t2.parent = group;
+
+  // A lock falling forward over the (left) shoulder, across the front.
+  const lock = box("hairWavyLock", 0.11, 0.5, 0.1, auburn, scene);
+  lock.position = new Vector3(0.18, 1.28, 0.13);
+  lock.parent = group;
   return group;
 }
 
