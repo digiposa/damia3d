@@ -18,6 +18,7 @@ import {
   additionHitsPercent,
   additionMultiplier,
   additionPresses,
+  comboRamp,
   type AdditionDef,
 } from "../data/additions";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
@@ -421,7 +422,9 @@ export class TrainingMode extends GameMode {
     const mods = { element };
     const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult, mods) : 0;
     const now = additionAttack(atk, df, additionHitsPercent(add, k), mult, mods);
-    const dmg = Math.max(1, now - before);
+    // Combo ramp: later hits of a damage Addition land harder, so completing longer /
+    // higher-tier damage Additions out-DPSes shorter ones (SP Additions get no ramp).
+    const dmg = Math.max(1, Math.floor((now - before) * comboRamp(add, k)));
 
     // Ranged bearers loose an arrow: damage lands when it reaches the target.
     if (this.isRanged()) {

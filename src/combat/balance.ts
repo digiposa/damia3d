@@ -3,6 +3,7 @@ import {
   additionHitsPercent,
   additionMultiplier,
   additionPresses,
+  comboRamp,
   type AdditionDef,
 } from "../data/additions";
 import { SIGHT_DURATION, COMPLETE_RECOVERY, MISS_RECOVERY_MAX } from "./AdditionRunner";
@@ -38,7 +39,13 @@ export function estimateDps(
   const mult = additionMultiplier(def, level);
   const presses = additionPresses(def);
 
-  const fullDamage = additionAttack(atk, targetDf, additionHitsPercent(def), mult);
+  // Full damage = sum of each hit's (ramped) damage, matching how the mode applies it.
+  let fullDamage = 0;
+  for (let k = 1; k <= def.hits.length; k++) {
+    const before = k > 1 ? additionAttack(atk, targetDf, additionHitsPercent(def, k - 1), mult) : 0;
+    const now = additionAttack(atk, targetDf, additionHitsPercent(def, k), mult);
+    fullDamage += Math.max(1, Math.floor((now - before) * comboRamp(def, k)));
+  }
   const fullTime = presses * SIGHT_DURATION * PRESS_AT + COMPLETE_RECOVERY;
   const fullDps = fullDamage / fullTime;
 
