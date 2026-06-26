@@ -2,6 +2,27 @@
 
 Living list of agreed reworks and open design questions. Not user-facing.
 
+## Review queue (tick as each point is settled)
+
+We will revisit each of these one at a time and decide what to rework. Nothing here is
+final. Details for every item are in the sections below.
+
+- [ ] Dragoon system — SP generation, MP, stats, spells, transform duration (full rework)
+- [ ] ATB / attack-interval model — values & feel (2.8s, REF_SPEED, Speed→recharge)
+- [ ] Movement / spacing constants (speeds, reaches, ranges, rooting, auto-approach)
+- [ ] Real-time ranged combat (arrows, reach, cadence) — keep / tune / rework
+- [ ] Addition timing windows (0.7s, window/perfect bands)
+- [ ] Addition leveling rule (+1 per 20 successes, cap Lv5)
+- [ ] Addition per-level multiplier tables (our modeling vs canon)
+- [ ] SP-per-hit distribution (floor(spMax/presses))
+- [ ] Final-Addition unlock rule (currently level 40 vs "prior ×80")
+- [ ] Character→class mapping: 7 shared stat tables for 18 bearers (Albert→Lavitz, etc.)
+- [ ] Guard durations / cooldown vs ATB; SP cap (flat 100 vs 100×Dragoon level)
+- [ ] Items system (currently one Healing Potion in a shared pool)
+- [ ] Enemy aggro spread (enemies target only the controlled member)
+- [ ] Ally HP bars / death / revive
+- [ ] Character models & 2D portraits (procedural placeholders / extrapolations)
+
 ## ⚠️ Dragoon system — full rework needed (agreed)
 
 The whole **Dragoon subsystem is placeholder** and must be completely redesigned for
