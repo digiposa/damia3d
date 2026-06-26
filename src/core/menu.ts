@@ -77,18 +77,40 @@ export interface GambitsView {
   cycle: (memberIndex: number, ruleIndex: number) => void;
 }
 
+/** One slot of the party-composition view. */
+export interface PartySlotView {
+  /** Bearer id currently in the slot. */
+  id: string;
+  name: string;
+  /** The player-controlled member. */
+  controlled: boolean;
+}
+
+/** Party composition (pick the 3 members) exposed to the System menu's Party tab. */
+export interface PartyComposeView {
+  slots: PartySlotView[];
+  /** The slot currently being edited. */
+  activeSlot: number;
+  /** Choose which slot to edit. */
+  selectSlot: (slot: number) => void;
+  /** Assign a roster bearer (by id) to the active slot. */
+  assign: (bearerId: string) => void;
+}
+
 /** Per-mode data the System menu reads to populate the Status / Addition / Equipment tabs. */
 export interface ModeMenuData {
   status: StatusView;
   additions: AdditionEntry[];
   equipAddition: (def: AdditionDef) => void;
   equipment: EquipView;
+  /** Party composition (Training/party modes only; absent elsewhere). */
+  party?: PartyComposeView;
   /** AI party gambits (Training/party modes only; absent elsewhere). */
   gambits?: GambitsView;
 }
 
 /** A section of the in-game System menu. */
-export type SystemSection = "status" | "equip" | "addition" | "gambits" | "config";
+export type SystemSection = "status" | "party" | "equip" | "addition" | "gambits" | "config";
 
 /** Services the running game exposes to its modes (e.g. opening the System menu). */
 export interface GameHost {

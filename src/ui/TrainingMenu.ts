@@ -1,7 +1,5 @@
 import { hasTouch } from "../core/device";
 import { t } from "../core/i18n";
-import { type Bearer, bearerById, selectableBearers } from "../data/bearers";
-import { dragoonClass } from "../data/dragoonClasses";
 
 /** One Addition's DPS readout: completing it vs. spamming the free hit 1. */
 export interface BalanceRow {
@@ -14,12 +12,6 @@ export interface BalanceRow {
 
 /** Live state the menu reads to render the current selection. */
 export interface TrainingState {
-  /** Bearer id in each party slot. */
-  party: string[];
-  /** Slot the Character tab is currently editing. */
-  activeSlot: number;
-  /** Slot index of the player-controlled member. */
-  controlledIndex: number;
   level: number;
   maxLevel: number;
   /** Reference enemy defence the balance figures are computed against. */
@@ -30,10 +22,6 @@ export interface TrainingState {
 
 export interface TrainingCallbacks {
   state: () => TrainingState;
-  /** Assign a bearer to the active party slot. */
-  onSelectBearer: (bearer: Bearer) => void;
-  /** Choose which party slot to edit. */
-  onSelectSlot: (slot: number) => void;
   onSetLevel: (level: number) => void;
   onSpawnDummy: () => void;
   onSpawnKnight: () => void;
@@ -41,10 +29,9 @@ export interface TrainingCallbacks {
   onResume: () => void;
 }
 
-type Tab = "character" | "level" | "spawn" | "balance";
+type Tab = "level" | "spawn" | "balance";
 
 const TABS: { id: Tab; labelKey: string; icon: string }[] = [
-  { id: "character", labelKey: "char.title", icon: "👤" },
   { id: "level", labelKey: "debug.level", icon: "📈" },
   { id: "spawn", labelKey: "debug.spawn", icon: "👾" },
   { id: "balance", labelKey: "debug.balance", icon: "⚖️" },
@@ -52,16 +39,15 @@ const TABS: { id: Tab; labelKey: string; icon: string }[] = [
 
 /**
  * Training-only debug menu (a pausing overlay) in the System-menu style: a left
- * tab rail (Character / Level / Spawn) and a single content panel — no long
- * scroll. Merges character switching, instant level changes and enemy spawning.
- * Rebuilt on each render so it follows the current language. Selecting a
- * character or Resume closes it; level tweaks and spawns keep it open.
+ * tab rail (Level / Spawn / Balance) and a single content panel. Instant level
+ * changes, enemy spawning and the DPS readout. (Party composition and gambits live
+ * in the normal System menu.) Rebuilt on each render so it follows the language.
  */
 export class TrainingMenu {
   private root: HTMLDivElement;
   private nav: HTMLDivElement;
   private content: HTMLDivElement;
-  private tab: Tab = "character";
+  private tab: Tab = "level";
   private compact = hasTouch();
 
   constructor(private cb: TrainingCallbacks) {
@@ -145,13 +131,11 @@ export class TrainingMenu {
   private render(): void {
     this.renderNav();
     this.content.replaceChildren(
-      this.tab === "character"
-        ? this.renderCharacter()
-        : this.tab === "level"
-          ? this.renderLevel()
-          : this.tab === "spawn"
-            ? this.renderSpawn()
-            : this.renderBalance(),
+      this.tab === "level"
+        ? this.renderLevel()
+        : this.tab === "spawn"
+          ? this.renderSpawn()
+          : this.renderBalance(),
     );
   }
 
@@ -176,133 +160,6 @@ export class TrainingMenu {
       navButton("▶", t("common.resume"), this.compact, () => this.cb.onResume(), "#2f6b3e"),
     );
     this.nav.replaceChildren(...items);
-  }
-
-  private renderCharacter(): HTMLElement {
-    const box = section(t("char.title"));
-    const s = this.cb.state();
-
-    // Party slot selector (3 slots). Tap a slot to edit it, then tap a character below
-    // to assign it. The ⓟ badge marks the member you currently control in-game.
-    box.appendChild(label(t("party.slots")));
-    box.appendChild(this.slotRow(s));
-
-    const hint = document.createElement("div");
-    Object.assign(hint.style, {
-      font: "400 11px/1.4 ui-monospace, monospace",
-      color: "#9a8a66",
-      margin: "0 2px 6px",
-    } satisfies Partial<CSSStyleDeclaration>);
-    hint.textContent = t("party.hint");
-    box.appendChild(hint);
-
-    // Grouped by Dragoon archetype (bearers are already ordered by class, then by
-    // possession), with an element header before each group's grid.
-    let currentClass: string | undefined;
-    let grid: HTMLElement | undefined;
-    for (const b of selectableBearers()) {
-      if (b.classId !== currentClass) {
-        currentClass = b.classId;
-        const header = document.createElement("div");
-        Object.assign(header.style, {
-          font: "700 12px/1.4 ui-monospace, monospace",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: "#c8a24a",
-          margin: "12px 2px 2px",
-        } satisfies Partial<CSSStyleDeclaration>);
-        header.textContent = dragoonClass(b.classId)?.element ?? b.classId;
-        box.appendChild(header);
-        grid = document.createElement("div");
-        Object.assign(grid.style, {
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "8px",
-        } satisfies Partial<CSSStyleDeclaration>);
-        box.appendChild(grid);
-      }
-      // -1 if not in the party, else the slot index it occupies.
-      const inSlot = s.party.indexOf(b.id);
-      grid!.appendChild(this.bearerCard(b, inSlot, inSlot === s.activeSlot));
-    }
-    return box;
-  }
-
-  /** The 3-slot party selector row for the Character tab. */
-  private slotRow(s: TrainingState): HTMLElement {
-    const slots = document.createElement("div");
-    Object.assign(slots.style, {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: "6px",
-      marginBottom: "8px",
-    } satisfies Partial<CSSStyleDeclaration>);
-    for (let i = 0; i < s.party.length; i++) {
-      slots.appendChild(this.slotCard(i, bearerById(s.party[i]), i === s.activeSlot, i === s.controlledIndex));
-    }
-    return slots;
-  }
-
-  /** A party-slot chip: its assigned bearer, highlighted when active for editing. */
-  private slotCard(slot: number, bearer: Bearer | undefined, active: boolean, controlled: boolean): HTMLElement {
-    const el = document.createElement("button");
-    Object.assign(el.style, {
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: "3px",
-      font: "700 12px/1.1 system-ui, sans-serif",
-      color: active ? "#1a1608" : "#f0e6cf",
-      background: active ? "rgba(200,162,74,0.9)" : "rgba(40,34,16,0.8)",
-      border: `2px solid ${active ? "#ffe08a" : "#6b551f"}`,
-      borderRadius: "9px",
-      padding: "8px 4px",
-      cursor: "pointer",
-      touchAction: "manipulation",
-    } satisfies Partial<CSSStyleDeclaration>);
-    const [r, g, b] = bearer?.color ?? [0.5, 0.5, 0.5];
-    el.innerHTML =
-      `<span style="width:12px;height:12px;border-radius:50%;` +
-      `background:rgb(${(r * 255) | 0},${(g * 255) | 0},${(b * 255) | 0});` +
-      `border:1px solid rgba(0,0,0,0.5)"></span>` +
-      `<span>${controlled ? "ⓟ " : ""}${bearer?.name ?? "—"}</span>`;
-    tap(el, () => this.cb.onSelectSlot(slot));
-    return el;
-  }
-
-  /**
-   * Roster card. `inSlot` is the party slot this bearer occupies (-1 if none);
-   * `editing` is true when it fills the slot currently being edited.
-   */
-  private bearerCard(bearer: Bearer, inSlot: number, editing: boolean): HTMLElement {
-    const inParty = inSlot >= 0;
-    const el = document.createElement("button");
-    Object.assign(el.style, {
-      display: "flex",
-      alignItems: "center",
-      gap: "9px",
-      textAlign: "left",
-      font: "700 15px/1.2 system-ui, sans-serif",
-      color: editing ? "#1a1608" : "#f0e6cf",
-      background: editing ? "rgba(200,162,74,0.9)" : "rgba(40,34,16,0.8)",
-      border: `1px solid ${editing ? "#ffe08a" : inParty ? "#caa24a" : "#6b551f"}`,
-      borderRadius: "9px",
-      padding: "10px 12px",
-      cursor: "pointer",
-      touchAction: "manipulation",
-    } satisfies Partial<CSSStyleDeclaration>);
-    const [r, g, b] = bearer.color;
-    const tag = inParty ? `slot ${inSlot + 1}` : bearer.storyPlayable ? "party" : "skin";
-    el.innerHTML =
-      `<span style="flex:0 0 auto;width:14px;height:14px;border-radius:50%;` +
-      `background:rgb(${(r * 255) | 0},${(g * 255) | 0},${(b * 255) | 0});` +
-      `border:1px solid rgba(0,0,0,0.5);box-shadow:0 0 4px rgba(0,0,0,0.4)"></span>` +
-      `<span style="display:flex;flex-direction:column;gap:2px;min-width:0">` +
-      `<span>${bearer.name}${inParty ? "  ✓" : ""}</span>` +
-      `<span style="font:400 11px/1.3 ui-monospace,monospace;opacity:0.8">${tag}</span>` +
-      `</span>`;
-    tap(el, () => this.cb.onSelectBearer(bearer));
-    return el;
   }
 
   private renderLevel(): HTMLElement {

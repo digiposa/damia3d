@@ -10,11 +10,14 @@ import {
   additionMultiplier,
 } from "../data/additions";
 import { gambitEntry } from "../combat/Gambit";
+import { selectableBearers } from "../data/bearers";
+import { dragoonClass } from "../data/dragoonClasses";
 
 type Section = SystemSection;
 
 const SECTIONS: { id: Section; labelKey: string; icon: string }[] = [
   { id: "status", labelKey: "section.status", icon: "📊" },
+  { id: "party", labelKey: "section.party", icon: "👥" },
   { id: "equip", labelKey: "section.equip", icon: "🛡️" },
   { id: "addition", labelKey: "section.addition", icon: "💥" },
   { id: "gambits", labelKey: "section.gambits", icon: "🧠" },
@@ -131,6 +134,7 @@ export class SystemMenu {
     // Character tabs only exist once a mode has player state; otherwise Config only.
     // The Gambits tab only shows when the mode exposes a party (Training/party modes).
     let available = data ? SECTIONS : SECTIONS.filter((s) => s.id === "config");
+    if (!data?.party) available = available.filter((s) => s.id !== "party");
     if (!data?.gambits) available = available.filter((s) => s.id !== "gambits");
     if (!available.some((s) => s.id === this.section)) this.section = available[0].id;
     if (this.section !== "equip") this.equipSlot = undefined;
@@ -139,13 +143,15 @@ export class SystemMenu {
     this.content.replaceChildren(
       this.section === "config"
         ? this.renderConfig()
-        : this.section === "gambits"
-          ? this.renderGambits(data)
-          : this.section === "addition"
-            ? this.renderAddition(data)
-            : this.section === "equip"
-              ? this.renderEquip(data)
-              : this.renderStatus(data),
+        : this.section === "party"
+          ? this.renderParty(data)
+          : this.section === "gambits"
+            ? this.renderGambits(data)
+            : this.section === "addition"
+              ? this.renderAddition(data)
+              : this.section === "equip"
+                ? this.renderEquip(data)
+                : this.renderStatus(data),
     );
   }
 
@@ -298,6 +304,49 @@ export class SystemMenu {
       });
     }
     return el;
+  }
+
+  private renderParty(data?: ModeMenuData): HTMLElement {
+    const box = section(t("section.party"));
+    const p = data?.party;
+    if (!p || p.slots.length === 0) {
+      box.appendChild(note(t("party.unavailable")));
+      return box;
+    }
+
+    // Slot selector: pick which of the 3 slots to fill (controlled member marked ⓟ).
+    box.appendChild(
+      choiceRow(
+        p.slots.map((_, i) => i),
+        p.activeSlot,
+        (i) => {
+          p.selectSlot(i);
+          this.render();
+        },
+        (i) => `${p.slots[i].controlled ? "ⓟ " : ""}${p.slots[i].name}`,
+      ),
+    );
+    box.appendChild(hint(t("party.hint")));
+    box.appendChild(divider());
+
+    // Roster, grouped by Dragoon element. Tap a character to put it in the active slot;
+    // a character already in the party shows its slot number (assigning swaps to dedupe).
+    let currentClass: string | undefined;
+    for (const b of selectableBearers()) {
+      if (b.classId !== currentClass) {
+        currentClass = b.classId;
+        box.appendChild(label(dragoonClass(b.classId)?.element ?? b.classId));
+      }
+      const inSlot = p.slots.findIndex((s) => s.id === b.id);
+      const sub = inSlot >= 0 ? t("party.inSlot", { n: inSlot + 1 }) : "";
+      box.appendChild(
+        listRow(b.name, sub, inSlot === p.activeSlot, true, () => {
+          p.assign(b.id);
+          this.render();
+        }),
+      );
+    }
+    return box;
   }
 
   private renderGambits(data?: ModeMenuData): HTMLElement {

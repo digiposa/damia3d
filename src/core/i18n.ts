@@ -31,10 +31,13 @@ const en: Dict = {
 
   // System menu sections
   "section.status": "Status",
+  "section.party": "Party",
   "section.equip": "Equipment",
   "section.addition": "Addition",
   "section.gambits": "Gambits",
   "section.config": "Config",
+  "party.unavailable": "No party in this mode.",
+  "party.inSlot": "In slot {n}",
   "gambit.unavailable": "No AI party members.",
 
   // Status
@@ -171,10 +174,13 @@ const fr: Dict = {
   "common.mainMenu": "Menu principal",
 
   "section.status": "Statut",
+  "section.party": "Équipe",
   "section.equip": "Équipement",
   "section.addition": "Addition",
   "section.gambits": "Gambits",
   "section.config": "Réglages",
+  "party.unavailable": "Pas d'équipe dans ce mode.",
+  "party.inSlot": "Slot {n}",
   "gambit.unavailable": "Aucun équipier IA.",
 
   "stat.hp": "PV",

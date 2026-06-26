@@ -36,7 +36,7 @@ import {
   equipmentForSlot,
   equipSummary,
 } from "../data/equipment";
-import { type Bearer, DEFAULT_BEARER, selectableBearers } from "../data/bearers";
+import { type Bearer, DEFAULT_BEARER, bearerById, selectableBearers } from "../data/bearers";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
@@ -157,20 +157,16 @@ export class TrainingMode extends GameMode {
     this.hud = new PartyPanel((i) => this.controlMember(i));
     this.sight = new TimingSight();
 
-    // Training debug menu (Training only): build the 3-member party, set level, spawn
-    // enemies. Opened from a button just below the gear (⚙); pauses gameplay.
+    // Training debug menu (Training only): set level, spawn enemies, DPS balance.
+    // (Party composition + gambits live in the normal System menu.) Opened from a
+    // button just below the gear (⚙); pauses gameplay.
     this.debugMenu = new TrainingMenu({
       state: () => ({
-        party: this.partyBearers.map((b) => b.id),
-        activeSlot: this.activeSlot,
-        controlledIndex: this.controlledIndex,
         level: this.partyLevel,
         maxLevel: this.player.maxLevel,
         refDf: BALANCE_REF_DF,
         balance: this.balanceRows(),
       }),
-      onSelectBearer: (b) => this.assignToSlot(b),
-      onSelectSlot: (slot) => this.selectSlot(slot),
       onSetLevel: (lv) => this.setLevel(lv),
       onSpawnDummy: () => this.spawnDummy(),
       onSpawnKnight: () => this.spawnKnight(),
@@ -325,16 +321,10 @@ export class TrainingMode extends GameMode {
     this.paused = false;
   }
 
-  /** Choose which party slot the Character menu edits. Keeps the menu open. */
-  private selectSlot(slot: number): void {
-    this.activeSlot = Math.min(Math.max(slot, 0), this.partyBearers.length - 1);
-    this.debugMenu.refresh();
-  }
-
   /**
    * Assign a bearer to the active party slot, then rebuild the party. Duplicates are
    * avoided by swapping: if the bearer already holds another slot, that slot inherits the
-   * one being replaced. Keeps the menu open so several slots can be set in a row.
+   * one being replaced. Driven by the System menu's Party tab (which re-renders itself).
    */
   private assignToSlot(b: Bearer): void {
     const slot = this.activeSlot;
@@ -343,7 +333,6 @@ export class TrainingMode extends GameMode {
     if (existing >= 0) this.partyBearers[existing] = this.partyBearers[slot]; // swap to dedupe
     this.partyBearers[slot] = b;
     this.buildParty();
-    this.debugMenu.refresh();
   }
 
   /**
@@ -1000,6 +989,21 @@ export class TrainingMode extends GameMode {
       },
       additions: this.additionEntries(),
       equipAddition: (def) => this.equipAddition(def),
+      party: {
+        slots: this.partyBearers.map((b, i) => ({
+          id: b.id,
+          name: b.name,
+          controlled: i === this.controlledIndex,
+        })),
+        activeSlot: this.activeSlot,
+        selectSlot: (s) => {
+          this.activeSlot = Math.min(Math.max(s, 0), this.partyBearers.length - 1);
+        },
+        assign: (id) => {
+          const b = bearerById(id);
+          if (b) this.assignToSlot(b);
+        },
+      },
       gambits: {
         members: this.party.map((m, i) => ({
           name: m.avatar.bearer.name,
