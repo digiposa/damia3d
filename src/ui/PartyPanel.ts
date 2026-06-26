@@ -66,8 +66,8 @@ export class PartyPanel {
       left: "calc(env(safe-area-inset-left, 0px) + 8px)",
       display: "flex",
       flexDirection: "column",
-      gap: "5px",
-      width: "min(290px, 76vw)",
+      gap: "4px",
+      width: "min(266px, 72vw)",
       pointerEvents: "none",
       zIndex: "13",
     } satisfies Partial<CSSStyleDeclaration>);
@@ -81,8 +81,8 @@ export class PartyPanel {
     const root = document.createElement("div");
     Object.assign(root.style, {
       display: "flex",
-      gap: "7px",
-      padding: "5px",
+      gap: "6px",
+      padding: "4px",
       borderRadius: "7px",
       background: "rgba(8,11,17,0.72)",
       border: "1px solid rgba(120,150,200,0.22)",
@@ -91,8 +91,8 @@ export class PartyPanel {
     const portrait = document.createElement("div");
     Object.assign(portrait.style, {
       position: "relative",
-      width: "42px",
-      height: "42px",
+      width: "36px",
+      height: "36px",
       flex: "0 0 auto",
       borderRadius: "5px",
       border: "2px solid #caa24a",
@@ -127,7 +127,7 @@ export class PartyPanel {
       display: "flex",
       flexDirection: "column",
       justifyContent: "center",
-      gap: "3px",
+      gap: "2px",
       flex: "1",
       minWidth: "0",
     } satisfies Partial<CSSStyleDeclaration>);
@@ -142,18 +142,18 @@ export class PartyPanel {
       textOverflow: "ellipsis",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    const hp = gauge("#c0392b", "#ef6b5a", 14);
-    const atb = gauge("#2f6dd0", "#56b6ff", 9);
+    const hp = gauge("#c0392b", "#ef6b5a", 13);
+    const atb = gauge("#2f6dd0", "#56b6ff", 12);
 
     const extras = document.createElement("div");
     Object.assign(extras.style, {
       display: "none",
       flexDirection: "column",
-      gap: "3px",
+      gap: "2px",
       marginTop: "1px",
     } satisfies Partial<CSSStyleDeclaration>);
-    const sp = gauge("#1c3a63", "#3f6fb0", 12);
-    const mp = gauge("#4a2370", "#8a4fb0", 12);
+    const sp = gauge("#1c3a63", "#3f6fb0", 11);
+    const mp = gauge("#4a2370", "#8a4fb0", 11);
     const line = document.createElement("div");
     Object.assign(line.style, {
       display: "flex",
@@ -173,7 +173,7 @@ export class PartyPanel {
       background: "rgba(40,55,85,0.75)",
       border: "1px solid rgba(120,150,200,0.45)",
       borderRadius: "6px",
-      padding: "4px 7px",
+      padding: "3px 7px",
       textAlign: "center",
       cursor: "pointer",
       pointerEvents: "auto",
