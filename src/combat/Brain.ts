@@ -18,6 +18,10 @@ export interface CombatantView {
   readonly reach: number;
   /** True when the ATB gauge is full and the combatant may act. */
   readonly ready: boolean;
+  /** Current HP as a fraction of max (0–1), for self-condition gambits. */
+  readonly hpFraction: number;
+  /** True when the Guard stance can be entered (off cooldown, not active). */
+  readonly canGuard: boolean;
 }
 
 /** Read-only snapshot of the battlefield the brain may reason about. */
@@ -31,7 +35,9 @@ export type Decision =
   /** Walk toward the target (out of reach). */
   | { kind: "approach"; target: Enemy }
   /** Strike the target (in reach and ready). */
-  | { kind: "attack"; target: Enemy };
+  | { kind: "attack"; target: Enemy }
+  /** Enter the defensive Guard stance (self-preservation). */
+  | { kind: "guard" };
 
 export interface Brain {
   decide(self: CombatantView, world: CombatWorld): Decision;

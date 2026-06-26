@@ -14,7 +14,7 @@ import { Player } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
-import { AutoBrain } from "../combat/Brain";
+import { GambitBrain, resolveGambit, nextGambitId, DEFAULT_GAMBIT_IDS } from "../combat/Gambit";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
@@ -90,6 +90,8 @@ export class TrainingMode extends GameMode {
   private activeSlot = 0;
   /** Shared training level applied to the whole party. */
   private partyLevel = 1;
+  /** Gambit rule ids per slot (3 rule slots each) — the AI rule lists the menu edits. */
+  private gambitIds: string[][] = [];
 
   private enemies: Enemy[] = [];
   private arrows: Arrow[] = [];
@@ -131,6 +133,7 @@ export class TrainingMode extends GameMode {
     createGround(this.scene, 40);
 
     this.partyBearers = this.defaultParty();
+    this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
@@ -145,6 +148,7 @@ export class TrainingMode extends GameMode {
         party: this.partyBearers.map((b) => b.id),
         activeSlot: this.activeSlot,
         controlledIndex: this.controlledIndex,
+        gambits: this.gambitIds,
         level: this.partyLevel,
         maxLevel: this.player.maxLevel,
         refDf: BALANCE_REF_DF,
@@ -152,6 +156,7 @@ export class TrainingMode extends GameMode {
       }),
       onSelectBearer: (b) => this.assignToSlot(b),
       onSelectSlot: (slot) => this.selectSlot(slot),
+      onCycleGambit: (slot, idx) => this.cycleGambit(slot, idx),
       onSetLevel: (lv) => this.setLevel(lv),
       onSpawnDummy: () => this.spawnDummy(),
       onSpawnKnight: () => this.spawnKnight(),
@@ -229,7 +234,8 @@ export class TrainingMode extends GameMode {
     for (const m of this.party) m.dispose();
     this.controlledIndex = Math.min(this.controlledIndex, this.partyBearers.length - 1);
     this.party = this.partyBearers.map((b, i) => {
-      const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), new AutoBrain(), this.partyLevel);
+      const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
+      const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
       m.setControlled(i === this.controlledIndex);
       return m;
     });
@@ -283,6 +289,19 @@ export class TrainingMode extends GameMode {
     if (existing >= 0) this.partyBearers[existing] = this.partyBearers[slot]; // swap to dedupe
     this.partyBearers[slot] = b;
     this.buildParty();
+    this.debugMenu.refresh();
+  }
+
+  /**
+   * Cycle one gambit rule slot to the next catalog entry, then re-arm that member's
+   * brain live (no rebuild needed). Keeps the menu open.
+   */
+  private cycleGambit(slot: number, idx: number): void {
+    const rules = this.gambitIds[slot];
+    if (!rules || idx < 0 || idx >= rules.length) return;
+    rules[idx] = nextGambitId(rules[idx]);
+    const member = this.party[slot];
+    if (member) member.brain = new GambitBrain(resolveGambit(rules));
     this.debugMenu.refresh();
   }
 
@@ -635,9 +654,23 @@ export class TrainingMode extends GameMode {
    */
   private updateAiMember(member: PartyMember, dt: number, cdt: number): void {
     member.tickGauge(cdt);
+    member.avatar.tickGuard(cdt);
+
+    // Guarding roots the member for the stance's duration (like the player).
+    if (member.avatar.guardActive) {
+      member.avatar.animate(dt, false);
+      member.syncHud(this.scene);
+      return;
+    }
 
     const before = member.position.clone();
-    const view = { position: member.position, reach: this.reachFor(member.avatar), ready: member.ready };
+    const view = {
+      position: member.position,
+      reach: this.reachFor(member.avatar),
+      ready: member.ready,
+      hpFraction: member.avatar.maxHp > 0 ? member.avatar.hp / member.avatar.maxHp : 1,
+      canGuard: member.avatar.guardReady,
+    };
     const decision = member.brain.decide(view, { enemies: this.enemies });
     switch (decision.kind) {
       case "approach": {
@@ -650,6 +683,11 @@ export class TrainingMode extends GameMode {
         member.avatar.face(decision.target.position.subtract(member.position));
         this.autoStrike(member.avatar, decision.target);
         member.gauge.spend();
+        break;
+      }
+      case "guard": {
+        const heal = member.avatar.startGuard();
+        this.popText(member.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
         break;
       }
       case "idle": {

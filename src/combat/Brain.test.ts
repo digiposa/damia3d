@@ -13,6 +13,8 @@ const self = (ready: boolean, reach = 2.3): CombatantView => ({
   position: new Vector3(0, 0, 0),
   reach,
   ready,
+  hpFraction: 1,
+  canGuard: true,
 });
 
 describe("AutoBrain", () => {
