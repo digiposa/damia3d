@@ -153,7 +153,8 @@ export class TrainingMode extends GameMode {
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
-    this.hud = new PartyPanel();
+    // Tapping a row takes control of that member.
+    this.hud = new PartyPanel((i) => this.controlMember(i));
     this.sight = new TimingSight();
 
     // Training debug menu (Training only): build the 3-member party, set level, spawn
@@ -298,11 +299,17 @@ export class TrainingMode extends GameMode {
   /** Cycle player control to the next party member (Tab / the ⇄ button). */
   private cycleControl(): void {
     if (this.party.length < 2) return;
+    this.controlMember((this.controlledIndex + 1) % this.party.length);
+  }
+
+  /** Take control of a specific party member (e.g. tapping its HUD row). */
+  private controlMember(index: number): void {
+    if (index === this.controlledIndex || index < 0 || index >= this.party.length) return;
     this.runner.cancel();
     this.comboTarget = undefined;
     this.clearNav();
     this.controlled.setControlled(false);
-    this.controlledIndex = (this.controlledIndex + 1) % this.party.length;
+    this.controlledIndex = index;
     this.controlled.setControlled(true);
     this.runner.attach(this.controlled.gauge);
     this.runner.setFillTime(this.player.atbFillTime);

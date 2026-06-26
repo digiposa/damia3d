@@ -52,7 +52,8 @@ export class PartyPanel {
   private root: HTMLDivElement;
   private rows: Row[] = [];
 
-  constructor() {
+  /** @param onSelect tap a member's row to take control of it. */
+  constructor(private onSelect?: (index: number) => void) {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "fixed",
@@ -66,12 +67,12 @@ export class PartyPanel {
       zIndex: "13",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    for (let i = 0; i < MAX_ROWS; i++) this.rows.push(this.buildRow());
+    for (let i = 0; i < MAX_ROWS; i++) this.rows.push(this.buildRow(i));
     this.root.append(...this.rows.map((r) => r.root));
     document.body.appendChild(this.root);
   }
 
-  private buildRow(): Row {
+  private buildRow(index: number): Row {
     const root = document.createElement("div");
     Object.assign(root.style, {
       display: "flex",
@@ -81,6 +82,16 @@ export class PartyPanel {
       background: "rgba(8,11,17,0.72)",
       border: "1px solid rgba(120,150,200,0.22)",
     } satisfies Partial<CSSStyleDeclaration>);
+    // Tapping a row takes control of that member.
+    if (this.onSelect) {
+      root.style.pointerEvents = "auto";
+      root.style.cursor = "pointer";
+      root.style.setProperty("-webkit-tap-highlight-color", "transparent");
+      root.addEventListener("pointerup", (e) => {
+        e.preventDefault();
+        this.onSelect!(index);
+      });
+    }
 
     const portrait = document.createElement("div");
     Object.assign(portrait.style, {
