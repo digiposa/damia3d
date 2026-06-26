@@ -11,8 +11,10 @@ import { IsoCamera } from "../world/IsoCamera";
 import { createGround } from "../world/Ground";
 import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
+import { Ally } from "../entities/Ally";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
+import { AutoBrain } from "../combat/Brain";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
@@ -32,7 +34,7 @@ import {
   equipmentForSlot,
   equipSummary,
 } from "../data/equipment";
-import { type Bearer, DEFAULT_BEARER } from "../data/bearers";
+import { type Bearer, BEARERS, DEFAULT_BEARER } from "../data/bearers";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
@@ -80,6 +82,8 @@ export class TrainingMode extends GameMode {
   private guardBtn?: ActionButton;
 
   private enemies: Enemy[] = [];
+  /** AI party member fighting alongside the player (FF12-style own ATB gauge). */
+  private ally?: Ally;
   private arrows: Arrow[] = [];
   /** Ranged fire cooldown (real seconds) so bow bearers don't spray arrows. */
   private rangedCooldownT = 0;
@@ -158,6 +162,29 @@ export class TrainingMode extends GameMode {
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
 
     this.spawnDummy();
+    this.spawnCompanion();
+  }
+
+  /**
+   * (Re)spawn the AI companion beside the player: a roster bearer different from the
+   * player's, with its own ATB gauge and an {@link AutoBrain}. Step toward the eventual
+   * 3-character party — for now a single proof-of-concept ally.
+   */
+  private spawnCompanion(): void {
+    this.ally?.dispose();
+    const bearer = this.companionBearer();
+    const spawn = this.player.position.add(new Vector3(-2.5, 0, -1.5));
+    this.ally = new Ally(this.scene, bearer, spawn, new AutoBrain(), this.player.level);
+  }
+
+  /** Pick a companion bearer distinct from the player's (prefers a melee front-liner). */
+  private companionBearer(): Bearer {
+    const prefs = ["lavitz", "albert", "dart", "rose", "shana"];
+    for (const id of prefs) {
+      const b = BEARERS.find((x) => x.id === id);
+      if (b && b.id !== this.bearer.id) return b;
+    }
+    return BEARERS.find((b) => b.id !== this.bearer.id) ?? this.bearer;
   }
 
   private openDebugMenu(): void {
@@ -187,6 +214,7 @@ export class TrainingMode extends GameMode {
       this.runner.cancel();
       this.comboTarget = undefined;
       this.clearNav();
+      this.spawnCompanion(); // keep the ally distinct from the new player bearer
     }
     this.closeDebugMenu();
   }
@@ -243,6 +271,7 @@ export class TrainingMode extends GameMode {
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
     }
     this.updateEnemies(cdt);
+    this.updateAlly(dt, cdt);
     this.updateSight();
 
     this.refreshHud();
@@ -461,9 +490,13 @@ export class TrainingMode extends GameMode {
       this.player.gainExp(target.def.expReward);
       this.player.gold += target.def.goldReward;
       this.popText(target.headPosition, `+${target.def.expReward} EXP`, "#9fe6a0");
+      // Only cancel the player's combo if it's the one that just died (an ally kill
+      // must not abort the player's in-progress Addition).
+      if (this.comboTarget === target) {
+        this.runner.cancel();
+        this.comboTarget = undefined;
+      }
       this.removeEnemy(target);
-      this.runner.cancel();
-      this.comboTarget = undefined;
     }
   }
 
@@ -510,7 +543,73 @@ export class TrainingMode extends GameMode {
 
   /** Attack distance: long for ranged bearers, short for melee. */
   private get reach(): number {
-    return this.isRanged() ? RANGED_REACH : PLAYER_REACH;
+    return this.reachFor(this.player);
+  }
+
+  /** Attack distance for any avatar (long for bow bearers, short for melee). */
+  private reachFor(p: Player): number {
+    return p.bearer.weapon === "bow" ? RANGED_REACH : PLAYER_REACH;
+  }
+
+  /**
+   * Drive the AI companion: charge its ATB gauge, then run its brain (the single
+   * decision point a future gambit system will replace) and execute the result —
+   * approach, strike (auto-resolving the full Addition), or hold while charging.
+   */
+  private updateAlly(dt: number, cdt: number): void {
+    const ally = this.ally;
+    if (!ally) return;
+    ally.tickGauge(cdt);
+
+    const before = ally.position.clone();
+    const view = { position: ally.position, reach: this.reachFor(ally.avatar), ready: ally.ready };
+    const decision = ally.brain.decide(view, { enemies: this.enemies });
+    switch (decision.kind) {
+      case "approach": {
+        const to = decision.target.position.subtract(ally.position);
+        to.y = 0;
+        ally.avatar.move(to, dt);
+        break;
+      }
+      case "attack": {
+        ally.avatar.face(decision.target.position.subtract(ally.position));
+        this.autoStrike(ally.avatar, decision.target);
+        ally.gauge.spend();
+        break;
+      }
+      case "idle": {
+        if (decision.target) ally.avatar.face(decision.target.position.subtract(ally.position));
+        break;
+      }
+    }
+    ally.avatar.animate(dt, Vector3.DistanceSquared(before, ally.position) > 1e-6);
+    ally.syncHud(this.scene);
+  }
+
+  /**
+   * An AI attacker auto-resolves its equipped Addition in one strike (no timed input):
+   * the whole combo's damage lands at once. Ranged bearers loose an arrow as usual.
+   */
+  private autoStrike(attacker: Player, target: Enemy): void {
+    attacker.strike();
+    const add = attacker.addition;
+    const atk = { at: attacker.atk, lv: attacker.level };
+    const df = target.def.stats.df;
+    const mult = additionMultiplier(add, attacker.additionLevel(add));
+    const element = elementMultiplier(attacker.attackElement, target.def.element);
+    const dmg = Math.max(1, additionAttack(atk, df, additionHitsPercent(add), mult, { element }));
+
+    if (attacker.bearer.weapon === "bow") {
+      const from = attacker.position.add(new Vector3(0, 1.3, 0));
+      const to = target.position.add(new Vector3(0, 1.2, 0));
+      this.arrows.push(
+        new Arrow(this.scene, from, to, ARROW_SPEED, () => {
+          if (target.alive) this.landDamage(target, dmg, element);
+        }, 0.22),
+      );
+      return;
+    }
+    this.landDamage(target, dmg, element);
   }
 
   /** Per-Addition DPS readout for the Training balance tab (full vs. spam-hit-1). */
@@ -715,6 +814,7 @@ export class TrainingMode extends GameMode {
     this.arrows = [];
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
+    this.ally?.dispose();
     this.stats.dispose();
     this.sight.dispose();
     this.debugMenu.dispose();
