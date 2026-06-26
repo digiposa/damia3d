@@ -9,18 +9,15 @@ export interface PartyRowView {
   maxHp: number;
   /** ATB charge, 0 (just acted) → 1 (ready). */
   atb: number;
-  /** The player-controlled member (highlighted, shows SP/MP/Addition detail). */
+  /** The player-controlled member (highlighted, shows SP/MP detail). */
   controlled: boolean;
+  /** In Dragoon form (controlled row then also shows the MP gauge). */
+  transformed?: boolean;
   // Controlled-member extras:
   sp?: number;
   maxSp?: number;
   mp?: number;
   maxMp?: number;
-  exp?: number;
-  nextExp?: number;
-  gold?: number;
-  additionName?: string;
-  additionLevel?: number;
 }
 
 const MAX_ROWS = 3;
@@ -36,29 +33,26 @@ interface Row {
   portrait: HTMLDivElement;
   portraitInitial: HTMLDivElement;
   lvBadge: HTMLDivElement;
-  nameLabel: HTMLDivElement;
   hp: Gauge;
   atb: Gauge;
   extras: HTMLDivElement;
   sp: Gauge;
   mp: Gauge;
-  line: HTMLDivElement;
-  goldEl: HTMLDivElement;
-  expEl: HTMLDivElement;
-  addition: HTMLDivElement;
 }
 
 /**
- * Top-left party HUD (FF12-style): one row per member with portrait, HP and a prominent
- * ATB gauge that fills at the member's own rate and glows gold when ready. The controlled
- * member's row is highlighted and additionally shows SP/MP and the equipped Addition (the
- * access point to the Additions menu). Rows update in place so the gauges animate.
+ * Compact top-left party HUD (FF12-style): one row per member with a mini portrait, an HP
+ * gauge (the member's name is overlaid in it) and a prominent ATB gauge that fills at the
+ * member's own rate and glows gold when ready. The controlled member's row is highlighted
+ * and adds a thin SP gauge (and an MP gauge while transformed). EXP/Gold and the equipped
+ * Addition live in the System menu (gear), keeping the in-combat footprint small. Rows
+ * update in place so the gauges animate.
  */
 export class PartyPanel {
   private root: HTMLDivElement;
   private rows: Row[] = [];
 
-  constructor(onAddition?: () => void) {
+  constructor() {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "fixed",
@@ -67,17 +61,17 @@ export class PartyPanel {
       display: "flex",
       flexDirection: "column",
       gap: "4px",
-      width: "min(266px, 72vw)",
+      width: "min(240px, 66vw)",
       pointerEvents: "none",
       zIndex: "13",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    for (let i = 0; i < MAX_ROWS; i++) this.rows.push(this.buildRow(onAddition));
+    for (let i = 0; i < MAX_ROWS; i++) this.rows.push(this.buildRow());
     this.root.append(...this.rows.map((r) => r.root));
     document.body.appendChild(this.root);
   }
 
-  private buildRow(onAddition?: () => void): Row {
+  private buildRow(): Row {
     const root = document.createElement("div");
     Object.assign(root.style, {
       display: "flex",
@@ -91,8 +85,8 @@ export class PartyPanel {
     const portrait = document.createElement("div");
     Object.assign(portrait.style, {
       position: "relative",
-      width: "36px",
-      height: "36px",
+      width: "28px",
+      height: "28px",
       flex: "0 0 auto",
       borderRadius: "5px",
       border: "2px solid #caa24a",
@@ -108,15 +102,15 @@ export class PartyPanel {
       display: "none",
       alignItems: "center",
       justifyContent: "center",
-      font: "800 20px/1 system-ui, sans-serif",
+      font: "800 14px/1 system-ui, sans-serif",
       color: "rgba(207,227,255,0.85)",
     } satisfies Partial<CSSStyleDeclaration>);
     const lvBadge = document.createElement("div");
     Object.assign(lvBadge.style, {
       position: "absolute",
-      top: "1px",
-      left: "2px",
-      font: "800 9px/1 system-ui, sans-serif",
+      bottom: "0",
+      right: "1px",
+      font: "800 8px/1 system-ui, sans-serif",
       color: "#ffe08a",
       textShadow: "0 1px 2px #000",
     } satisfies Partial<CSSStyleDeclaration>);
@@ -132,66 +126,23 @@ export class PartyPanel {
       minWidth: "0",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    const nameLabel = document.createElement("div");
-    Object.assign(nameLabel.style, {
-      font: "700 12px/1 system-ui, sans-serif",
-      color: "#eaf2ff",
-      textShadow: "0 1px 2px #000",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-    } satisfies Partial<CSSStyleDeclaration>);
-
-    const hp = gauge("#c0392b", "#ef6b5a", 13);
-    const atb = gauge("#2f6dd0", "#56b6ff", 12);
+    const hp = gauge("#c0392b", "#ef6b5a", 14);
+    const atb = gauge("#2f6dd0", "#56b6ff", 11);
 
     const extras = document.createElement("div");
     Object.assign(extras.style, {
       display: "none",
       flexDirection: "column",
       gap: "2px",
-      marginTop: "1px",
     } satisfies Partial<CSSStyleDeclaration>);
-    const sp = gauge("#1c3a63", "#3f6fb0", 11);
-    const mp = gauge("#4a2370", "#8a4fb0", 11);
-    const line = document.createElement("div");
-    Object.assign(line.style, {
-      display: "flex",
-      justifyContent: "space-between",
-      font: "800 11px/1.2 ui-monospace, monospace",
-      color: "#e8c45a",
-      textShadow: "0 1px 2px #000",
-    } satisfies Partial<CSSStyleDeclaration>);
-    const goldEl = document.createElement("div");
-    const expEl = document.createElement("div");
-    line.append(goldEl, expEl);
+    const sp = gauge("#1c3a63", "#3f6fb0", 9);
+    const mp = gauge("#4a2370", "#8a4fb0", 9);
+    extras.append(sp.track, mp.track);
 
-    const addition = document.createElement("div");
-    Object.assign(addition.style, {
-      font: "700 11px/1.2 system-ui, sans-serif",
-      color: "#cfe3ff",
-      background: "rgba(40,55,85,0.75)",
-      border: "1px solid rgba(120,150,200,0.45)",
-      borderRadius: "6px",
-      padding: "3px 7px",
-      textAlign: "center",
-      cursor: "pointer",
-      pointerEvents: "auto",
-      touchAction: "manipulation",
-    } satisfies Partial<CSSStyleDeclaration>);
-    addition.style.setProperty("-webkit-tap-highlight-color", "transparent");
-    if (onAddition) {
-      addition.addEventListener("pointerup", (e) => {
-        e.preventDefault();
-        onAddition();
-      });
-    }
-
-    extras.append(sp.track, mp.track, line, addition);
-    col.append(nameLabel, hp.track, atb.track, extras);
+    col.append(hp.track, atb.track, extras);
     root.append(portrait, col);
 
-    return { root, portrait, portraitInitial, lvBadge, nameLabel, hp, atb, extras, sp, mp, line, goldEl, expEl, addition };
+    return { root, portrait, portraitInitial, lvBadge, hp, atb, extras, sp, mp };
   }
 
   set(views: PartyRowView[]): void {
@@ -203,13 +154,10 @@ export class PartyPanel {
         continue;
       }
       row.root.style.display = "flex";
-      row.root.style.border = v.controlled
-        ? "1px solid #ffe08a"
-        : "1px solid rgba(120,150,200,0.22)";
+      row.root.style.border = v.controlled ? "1px solid #ffe08a" : "1px solid rgba(120,150,200,0.22)";
       row.root.style.background = v.controlled ? "rgba(26,22,8,0.78)" : "rgba(8,11,17,0.72)";
 
       row.lvBadge.textContent = `${v.level}`;
-      row.nameLabel.textContent = v.name;
       if (v.portrait) {
         row.portrait.style.backgroundImage = `url(${v.portrait})`;
         row.portraitInitial.style.display = "none";
@@ -219,16 +167,16 @@ export class PartyPanel {
         row.portraitInitial.style.display = "flex";
       }
 
-      fillGauge(row.hp, v.hp, v.maxHp, t("stat.hp"));
+      // The member's name is overlaid in the HP gauge to save a whole line.
+      fillGauge(row.hp, v.hp, v.maxHp, v.name);
       fillAtb(row.atb, v.atb);
 
       if (v.controlled) {
         row.extras.style.display = "flex";
         fillGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, t("stat.sp"));
-        fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));
-        row.goldEl.textContent = `${v.gold ?? 0} G`;
-        row.expEl.textContent = `EXP ${v.exp ?? 0} / ${v.nextExp ?? 0}`;
-        row.addition.textContent = `⚔ ${v.additionName ?? "—"}  Lv ${v.additionLevel ?? 1} ▸`;
+        // MP only matters in Dragoon form — show it then.
+        row.mp.track.style.display = v.transformed ? "block" : "none";
+        if (v.transformed) fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));
       } else {
         row.extras.style.display = "none";
       }
@@ -240,7 +188,7 @@ export class PartyPanel {
   }
 }
 
-/** Build a labeled gauge (track + colored fill + overlaid text) of the given height. */
+/** Build a gauge (track + colored fill + overlaid text) of the given height. */
 function gauge(dark: string, light: string, height: number): Gauge {
   const track = document.createElement("div");
   Object.assign(track.style, {
@@ -267,7 +215,8 @@ function gauge(dark: string, light: string, height: number): Gauge {
     inset: "0",
     display: "flex",
     alignItems: "center",
-    paddingLeft: "6px",
+    justifyContent: "space-between",
+    padding: "0 6px",
     font: "800 10px/1 ui-monospace, monospace",
     color: "#fff",
     textShadow: "0 1px 2px rgba(0,0,0,0.95)",
@@ -277,10 +226,11 @@ function gauge(dark: string, light: string, height: number): Gauge {
   return { track, fill, text };
 }
 
+/** Fill a gauge and label it "<label>   <value>/<max>" (label left, value right). */
 function fillGauge(g: Gauge, value: number, max: number, label: string): void {
   const ratio = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   g.fill.style.transform = `scaleX(${ratio})`;
-  g.text.textContent = `${label} ${value} / ${max}`;
+  g.text.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span><span>${value}/${max}</span>`;
 }
 
 /** The ATB gauge: cyan while charging, gold + glow when full (ready to act). */
@@ -292,5 +242,5 @@ function fillAtb(g: Gauge, atb: number): void {
     ? "linear-gradient(90deg, #d8a32a, #ffe08a)"
     : "linear-gradient(90deg, #2f6dd0, #56b6ff)";
   g.track.style.boxShadow = ready ? "0 0 6px rgba(255,216,107,0.8)" : "none";
-  g.text.textContent = ready ? "ATB ●" : "ATB";
+  g.text.innerHTML = `<span>ATB</span><span>${ready ? "●" : ""}</span>`;
 }

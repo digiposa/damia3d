@@ -152,9 +152,8 @@ export class TrainingMode extends GameMode {
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
-    // Party HUD: one ATB row per member. The controlled member's Addition chip opens
-    // the System menu on Addition.
-    this.hud = new PartyPanel(() => this.host.openSystemMenu("addition"));
+    // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
+    this.hud = new PartyPanel();
     this.sight = new TimingSight();
 
     // Training debug menu (Training only): build the 3-member party, set level, spawn
@@ -1075,18 +1074,13 @@ export class TrainingMode extends GameMode {
           maxHp: a.maxHp,
           atb: m.gauge.fill,
           controlled,
+          transformed: a.transformed,
         };
         if (controlled) {
-          const eq = a.addition;
           row.sp = a.sp;
           row.maxSp = a.maxSp;
           row.mp = a.mp;
           row.maxMp = a.maxMp;
-          row.exp = a.exp;
-          row.nextExp = a.nextExp;
-          row.gold = a.gold;
-          row.additionName = eq.name;
-          row.additionLevel = a.additionLevel(eq);
         }
         return row;
       }),
