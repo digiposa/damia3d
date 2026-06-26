@@ -21,8 +21,6 @@ export class PartyMember {
   brain: Brain;
   controlled = false;
 
-  private bar: HTMLDivElement;
-  private barFill: HTMLDivElement;
   private nameTag: HTMLDivElement;
 
   constructor(scene: Scene, bearer: Bearer, spawn: Vector3, brain: Brain, level = 1) {
@@ -30,29 +28,8 @@ export class PartyMember {
     this.gauge = new AtbGauge(this.avatar.atbFillTime);
     this.brain = brain;
 
-    // Floating ATB gauge (positioned each frame via syncHud), shown only for AI members.
-    this.bar = document.createElement("div");
-    Object.assign(this.bar.style, {
-      position: "fixed",
-      width: "46px",
-      height: "5px",
-      marginLeft: "-23px",
-      borderRadius: "3px",
-      background: "rgba(10,14,22,0.85)",
-      border: "1px solid rgba(0,0,0,0.6)",
-      overflow: "hidden",
-      pointerEvents: "none",
-      zIndex: "12",
-    } satisfies Partial<CSSStyleDeclaration>);
-    this.barFill = document.createElement("div");
-    Object.assign(this.barFill.style, {
-      position: "absolute",
-      inset: "0",
-      transformOrigin: "left",
-      background: "linear-gradient(90deg, #2f6dd0, #56b6ff)",
-    } satisfies Partial<CSSStyleDeclaration>);
-    this.bar.appendChild(this.barFill);
-
+    // Floating name tag above the head, so panel rows map to characters in the world.
+    // (The ATB gauge itself lives in the party HUD panel, not over the head.)
     this.nameTag = document.createElement("div");
     this.nameTag.textContent = bearer.name;
     Object.assign(this.nameTag.style, {
@@ -66,7 +43,6 @@ export class PartyMember {
       zIndex: "12",
     } satisfies Partial<CSSStyleDeclaration>);
 
-    document.body.appendChild(this.bar);
     document.body.appendChild(this.nameTag);
   }
 
@@ -97,11 +73,10 @@ export class PartyMember {
   }
 
   private hideHud(): void {
-    this.bar.style.display = "none";
     this.nameTag.style.display = "none";
   }
 
-  /** Position and fill the floating ATB bar + name tag each frame (AI members only). */
+  /** Position the floating name tag each frame (hidden for the controlled member). */
   syncHud(scene: Scene): void {
     if (this.controlled) {
       this.hideHud();
@@ -112,20 +87,12 @@ export class PartyMember {
       this.hideHud();
       return;
     }
-    this.bar.style.display = "block";
     this.nameTag.style.display = "block";
-    this.bar.style.left = `${p.x}px`;
-    this.bar.style.top = `${p.y}px`;
-    this.barFill.style.transform = `scaleX(${this.gauge.fill})`;
-    this.barFill.style.background = this.ready
-      ? "linear-gradient(90deg, #d8a32a, #ffd86b)"
-      : "linear-gradient(90deg, #2f6dd0, #56b6ff)";
     this.nameTag.style.left = `${p.x}px`;
-    this.nameTag.style.top = `${p.y - 6}px`;
+    this.nameTag.style.top = `${p.y}px`;
   }
 
   dispose(): void {
-    this.bar.remove();
     this.nameTag.remove();
     this.avatar.dispose();
   }

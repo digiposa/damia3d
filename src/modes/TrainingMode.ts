@@ -39,7 +39,7 @@ import {
 import { type Bearer, DEFAULT_BEARER, selectableBearers } from "../data/bearers";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
-import { StatsBar } from "../ui/StatsBar";
+import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { TimingSight } from "../ui/TimingSight";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
 import { floatingText } from "../ui/FloatingText";
@@ -80,7 +80,7 @@ export class TrainingMode extends GameMode {
   readonly name = "Training";
 
   private camera!: IsoCamera;
-  private stats!: StatsBar;
+  private hud!: PartyPanel;
   private sight!: TimingSight;
   private debugBtn!: Button;
   private debugMenu!: TrainingMenu;
@@ -152,8 +152,9 @@ export class TrainingMode extends GameMode {
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
-    // The equipped-Addition chip in the stats bar opens the System menu on Addition.
-    this.stats = new StatsBar(() => this.host.openSystemMenu("addition"));
+    // Party HUD: one ATB row per member. The controlled member's Addition chip opens
+    // the System menu on Addition.
+    this.hud = new PartyPanel(() => this.host.openSystemMenu("addition"));
     this.sight = new TimingSight();
 
     // Training debug menu (Training only): build the 3-member party, set level, spawn
@@ -1061,23 +1062,35 @@ export class TrainingMode extends GameMode {
 
   private refreshHud(): void {
     const p = this.player;
-    const eq = p.addition;
-    this.stats.set({
-      name: p.bearer.name,
-      portrait: p.bearer.portrait,
-      level: p.level,
-      hp: p.hp,
-      maxHp: p.maxHp,
-      sp: p.sp,
-      maxSp: p.maxSp,
-      mp: p.mp,
-      maxMp: p.maxMp,
-      exp: p.exp,
-      nextExp: p.nextExp,
-      gold: p.gold,
-      additionName: eq.name,
-      additionLevel: p.additionLevel(eq),
-    });
+    // Party HUD: one ATB row per member (the controlled one shows SP/MP/Addition detail).
+    this.hud.set(
+      this.party.map((m): PartyRowView => {
+        const a = m.avatar;
+        const controlled = m === this.controlled;
+        const row: PartyRowView = {
+          name: a.bearer.name,
+          portrait: a.bearer.portrait,
+          level: a.level,
+          hp: a.hp,
+          maxHp: a.maxHp,
+          atb: m.gauge.fill,
+          controlled,
+        };
+        if (controlled) {
+          const eq = a.addition;
+          row.sp = a.sp;
+          row.maxSp = a.maxSp;
+          row.mp = a.mp;
+          row.maxMp = a.maxMp;
+          row.exp = a.exp;
+          row.nextExp = a.nextExp;
+          row.gold = a.gold;
+          row.additionName = eq.name;
+          row.additionLevel = a.additionLevel(eq);
+        }
+        return row;
+      }),
+    );
 
     // Attack-button lockout readout: guard disables attacking for the stance; otherwise
     // show the attack-interval "swing timer" (Addition recovery), or the ranged cadence.
@@ -1121,7 +1134,7 @@ export class TrainingMode extends GameMode {
     this.enemies = [];
     for (const m of this.party) m.dispose();
     this.party = [];
-    this.stats.dispose();
+    this.hud.dispose();
     this.sight.dispose();
     this.debugMenu.dispose();
     this.debugBtn.dispose();
