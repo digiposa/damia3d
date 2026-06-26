@@ -22,8 +22,10 @@ import {
   additionHitsPercent,
   additionMultiplier,
   additionPresses,
+  BASIC_ATTACK,
   type AdditionDef,
 } from "../data/additions";
+import { RosterStore, EQUIP_SLOTS } from "../data/roster";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { estimateDps } from "../combat/balance";
 import { elementMultiplier } from "../combat/element";
@@ -107,6 +109,8 @@ export class TrainingMode extends GameMode {
   private partyLevel = 1;
   /** Gambit rule ids per slot (3 rule slots each) — the AI rule lists the menu edits. */
   private gambitIds: string[][] = [];
+  /** Per-character gear/Addition config for the whole roster (persists across rebuilds). */
+  private roster = new RosterStore();
 
   private enemies: Enemy[] = [];
   private arrows: Arrow[] = [];
@@ -280,6 +284,7 @@ export class TrainingMode extends GameMode {
     this.party = this.partyBearers.map((b, i) => {
       const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
       const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
+      this.applyConfig(m.avatar, b); // restore this character's stored gear / Addition
       m.setControlled(i === this.controlledIndex);
       return m;
     });
@@ -1024,14 +1029,52 @@ export class TrainingMode extends GameMode {
             detail: equipSummary(def),
             equipped: p.equipment[slot]?.id === def.id,
           })),
-        equip: (slot, id) => (id ? p.equip(equipById(id)!) : p.unequip(slot)),
+        equip: (slot, id) => this.setEquip(p.bearer.id, slot, id),
       },
     };
   }
 
   private equipAddition(def: AdditionDef): void {
-    this.player.addition = def;
-    this.runner.cancel(); // never keep a running combo on the old Addition
+    this.setAddition(this.player.bearer.id, def.name);
+  }
+
+  // --- Roster config (gear / Addition persistence per character) -------------
+
+  /** Apply a character's stored config (gear + equipped Addition) to a live avatar. */
+  private applyConfig(p: Player, bearer: Bearer): void {
+    const cfg = this.roster.get(bearer);
+    for (const slot of EQUIP_SLOTS) {
+      const id = cfg.equipment[slot];
+      const def = id ? equipById(id) : undefined;
+      if (def && def.slot === slot) p.equip(def);
+      else p.unequip(slot);
+    }
+    p.addition = p.additions.find((a) => a.name === cfg.additionName) ?? BASIC_ATTACK;
+  }
+
+  /** Set a character's equipment (store + live avatar if it's in the party). */
+  private setEquip(bearerId: string, slot: EquipSlot, id?: string): void {
+    const bearer = bearerById(bearerId);
+    if (!bearer) return;
+    this.roster.get(bearer).equipment[slot] = id;
+    const live = this.party.find((m) => m.avatar.bearer.id === bearerId)?.avatar;
+    if (live) {
+      const def = id ? equipById(id) : undefined;
+      if (def && def.slot === slot) live.equip(def);
+      else live.unequip(slot);
+    }
+  }
+
+  /** Set a character's equipped Addition (store + live avatar if it's in the party). */
+  private setAddition(bearerId: string, name: string): void {
+    const bearer = bearerById(bearerId);
+    if (!bearer) return;
+    this.roster.get(bearer).additionName = name;
+    const live = this.party.find((m) => m.avatar.bearer.id === bearerId)?.avatar;
+    if (live) {
+      live.addition = live.additions.find((a) => a.name === name) ?? BASIC_ATTACK;
+      if (live === this.player) this.runner.cancel(); // never keep a running combo on the old Addition
+    }
   }
 
   /** Build the Addition rows from the player's unlock/level state. */
