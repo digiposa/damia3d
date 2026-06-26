@@ -15,6 +15,8 @@ import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
 import { GambitBrain, resolveGambit, nextGambitId, DEFAULT_GAMBIT_IDS } from "../combat/Gambit";
+import type { ActionId } from "../combat/Action";
+import { startingItems } from "../data/items";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
@@ -60,6 +62,12 @@ const ARROW_SPEED = 26;
 /** Reference enemy defence used by the Training balance/DPS readout. */
 const BALANCE_REF_DF = 20;
 
+/** Damage multiplier of one Dragoon magic cast (MAT²·5/MDF × this). */
+const DRAGOON_MAGIC_MULT = 2;
+
+/** SP gained by an AI member per auto-attack (so it can charge up to transform). */
+const AI_SP_PER_HIT = 20;
+
 /**
  * Training arena: a Diablo-style real-time hack-and-slash sandbox with
  * LoD-faithful attacks. Desktop uses click-to-move (click an enemy to approach
@@ -78,7 +86,13 @@ export class TrainingMode extends GameMode {
   private debugMenu!: TrainingMenu;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
+  private transformBtn?: ActionButton;
+  private itemBtn?: ActionButton;
+  private magicBtn?: ActionButton;
   private switchBtn?: ActionButton;
+
+  /** Shared consumable pool (Training sandbox). */
+  private items = startingItems();
 
   /** The party (up to 3): one member is player-controlled, the rest run their Brain. */
   private party: PartyMember[] = [];
@@ -173,31 +187,45 @@ export class TrainingMode extends GameMode {
         padding: "10px 14px",
       },
     });
-    // Touch devices attack with the ⚔ button (desktop attacks by clicking). The
-    // 🛡 guard button is shown on both (also bound to Shift) so its cooldown is
-    // always visible; it sits left of the attack button on touch.
+    // Touch devices attack with the ⚔ button (desktop attacks by clicking). The other
+    // ATB actions (Guard / Transform / Item / Magic) are a small left-side column, each
+    // gated by the ATB gauge; desktop also has key shortcuts (G/T/R/F, Tab to switch).
     const touch = hasTouch();
     if (touch) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
-    this.guardBtn = new ActionButton("🛡", () => this.input.pressVirtual("Guard"), {
-      right: touch ? "calc(env(safe-area-inset-right, 0px) + 124px)" : "calc(env(safe-area-inset-right, 0px) + 26px)",
-      background: "rgba(40,90,150,0.8)",
-      border: "1px solid rgba(150,190,255,0.6)",
-      color: "#e6f0ff",
-    });
-    // Switch which party member you control (also Tab on desktop), bottom-left.
-    this.switchBtn = new ActionButton("⇄", () => this.input.pressVirtual("Switch"), {
-      right: "auto",
-      left: "calc(env(safe-area-inset-left, 0px) + 26px)",
-      background: "rgba(70,60,120,0.82)",
-      border: "1px solid rgba(180,170,255,0.6)",
-      color: "#ece6ff",
-    });
+    this.guardBtn = this.actionColumnButton("🛡", "Guard", 104, "rgba(40,90,150,0.82)", "rgba(150,190,255,0.6)", "#e6f0ff");
+    this.itemBtn = this.actionColumnButton("🧪", "Item", 168, "rgba(40,110,70,0.82)", "rgba(150,230,180,0.6)", "#e6fff0");
+    this.transformBtn = this.actionColumnButton("✨", "Transform", 232, "rgba(150,120,40,0.82)", "rgba(255,225,140,0.6)", "#fff4d8");
+    this.magicBtn = this.actionColumnButton("🔮", "Magic", 296, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");
+    // Switch which party member you control (also Tab on desktop), bottom of the column.
+    this.switchBtn = this.actionColumnButton("⇄", "Switch", 40, "rgba(70,60,120,0.82)", "rgba(180,170,255,0.6)", "#ece6ff");
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
     window.addEventListener("keydown", this.onKeyDown);
 
     this.spawnDummy();
+  }
+
+  /** Build one button in the left action column (smaller, stacked by `bottom` offset). */
+  private actionColumnButton(
+    icon: string,
+    code: string,
+    bottom: number,
+    background: string,
+    borderColor: string,
+    color: string,
+  ): ActionButton {
+    return new ActionButton(icon, () => this.input.pressVirtual(code), {
+      right: "auto",
+      left: "calc(env(safe-area-inset-left, 0px) + 18px)",
+      bottom: `calc(env(safe-area-inset-bottom, 0px) + ${bottom}px)`,
+      width: "58px",
+      height: "58px",
+      font: "600 22px/1 system-ui, sans-serif",
+      background,
+      border: `1px solid ${borderColor}`,
+      color,
+    });
   }
 
   /** Default party: the starting bearer plus two distinct implemented front-liners. */
@@ -347,10 +375,13 @@ export class TrainingMode extends GameMode {
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
     if (this.rangedCooldownT > 0) this.rangedCooldownT = Math.max(0, this.rangedCooldownT - dt);
 
-    // Guarding roots the player and locks out attacking (you can't strike while
-    // holding the stance); the Attack press is ignored until the guard ends.
+    // Attack is the ⚔ button / click / Space (the timed combo). The other ATB actions
+    // are the left-column buttons (or G/R/T/F keys); each is gated by the ATB gauge.
     if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget);
-    if (this.guardPressed()) this.tryGuard();
+    if (this.guardPressed()) this.playerAct("guard");
+    if (this.input.wasPressed("Item") || this.input.wasPressed("KeyR")) this.playerAct("item");
+    if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) this.playerAct("transform");
+    if (this.input.wasPressed("Magic") || this.input.wasPressed("KeyF")) this.playerAct("magic");
     if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
 
     // Combat time scales with the Options "combat speed" setting.
@@ -376,16 +407,94 @@ export class TrainingMode extends GameMode {
   private guardPressed(): boolean {
     return (
       this.input.wasPressed("Guard") ||
+      this.input.wasPressed("KeyG") ||
       this.input.wasPressed("ShiftLeft") ||
       this.input.wasPressed("ShiftRight")
     );
   }
 
-  /** Enter the Defense stance if it's off cooldown. */
-  private tryGuard(): void {
-    if (!this.player.guardReady) return;
-    const heal = this.player.startGuard();
-    this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
+  // --- Player ATB actions (FF12-style: any one action spends the gauge) -----
+
+  /**
+   * Perform a non-attack ATB action for the controlled member. Requires the ATB gauge
+   * full and no combo in progress; on success it spends the gauge and counts a Dragoon
+   * turn (except the transform itself). Attack is handled separately (the timed combo).
+   */
+  private playerAct(id: ActionId): void {
+    if (this.runner.active || !this.runner.gauge.isReady) return;
+    const m = this.controlled;
+    let ok = false;
+    switch (id) {
+      case "guard":
+        ok = this.doGuard(m);
+        break;
+      case "transform":
+        ok = this.doTransform(m);
+        break;
+      case "item":
+        ok = this.doItem(m);
+        break;
+      case "magic":
+        ok = this.doMagic(m);
+        break;
+      case "attack":
+        break; // attack uses the timed-combo path, not this
+    }
+    if (ok) {
+      this.runner.gauge.spend();
+      if (id !== "transform") m.avatar.tickDragoon();
+    }
+  }
+
+  private doGuard(m: PartyMember): boolean {
+    if (m.avatar.guardActive) return false;
+    const heal = m.avatar.startGuard();
+    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
+    return true;
+  }
+
+  private doTransform(m: PartyMember): boolean {
+    if (!m.avatar.canTransform) return false;
+    m.avatar.transform();
+    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), "#ffe08a");
+    return true;
+  }
+
+  private doItem(m: PartyMember): boolean {
+    return this.useHealItem(m);
+  }
+
+  private doMagic(m: PartyMember): boolean {
+    if (!m.avatar.canCastMagic) return false;
+    const target =
+      this.attackTarget && this.attackTarget.alive ? this.attackTarget : this.nearestEnemy(ACQUIRE_RANGE);
+    if (!target) return false;
+    m.avatar.face(target.position.subtract(m.position));
+    this.castMagic(m.avatar, target);
+    return true;
+  }
+
+  /** Consume the first available healing item on `m`. Returns false if none/full. */
+  private useHealItem(m: PartyMember): boolean {
+    const stock = this.items.find((s) => s.count > 0 && s.def.healFraction > 0);
+    if (!stock) return false;
+    const healed = m.avatar.heal(Math.floor(m.avatar.maxHp * stock.def.healFraction));
+    stock.count -= 1;
+    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, "#9fe6a0");
+    return true;
+  }
+
+  /** Cast Dragoon magic: spend MP and deal magical damage (the Dragoon's element) to a foe. */
+  private castMagic(attacker: Player, target: Enemy): void {
+    attacker.mp = Math.max(0, attacker.mp - attacker.magicCost);
+    attacker.strike();
+    const element = elementMultiplier(attacker.element, target.def.element);
+    const dmg = Math.max(
+      1,
+      enemyMagicalAttack(attacker.matk, target.def.stats.mdf, DRAGOON_MAGIC_MULT, { element }),
+    );
+    this.popText(attacker.position.add(new Vector3(0, 2.6, 0)), t("action.magic"), "#c8a6ff");
+    this.landDamage(target, dmg, element);
   }
 
   private updateSight(): void {
@@ -508,6 +617,7 @@ export class TrainingMode extends GameMode {
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
     this.player.face(target.position.subtract(this.player.position));
+    this.player.tickDragoon(); // one attack = one Dragoon turn
     this.applyHit(target, res.hits); // guaranteed hit 1
   }
 
@@ -670,33 +780,65 @@ export class TrainingMode extends GameMode {
       ready: member.ready,
       hpFraction: member.avatar.maxHp > 0 ? member.avatar.hp / member.avatar.maxHp : 1,
       canGuard: member.avatar.guardReady,
+      canTransform: member.avatar.canTransform,
+      hasItem: this.hasHealItem(),
+      canCastMagic: member.avatar.canCastMagic,
     };
     const decision = member.brain.decide(view, { enemies: this.enemies });
-    switch (decision.kind) {
-      case "approach": {
-        const to = decision.target.position.subtract(member.position);
-        to.y = 0;
-        member.avatar.move(to, dt);
-        break;
-      }
-      case "attack": {
-        member.avatar.face(decision.target.position.subtract(member.position));
-        this.autoStrike(member.avatar, decision.target);
+    if (decision.kind === "approach") {
+      const to = decision.target.position.subtract(member.position);
+      to.y = 0;
+      member.avatar.move(to, dt);
+    } else if (decision.kind === "idle") {
+      if (decision.target) member.avatar.face(decision.target.position.subtract(member.position));
+    } else {
+      // An ATB action — only when the gauge is full; otherwise hold (face the target).
+      if (member.ready && this.performAiAction(member, decision)) {
         member.gauge.spend();
-        break;
-      }
-      case "guard": {
-        const heal = member.avatar.startGuard();
-        this.popText(member.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
-        break;
-      }
-      case "idle": {
-        if (decision.target) member.avatar.face(decision.target.position.subtract(member.position));
-        break;
+        if (decision.kind !== "transform") member.avatar.tickDragoon();
+      } else if ("target" in decision) {
+        member.avatar.face(decision.target.position.subtract(member.position));
       }
     }
     member.avatar.animate(dt, Vector3.DistanceSquared(before, member.position) > 1e-6);
     member.syncHud(this.scene);
+  }
+
+  /** Execute an AI member's chosen ATB action. Returns false if it couldn't be performed. */
+  private performAiAction(member: PartyMember, decision: { kind: string; target?: Enemy }): boolean {
+    const avatar = member.avatar;
+    switch (decision.kind) {
+      case "attack":
+        if (!decision.target) return false;
+        avatar.face(decision.target.position.subtract(member.position));
+        this.autoStrike(avatar, decision.target);
+        return true;
+      case "magic":
+        if (!decision.target || !avatar.canCastMagic) return false;
+        avatar.face(decision.target.position.subtract(member.position));
+        this.castMagic(avatar, decision.target);
+        return true;
+      case "guard": {
+        if (avatar.guardActive) return false;
+        const heal = avatar.startGuard();
+        this.popText(member.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
+        return true;
+      }
+      case "transform":
+        if (!avatar.canTransform) return false;
+        avatar.transform();
+        this.popText(member.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), "#ffe08a");
+        return true;
+      case "item":
+        return this.useHealItem(member);
+      default:
+        return false;
+    }
+  }
+
+  /** True when at least one healing item is in stock. */
+  private hasHealItem(): boolean {
+    return this.items.some((s) => s.count > 0 && s.def.healFraction > 0);
   }
 
   /**
@@ -705,6 +847,7 @@ export class TrainingMode extends GameMode {
    */
   private autoStrike(attacker: Player, target: Enemy): void {
     attacker.strike();
+    attacker.sp = Math.min(attacker.maxSp, attacker.sp + AI_SP_PER_HIT); // charge toward transform
     const add = attacker.addition;
     const atk = { at: attacker.atk, lv: attacker.level };
     const df = target.def.stats.df;
@@ -906,8 +1049,6 @@ export class TrainingMode extends GameMode {
       additionLevel: p.additionLevel(eq),
     });
 
-    // Cooldown readout. Timers run on combat time, so convert to real seconds.
-    this.guardBtn?.setCooldown(p.guardCooldownRemaining / settings.combatSpeed, p.guardCooldownFraction);
     // Attack-button lockout readout: guard disables attacking for the stance; otherwise
     // show the attack-interval "swing timer" (Addition recovery), or the ranged cadence.
     if (p.guardActive) {
@@ -919,6 +1060,15 @@ export class TrainingMode extends GameMode {
     } else {
       this.attackBtn?.setCooldown(0, 0);
     }
+
+    // The other ATB actions are usable only when the gauge is full and no combo is running;
+    // each also needs its own precondition (stance/SP/items/Dragoon form). Dim otherwise.
+    const ready = this.runner.gauge.isReady && !this.runner.active;
+    this.guardBtn?.setAvailable(ready && !p.guardActive);
+    this.transformBtn?.setAvailable(ready && p.canTransform);
+    this.itemBtn?.setAvailable(ready && this.hasHealItem());
+    this.magicBtn?.setAvailable(ready && p.canCastMagic);
+    this.switchBtn?.setAvailable(this.party.length > 1);
   }
 
   dispose(): void {
@@ -936,6 +1086,9 @@ export class TrainingMode extends GameMode {
     this.debugBtn.dispose();
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
+    this.transformBtn?.dispose();
+    this.itemBtn?.dispose();
+    this.magicBtn?.dispose();
     this.switchBtn?.dispose();
   }
 }

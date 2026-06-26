@@ -90,6 +90,12 @@ export class ActionButton {
     this.el.style.opacity = "0.85";
   }
 
+  /** Enable/disable the button: dims and blocks taps when unavailable. */
+  setAvailable(enabled: boolean): void {
+    this.el.style.opacity = enabled ? "1" : "0.35";
+    this.el.style.pointerEvents = enabled ? "auto" : "none";
+  }
+
   dispose(): void {
     this.el.remove();
   }

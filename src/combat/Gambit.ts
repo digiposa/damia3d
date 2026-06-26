@@ -15,9 +15,10 @@ import type { Brain, CombatantView, CombatWorld, Decision } from "./Brain";
 /** How a rule chooses its subject. */
 export type GambitTarget =
   | { who: "foe"; pick: "nearest" | "lowestHp" | "highestHp" }
-  | { who: "self"; cond: "hpBelow"; pct: number };
+  | { who: "self"; cond: "hpBelow"; pct: number }
+  | { who: "self"; cond: "spFull" };
 
-export type GambitAction = "attack" | "guard";
+export type GambitAction = "attack" | "guard" | "transform" | "item" | "magic";
 
 export interface GambitRule {
   target: GambitTarget;
@@ -37,6 +38,10 @@ export const GAMBIT_CATALOG: GambitCatalogEntry[] = [
   { id: "foeNear", labelKey: "gambit.foeNear", rule: { target: { who: "foe", pick: "nearest" }, action: "attack" } },
   { id: "foeLow", labelKey: "gambit.foeLow", rule: { target: { who: "foe", pick: "lowestHp" }, action: "attack" } },
   { id: "foeHigh", labelKey: "gambit.foeHigh", rule: { target: { who: "foe", pick: "highestHp" }, action: "attack" } },
+  { id: "magicNear", labelKey: "gambit.magicNear", rule: { target: { who: "foe", pick: "nearest" }, action: "magic" } },
+  { id: "transform", labelKey: "gambit.transform", rule: { target: { who: "self", cond: "spFull" }, action: "transform" } },
+  { id: "itemLow30", labelKey: "gambit.itemLow30", rule: { target: { who: "self", cond: "hpBelow", pct: 0.3 }, action: "item" } },
+  { id: "itemLow50", labelKey: "gambit.itemLow50", rule: { target: { who: "self", cond: "hpBelow", pct: 0.5 }, action: "item" } },
   { id: "selfLow30", labelKey: "gambit.selfLow30", rule: { target: { who: "self", cond: "hpBelow", pct: 0.3 }, action: "guard" } },
   { id: "selfLow50", labelKey: "gambit.selfLow50", rule: { target: { who: "self", cond: "hpBelow", pct: 0.5 }, action: "guard" } },
 ];
@@ -94,14 +99,24 @@ export class GambitBrain implements Brain {
 
   private evalRule(rule: GambitRule, self: CombatantView, world: CombatWorld): Decision | null {
     if (rule.target.who === "self") {
-      if (rule.target.cond === "hpBelow" && self.hpFraction < rule.target.pct) {
-        if (rule.action === "guard") return self.canGuard ? { kind: "guard" } : null;
+      if (rule.target.cond === "spFull") {
+        return rule.action === "transform" && self.canTransform ? { kind: "transform" } : null;
       }
+      // hpBelow
+      if (self.hpFraction >= rule.target.pct) return null;
+      if (rule.action === "guard") return self.canGuard ? { kind: "guard" } : null;
+      if (rule.action === "item") return self.hasItem ? { kind: "item" } : null;
       return null;
     }
 
     const target = pickFoe(self.position, world.enemies, this.aggroRange, rule.target.pick);
-    if (!target || rule.action !== "attack") return null;
+    if (!target) return null;
+
+    // Dragoon magic is ranged: cast from anywhere in aggro range (no approach needed).
+    if (rule.action === "magic") {
+      return self.canCastMagic ? { kind: "magic", target } : null;
+    }
+    if (rule.action !== "attack") return null;
     const dist = Vector3.Distance(self.position, target.position);
     if (dist > self.reach) return { kind: "approach", target };
     return self.ready ? { kind: "attack", target } : { kind: "idle", target };

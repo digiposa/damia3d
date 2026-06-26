@@ -22,6 +22,12 @@ export interface CombatantView {
   readonly hpFraction: number;
   /** True when the Guard stance can be entered (off cooldown, not active). */
   readonly canGuard: boolean;
+  /** True when the Dragoon Spirit is full and the member can transform. */
+  readonly canTransform: boolean;
+  /** True when a healing item is available to use. */
+  readonly hasItem: boolean;
+  /** True when Dragoon magic can be cast (transformed + enough MP). */
+  readonly canCastMagic: boolean;
 }
 
 /** Read-only snapshot of the battlefield the brain may reason about. */
@@ -37,7 +43,13 @@ export type Decision =
   /** Strike the target (in reach and ready). */
   | { kind: "attack"; target: Enemy }
   /** Enter the defensive Guard stance (self-preservation). */
-  | { kind: "guard" };
+  | { kind: "guard" }
+  /** Transform into Dragoon form (spends the full SP gauge). */
+  | { kind: "transform" }
+  /** Use a healing item on self. */
+  | { kind: "item" }
+  /** Cast Dragoon magic at the target. */
+  | { kind: "magic"; target: Enemy };
 
 export interface Brain {
   decide(self: CombatantView, world: CombatWorld): Decision;

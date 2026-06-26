@@ -15,6 +15,9 @@ const self = (ready: boolean, reach = 2.3): CombatantView => ({
   ready,
   hpFraction: 1,
   canGuard: true,
+  canTransform: false,
+  hasItem: true,
+  canCastMagic: false,
 });
 
 describe("AutoBrain", () => {

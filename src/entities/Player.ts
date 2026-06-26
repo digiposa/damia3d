@@ -23,6 +23,11 @@ const GUARD_DURATION = 2; // seconds the stance lasts
 const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activation)
 const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
 
+/** Dragoon transformation: lasts this many of the member's own actions. */
+const DRAGOON_TURNS = 3;
+/** Physical attack multiplier while transformed into Dragoon form. */
+const DRAGOON_ATK_MULT = 1.5;
+
 /**
  * The player avatar. Placeholder capsule body with a "nose" marker so facing is
  * visible; swap for a rigged glTF model later. Driven by a {@link Bearer} (the
@@ -63,6 +68,9 @@ export class Player {
   private guardTimer = 0;
   private guardCdTimer = 0;
   private guardShield!: Mesh;
+  /** Remaining actions of the active Dragoon transformation (0 = human form). */
+  private dragoonTurns = 0;
+  private dragoonAura!: Mesh;
   private humanoid: Humanoid;
 
   constructor(scene: Scene, bearer: Bearer, spawn = new Vector3(0, 0, 0), level = 1) {
@@ -116,6 +124,22 @@ export class Player {
     this.guardShield.isVisible = false;
     this.guardShield.isPickable = false;
     this.guardShield.parent = this.root;
+
+    // Golden aura shown while transformed into Dragoon form.
+    this.dragoonAura = MeshBuilder.CreateSphere("dragoonAura", { diameter: 2.6, segments: 12 }, scene);
+    this.dragoonAura.position.y = 1;
+    const auraMat = new StandardMaterial("dragoonAuraMat", scene);
+    auraMat.diffuseColor = new Color3(1, 0.85, 0.4);
+    auraMat.emissiveColor = new Color3(0.9, 0.7, 0.2);
+    auraMat.alpha = 0.16;
+    auraMat.backFaceCulling = false;
+    this.dragoonAura.material = auraMat;
+    this.dragoonAura.isVisible = false;
+    this.dragoonAura.isPickable = false;
+    this.dragoonAura.parent = this.root;
+
+    // Start with a full MP pool so Dragoon magic is usable straight away in training.
+    this.mp = this.maxMp;
   }
 
   get position(): Vector3 {
@@ -177,7 +201,8 @@ export class Player {
     return Math.floor(BASE_MAX_MP * (1 + this.bonusPct("mpPct")));
   }
   get atk(): number {
-    return this.stats.at + this.bonus("at");
+    const base = this.stats.at + this.bonus("at");
+    return this.transformed ? Math.floor(base * DRAGOON_ATK_MULT) : base;
   }
   get def(): number {
     return this.stats.df + this.bonus("df");
@@ -265,6 +290,51 @@ export class Player {
       if (this.guardTimer === 0) this.guardShield.isVisible = false;
     }
     if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
+  }
+
+  // --- Dragoon transformation ----------------------------------------------
+
+  /** True while in Dragoon form (boosted ATK, Dragoon magic available). */
+  get transformed(): boolean {
+    return this.dragoonTurns > 0;
+  }
+
+  /** True when the Dragoon Spirit is full and the member can transform. */
+  get canTransform(): boolean {
+    return !this.transformed && this.sp >= this.maxSp;
+  }
+
+  /** Spend the full SP gauge to enter Dragoon form for {@link DRAGOON_TURNS} actions. */
+  transform(): void {
+    if (!this.canTransform) return;
+    this.dragoonTurns = DRAGOON_TURNS;
+    this.sp = 0;
+    this.dragoonAura.isVisible = true;
+  }
+
+  /** Count one performed action against the transformation; revert at zero. */
+  tickDragoon(): void {
+    if (this.dragoonTurns > 0) {
+      this.dragoonTurns -= 1;
+      if (this.dragoonTurns === 0) this.dragoonAura.isVisible = false;
+    }
+  }
+
+  // --- Magic / healing ------------------------------------------------------
+
+  /** MP cost of one Dragoon magic cast. */
+  readonly magicCost = 10;
+
+  /** True when Dragoon magic can be cast: in Dragoon form with enough MP. */
+  get canCastMagic(): boolean {
+    return this.transformed && this.mp >= this.magicCost;
+  }
+
+  /** Restore HP (clamped to Max HP). Returns the amount actually healed. */
+  heal(amount: number): number {
+    const before = this.hp;
+    this.hp = Math.min(this.maxHp, this.hp + Math.max(0, amount));
+    return this.hp - before;
   }
 
   /** Jump straight to a level (debug/training): set stats & EXP and fully heal. */

@@ -16,6 +16,9 @@ const view = (over: Partial<CombatantView> = {}): CombatantView => ({
   ready: true,
   hpFraction: 1,
   canGuard: true,
+  canTransform: false,
+  hasItem: true,
+  canCastMagic: false,
   ...over,
 });
 
@@ -78,5 +81,26 @@ describe("GambitBrain (top-down rule evaluation)", () => {
     expect(brain.decide(view({ hpFraction: 0.2, canGuard: false }), { enemies: [e] })).toMatchObject({
       kind: "attack",
     });
+  });
+
+  it("transforms when SP is full and falls through otherwise", () => {
+    const e = enemy(1, 100);
+    const brain = new GambitBrain(resolveGambit(["transform", "foeNear"]));
+    expect(brain.decide(view({ canTransform: true }), { enemies: [e] })).toEqual({ kind: "transform" });
+    expect(brain.decide(view({ canTransform: false }), { enemies: [e] })).toMatchObject({ kind: "attack" });
+  });
+
+  it("uses an item when hurt and stock is available", () => {
+    const brain = new GambitBrain(resolveGambit(["itemLow50"]));
+    expect(brain.decide(view({ hpFraction: 0.3, hasItem: true }), { enemies: [] })).toEqual({ kind: "item" });
+    expect(brain.decide(view({ hpFraction: 0.3, hasItem: false }), { enemies: [] })).toEqual({ kind: "idle" });
+  });
+
+  it("casts magic at range only when able (no approach needed)", () => {
+    const far = enemy(15, 100);
+    const brain = new GambitBrain(resolveGambit(["magicNear"]));
+    expect(brain.decide(view({ canCastMagic: true }), { enemies: [far] })).toMatchObject({ kind: "magic", target: far });
+    // Can't cast (not transformed / no MP): the rule doesn't fire.
+    expect(brain.decide(view({ canCastMagic: false }), { enemies: [far] })).toEqual({ kind: "idle" });
   });
 });
