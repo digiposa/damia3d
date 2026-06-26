@@ -1,5 +1,6 @@
 import type { AdditionDef } from "../data/additions";
 import { additionPresses } from "../data/additions";
+import { AtbGauge, BASE_FILL_TIME } from "./AtbGauge";
 
 // --- Timing-sight tuning (seconds / progress fractions) --------------------
 
@@ -14,18 +15,16 @@ export const PERFECT_LO = 0.93;
 export const PERFECT_HI = 1.05;
 
 /**
- * Attack-interval model. Each Addition is one "attack" that occupies roughly
- * ATTACK_INTERVAL seconds (the real-time analogue of a turn): after it starts, the next
- * attack can't begin until the interval elapses. A short combo waits out the remainder;
- * a long combo that overruns the interval gets only MIN_RECOVERY. Because attacks come
- * at a fixed rate, sustained DPS tracks the canon per-execution damage (higher-rank
- * damage Additions out-DPS lower-rank ones, canon values untouched), and whiffing wastes
- * the whole interval — a pure opportunity cost, exactly like fumbling a turn.
+ * Attack-interval model, now expressed as an {@link AtbGauge}. Each Addition is one
+ * "attack": it spends the gauge at its start, then the gauge refills over ~ATTACK_INTERVAL
+ * seconds (modulated by the character's Speed). The next attack can't begin until the
+ * gauge is full again — a short combo waits out the remainder, a long combo that overruns
+ * the fill finds the gauge already full. Because attacks come at this fixed rate, sustained
+ * DPS tracks canon per-execution damage (higher-rank damage Additions out-DPS lower-rank
+ * ones, canon values untouched), and whiffing still burns the whole interval. This is the
+ * per-character ATB gauge the future party will each own.
  */
-export const ATTACK_INTERVAL = 2.8;
-export const MIN_RECOVERY = 0.2;
-/** Press-less basic attack (Shana/Miranda); their cadence is paced by the mode instead. */
-export const BASIC_RECOVERY = 0.25;
+export const ATTACK_INTERVAL = BASE_FILL_TIME;
 
 export type AttackResult =
   | { kind: "none" }
@@ -43,20 +42,22 @@ export type AttackResult =
  * window — or letting it lapse — ends the chain. Carries no damage math; the
  * owner reads the hit count and applies the LoD Addition formula per hit.
  *
+ * Cadence is governed by an {@link AtbGauge}: starting a (multi-hit) Addition spends
+ * the gauge, and the next attack waits for it to refill. A press-less basic attack
+ * (Shana/Miranda) does not spend the gauge — its cadence is paced by the mode.
+ *
  * Pure logic (no DOM/Babylon) so it can be unit-tested; the UI reads
  * {@link sightProgress} and {@link inWindow} to draw the sight.
  */
 export class AdditionRunner {
   active = false;
   hits = 0;
+  /** Per-character ATB gauge: full = ready to attack, empties on each Addition. */
+  readonly gauge = new AtbGauge(ATTACK_INTERVAL);
   private def?: AdditionDef;
   /** Timed presses landed so far (hit 1 is free, so presses = hits - 1). */
   private presses = 0;
   private sightTimer = 0;
-  private recoveryTimer = 0;
-  private recoveryTotal = 0;
-  /** Real seconds elapsed since the current attack (Addition) started. */
-  private elapsed = 0;
 
   constructor(private sightDuration = SIGHT_DURATION) {}
 
@@ -64,18 +65,24 @@ export class AdditionRunner {
     return this.def;
   }
 
+  /** Set the gauge's fill time (seconds) — e.g. from the bearer's Speed stat. */
+  setFillTime(seconds: number): void {
+    this.gauge.fillTime = seconds;
+  }
+
+  /** True while the ATB gauge is still refilling (the attack is on cooldown). */
   get recovering(): boolean {
-    return this.recoveryTimer > 0;
+    return !this.gauge.isReady;
   }
 
   /** Seconds of lockout still to run (combat time). */
   get recoveryRemaining(): number {
-    return this.recoveryTimer;
+    return this.gauge.remainingSeconds;
   }
 
   /** Fraction of the current lockout still to go (1 → 0). */
   get recoveryFraction(): number {
-    return this.recoveryTotal > 0 ? this.recoveryTimer / this.recoveryTotal : 0;
+    return this.gauge.remainingFraction;
   }
 
   /** Seconds for the active window to collapse to alignment. */
@@ -99,17 +106,23 @@ export class AdditionRunner {
    * idle (auto hit 1), or evaluates the current timing sight when active.
    */
   press(def: AdditionDef): AttackResult {
-    if (this.recoveryTimer > 0) return { kind: "none" };
-
     if (!this.active) {
+      const multiHit = additionPresses(def) > 0;
+      // A multi-hit Addition needs a charged gauge; the gauge is its cadence.
+      if (multiHit && !this.gauge.isReady) return { kind: "none" };
+
       this.def = def;
       this.active = true;
       this.hits = 1;
       this.presses = 0;
       this.sightTimer = 0;
-      this.elapsed = 0;
-      // A single-hit Addition (no presses) completes instantly (e.g. the basic attack).
-      if (additionPresses(def) === 0) this.endCombo();
+      if (multiHit) {
+        this.gauge.spend(); // start refilling from empty — this attack's cadence
+      } else {
+        // A single-hit Addition (basic attack) resolves instantly and leaves the
+        // gauge untouched (its cadence is paced by the mode, e.g. ranged cooldown).
+        this.endCombo();
+      }
       return { kind: "started", hits: 1 };
     }
 
@@ -131,13 +144,9 @@ export class AdditionRunner {
 
   /** Advance timers. Returns true on the frame a sight lapses unpressed (a miss). */
   tick(dt: number): boolean {
-    if (this.recoveryTimer > 0) {
-      this.recoveryTimer = Math.max(0, this.recoveryTimer - dt);
-      return false;
-    }
+    this.gauge.tick(dt); // the ATB gauge refills whether idle or mid-combo
     if (!this.active) return false;
     this.sightTimer += dt;
-    this.elapsed += dt;
     if (this.sightProgress > WINDOW_HI) {
       this.endCombo();
       return true;
@@ -151,21 +160,16 @@ export class AdditionRunner {
   }
 
   /**
-   * End the attack and set the lockout so the whole attack occupies ~ATTACK_INTERVAL
-   * from its start: a short combo waits out the remainder, a long one that overran the
-   * interval gets only MIN_RECOVERY. A press-less basic attack uses BASIC_RECOVERY.
-   * Whether it completed or whiffed doesn't change the cost — that's the point.
+   * End the attack: clear the active combo state. The gauge was spent when the
+   * attack started (for multi-hit Additions) and keeps refilling from there, so the
+   * whole attack occupies ~one fill cycle from its start regardless of whether it
+   * completed or whiffed — that's the point.
    */
   private endCombo(): void {
-    const presses = this.def ? additionPresses(this.def) : 0;
-    this.recoveryTotal =
-      presses === 0 ? BASIC_RECOVERY : Math.max(MIN_RECOVERY, ATTACK_INTERVAL - this.elapsed);
-    this.recoveryTimer = this.recoveryTotal;
     this.active = false;
     this.hits = 0;
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
-    this.elapsed = 0;
   }
 }

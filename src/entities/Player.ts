@@ -12,6 +12,7 @@ import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/e
 import { type DragoonClass, dragoonClass } from "../data/dragoonClasses";
 import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
+import { atbFillTime, REF_SPEED } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 
 const SPEED = 6; // world units per second
@@ -153,6 +154,20 @@ export class Player {
   /** Total of a flat equipment-only stat across equipped gear (0 if none). */
   gearTotal(key: "spd" | "aHit" | "mHit" | "aAv" | "mAv"): number {
     return this.equipped.reduce((sum, e) => sum + (e[key] ?? 0), 0);
+  }
+
+  /**
+   * Action speed: reference base + equipment Speed bonuses. Drives the ATB gauge
+   * recharge rate (the future party will each have their own). At base speed with no
+   * Speed gear this leaves the cadence unchanged.
+   */
+  get speed(): number {
+    return REF_SPEED + this.gearTotal("spd");
+  }
+
+  /** Seconds to refill this character's ATB gauge — shorter with higher Speed. */
+  get atbFillTime(): number {
+    return atbFillTime(this.speed);
   }
 
   get maxHp(): number {

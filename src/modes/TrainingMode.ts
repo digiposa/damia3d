@@ -235,6 +235,8 @@ export class TrainingMode extends GameMode {
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
     this.player.tickGuard(cdt);
+    // Keep the ATB gauge's fill time in sync with the bearer's Speed (gear can change it).
+    this.runner.setFillTime(this.player.atbFillTime);
     if (this.runner.tick(cdt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.comboTarget = undefined;
@@ -515,7 +517,7 @@ export class TrainingMode extends GameMode {
   private balanceRows(): BalanceRow[] {
     const atk = { at: this.player.atk, lv: this.player.level };
     return this.player.additions.map((a) => {
-      const e = estimateDps(atk, a, this.player.additionLevel(a), BALANCE_REF_DF);
+      const e = estimateDps(atk, a, this.player.additionLevel(a), BALANCE_REF_DF, this.player.atbFillTime);
       return {
         name: a.name,
         fullDps: Math.round(e.fullDps),
