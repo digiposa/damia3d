@@ -88,6 +88,14 @@ is ours.
 - All character **models and 2D portraits are procedural placeholders / extrapolations**
   (notably Shirley, never seen in human form in canon).
 
+## Assets on hand (not yet used)
+
+- `src/assets/icons/lod-icons-sheet.png` — a sprite sheet of in-game LoD icons (ripped):
+  weapons (swords/spears/axes), shields, boots, gloves/gauntlets, accessories (rings/
+  bracelets), the 8 element orbs, item icons (potions/bags), action/UI icons (magic, crossed
+  swords, etc.), and small character portrait headshots. To be sliced/atlased later for
+  equipment, element, action and item icons (and maybe HUD portraits). Stored for now.
+
 ## Other open items
 
 - **Items** — to be re-discussed (currently a single Healing Potion in a shared pool).
