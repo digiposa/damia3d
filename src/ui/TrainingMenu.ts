@@ -2,7 +2,6 @@ import { hasTouch } from "../core/device";
 import { t } from "../core/i18n";
 import { type Bearer, bearerById, selectableBearers } from "../data/bearers";
 import { dragoonClass } from "../data/dragoonClasses";
-import { gambitEntry } from "../combat/Gambit";
 
 /** One Addition's DPS readout: completing it vs. spamming the free hit 1. */
 export interface BalanceRow {
@@ -21,8 +20,6 @@ export interface TrainingState {
   activeSlot: number;
   /** Slot index of the player-controlled member. */
   controlledIndex: number;
-  /** Gambit rule ids per party slot (3 rule slots each). */
-  gambits: string[][];
   level: number;
   maxLevel: number;
   /** Reference enemy defence the balance figures are computed against. */
@@ -37,8 +34,6 @@ export interface TrainingCallbacks {
   onSelectBearer: (bearer: Bearer) => void;
   /** Choose which party slot to edit. */
   onSelectSlot: (slot: number) => void;
-  /** Cycle a gambit rule slot (slot, rule index) to the next catalog entry. */
-  onCycleGambit: (slot: number, idx: number) => void;
   onSetLevel: (level: number) => void;
   onSpawnDummy: () => void;
   onSpawnKnight: () => void;
@@ -46,11 +41,10 @@ export interface TrainingCallbacks {
   onResume: () => void;
 }
 
-type Tab = "character" | "gambits" | "level" | "spawn" | "balance";
+type Tab = "character" | "level" | "spawn" | "balance";
 
 const TABS: { id: Tab; labelKey: string; icon: string }[] = [
   { id: "character", labelKey: "char.title", icon: "👤" },
-  { id: "gambits", labelKey: "debug.gambits", icon: "🧠" },
   { id: "level", labelKey: "debug.level", icon: "📈" },
   { id: "spawn", labelKey: "debug.spawn", icon: "👾" },
   { id: "balance", labelKey: "debug.balance", icon: "⚖️" },
@@ -153,13 +147,11 @@ export class TrainingMenu {
     this.content.replaceChildren(
       this.tab === "character"
         ? this.renderCharacter()
-        : this.tab === "gambits"
-          ? this.renderGambits()
-          : this.tab === "level"
-            ? this.renderLevel()
-            : this.tab === "spawn"
-              ? this.renderSpawn()
-              : this.renderBalance(),
+        : this.tab === "level"
+          ? this.renderLevel()
+          : this.tab === "spawn"
+            ? this.renderSpawn()
+            : this.renderBalance(),
     );
   }
 
@@ -236,7 +228,7 @@ export class TrainingMenu {
     return box;
   }
 
-  /** The 3-slot party selector row (shared by the Character and Gambits tabs). */
+  /** The 3-slot party selector row for the Character tab. */
   private slotRow(s: TrainingState): HTMLElement {
     const slots = document.createElement("div");
     Object.assign(slots.style, {
@@ -249,61 +241,6 @@ export class TrainingMenu {
       slots.appendChild(this.slotCard(i, bearerById(s.party[i]), i === s.activeSlot, i === s.controlledIndex));
     }
     return slots;
-  }
-
-  /** AI rule list (gambits) for the active party member: tap a rule to cycle it. */
-  private renderGambits(): HTMLElement {
-    const box = section(t("debug.gambits"));
-    const s = this.cb.state();
-
-    box.appendChild(label(t("party.slots")));
-    box.appendChild(this.slotRow(s));
-
-    const member = bearerById(s.party[s.activeSlot]);
-    box.appendChild(label(t("gambit.rulesFor").replace("{name}", member?.name ?? "—")));
-
-    const list = document.createElement("div");
-    Object.assign(list.style, { display: "flex", flexDirection: "column", gap: "6px" } satisfies Partial<CSSStyleDeclaration>);
-    const rules = s.gambits[s.activeSlot] ?? [];
-    rules.forEach((id, idx) => list.appendChild(this.gambitChip(idx, id)));
-    box.appendChild(list);
-
-    const note = document.createElement("div");
-    Object.assign(note.style, {
-      font: "400 11px/1.5 ui-monospace, monospace",
-      color: "#9a8a66",
-      marginTop: "12px",
-    } satisfies Partial<CSSStyleDeclaration>);
-    note.textContent = t("gambit.note");
-    box.appendChild(note);
-    return box;
-  }
-
-  /** One gambit rule row: its order number + current rule; tap cycles to the next. */
-  private gambitChip(idx: number, id: string): HTMLElement {
-    const el = document.createElement("button");
-    const empty = id === "none";
-    Object.assign(el.style, {
-      display: "flex",
-      alignItems: "center",
-      gap: "10px",
-      textAlign: "left",
-      font: "700 14px/1.2 system-ui, sans-serif",
-      color: empty ? "#9a8a66" : "#f0e6cf",
-      background: empty ? "rgba(28,24,12,0.7)" : "rgba(40,34,16,0.85)",
-      border: "1px solid #6b551f",
-      borderRadius: "9px",
-      padding: "11px 13px",
-      cursor: "pointer",
-      touchAction: "manipulation",
-    } satisfies Partial<CSSStyleDeclaration>);
-    el.innerHTML =
-      `<span style="flex:0 0 auto;width:20px;height:20px;border-radius:50%;` +
-      `display:inline-flex;align-items:center;justify-content:center;` +
-      `background:rgba(200,162,74,0.25);font:800 12px/1 ui-monospace,monospace;color:#ffe08a">${idx + 1}</span>` +
-      `<span>${t(gambitEntry(id).labelKey)}</span>`;
-    tap(el, () => this.cb.onCycleGambit(this.cb.state().activeSlot, idx));
-    return el;
   }
 
   /** A party-slot chip: its assigned bearer, highlighted when active for editing. */

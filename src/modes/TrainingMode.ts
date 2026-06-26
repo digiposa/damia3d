@@ -164,7 +164,6 @@ export class TrainingMode extends GameMode {
         party: this.partyBearers.map((b) => b.id),
         activeSlot: this.activeSlot,
         controlledIndex: this.controlledIndex,
-        gambits: this.gambitIds,
         level: this.partyLevel,
         maxLevel: this.player.maxLevel,
         refDf: BALANCE_REF_DF,
@@ -172,7 +171,6 @@ export class TrainingMode extends GameMode {
       }),
       onSelectBearer: (b) => this.assignToSlot(b),
       onSelectSlot: (slot) => this.selectSlot(slot),
-      onCycleGambit: (slot, idx) => this.cycleGambit(slot, idx),
       onSetLevel: (lv) => this.setLevel(lv),
       onSpawnDummy: () => this.spawnDummy(),
       onSpawnKnight: () => this.spawnKnight(),
@@ -350,15 +348,14 @@ export class TrainingMode extends GameMode {
 
   /**
    * Cycle one gambit rule slot to the next catalog entry, then re-arm that member's
-   * brain live (no rebuild needed). Keeps the menu open.
+   * brain live (no rebuild needed). Edited from the System menu's Gambits tab.
    */
-  private cycleGambit(slot: number, idx: number): void {
-    const rules = this.gambitIds[slot];
+  private cycleGambit(member: number, idx: number): void {
+    const rules = this.gambitIds[member];
     if (!rules || idx < 0 || idx >= rules.length) return;
     rules[idx] = nextGambitId(rules[idx]);
-    const member = this.party[slot];
-    if (member) member.brain = new GambitBrain(resolveGambit(rules));
-    this.debugMenu.refresh();
+    const m = this.party[member];
+    if (m) m.brain = new GambitBrain(resolveGambit(rules));
   }
 
   /** Jump the whole party to a level (debug). Keeps the menu open. */
@@ -1003,6 +1000,14 @@ export class TrainingMode extends GameMode {
       },
       additions: this.additionEntries(),
       equipAddition: (def) => this.equipAddition(def),
+      gambits: {
+        members: this.party.map((m, i) => ({
+          name: m.avatar.bearer.name,
+          controlled: m === this.controlled,
+          rules: this.gambitIds[i] ?? [],
+        })),
+        cycle: (mi, ri) => this.cycleGambit(mi, ri),
+      },
       equipment: {
         slots: (["weapon", "head", "body", "feet", "accessory"] as EquipSlot[]).map((slot) => ({
           slot,

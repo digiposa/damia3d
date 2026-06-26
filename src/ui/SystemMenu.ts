@@ -9,6 +9,7 @@ import {
   additionHitsPercent,
   additionMultiplier,
 } from "../data/additions";
+import { gambitEntry } from "../combat/Gambit";
 
 type Section = SystemSection;
 
@@ -16,6 +17,7 @@ const SECTIONS: { id: Section; labelKey: string; icon: string }[] = [
   { id: "status", labelKey: "section.status", icon: "📊" },
   { id: "equip", labelKey: "section.equip", icon: "🛡️" },
   { id: "addition", labelKey: "section.addition", icon: "💥" },
+  { id: "gambits", labelKey: "section.gambits", icon: "🧠" },
   { id: "config", labelKey: "section.config", icon: "⚙" },
 ];
 
@@ -46,6 +48,8 @@ export class SystemMenu {
   private atMainMenu = false;
   /** Equipment tab sub-state: which slot is being chosen (undefined = slot list). */
   private equipSlot?: EquipSlot;
+  /** Gambits tab sub-state: which party member is being edited. */
+  private gambitMember = 0;
 
   constructor(private cb: SystemMenuCallbacks) {
     this.root = document.createElement("div");
@@ -125,7 +129,9 @@ export class SystemMenu {
   private render(): void {
     const data = this.cb.data();
     // Character tabs only exist once a mode has player state; otherwise Config only.
-    const available = data ? SECTIONS : SECTIONS.filter((s) => s.id === "config");
+    // The Gambits tab only shows when the mode exposes a party (Training/party modes).
+    let available = data ? SECTIONS : SECTIONS.filter((s) => s.id === "config");
+    if (!data?.gambits) available = available.filter((s) => s.id !== "gambits");
     if (!available.some((s) => s.id === this.section)) this.section = available[0].id;
     if (this.section !== "equip") this.equipSlot = undefined;
 
@@ -133,11 +139,13 @@ export class SystemMenu {
     this.content.replaceChildren(
       this.section === "config"
         ? this.renderConfig()
-        : this.section === "addition"
-          ? this.renderAddition(data)
-          : this.section === "equip"
-            ? this.renderEquip(data)
-            : this.renderStatus(data),
+        : this.section === "gambits"
+          ? this.renderGambits(data)
+          : this.section === "addition"
+            ? this.renderAddition(data)
+            : this.section === "equip"
+              ? this.renderEquip(data)
+              : this.renderStatus(data),
     );
   }
 
@@ -290,6 +298,43 @@ export class SystemMenu {
       });
     }
     return el;
+  }
+
+  private renderGambits(data?: ModeMenuData): HTMLElement {
+    const box = section(t("section.gambits"));
+    const g = data?.gambits;
+    if (!g || g.members.length === 0) {
+      box.appendChild(note(t("gambit.unavailable")));
+      return box;
+    }
+    if (this.gambitMember >= g.members.length) this.gambitMember = 0;
+
+    // Member selector: pick whose rules to edit (the controlled member is marked ⓟ).
+    box.appendChild(
+      choiceRow(
+        g.members.map((_, i) => i),
+        this.gambitMember,
+        (i) => {
+          this.gambitMember = i;
+          this.render();
+        },
+        (i) => `${g.members[i].controlled ? "ⓟ " : ""}${g.members[i].name}`,
+      ),
+    );
+
+    const m = g.members[this.gambitMember];
+    box.appendChild(divider());
+    box.appendChild(label(t("gambit.rulesFor", { name: m.name })));
+    m.rules.forEach((id, idx) => {
+      box.appendChild(
+        listRow(`${idx + 1}.  ${t(gambitEntry(id).labelKey)}`, "", false, true, () => {
+          g.cycle(this.gambitMember, idx);
+          this.render();
+        }),
+      );
+    });
+    box.appendChild(hint(t("gambit.note")));
+    return box;
   }
 
   private renderConfig(): HTMLElement {

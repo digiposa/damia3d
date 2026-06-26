@@ -61,16 +61,34 @@ export interface EquipView {
   equip: (slot: EquipSlot, id?: string) => void;
 }
 
+/** One party member in the Gambits tab. */
+export interface GambitMemberView {
+  name: string;
+  /** The player-controlled member (marked, listed first focus). */
+  controlled: boolean;
+  /** Ordered catalog ids for this member's rule slots. */
+  rules: string[];
+}
+
+/** AI gambit rules + actions exposed to the System menu's Gambits tab. */
+export interface GambitsView {
+  members: GambitMemberView[];
+  /** Cycle a member's rule slot to the next catalog entry. */
+  cycle: (memberIndex: number, ruleIndex: number) => void;
+}
+
 /** Per-mode data the System menu reads to populate the Status / Addition / Equipment tabs. */
 export interface ModeMenuData {
   status: StatusView;
   additions: AdditionEntry[];
   equipAddition: (def: AdditionDef) => void;
   equipment: EquipView;
+  /** AI party gambits (Training/party modes only; absent elsewhere). */
+  gambits?: GambitsView;
 }
 
 /** A section of the in-game System menu. */
-export type SystemSection = "status" | "equip" | "addition" | "config";
+export type SystemSection = "status" | "equip" | "addition" | "gambits" | "config";
 
 /** Services the running game exposes to its modes (e.g. opening the System menu). */
 export interface GameHost {

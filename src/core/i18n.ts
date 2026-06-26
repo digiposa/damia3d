@@ -33,7 +33,9 @@ const en: Dict = {
   "section.status": "Status",
   "section.equip": "Equipment",
   "section.addition": "Addition",
+  "section.gambits": "Gambits",
   "section.config": "Config",
+  "gambit.unavailable": "No AI party members.",
 
   // Status
   "stat.hp": "HP",
@@ -171,7 +173,9 @@ const fr: Dict = {
   "section.status": "Statut",
   "section.equip": "Équipement",
   "section.addition": "Addition",
+  "section.gambits": "Gambits",
   "section.config": "Réglages",
+  "gambit.unavailable": "Aucun équipier IA.",
 
   "stat.hp": "PV",
   "stat.sp": "SP",
