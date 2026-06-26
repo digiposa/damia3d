@@ -8,16 +8,18 @@ import { projectToScreen } from "../world/project";
 import { Player } from "./Player";
 
 /**
- * An AI-controlled party member. Reuses the {@link Player} avatar for its model and stats,
- * but is driven by a {@link Brain} instead of input and gated by its own {@link AtbGauge}
- * (FF12-style: it acts when the gauge fills, at a rate set by its Speed). Carries a floating
- * ATB bar + name tag above its head so the cadence is visible. The mode reads {@link ready}
- * and {@link brain} to decide and execute its actions.
+ * One member of the party. Reuses the {@link Player} avatar for its model and stats, and
+ * owns its own {@link AtbGauge} (FF12-style: it acts when the gauge fills, at a Speed-scaled
+ * rate). A member is either player-controlled (driven by input + the timed AdditionRunner)
+ * or AI-driven (its {@link Brain} chooses actions, auto-resolved). The controlled member
+ * hides its floating gauge (the attack button shows its cooldown instead); AI members show
+ * an ATB bar + name tag above the head so their cadence is visible.
  */
-export class Ally {
+export class PartyMember {
   readonly avatar: Player;
   readonly gauge: AtbGauge;
   brain: Brain;
+  controlled = false;
 
   private bar: HTMLDivElement;
   private barFill: HTMLDivElement;
@@ -28,7 +30,7 @@ export class Ally {
     this.gauge = new AtbGauge(this.avatar.atbFillTime);
     this.brain = brain;
 
-    // Floating ATB gauge (positioned each frame via syncHud); amber when full.
+    // Floating ATB gauge (positioned each frame via syncHud), shown only for AI members.
     this.bar = document.createElement("div");
     Object.assign(this.bar.style, {
       position: "fixed",
@@ -72,9 +74,15 @@ export class Ally {
     return this.avatar.position;
   }
 
-  /** True when the ATB gauge is full and the ally may act. */
+  /** True when the ATB gauge is full and the member may act. */
   get ready(): boolean {
     return this.gauge.isReady;
+  }
+
+  /** Mark this member as the player-controlled one (or not), updating its HUD. */
+  setControlled(flag: boolean): void {
+    this.controlled = flag;
+    if (flag) this.hideHud();
   }
 
   /** Advance the ATB gauge (use combat-scaled dt); keeps the fill rate in sync with Speed. */
@@ -88,12 +96,20 @@ export class Ally {
     return this.position.add(new Vector3(0, 2.4 * s, 0));
   }
 
-  /** Position and fill the floating ATB bar + name tag each frame. */
+  private hideHud(): void {
+    this.bar.style.display = "none";
+    this.nameTag.style.display = "none";
+  }
+
+  /** Position and fill the floating ATB bar + name tag each frame (AI members only). */
   syncHud(scene: Scene): void {
+    if (this.controlled) {
+      this.hideHud();
+      return;
+    }
     const p = projectToScreen(scene, this.headPosition);
     if (!p.visible) {
-      this.bar.style.display = "none";
-      this.nameTag.style.display = "none";
+      this.hideHud();
       return;
     }
     this.bar.style.display = "block";

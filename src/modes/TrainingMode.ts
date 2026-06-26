@@ -11,7 +11,7 @@ import { IsoCamera } from "../world/IsoCamera";
 import { createGround } from "../world/Ground";
 import { projectToScreen } from "../world/project";
 import { Player } from "../entities/Player";
-import { Ally } from "../entities/Ally";
+import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
 import { AutoBrain } from "../combat/Brain";
@@ -34,7 +34,7 @@ import {
   equipmentForSlot,
   equipSummary,
 } from "../data/equipment";
-import { type Bearer, BEARERS, DEFAULT_BEARER } from "../data/bearers";
+import { type Bearer, DEFAULT_BEARER, selectableBearers } from "../data/bearers";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { StatsBar } from "../ui/StatsBar";
@@ -72,18 +72,26 @@ export class TrainingMode extends GameMode {
   readonly name = "Training";
 
   private camera!: IsoCamera;
-  private player!: Player;
   private stats!: StatsBar;
   private sight!: TimingSight;
   private debugBtn!: Button;
   private debugMenu!: TrainingMenu;
-  private bearer: Bearer = DEFAULT_BEARER;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
+  private switchBtn?: ActionButton;
+
+  /** The party (up to 3): one member is player-controlled, the rest run their Brain. */
+  private party: PartyMember[] = [];
+  /** Index into {@link party} of the player-controlled member. */
+  private controlledIndex = 0;
+  /** The bearers assigned to each party slot (the roster the menu edits). */
+  private partyBearers: Bearer[] = [];
+  /** The slot the Character menu is currently editing. */
+  private activeSlot = 0;
+  /** Shared training level applied to the whole party. */
+  private partyLevel = 1;
 
   private enemies: Enemy[] = [];
-  /** AI party member fighting alongside the player (FF12-style own ATB gauge). */
-  private ally?: Ally;
   private arrows: Arrow[] = [];
   /** Ranged fire cooldown (real seconds) so bow bearers don't spray arrows. */
   private rangedCooldownT = 0;
@@ -100,6 +108,16 @@ export class TrainingMode extends GameMode {
 
   private canvas?: HTMLCanvasElement;
 
+  /** The player-controlled party member. */
+  private get controlled(): PartyMember {
+    return this.party[this.controlledIndex];
+  }
+
+  /** The controlled member's avatar — the "player" for movement, camera, HUD and stats. */
+  private get player(): Player {
+    return this.controlled.avatar;
+  }
+
   enter(): void {
     this.scene.clearColor = new Color4(0.043, 0.051, 0.071, 1);
 
@@ -112,24 +130,28 @@ export class TrainingMode extends GameMode {
 
     createGround(this.scene, 40);
 
-    this.player = new Player(this.scene, this.bearer, new Vector3(0, 0, 0));
+    this.partyBearers = this.defaultParty();
+    this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
 
     // The equipped-Addition chip in the stats bar opens the System menu on Addition.
     this.stats = new StatsBar(() => this.host.openSystemMenu("addition"));
     this.sight = new TimingSight();
 
-    // Training debug menu (Training only): switch character, set level, spawn
+    // Training debug menu (Training only): build the 3-member party, set level, spawn
     // enemies. Opened from a button just below the gear (⚙); pauses gameplay.
     this.debugMenu = new TrainingMenu({
       state: () => ({
-        bearerId: this.bearer.id,
-        level: this.player.level,
+        party: this.partyBearers.map((b) => b.id),
+        activeSlot: this.activeSlot,
+        controlledIndex: this.controlledIndex,
+        level: this.partyLevel,
         maxLevel: this.player.maxLevel,
         refDf: BALANCE_REF_DF,
         balance: this.balanceRows(),
       }),
-      onSelectBearer: (b) => this.setBearer(b),
+      onSelectBearer: (b) => this.assignToSlot(b),
+      onSelectSlot: (slot) => this.selectSlot(slot),
       onSetLevel: (lv) => this.setLevel(lv),
       onSpawnDummy: () => this.spawnDummy(),
       onSpawnKnight: () => this.spawnKnight(),
@@ -157,34 +179,78 @@ export class TrainingMode extends GameMode {
       border: "1px solid rgba(150,190,255,0.6)",
       color: "#e6f0ff",
     });
+    // Switch which party member you control (also Tab on desktop), bottom-left.
+    this.switchBtn = new ActionButton("⇄", () => this.input.pressVirtual("Switch"), {
+      right: "auto",
+      left: "calc(env(safe-area-inset-left, 0px) + 26px)",
+      background: "rgba(70,60,120,0.82)",
+      border: "1px solid rgba(180,170,255,0.6)",
+      color: "#ece6ff",
+    });
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
+    window.addEventListener("keydown", this.onKeyDown);
 
     this.spawnDummy();
-    this.spawnCompanion();
+  }
+
+  /** Default party: the starting bearer plus two distinct implemented front-liners. */
+  private defaultParty(): Bearer[] {
+    const roster = selectableBearers();
+    const prefs = ["lavitz", "albert", "rose", "shana", "meru"];
+    const team: Bearer[] = [DEFAULT_BEARER];
+    for (const id of prefs) {
+      if (team.length >= 3) break;
+      const b = roster.find((x) => x.id === id);
+      if (b && !team.some((m) => m.id === b.id)) team.push(b);
+    }
+    // Top up from the implemented roster if the preferred picks weren't enough.
+    for (const b of roster) {
+      if (team.length >= 3) break;
+      if (!team.some((m) => m.id === b.id)) team.push(b);
+    }
+    return team;
+  }
+
+  /** A small formation offset for party slot `i` around a base point. */
+  private formationOffset(i: number): Vector3 {
+    const offs = [new Vector3(0, 0, 0), new Vector3(-2.5, 0, -1.5), new Vector3(2.5, 0, -1.5)];
+    return offs[i] ?? new Vector3(0, 0, 0);
   }
 
   /**
-   * (Re)spawn the AI companion beside the player: a roster bearer different from the
-   * player's, with its own ATB gauge and an {@link AutoBrain}. Step toward the eventual
-   * 3-character party — for now a single proof-of-concept ally.
+   * Build (or rebuild) the party from {@link partyBearers}: dispose any existing members,
+   * spawn each in formation at {@link partyLevel}, mark the controlled one, and bind the
+   * AdditionRunner to that member's ATB gauge. Resets transient combat state.
    */
-  private spawnCompanion(): void {
-    this.ally?.dispose();
-    const bearer = this.companionBearer();
-    const spawn = this.player.position.add(new Vector3(-2.5, 0, -1.5));
-    this.ally = new Ally(this.scene, bearer, spawn, new AutoBrain(), this.player.level);
+  private buildParty(): void {
+    const base = this.party.length ? this.player.position.clone() : new Vector3(0, 0, 0);
+    for (const m of this.party) m.dispose();
+    this.controlledIndex = Math.min(this.controlledIndex, this.partyBearers.length - 1);
+    this.party = this.partyBearers.map((b, i) => {
+      const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), new AutoBrain(), this.partyLevel);
+      m.setControlled(i === this.controlledIndex);
+      return m;
+    });
+    this.runner.cancel();
+    this.comboTarget = undefined;
+    this.clearNav();
+    this.runner.attach(this.controlled.gauge);
+    this.runner.setFillTime(this.player.atbFillTime);
   }
 
-  /** Pick a companion bearer distinct from the player's (prefers a melee front-liner). */
-  private companionBearer(): Bearer {
-    const prefs = ["lavitz", "albert", "dart", "rose", "shana"];
-    for (const id of prefs) {
-      const b = BEARERS.find((x) => x.id === id);
-      if (b && b.id !== this.bearer.id) return b;
-    }
-    return BEARERS.find((b) => b.id !== this.bearer.id) ?? this.bearer;
+  /** Cycle player control to the next party member (Tab / the ⇄ button). */
+  private cycleControl(): void {
+    if (this.party.length < 2) return;
+    this.runner.cancel();
+    this.comboTarget = undefined;
+    this.clearNav();
+    this.controlled.setControlled(false);
+    this.controlledIndex = (this.controlledIndex + 1) % this.party.length;
+    this.controlled.setControlled(true);
+    this.runner.attach(this.controlled.gauge);
+    this.runner.setFillTime(this.player.atbFillTime);
   }
 
   private openDebugMenu(): void {
@@ -199,31 +265,38 @@ export class TrainingMode extends GameMode {
     this.paused = false;
   }
 
-  /**
-   * Re-skin the player to another bearer: rebuild the avatar in place (same
-   * position and level) on the new bearer's Dragoon class, resetting transient
-   * combat state. Selecting the current bearer just resumes.
-   */
-  private setBearer(b: Bearer): void {
-    if (b.id !== this.bearer.id) {
-      const pos = this.player.position.clone();
-      const level = this.player.level;
-      this.player.dispose();
-      this.bearer = b;
-      this.player = new Player(this.scene, b, pos, level);
-      this.runner.cancel();
-      this.comboTarget = undefined;
-      this.clearNav();
-      this.spawnCompanion(); // keep the ally distinct from the new player bearer
-    }
-    this.closeDebugMenu();
+  /** Choose which party slot the Character menu edits. Keeps the menu open. */
+  private selectSlot(slot: number): void {
+    this.activeSlot = Math.min(Math.max(slot, 0), this.partyBearers.length - 1);
+    this.debugMenu.refresh();
   }
 
-  /** Jump the player to a level (debug). Keeps the menu open. */
+  /**
+   * Assign a bearer to the active party slot, then rebuild the party. Duplicates are
+   * avoided by swapping: if the bearer already holds another slot, that slot inherits the
+   * one being replaced. Keeps the menu open so several slots can be set in a row.
+   */
+  private assignToSlot(b: Bearer): void {
+    const slot = this.activeSlot;
+    const existing = this.partyBearers.findIndex((x) => x.id === b.id);
+    if (existing === slot) return; // no change
+    if (existing >= 0) this.partyBearers[existing] = this.partyBearers[slot]; // swap to dedupe
+    this.partyBearers[slot] = b;
+    this.buildParty();
+    this.debugMenu.refresh();
+  }
+
+  /** Jump the whole party to a level (debug). Keeps the menu open. */
   private setLevel(level: number): void {
-    this.player.setLevel(level);
+    this.partyLevel = level;
+    for (const m of this.party) m.avatar.setLevel(level);
     this.refreshHud();
   }
+
+  /** Stop Tab from moving DOM focus — it's the control-switch key in Training. */
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.code === "Tab") e.preventDefault();
+  };
 
   update(dt: number): void {
     // Spawn menu open: gameplay is paused (the HUD keeps its last state).
@@ -259,6 +332,7 @@ export class TrainingMode extends GameMode {
     // holding the stance); the Attack press is ignored until the guard ends.
     if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget);
     if (this.guardPressed()) this.tryGuard();
+    if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
 
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
@@ -271,7 +345,10 @@ export class TrainingMode extends GameMode {
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
     }
     this.updateEnemies(cdt);
-    this.updateAlly(dt, cdt);
+    // AI party members (everyone except the controlled one) run their Brain.
+    for (const m of this.party) {
+      if (m !== this.controlled) this.updateAiMember(m, dt, cdt);
+    }
     this.updateSight();
 
     this.refreshHud();
@@ -552,38 +629,36 @@ export class TrainingMode extends GameMode {
   }
 
   /**
-   * Drive the AI companion: charge its ATB gauge, then run its brain (the single
+   * Drive an AI party member: charge its ATB gauge, then run its brain (the single
    * decision point a future gambit system will replace) and execute the result —
    * approach, strike (auto-resolving the full Addition), or hold while charging.
    */
-  private updateAlly(dt: number, cdt: number): void {
-    const ally = this.ally;
-    if (!ally) return;
-    ally.tickGauge(cdt);
+  private updateAiMember(member: PartyMember, dt: number, cdt: number): void {
+    member.tickGauge(cdt);
 
-    const before = ally.position.clone();
-    const view = { position: ally.position, reach: this.reachFor(ally.avatar), ready: ally.ready };
-    const decision = ally.brain.decide(view, { enemies: this.enemies });
+    const before = member.position.clone();
+    const view = { position: member.position, reach: this.reachFor(member.avatar), ready: member.ready };
+    const decision = member.brain.decide(view, { enemies: this.enemies });
     switch (decision.kind) {
       case "approach": {
-        const to = decision.target.position.subtract(ally.position);
+        const to = decision.target.position.subtract(member.position);
         to.y = 0;
-        ally.avatar.move(to, dt);
+        member.avatar.move(to, dt);
         break;
       }
       case "attack": {
-        ally.avatar.face(decision.target.position.subtract(ally.position));
-        this.autoStrike(ally.avatar, decision.target);
-        ally.gauge.spend();
+        member.avatar.face(decision.target.position.subtract(member.position));
+        this.autoStrike(member.avatar, decision.target);
+        member.gauge.spend();
         break;
       }
       case "idle": {
-        if (decision.target) ally.avatar.face(decision.target.position.subtract(ally.position));
+        if (decision.target) member.avatar.face(decision.target.position.subtract(member.position));
         break;
       }
     }
-    ally.avatar.animate(dt, Vector3.DistanceSquared(before, ally.position) > 1e-6);
-    ally.syncHud(this.scene);
+    member.avatar.animate(dt, Vector3.DistanceSquared(before, member.position) > 1e-6);
+    member.syncHud(this.scene);
   }
 
   /**
@@ -810,17 +885,20 @@ export class TrainingMode extends GameMode {
 
   dispose(): void {
     this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
+    window.removeEventListener("keydown", this.onKeyDown);
     for (const a of this.arrows) a.dispose();
     this.arrows = [];
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
-    this.ally?.dispose();
+    for (const m of this.party) m.dispose();
+    this.party = [];
     this.stats.dispose();
     this.sight.dispose();
     this.debugMenu.dispose();
     this.debugBtn.dispose();
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
+    this.switchBtn?.dispose();
   }
 }
 

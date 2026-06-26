@@ -52,8 +52,12 @@ export type AttackResult =
 export class AdditionRunner {
   active = false;
   hits = 0;
-  /** Per-character ATB gauge: full = ready to attack, empties on each Addition. */
-  readonly gauge = new AtbGauge(ATTACK_INTERVAL);
+  /**
+   * Per-character ATB gauge: full = ready to attack, empties on each Addition. Defaults
+   * to an own gauge (used standalone in tests); in a party the runner is {@link attach}ed
+   * to whichever member is currently player-controlled, so its gauge is that member's.
+   */
+  gauge = new AtbGauge(ATTACK_INTERVAL);
   private def?: AdditionDef;
   /** Timed presses landed so far (hit 1 is free, so presses = hits - 1). */
   private presses = 0;
@@ -68,6 +72,11 @@ export class AdditionRunner {
   /** Set the gauge's fill time (seconds) — e.g. from the bearer's Speed stat. */
   setFillTime(seconds: number): void {
     this.gauge.fillTime = seconds;
+  }
+
+  /** Bind the runner to a specific ATB gauge (the now-controlled party member's). */
+  attach(gauge: AtbGauge): void {
+    this.gauge = gauge;
   }
 
   /** True while the ATB gauge is still refilling (the attack is on cooldown). */

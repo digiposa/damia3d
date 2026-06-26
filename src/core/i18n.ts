@@ -82,6 +82,8 @@ const en: Dict = {
 
   // Character menu
   "char.title": "Character",
+  "party.slots": "Party (3)",
+  "party.hint": "Tap a slot, then a character to assign it. Tab / ⇄ switches control in-game.",
 
   // Training debug menu
   "debug.title": "Training",
@@ -188,6 +190,8 @@ const fr: Dict = {
   "config.language": "Langue",
 
   "char.title": "Personnage",
+  "party.slots": "Équipe (3)",
+  "party.hint": "Touche un slot, puis un personnage pour l'assigner. Tab / ⇄ change de perso contrôlé en jeu.",
   "debug.title": "Entraînement",
   "debug.level": "Niveau",
   "debug.spawn": "Apparition",
