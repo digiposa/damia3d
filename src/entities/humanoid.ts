@@ -1641,52 +1641,47 @@ function buildSpikyHair(scene: Scene): TransformNode {
 }
 
 /**
- * Zieg's hair: a vivid-blond mane slicked back off the brow and flaring up and back — built
- * from stacked, back-tilted slabs (the smooth swept silhouette, NOT anime cone-spikes), with
- * only a few short feathered tips at the flared back edge, sideburns framing the face, and
- * stern angled eyebrows for the mature, hard look of his art. Rigid; bobs with the head.
+ * Zieg's hair: a blond MULLET — slicked flat back over the crown and sides, with a tapering
+ * tail gathered at the nape that falls DOWN the back of the neck (not up), ending in a
+ * pointed flare. Thin sideburns frame the face; stern angled eyebrows give the mature, hard
+ * look of his art. Rigid; bobs with the head.
  */
 function buildManeHair(scene: Scene): TransformNode {
   const group = new TransformNode("hairMane", scene);
   const blond = mat("hairBlondZieg", 0.9, 0.78, 0.32, scene);
 
-  // Crown cap, set slightly back so the forehead reads (hair pulled back, not a fringe).
-  const cap = box("hairCap", 0.38, 0.2, 0.42, blond, scene);
-  cap.position = new Vector3(0, 1.77, -0.02);
+  // Slim cap hugging the crown, swept back (low — the top is slicked, not voluminous).
+  const cap = box("hairCap", 0.37, 0.14, 0.42, blond, scene);
+  cap.position = new Vector3(0, 1.75, -0.03);
   cap.parent = group;
 
-  // Just a couple of short strands at the hairline (most of it is swept back).
-  const bang = box("hairBang", 0.13, 0.1, 0.1, blond, scene);
-  bang.position = new Vector3(-0.04, 1.73, 0.16);
-  bang.rotation.x = 0.4;
+  // A couple of short strands at the hairline.
+  const bang = box("hairBang", 0.12, 0.08, 0.1, blond, scene);
+  bang.position = new Vector3(-0.05, 1.73, 0.16);
+  bang.rotation.x = 0.35;
   bang.parent = group;
 
-  // Sideburns / side volume framing the face.
-  for (const dx of [-0.2, 0.2]) {
-    const side = box("hairSide", 0.07, 0.36, 0.4, blond, scene);
-    side.position = new Vector3(dx, 1.59, -0.03);
+  // Thin sideburns framing the face.
+  for (const dx of [-0.19, 0.19]) {
+    const side = box("hairSide", 0.06, 0.3, 0.36, blond, scene);
+    side.position = new Vector3(dx, 1.6, -0.04);
     side.parent = group;
   }
 
-  // Flared back mane: stacked slabs swept up and back, tapering — the slicked silhouette.
-  const slab = (w: number, h: number, d: number, y: number, z: number, rotX: number) => {
-    const s = box("hairBack", w, h, d, blond, scene);
-    s.position = new Vector3(0, y, z);
-    s.rotation.x = rotX;
-    s.parent = group;
-  };
-  slab(0.4, 0.36, 0.26, 1.6, -0.2, -0.25);
-  slab(0.42, 0.3, 0.2, 1.74, -0.29, -0.5);
-  slab(0.4, 0.26, 0.16, 1.86, -0.37, -0.72);
-
-  // A few short feathered tips at the flared back edge (subtle, not big spikes).
-  const tip = (x: number, y: number, z: number, rotX: number, rotZ: number, len = 0.2) =>
-    (coneSpike(scene, blond, new Vector3(x, y, z), rotX, rotZ, len).parent = group);
-  tip(-0.14, 1.9, -0.37, -0.85, -0.2);
-  tip(0, 1.94, -0.39, -0.95, 0);
-  tip(0.14, 1.9, -0.37, -0.85, 0.2);
-  tip(-0.2, 1.69, -0.3, -0.95, -0.5, 0.22);
-  tip(0.2, 1.69, -0.3, -0.95, 0.5, 0.22);
+  // Mullet: a mass at the nape feeding a tail that hangs DOWN the back, tapering.
+  const nape = box("hairNape", 0.32, 0.2, 0.18, blond, scene);
+  nape.position = new Vector3(0, 1.57, -0.17);
+  nape.parent = group;
+  const t1 = box("hairTail", 0.26, 0.28, 0.14, blond, scene);
+  t1.position = new Vector3(0, 1.4, -0.2);
+  t1.rotation.x = -0.12; // leans slightly back
+  t1.parent = group;
+  const t2 = box("hairTail", 0.2, 0.26, 0.11, blond, scene);
+  t2.position = new Vector3(0, 1.18, -0.22);
+  t2.rotation.x = -0.1;
+  t2.parent = group;
+  // Pointed flared end of the tail (cone tip pointing down and slightly back).
+  coneSpike(scene, blond, new Vector3(0, 1.04, -0.22), Math.PI + 0.15, 0, 0.26, 0.2).parent = group;
 
   // Stern angled eyebrows (the hard look of his art), on the +Z face above the eyes.
   for (const dx of [-0.09, 0.09]) {
