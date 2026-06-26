@@ -196,6 +196,8 @@ export class Humanoid {
       buildWrapHair(scene).parent = this.body;
     } else if (opts.hair === "topknot") {
       buildTopknotHair(scene).parent = this.body;
+    } else if (opts.hair === "mane") {
+      buildManeHair(scene).parent = this.body;
     }
   }
 
@@ -1635,6 +1637,68 @@ function buildSpikyHair(scene: Scene): TransformNode {
   spike(0.11, 1.77, -0.14, -0.6, 0.25);
   spike(-0.17, 1.72, 0, 0, -0.9, 0.24);
   spike(0.17, 1.72, 0, 0, 0.9, 0.24);
+  return group;
+}
+
+/**
+ * Zieg's hair: a long, vivid-blond mane swept dramatically up and back into spikes, with a
+ * couple of parted bangs falling over the brow, sideburns framing the face, and a fuller
+ * nape with two longer back-flaring locks. Stern angled eyebrows give the mature, hard look
+ * of his art. Rigid; bobs with the head.
+ */
+function buildManeHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairMane", scene);
+  const blond = mat("hairBlondZieg", 0.9, 0.78, 0.32, scene);
+
+  // Crown cap.
+  const cap = box("hairCap", 0.38, 0.2, 0.4, blond, scene);
+  cap.position.y = 1.76;
+  cap.parent = group;
+
+  // Parted bangs falling forward over the forehead.
+  const bangC = box("hairBang", 0.1, 0.17, 0.1, blond, scene);
+  bangC.position = new Vector3(-0.04, 1.71, 0.17);
+  bangC.rotation.x = 0.5;
+  bangC.parent = group;
+  const bangR = box("hairBang", 0.12, 0.13, 0.09, blond, scene);
+  bangR.position = new Vector3(0.12, 1.72, 0.16);
+  bangR.rotation.x = 0.35;
+  bangR.rotation.z = 0.25;
+  bangR.parent = group;
+
+  // Sideburns / side volume framing the face.
+  for (const dx of [-0.2, 0.2]) {
+    const side = box("hairSide", 0.07, 0.36, 0.38, blond, scene);
+    side.position = new Vector3(dx, 1.59, -0.02);
+    side.parent = group;
+  }
+
+  // Fuller back mass (the mane gathers behind the head).
+  const nape = box("hairNape", 0.34, 0.42, 0.22, blond, scene);
+  nape.position = new Vector3(0, 1.53, -0.18);
+  nape.parent = group;
+
+  // Swept-back spikes: a fan rising up and back from the crown (Zieg's flared mane).
+  const spike = (x: number, y: number, z: number, rotX: number, rotZ: number, len: number) =>
+    (coneSpike(scene, blond, new Vector3(x, y, z), rotX, rotZ, len).parent = group);
+  spike(0, 1.86, -0.08, -0.5, 0, 0.44);
+  spike(-0.12, 1.84, -0.1, -0.5, -0.25, 0.4);
+  spike(0.12, 1.84, -0.1, -0.5, 0.25, 0.4);
+  spike(-0.05, 1.88, -0.16, -0.85, -0.1, 0.48);
+  spike(0.06, 1.88, -0.16, -0.85, 0.1, 0.48);
+  spike(-0.18, 1.74, -0.12, -0.7, -0.6, 0.34);
+  spike(0.18, 1.74, -0.12, -0.7, 0.6, 0.34);
+  // Two longer locks flaring further back and down at the nape.
+  spike(-0.08, 1.5, -0.28, -1.15, -0.15, 0.42);
+  spike(0.09, 1.5, -0.28, -1.15, 0.15, 0.42);
+
+  // Stern angled eyebrows (the hard look of his art), on the +Z face above the eyes.
+  for (const dx of [-0.09, 0.09]) {
+    const brow = box("hairBrow", 0.1, 0.03, 0.03, blond, scene);
+    brow.position = new Vector3(dx, 1.68, 0.17);
+    brow.rotation.z = dx < 0 ? -0.25 : 0.25; // angled down toward the nose
+    brow.parent = group;
+  }
   return group;
 }
 
