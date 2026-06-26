@@ -96,6 +96,11 @@ export class ActionButton {
     this.el.style.pointerEvents = enabled ? "auto" : "none";
   }
 
+  /** Show or hide the button entirely (e.g. actions only valid in one form). */
+  setVisible(visible: boolean): void {
+    this.el.style.display = visible ? "block" : "none";
+  }
+
   dispose(): void {
     this.el.remove();
   }

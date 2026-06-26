@@ -320,6 +320,12 @@ export class Player {
     }
   }
 
+  /** Manually return to human form (ends the transformation immediately). */
+  revert(): void {
+    this.dragoonTurns = 0;
+    this.dragoonAura.isVisible = false;
+  }
+
   // --- Magic / healing ------------------------------------------------------
 
   /** MP cost of one Dragoon magic cast. */

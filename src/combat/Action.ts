@@ -7,7 +7,7 @@
 // via their gambit. Execution lives in the mode (it touches enemies, arrows, the runner…),
 // keyed by these ids.
 
-export type ActionId = "attack" | "guard" | "transform" | "item" | "magic";
+export type ActionId = "attack" | "guard" | "transform" | "item" | "magic" | "revert";
 
 export interface ActionInfo {
   id: ActionId;
@@ -21,4 +21,5 @@ export const ACTION_INFO: Record<ActionId, ActionInfo> = {
   transform: { id: "transform", nameKey: "action.transform", icon: "✨" },
   item: { id: "item", nameKey: "action.item", icon: "🧪" },
   magic: { id: "magic", nameKey: "action.magic", icon: "🔮" },
+  revert: { id: "revert", nameKey: "action.revert", icon: "⮌" },
 };

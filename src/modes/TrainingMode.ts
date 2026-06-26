@@ -89,6 +89,7 @@ export class TrainingMode extends GameMode {
   private transformBtn?: ActionButton;
   private itemBtn?: ActionButton;
   private magicBtn?: ActionButton;
+  private revertBtn?: ActionButton;
   private switchBtn?: ActionButton;
 
   /** Shared consumable pool (Training sandbox). */
@@ -187,17 +188,31 @@ export class TrainingMode extends GameMode {
         padding: "10px 14px",
       },
     });
-    // Touch devices attack with the ⚔ button (desktop attacks by clicking). The other
-    // ATB actions (Guard / Transform / Item / Magic) are a small left-side column, each
-    // gated by the ATB gauge; desktop also has key shortcuts (G/T/R/F, Tab to switch).
+    // Right-hand action cluster (the left thumb drives the floating joystick). Touch gets
+    // a big ⚔ attack button bottom-right; the secondary actions sit in an arc above it and
+    // SWAP with the form — human: Guard/Item/Transform · Dragoon: Magic/Return (shared arc
+    // slots). Desktop also has key shortcuts (G/R/T/F, Tab to switch).
     const touch = hasTouch();
     if (touch) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
-    this.guardBtn = this.actionColumnButton("🛡", "Guard", 104, "rgba(40,90,150,0.82)", "rgba(150,190,255,0.6)", "#e6f0ff");
-    this.itemBtn = this.actionColumnButton("🧪", "Item", 168, "rgba(40,110,70,0.82)", "rgba(150,230,180,0.6)", "#e6fff0");
-    this.transformBtn = this.actionColumnButton("✨", "Transform", 232, "rgba(150,120,40,0.82)", "rgba(255,225,140,0.6)", "#fff4d8");
-    this.magicBtn = this.actionColumnButton("🔮", "Magic", 296, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");
-    // Switch which party member you control (also Tab on desktop), bottom of the column.
-    this.switchBtn = this.actionColumnButton("⇄", "Switch", 40, "rgba(70,60,120,0.82)", "rgba(180,170,255,0.6)", "#ece6ff");
+    // Slot 0 (above attack): Guard ⇄ Magic. Slot 1 (diagonal): Item ⇄ Return.
+    this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.82)", "rgba(150,190,255,0.6)", "#e6f0ff");
+    this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");
+    this.itemBtn = this.actionArcButton("🧪", "Item", 1, "rgba(40,110,70,0.82)", "rgba(150,230,180,0.6)", "#e6fff0");
+    this.revertBtn = this.actionArcButton("⮌", "Revert", 1, "rgba(120,80,40,0.82)", "rgba(230,190,150,0.6)", "#fff0e0");
+    // Slot 2 (left of attack): Transform (human only, appears at full SP).
+    this.transformBtn = this.actionArcButton("✨", "Transform", 2, "rgba(150,120,40,0.82)", "rgba(255,225,140,0.6)", "#fff4d8");
+    // Switch controlled member — occasional, kept out of the combat cluster (top-right).
+    this.switchBtn = new ActionButton("⇄", () => this.input.pressVirtual("Switch"), {
+      top: "calc(env(safe-area-inset-top, 0px) + 104px)",
+      right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+      bottom: "auto",
+      width: "48px",
+      height: "48px",
+      font: "600 20px/1 system-ui, sans-serif",
+      background: "rgba(70,60,120,0.82)",
+      border: "1px solid rgba(180,170,255,0.6)",
+      color: "#ece6ff",
+    });
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
@@ -206,22 +221,28 @@ export class TrainingMode extends GameMode {
     this.spawnDummy();
   }
 
-  /** Build one button in the left action column (smaller, stacked by `bottom` offset). */
-  private actionColumnButton(
+  /** Build one secondary-action button in the right-hand arc above the attack button. */
+  private actionArcButton(
     icon: string,
     code: string,
-    bottom: number,
+    slot: number,
     background: string,
     borderColor: string,
     color: string,
   ): ActionButton {
+    const slots = [
+      { right: 34, bottom: 142 }, // above the attack button
+      { right: 118, bottom: 118 }, // up-left diagonal
+      { right: 152, bottom: 44 }, // left of the attack button
+    ];
+    const s = slots[slot] ?? slots[0];
     return new ActionButton(icon, () => this.input.pressVirtual(code), {
-      right: "auto",
-      left: "calc(env(safe-area-inset-left, 0px) + 18px)",
-      bottom: `calc(env(safe-area-inset-bottom, 0px) + ${bottom}px)`,
-      width: "58px",
-      height: "58px",
-      font: "600 22px/1 system-ui, sans-serif",
+      left: "auto",
+      right: `calc(env(safe-area-inset-right, 0px) + ${s.right}px)`,
+      bottom: `calc(env(safe-area-inset-bottom, 0px) + ${s.bottom}px)`,
+      width: "62px",
+      height: "62px",
+      font: "600 24px/1 system-ui, sans-serif",
       background,
       border: `1px solid ${borderColor}`,
       color,
@@ -380,8 +401,12 @@ export class TrainingMode extends GameMode {
     if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget);
     if (this.guardPressed()) this.playerAct("guard");
     if (this.input.wasPressed("Item") || this.input.wasPressed("KeyR")) this.playerAct("item");
-    if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) this.playerAct("transform");
     if (this.input.wasPressed("Magic") || this.input.wasPressed("KeyF")) this.playerAct("magic");
+    if (this.input.wasPressed("Revert")) this.playerAct("revert");
+    // T toggles form: transform in human form, return to human in Dragoon form.
+    if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) {
+      this.playerAct(this.player.transformed ? "revert" : "transform");
+    }
     if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
 
     // Combat time scales with the Options "combat speed" setting.
@@ -421,6 +446,11 @@ export class TrainingMode extends GameMode {
    * turn (except the transform itself). Attack is handled separately (the timed combo).
    */
   private playerAct(id: ActionId): void {
+    // Returning to human form is a free stance change — not gated by the ATB gauge.
+    if (id === "revert") {
+      if (this.player.transformed) this.player.revert();
+      return;
+    }
     if (this.runner.active || !this.runner.gauge.isReady) return;
     const m = this.controlled;
     let ok = false;
@@ -438,7 +468,7 @@ export class TrainingMode extends GameMode {
         ok = this.doMagic(m);
         break;
       case "attack":
-        break; // attack uses the timed-combo path, not this
+        break; // attack uses the timed-combo path; revert handled above
     }
     if (ok) {
       this.runner.gauge.spend();
@@ -1061,13 +1091,24 @@ export class TrainingMode extends GameMode {
       this.attackBtn?.setCooldown(0, 0);
     }
 
-    // The other ATB actions are usable only when the gauge is full and no combo is running;
-    // each also needs its own precondition (stance/SP/items/Dragoon form). Dim otherwise.
+    // The action set swaps with the form (human: Guard/Item/Transform · Dragoon:
+    // Magic/Return). Each is usable only with a full gauge and no combo running, plus its
+    // own precondition; dim otherwise. Transform only appears once SP is full.
+    const transformed = p.transformed;
     const ready = this.runner.gauge.isReady && !this.runner.active;
+
+    this.guardBtn?.setVisible(!transformed);
     this.guardBtn?.setAvailable(ready && !p.guardActive);
-    this.transformBtn?.setAvailable(ready && p.canTransform);
+    this.itemBtn?.setVisible(!transformed);
     this.itemBtn?.setAvailable(ready && this.hasHealItem());
+    this.transformBtn?.setVisible(!transformed && p.canTransform);
+    this.transformBtn?.setAvailable(ready);
+
+    this.magicBtn?.setVisible(transformed);
     this.magicBtn?.setAvailable(ready && p.canCastMagic);
+    this.revertBtn?.setVisible(transformed);
+    this.revertBtn?.setAvailable(true);
+
     this.switchBtn?.setAvailable(this.party.length > 1);
   }
 
@@ -1089,6 +1130,7 @@ export class TrainingMode extends GameMode {
     this.transformBtn?.dispose();
     this.itemBtn?.dispose();
     this.magicBtn?.dispose();
+    this.revertBtn?.dispose();
     this.switchBtn?.dispose();
   }
 }

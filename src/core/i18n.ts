@@ -91,6 +91,7 @@ const en: Dict = {
   "action.transform": "Transform",
   "action.item": "Item",
   "action.magic": "Magic",
+  "action.revert": "Return",
   "combat.dragoon": "Dragoon!",
   "item.healingPotion": "Healing Potion",
 
@@ -221,6 +222,7 @@ const fr: Dict = {
   "action.transform": "Transformation",
   "action.item": "Objet",
   "action.magic": "Magie",
+  "action.revert": "Retour",
   "combat.dragoon": "Dragoon !",
   "item.healingPotion": "Potion de soin",
   "gambit.rulesFor": "Règles IA — {name}",
