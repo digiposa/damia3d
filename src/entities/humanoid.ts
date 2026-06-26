@@ -1668,20 +1668,16 @@ function buildManeHair(scene: Scene): TransformNode {
     side.parent = group;
   }
 
-  // Mullet: a mass at the nape feeding a tail that hangs DOWN the back, tapering.
+  // Mullet: a mass at the nape feeding a short tail that hangs DOWN the back, tapering.
   const nape = box("hairNape", 0.32, 0.2, 0.18, blond, scene);
   nape.position = new Vector3(0, 1.57, -0.17);
   nape.parent = group;
-  const t1 = box("hairTail", 0.26, 0.28, 0.14, blond, scene);
-  t1.position = new Vector3(0, 1.4, -0.2);
+  const t1 = box("hairTail", 0.24, 0.2, 0.13, blond, scene);
+  t1.position = new Vector3(0, 1.43, -0.2);
   t1.rotation.x = -0.12; // leans slightly back
   t1.parent = group;
-  const t2 = box("hairTail", 0.2, 0.26, 0.11, blond, scene);
-  t2.position = new Vector3(0, 1.18, -0.22);
-  t2.rotation.x = -0.1;
-  t2.parent = group;
   // Pointed flared end of the tail (cone tip pointing down and slightly back).
-  coneSpike(scene, blond, new Vector3(0, 1.04, -0.22), Math.PI + 0.15, 0, 0.26, 0.2).parent = group;
+  coneSpike(scene, blond, new Vector3(0, 1.33, -0.21), Math.PI + 0.15, 0, 0.2, 0.18).parent = group;
 
   // Stern angled eyebrows (the hard look of his art), on the +Z face above the eyes.
   for (const dx of [-0.09, 0.09]) {
