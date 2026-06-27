@@ -8,7 +8,7 @@ We will revisit each of these one at a time and decide what to rework. Nothing h
 final. Details for every item are in the sections below.
 
 - [ ] Dragoon system — SP generation, MP, stats, spells, transform duration (full rework)
-- [ ] ATB / attack-interval model — values & feel (2.8s, REF_SPEED, Speed→recharge)
+- [ ] ATB / attack-interval model — values & feel (3.0s @ SPD 50, REF_SPEED 50, Speed→recharge)
 - [ ] Movement / spacing constants (speeds, reaches, ranges, rooting, auto-approach)
 - [ ] Real-time ranged combat (arrows, reach, cadence) — keep / tune / rework
 - [ ] Addition timing windows (0.7s, window/perfect bands)
@@ -72,7 +72,7 @@ damage formulas (`formula.ts`), element multipliers ×1.5/×0.5 (`element.ts`). 
 is ours.
 
 ### Real-time combat layer (entirely invented — LoD is turn-based)
-- **ATB / attack-interval model**: `ATTACK_INTERVAL` 2.8s, `REF_SPEED` 40, `BASE_FILL_TIME`,
+- **ATB / attack-interval model**: `ATTACK_INTERVAL`/`BASE_FILL_TIME` 3.0s, `REF_SPEED` 50, per-class SPD,
   Speed→recharge. The whole per-character real-time gauge is an adaptation.
 - **Movement / spacing**: player `SPEED` 6 u/s, enemy `SPEED` 3.2, enemy `ATTACK_INTERVAL`
   1.4s, `ATTACK_RANGE` 1.7, `PLAYER_REACH` 2.3, `ACQUIRE_RANGE` 20. All invented.

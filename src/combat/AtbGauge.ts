@@ -9,10 +9,11 @@
 // action. Pure logic, no DOM/Babylon — unit-tested.
 
 /** Base ATB fill time (seconds) for a character at the reference Speed. */
-export const BASE_FILL_TIME = 2.8;
+export const BASE_FILL_TIME = 3.0;
 
 /** Reference Speed: a character at this Speed fills its gauge in {@link BASE_FILL_TIME}.
- *  Calibrated to Dart (canon SPD 50) → 2.8s; the roster spans SPD 30 (Kongol) to 70 (Meru). */
+ *  Calibrated to Dart (canon SPD 50) → 3.0s; the roster spans SPD 30 (Kongol, 5.0s) to
+ *  70 (Meru, ~2.14s). Fill time = 150 / SPD. */
 export const REF_SPEED = 50;
 
 /**
