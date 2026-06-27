@@ -59,7 +59,7 @@ gear SPD`). SPD is fixed (does not level). Calibrate `REF_SPEED` once all values
 - Red-Eye (Dart/Zieg): **50**
 - Jade (Lavitz/Albert/Syuveil/Greham): **40**
 - White-Silver (Shana/Miranda): **65**
-- Darkness (Rose): ?
+- Darkness (Rose): **55**
 - Violet (Haschel): ?
 - Blue-Sea (Meru): ?
 - Golden (Kongol): ?
