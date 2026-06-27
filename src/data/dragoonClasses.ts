@@ -32,6 +32,8 @@ export interface DragoonClass {
   id: DragoonClassId;
   dragoonName: string;
   element: Element;
+  /** Base Speed (canon, fixed — drives ATB cadence). Equipment SPD adds on top. */
+  baseSpeed: number;
   /** Which equipment `users` tag this line draws from (the base character). */
   equipmentUser: Member;
   levels: CharacterLevel[];
@@ -44,6 +46,7 @@ export const RED_EYE: DragoonClass = {
   id: "redEye",
   dragoonName: "Red-Eye Dragoon",
   element: "Fire",
+  baseSpeed: 50,
   equipmentUser: "Dart",
   levels: DART_LEVELS,
   additions: DART_ADDITION_LIST,
@@ -54,6 +57,7 @@ export const JADE: DragoonClass = {
   id: "jade",
   dragoonName: "Jade Dragoon",
   element: "Wind",
+  baseSpeed: 40,
   equipmentUser: "Lavitz",
   levels: LAVITZ_LEVELS,
   additions: LAVITZ_ADDITION_LIST,
@@ -64,6 +68,7 @@ export const WHITE_SILVER: DragoonClass = {
   id: "whiteSilver",
   dragoonName: "White-Silver Dragoon",
   element: "Light",
+  baseSpeed: 65,
   equipmentUser: "Shana",
   levels: SHANA_LEVELS,
   // Shana / Miranda have no Additions — they fight with a plain bow attack.
@@ -75,6 +80,7 @@ export const DARKNESS: DragoonClass = {
   id: "darkness",
   dragoonName: "Darkness Dragoon",
   element: "Darkness",
+  baseSpeed: 55,
   equipmentUser: "Rose",
   levels: ROSE_LEVELS,
   additions: ROSE_ADDITION_LIST,
@@ -85,6 +91,7 @@ export const VIOLET: DragoonClass = {
   id: "thunder",
   dragoonName: "Violet Dragoon",
   element: "Thunder",
+  baseSpeed: 60,
   equipmentUser: "Haschel",
   levels: HASCHEL_LEVELS,
   additions: HASCHEL_ADDITION_LIST,
@@ -95,6 +102,7 @@ export const BLUE_SEA: DragoonClass = {
   id: "blueSea",
   dragoonName: "Blue-Sea Dragoon",
   element: "Water",
+  baseSpeed: 70,
   equipmentUser: "Meru",
   levels: MERU_LEVELS,
   additions: MERU_ADDITION_LIST,
@@ -105,6 +113,7 @@ export const GOLDEN: DragoonClass = {
   id: "golden",
   dragoonName: "Golden Dragoon",
   element: "Earth",
+  baseSpeed: 30,
   equipmentUser: "Kongol",
   levels: KONGOL_LEVELS,
   additions: KONGOL_ADDITION_LIST,

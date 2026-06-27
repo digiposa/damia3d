@@ -22,6 +22,8 @@ export interface ComputedCharacterStats {
   maxMp: number;
   exp: number;
   nextExp: number;
+  /** Total Speed (class base + equipment SPD) — drives ATB cadence. */
+  speed: number;
   at: StatSplit;
   df: StatSplit;
   mat: StatSplit;
@@ -56,6 +58,7 @@ export function computeCharacterStats(
     maxMp,
     exp: base.exp,
     nextExp: nextLevelExp(cls.levels, level),
+    speed: cls.baseSpeed + sum("spd"),
     at: { base: base.at, gear: sum("at") },
     df: { base: base.df, gear: sum("df") },
     mat: { base: base.mat, gear: sum("mat") },

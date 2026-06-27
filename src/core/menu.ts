@@ -23,6 +23,8 @@ export interface StatusView {
   maxSp: number;
   mp: number;
   maxMp: number;
+  /** Total Speed (drives ATB cadence). */
+  speed: number;
   /** AT / DF / MAT / MDF with Body + Gear = Total. */
   combat: StatBreakdown[];
   /** Equipment-only stats that are non-zero (SPD, A-HIT, A-AV, M-AV). */

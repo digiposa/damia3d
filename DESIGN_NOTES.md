@@ -50,7 +50,7 @@ rules). Treat all of these constants/effects as throwaway until the rework.
 SPD + aux stats, Dragoon D'levels & multipliers, Dragoon magic spells). Transcribe from
 there when building the real Dragoon system.
 
-## Per-character Speed (SPD) — in progress
+## Per-character Speed (SPD) — DONE
 
 Adding a per-class base SPD so the ATB cadence differs by character (`speed = baseSpeed +
 gear SPD`). SPD is fixed (does not level). Calibrate `REF_SPEED` once all values are in

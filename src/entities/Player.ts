@@ -12,7 +12,7 @@ import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/e
 import { type DragoonClass, dragoonClass } from "../data/dragoonClasses";
 import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
-import { atbFillTime, REF_SPEED } from "../combat/AtbGauge";
+import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 
 const SPEED = 6; // world units per second
@@ -186,7 +186,7 @@ export class Player {
    * Speed gear this leaves the cadence unchanged.
    */
   get speed(): number {
-    return REF_SPEED + this.gearTotal("spd");
+    return this.cls.baseSpeed + this.gearTotal("spd");
   }
 
   /** Seconds to refill this character's ATB gauge — shorter with higher Speed. */

@@ -1037,6 +1037,7 @@ export class TrainingMode extends GameMode {
       maxSp: 100,
       mp: live ? live.mp : cs.maxMp,
       maxMp: cs.maxMp,
+      speed: cs.speed,
       combat: [
         { label: "AT", base: cs.at.base, gear: cs.at.gear, total: cs.at.base + cs.at.gear },
         { label: "DF", base: cs.df.base, gear: cs.df.gear, total: cs.df.base + cs.df.gear },

@@ -284,6 +284,7 @@ export class SystemMenu {
       [t("stat.hp"), `${s.hp} / ${s.maxHp}`],
       [t("stat.sp"), `${s.sp} / ${s.maxSp}`],
       [t("stat.mp"), `${s.mp} / ${s.maxMp}`],
+      ["SPD", `${s.speed}`],
       [t("stat.exp"), `${s.exp} / ${s.nextExp}`],
     ]));
     box.appendChild(divider());
