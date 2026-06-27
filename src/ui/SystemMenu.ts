@@ -20,7 +20,7 @@ import {
   additionMultiplier,
 } from "../data/additions";
 import { gambitEntry } from "../combat/Gambit";
-import { selectableBearers } from "../data/bearers";
+import { selectableBearers, bearerById } from "../data/bearers";
 import { dragoonClass } from "../data/dragoonClasses";
 
 type Section = SystemSection;
@@ -396,18 +396,29 @@ export class SystemMenu {
       return box;
     }
 
-    // Slot selector: pick which of the 3 slots to fill (controlled member marked ⓟ).
-    box.appendChild(
-      choiceRow(
-        p.slots.map((_, i) => i),
-        p.activeSlot,
-        (i) => {
-          p.selectSlot(i);
-          this.render();
-        },
-        (i) => `${p.slots[i].controlled ? "ⓟ " : ""}${p.slots[i].name}`,
-      ),
-    );
+    // Slot selector: portrait cards for the 3 slots (controlled member marked with a dot).
+    const slots = document.createElement("div");
+    Object.assign(slots.style, {
+      display: "grid",
+      gridTemplateColumns: `repeat(${p.slots.length}, 1fr)`,
+      gap: "6px",
+      marginBottom: "8px",
+    } satisfies Partial<CSSStyleDeclaration>);
+    p.slots.forEach((s, i) => {
+      const b = bearerById(s.id);
+      slots.appendChild(
+        slotCard(
+          b ? { name: b.name, portrait: b.portrait, color: b.color } : undefined,
+          i === p.activeSlot,
+          s.controlled,
+          () => {
+            p.selectSlot(i);
+            this.render();
+          },
+        ),
+      );
+    });
+    box.appendChild(slots);
     box.appendChild(hint(t("party.hint")));
     box.appendChild(divider());
 
@@ -420,11 +431,17 @@ export class SystemMenu {
         box.appendChild(label(dragoonClass(b.classId)?.element ?? b.classId));
       }
       const inSlot = p.slots.findIndex((s) => s.id === b.id);
-      const sub = inSlot >= 0 ? t("party.inSlot", { n: inSlot + 1 }) : "";
       box.appendChild(
-        listRow(b.name, sub, inSlot === p.activeSlot, true, () => {
-          p.assign(b.id);
-          this.render();
+        entryRow({
+          name: b.name,
+          portrait: b.portrait,
+          color: b.color,
+          focused: inSlot === p.activeSlot,
+          badgeText: inSlot >= 0 ? t("party.inSlot", { n: inSlot + 1 }) : undefined,
+          onClick: () => {
+            p.assign(b.id);
+            this.render();
+          },
         }),
       );
     }
@@ -760,9 +777,17 @@ function goldChip(gold: number, compact: boolean): HTMLDivElement {
   return el;
 }
 
-/** A roster-list row: element-colour accent + mini portrait + name + active/controlled badge. */
-function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): HTMLButtonElement {
-  const [cr, cg, cb] = e.color;
+/** Shared selectable row: element-colour accent + mini portrait + name + optional badge. */
+function entryRow(o: {
+  name: string;
+  portrait?: string;
+  color: [number, number, number];
+  focused: boolean;
+  badgeText?: string;
+  badgeColor?: string;
+  onClick: () => void;
+}): HTMLButtonElement {
+  const [cr, cg, cb] = o.color;
   const rgb = `rgb(${(cr * 255) | 0},${(cg * 255) | 0},${(cb * 255) | 0})`;
   const el = document.createElement("button");
   Object.assign(el.style, {
@@ -771,9 +796,9 @@ function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): 
     gap: "10px",
     width: "100%",
     textAlign: "left",
-    color: focused ? "#1a1608" : "#f0e6cf",
-    background: focused ? "rgba(200,162,74,0.9)" : "rgba(40,34,16,0.7)",
-    border: `1px solid ${focused ? "#ffe08a" : "#6b551f"}`,
+    color: o.focused ? "#1a1608" : "#f0e6cf",
+    background: o.focused ? "rgba(200,162,74,0.9)" : "rgba(40,34,16,0.7)",
+    border: `1px solid ${o.focused ? "#ffe08a" : "#6b551f"}`,
     borderLeft: `4px solid ${rgb}`,
     borderRadius: "8px",
     padding: "6px 9px",
@@ -781,8 +806,6 @@ function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): 
     cursor: "pointer",
     touchAction: "manipulation",
   } satisfies Partial<CSSStyleDeclaration>);
-
-  const port = miniPortrait(e.name, e.portrait, 30);
 
   const name = document.createElement("span");
   Object.assign(name.style, {
@@ -793,11 +816,65 @@ function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): 
     overflow: "hidden",
     textOverflow: "ellipsis",
   } satisfies Partial<CSSStyleDeclaration>);
-  name.textContent = e.name;
+  name.textContent = o.name;
 
-  el.append(port, name);
-  if (e.controlled) el.appendChild(badge(t("char.controlled"), "#ffe08a"));
-  else if (e.active) el.appendChild(badge(t("char.active"), "#9fe6a0"));
+  el.append(miniPortrait(o.name, o.portrait, 30), name);
+  if (o.badgeText) el.appendChild(badge(o.badgeText, o.badgeColor ?? "#ffe08a"));
+
+  el.addEventListener("pointerup", (ev) => {
+    ev.preventDefault();
+    o.onClick();
+  });
+  return el;
+}
+
+/** A roster-list row (Characters tab): shows the active/controlled state as a badge. */
+function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): HTMLButtonElement {
+  return entryRow({
+    name: e.name,
+    portrait: e.portrait,
+    color: e.color,
+    focused,
+    badgeText: e.controlled ? t("char.controlled") : e.active ? t("char.active") : undefined,
+    badgeColor: e.controlled ? "#ffe08a" : "#9fe6a0",
+    onClick,
+  });
+}
+
+/** A party-slot card (Party tab): a small portrait tile + name; gold when it's the edited slot. */
+function slotCard(
+  bearer: { name: string; portrait?: string; color: [number, number, number] } | undefined,
+  active: boolean,
+  controlled: boolean,
+  onClick: () => void,
+): HTMLButtonElement {
+  const el = document.createElement("button");
+  Object.assign(el.style, {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "4px",
+    minWidth: "0",
+    color: active ? "#1a1608" : "#f0e6cf",
+    background: active ? "rgba(200,162,74,0.9)" : "rgba(40,34,16,0.8)",
+    border: `2px solid ${active ? "#ffe08a" : "#6b551f"}`,
+    borderRadius: "9px",
+    padding: "8px 4px",
+    cursor: "pointer",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+
+  el.appendChild(miniPortrait(bearer?.name ?? "—", bearer?.portrait, 36, controlled ? "#ffe08a" : undefined));
+  const nm = document.createElement("span");
+  Object.assign(nm.style, {
+    font: "700 11px/1.1 system-ui, sans-serif",
+    maxWidth: "100%",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  } satisfies Partial<CSSStyleDeclaration>);
+  nm.textContent = bearer?.name ?? "—";
+  el.appendChild(nm);
 
   el.addEventListener("pointerup", (ev) => {
     ev.preventDefault();
