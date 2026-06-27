@@ -195,27 +195,40 @@ export class SystemMenu {
     }
     if (this.charListOpen) return this.renderCharList(c);
 
-    const entry = c.list.find((e) => e.id === this.focusedChar)!;
+    const idx = c.list.findIndex((e) => e.id === this.focusedChar);
+    const entry = c.list[idx];
     const sheet = c.sheet(this.focusedChar);
-    const badge = entry.controlled ? "  ⓟ" : entry.active ? "  ●" : "";
-    const box = section(`${sheet.status.name}${badge}`);
+    const box = document.createElement("div");
 
-    box.appendChild(
-      navButton("☰", t("char.roster"), false, () => {
+    // Header: ‹ name (tap → roster) ›, flipping through the roster.
+    const goto = (delta: number): void => {
+      const n = c.list.length;
+      this.focusedChar = c.list[(idx + delta + n) % n].id;
+      this.render();
+    };
+    const badge = entry.controlled ? " ⓟ" : entry.active ? " ●" : "";
+    const header = document.createElement("div");
+    Object.assign(header.style, { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" } satisfies Partial<CSSStyleDeclaration>);
+    header.append(
+      arrowButton("‹", () => goto(-1)),
+      nameButton(`☰  ${entry.name}${badge}`, () => {
         this.charListOpen = true;
         this.render();
       }),
+      arrowButton("›", () => goto(1)),
     );
+    box.appendChild(header);
+
+    // Segmented sub-tabs (single row, equal widths — no wrap).
     box.appendChild(
-      choiceRow(
-        ["stats", "equip", "additions"] as CharTab[],
+      segTabs(
+        (["stats", "equip", "additions"] as CharTab[]).map((id) => ({ id, label: t(`char.${id}`) })),
         this.charTab,
         (tab) => {
           this.charTab = tab;
           this.equipSlot = undefined;
           this.render();
         },
-        (tab) => t(`char.${tab}`),
       ),
     );
     box.appendChild(divider());
@@ -708,6 +721,88 @@ function pill(text: string, onClick: () => void): HTMLButtonElement {
     onClick();
   });
   return btn;
+}
+
+/** Compact square arrow button (member prev/next in the Characters header). */
+function arrowButton(glyph: string, onClick: () => void): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.textContent = glyph;
+  Object.assign(btn.style, {
+    flex: "0 0 auto",
+    width: "38px",
+    font: "800 20px/1 system-ui, sans-serif",
+    color: "#f0e6cf",
+    background: "rgba(40,34,16,0.85)",
+    border: "1px solid #6b551f",
+    borderRadius: "8px",
+    padding: "9px 0",
+    cursor: "pointer",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+  btn.addEventListener("pointerup", (e) => {
+    e.preventDefault();
+    onClick();
+  });
+  return btn;
+}
+
+/** The focused character's name button (taps open the roster list). */
+function nameButton(text: string, onClick: () => void): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.textContent = text;
+  Object.assign(btn.style, {
+    flex: "1",
+    minWidth: "0",
+    font: "800 17px/1 system-ui, sans-serif",
+    color: "#ffe08a",
+    background: "rgba(40,34,16,0.7)",
+    border: "1px solid #6b551f",
+    borderRadius: "8px",
+    padding: "10px 12px",
+    textAlign: "center",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    cursor: "pointer",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+  btn.addEventListener("pointerup", (e) => {
+    e.preventDefault();
+    onClick();
+  });
+  return btn;
+}
+
+/** A segmented tab bar: equal-width buttons on a single row (no wrapping). */
+function segTabs<T extends string>(tabs: { id: T; label: string }[], active: T, onPick: (id: T) => void): HTMLDivElement {
+  const row = document.createElement("div");
+  Object.assign(row.style, { display: "flex", gap: "6px", marginBottom: "12px" } satisfies Partial<CSSStyleDeclaration>);
+  for (const tab of tabs) {
+    const on = tab.id === active;
+    const btn = document.createElement("button");
+    btn.textContent = tab.label;
+    Object.assign(btn.style, {
+      flex: "1",
+      minWidth: "0",
+      font: "700 14px/1 system-ui, sans-serif",
+      color: on ? "#1a1608" : "#f0e6cf",
+      background: on ? "rgba(200,162,74,0.92)" : "rgba(40,34,16,0.85)",
+      border: `1px solid ${on ? "#ffe08a" : "#6b551f"}`,
+      borderRadius: "8px",
+      padding: "10px 4px",
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      touchAction: "manipulation",
+    } satisfies Partial<CSSStyleDeclaration>);
+    btn.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      onPick(tab.id);
+    });
+    row.appendChild(btn);
+  }
+  return row;
 }
 
 function choiceRow<T extends string | number>(

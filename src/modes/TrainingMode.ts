@@ -1037,10 +1037,10 @@ export class TrainingMode extends GameMode {
       maxMp: cs.maxMp,
       gold: this.player.gold,
       combat: [
-        { label: t("stat.at"), base: cs.at.base, gear: cs.at.gear, total: cs.at.base + cs.at.gear },
-        { label: t("stat.df"), base: cs.df.base, gear: cs.df.gear, total: cs.df.base + cs.df.gear },
-        { label: t("stat.mat"), base: cs.mat.base, gear: cs.mat.gear, total: cs.mat.base + cs.mat.gear },
-        { label: t("stat.mdf"), base: cs.mdf.base, gear: cs.mdf.gear, total: cs.mdf.base + cs.mdf.gear },
+        { label: "AT", base: cs.at.base, gear: cs.at.gear, total: cs.at.base + cs.at.gear },
+        { label: "DF", base: cs.df.base, gear: cs.df.gear, total: cs.df.base + cs.df.gear },
+        { label: "MAT", base: cs.mat.base, gear: cs.mat.gear, total: cs.mat.base + cs.mat.gear },
+        { label: "MDF", base: cs.mdf.base, gear: cs.mdf.gear, total: cs.mdf.base + cs.mdf.gear },
       ],
       gearExtras,
     };
