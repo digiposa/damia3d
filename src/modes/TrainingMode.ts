@@ -41,7 +41,13 @@ import { type Bearer, DEFAULT_BEARER, bearerById, selectableBearers } from "../d
 import { dragoonClass } from "../data/dragoonClasses";
 import { computeCharacterStats } from "../data/characterStats";
 import { ActionButton } from "../ui/ActionButton";
-import attackIcon from "../assets/icons/attack.png";
+// Blue-handled sword sprite, 3 frames (diagonal → vertical) ripped from the LoD icon
+// sheet — animates a swing while the ATB is ready, freezes on the upright rest pose.
+import attackFrame0 from "../assets/icons/attack_0.png";
+import attackFrame1 from "../assets/icons/attack_1.png";
+import attackFrame2 from "../assets/icons/attack_2.png";
+
+const ATTACK_ICON_FRAMES = [attackFrame0, attackFrame1, attackFrame2];
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { TimingSight } from "../ui/TimingSight";
@@ -195,7 +201,12 @@ export class TrainingMode extends GameMode {
     // slots). Desktop also has key shortcuts (G/R/T/F, Tab to switch).
     const touch = hasTouch();
     if (touch)
-      this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"), undefined, attackIcon);
+      this.attackBtn = new ActionButton(
+        "⚔",
+        () => this.input.pressVirtual("Space"),
+        undefined,
+        ATTACK_ICON_FRAMES,
+      );
     // Slot 0 (above attack): Guard ⇄ Magic. Slot 1 (diagonal): Item ⇄ Return.
     this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.82)", "rgba(150,190,255,0.6)", "#e6f0ff");
     this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");

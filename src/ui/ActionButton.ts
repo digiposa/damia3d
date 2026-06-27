@@ -10,11 +10,20 @@ export class ActionButton {
   private overlay: HTMLDivElement;
   private count: HTMLSpanElement;
 
+  /** Ordered sprite frames (≥2 → animated icon); empty for an emoji/text label. */
+  private frames: string[] = [];
+  /** Frame shown while idle (last frame = the resting pose). */
+  private restFrame = 0;
+  private frameTimer = 0;
+  private frameIndex = 0;
+  /** Whether the icon is currently cycling (ATB ready). */
+  private animating = false;
+
   constructor(
     label: string,
     onPress: () => void,
     style?: Partial<CSSStyleDeclaration>,
-    iconUrl?: string,
+    iconFrames?: string[],
   ) {
     this.el = document.createElement("button");
     Object.assign(this.el.style, {
@@ -42,13 +51,18 @@ export class ActionButton {
       position: "relative",
       zIndex: "1",
     } satisfies Partial<CSSStyleDeclaration>);
-    if (iconUrl) {
-      // Pixel-art sprite icon: show it crisp (no smoothing) and centred.
+    if (iconFrames && iconFrames.length > 0) {
+      // Pixel-art sprite icon: show it crisp (no smoothing) and centred. With several
+      // frames the icon animates (a sword swing) while ready and freezes on the rest
+      // pose otherwise — see setReady().
+      this.frames = iconFrames;
+      this.restFrame = iconFrames.length - 1;
+      this.frameIndex = this.restFrame;
       Object.assign(this.label.style, {
         display: "block",
         width: "42px",
         height: "42px",
-        backgroundImage: `url(${iconUrl})`,
+        backgroundImage: `url(${iconFrames[this.restFrame]})`,
         backgroundSize: "contain",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -121,14 +135,45 @@ export class ActionButton {
     this.el.style.display = visible ? "block" : "none";
   }
 
-  /** Highlight the button with a gold "ready to act" glow (ATB full). */
+  /** Highlight the button with a gold "ready to act" glow (ATB full), and — for a
+   *  multi-frame sprite icon — cycle the frames while ready, freezing on the rest pose. */
   setReady(ready: boolean): void {
     this.el.style.boxShadow = ready
       ? "0 0 12px rgba(255,216,107,0.9), 0 2px 12px rgba(0,0,0,0.4)"
       : "0 2px 12px rgba(0,0,0,0.4)";
+    if (this.frames.length > 1) {
+      if (ready) this.startAnim();
+      else this.stopAnim();
+    }
+  }
+
+  /** Begin cycling sprite frames (idempotent — safe to call every HUD refresh). */
+  private startAnim(): void {
+    if (this.animating) return;
+    this.animating = true;
+    this.frameIndex = 0;
+    this.showFrame(0);
+    this.frameTimer = window.setInterval(() => {
+      this.frameIndex = (this.frameIndex + 1) % this.frames.length;
+      this.showFrame(this.frameIndex);
+    }, 130);
+  }
+
+  /** Stop cycling and settle on the rest pose. */
+  private stopAnim(): void {
+    if (!this.animating) return;
+    this.animating = false;
+    window.clearInterval(this.frameTimer);
+    this.frameTimer = 0;
+    this.showFrame(this.restFrame);
+  }
+
+  private showFrame(i: number): void {
+    this.label.style.backgroundImage = `url(${this.frames[i]})`;
   }
 
   dispose(): void {
+    if (this.frameTimer) window.clearInterval(this.frameTimer);
     this.el.remove();
   }
 }
