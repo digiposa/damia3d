@@ -10,7 +10,12 @@ export class ActionButton {
   private overlay: HTMLDivElement;
   private count: HTMLSpanElement;
 
-  constructor(label: string, onPress: () => void, style?: Partial<CSSStyleDeclaration>) {
+  constructor(
+    label: string,
+    onPress: () => void,
+    style?: Partial<CSSStyleDeclaration>,
+    iconUrl?: string,
+  ) {
     this.el = document.createElement("button");
     Object.assign(this.el.style, {
       position: "fixed",
@@ -33,11 +38,26 @@ export class ActionButton {
     this.el.style.setProperty("-webkit-tap-highlight-color", "transparent");
 
     this.label = document.createElement("span");
-    this.label.textContent = label;
     Object.assign(this.label.style, {
       position: "relative",
       zIndex: "1",
     } satisfies Partial<CSSStyleDeclaration>);
+    if (iconUrl) {
+      // Pixel-art sprite icon: show it crisp (no smoothing) and centred.
+      Object.assign(this.label.style, {
+        display: "block",
+        width: "42px",
+        height: "42px",
+        backgroundImage: `url(${iconUrl})`,
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        imageRendering: "pixelated",
+        filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
+      } satisfies Partial<CSSStyleDeclaration>);
+    } else {
+      this.label.textContent = label;
+    }
 
     // Depleting radial overlay (a dark wedge that shrinks as the cooldown ends).
     this.overlay = document.createElement("div");

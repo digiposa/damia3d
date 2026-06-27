@@ -41,6 +41,7 @@ import { type Bearer, DEFAULT_BEARER, bearerById, selectableBearers } from "../d
 import { dragoonClass } from "../data/dragoonClasses";
 import { computeCharacterStats } from "../data/characterStats";
 import { ActionButton } from "../ui/ActionButton";
+import attackIcon from "../assets/icons/attack.png";
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { TimingSight } from "../ui/TimingSight";
@@ -193,7 +194,8 @@ export class TrainingMode extends GameMode {
     // SWAP with the form — human: Guard/Item/Transform · Dragoon: Magic/Return (shared arc
     // slots). Desktop also has key shortcuts (G/R/T/F, Tab to switch).
     const touch = hasTouch();
-    if (touch) this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"));
+    if (touch)
+      this.attackBtn = new ActionButton("⚔", () => this.input.pressVirtual("Space"), undefined, attackIcon);
     // Slot 0 (above attack): Guard ⇄ Magic. Slot 1 (diagonal): Item ⇄ Return.
     this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.82)", "rgba(150,190,255,0.6)", "#e6f0ff");
     this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");
