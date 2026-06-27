@@ -10,6 +10,7 @@ import type {
   EquipView,
   CharacterSheet,
   CharacterRosterView,
+  CharacterListEntry,
 } from "../core/menu";
 import type { EquipSlot } from "../data/equipment";
 import {
@@ -244,23 +245,28 @@ export class SystemMenu {
 
   /** The whole roster, grouped by element; tap a character to open its sheet. */
   private renderCharList(c: CharacterRosterView): HTMLElement {
-    const box = section(t("section.characters"));
-    // Back to the focused character's sheet (without changing the selection).
-    box.appendChild(
-      navButton("‹", t("common.back"), false, () => {
+    const box = document.createElement("div");
+
+    // Header bar: a back arrow (return to the focused sheet) + the title.
+    const header = document.createElement("div");
+    Object.assign(header.style, { display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" } satisfies Partial<CSSStyleDeclaration>);
+    header.append(
+      arrowButton("‹", () => {
         this.charListOpen = false;
         this.render();
       }),
+      heading(t("section.characters")),
     );
+    box.appendChild(header);
+
     let currentEl: string | undefined;
     for (const e of c.list) {
       if (e.element !== currentEl) {
         currentEl = e.element;
         box.appendChild(label(e.element));
       }
-      const sub = e.controlled ? t("char.controlled") : e.active ? t("char.active") : "";
       box.appendChild(
-        listRow(e.name, sub, e.id === this.focusedChar, true, () => {
+        charRow(e, e.id === this.focusedChar, () => {
           this.focusedChar = e.id;
           this.charListOpen = false;
           this.render();
@@ -728,6 +734,87 @@ function pill(text: string, onClick: () => void): HTMLButtonElement {
     onClick();
   });
   return btn;
+}
+
+/** A roster-list row: element-colour accent + mini portrait + name + active/controlled badge. */
+function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): HTMLButtonElement {
+  const [cr, cg, cb] = e.color;
+  const rgb = `rgb(${(cr * 255) | 0},${(cg * 255) | 0},${(cb * 255) | 0})`;
+  const el = document.createElement("button");
+  Object.assign(el.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    width: "100%",
+    textAlign: "left",
+    color: focused ? "#1a1608" : "#f0e6cf",
+    background: focused ? "rgba(200,162,74,0.9)" : "rgba(40,34,16,0.7)",
+    border: `1px solid ${focused ? "#ffe08a" : "#6b551f"}`,
+    borderLeft: `4px solid ${rgb}`,
+    borderRadius: "8px",
+    padding: "6px 9px",
+    marginBottom: "6px",
+    cursor: "pointer",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+
+  const port = document.createElement("div");
+  Object.assign(port.style, {
+    width: "30px",
+    height: "30px",
+    flex: "0 0 auto",
+    borderRadius: "5px",
+    border: "1px solid rgba(0,0,0,0.5)",
+    overflow: "hidden",
+    background: "rgba(20,28,44,0.7)",
+    backgroundSize: "cover",
+    backgroundPosition: "center top",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    font: "800 14px/1 system-ui, sans-serif",
+    color: "rgba(207,227,255,0.85)",
+  } satisfies Partial<CSSStyleDeclaration>);
+  if (e.portrait) port.style.backgroundImage = `url(${e.portrait})`;
+  else port.textContent = e.name.charAt(0);
+
+  const name = document.createElement("span");
+  Object.assign(name.style, {
+    flex: "1",
+    minWidth: "0",
+    font: "700 15px/1 system-ui, sans-serif",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  } satisfies Partial<CSSStyleDeclaration>);
+  name.textContent = e.name;
+
+  el.append(port, name);
+  if (e.controlled) el.appendChild(badge(t("char.controlled"), "#ffe08a"));
+  else if (e.active) el.appendChild(badge(t("char.active"), "#9fe6a0"));
+
+  el.addEventListener("pointerup", (ev) => {
+    ev.preventDefault();
+    onClick();
+  });
+  return el;
+}
+
+/** A small status pill: coloured text on a dark chip (readable on light or dark rows). */
+function badge(text: string, color: string): HTMLSpanElement {
+  const s = document.createElement("span");
+  s.textContent = text;
+  Object.assign(s.style, {
+    flex: "0 0 auto",
+    font: "800 10px/1 ui-monospace, monospace",
+    color,
+    background: "rgba(10,12,18,0.88)",
+    border: `1px solid ${color}`,
+    borderRadius: "6px",
+    padding: "4px 7px",
+    letterSpacing: "0.03em",
+  } satisfies Partial<CSSStyleDeclaration>);
+  return s;
 }
 
 /** Compact square arrow button (member prev/next in the Characters header). */

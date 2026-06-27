@@ -92,6 +92,8 @@ export interface CharacterListEntry {
   portrait?: string;
   /** Dragoon element (for grouping). */
   element: string;
+  /** Element/archetype colour (0–1 RGB), for the row accent. */
+  color: [number, number, number];
   /** In the active party. */
   active: boolean;
   /** The player-controlled member. */

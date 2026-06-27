@@ -968,6 +968,7 @@ export class TrainingMode extends GameMode {
           name: b.name,
           portrait: b.portrait,
           element: dragoonClass(b.classId)?.element ?? b.classId,
+          color: b.color,
           active: this.partyBearers.some((pb) => pb.id === b.id),
           controlled: b.id === this.player.bearer.id,
         })),
