@@ -46,6 +46,24 @@ Where this lives today: `Player.ts` (transform state, `canCastMagic`, `magicCost
 `DRAGOON_MAGIC_MULT`, `AI_SP_PER_HIT`, SP gain on hits), `Gambit.ts` (transform/magic
 rules). Treat all of these constants/effects as throwaway until the rework.
 
+**Canon reference for the rework** lives in `docs/canon/` (Wiki Project data per character:
+SPD + aux stats, Dragoon D'levels & multipliers, Dragoon magic spells). Transcribe from
+there when building the real Dragoon system.
+
+## Per-character Speed (SPD) — in progress
+
+Adding a per-class base SPD so the ATB cadence differs by character (`speed = baseSpeed +
+gear SPD`). SPD is fixed (does not level). Calibrate `REF_SPEED` once all values are in
+(Dart=50 is the likely reference → 2.8s). Collected so far:
+
+- Red-Eye (Dart/Zieg): **50**
+- Jade (Lavitz/Albert): **40**
+- White-Silver (Shana/Miranda): ?
+- Darkness (Rose): ?
+- Violet (Haschel): ?
+- Blue-Sea (Meru): ?
+- Golden (Kongol): ?
+
 ## Non-canon / invented — full audit (any subject)
 
 Canon and correct (for reference): Dart's level table 1–60 (`dart.ts`), enemy stat blocks
