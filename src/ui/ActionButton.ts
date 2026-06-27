@@ -1,3 +1,18 @@
+/** Color-independent gloss laid over each button's solid colour: a soft top
+ *  highlight + a darker bottom, giving the flat disc some depth. */
+const GLOSS =
+  "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.30), rgba(255,255,255,0) 55%)," +
+  "radial-gradient(circle at 50% 122%, rgba(0,0,0,0.45), rgba(0,0,0,0) 60%)";
+
+/** Resting shadow stack: an inset rim (light top / dark bottom) + an outer drop. */
+const BASE_SHADOW =
+  "inset 0 2px 3px rgba(255,255,255,0.30)," +
+  "inset 0 -5px 10px rgba(0,0,0,0.40)," +
+  "0 4px 12px rgba(0,0,0,0.45)";
+
+/** Same stack with the gold "ATB ready" halo prepended. */
+const READY_SHADOW = "0 0 16px 2px rgba(255,216,107,0.95)," + BASE_SHADOW;
+
 /**
  * Round on-screen action button, anchored bottom-right by default (clear of the
  * build tag). Primarily for touch, but also clickable with a mouse. Fires
@@ -33,17 +48,25 @@ export class ActionButton {
       width: "84px",
       height: "84px",
       borderRadius: "50%",
+      // Flex-centre the label so emoji and sprite icons sit dead-centre.
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
       font: "700 16px/1 system-ui, sans-serif",
       color: "#ffe6e6",
-      background: "rgba(150,40,50,0.8)",
-      border: "1px solid rgba(255,160,160,0.6)",
-      boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
+      // Solid colour lives in backgroundColor so the GLOSS image survives style overrides.
+      backgroundColor: "rgba(150,40,50,0.85)",
+      backgroundImage: GLOSS,
+      border: "1px solid rgba(255,160,160,0.55)",
+      boxShadow: BASE_SHADOW,
       cursor: "pointer",
       touchAction: "manipulation",
       overflow: "hidden",
       zIndex: "16",
     } satisfies Partial<CSSStyleDeclaration>);
     Object.assign(this.el.style, style ?? {});
+    // Re-apply the gloss in case a caller's style override cleared it.
+    if (!this.el.style.backgroundImage) this.el.style.backgroundImage = GLOSS;
     this.el.style.setProperty("-webkit-tap-highlight-color", "transparent");
 
     this.label = document.createElement("span");
@@ -54,15 +77,17 @@ export class ActionButton {
     if (iconFrames && iconFrames.length > 0) {
       // Pixel-art sprite icon: show it crisp (no smoothing) and centred. With several
       // frames the icon animates (a sword swing) while ready and freezes on the rest
-      // pose otherwise — see setReady().
+      // pose otherwise — see setReady(). Frame 0 is the resting pose (sword lowered);
+      // later frames raise it, so the swing reads as "I'm ready to strike".
       this.frames = iconFrames;
-      this.restFrame = iconFrames.length - 1;
-      this.frameIndex = this.restFrame;
+      this.restFrame = 0;
+      this.frameIndex = 0;
       Object.assign(this.label.style, {
         display: "block",
-        width: "42px",
-        height: "42px",
-        backgroundImage: `url(${iconFrames[this.restFrame]})`,
+        // Scale with the button so the sprite fills it nicely whatever the size.
+        width: "60%",
+        height: "60%",
+        backgroundImage: `url(${iconFrames[0]})`,
         backgroundSize: "contain",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -132,15 +157,13 @@ export class ActionButton {
 
   /** Show or hide the button entirely (e.g. actions only valid in one form). */
   setVisible(visible: boolean): void {
-    this.el.style.display = visible ? "block" : "none";
+    this.el.style.display = visible ? "flex" : "none";
   }
 
   /** Highlight the button with a gold "ready to act" glow (ATB full), and — for a
    *  multi-frame sprite icon — cycle the frames while ready, freezing on the rest pose. */
   setReady(ready: boolean): void {
-    this.el.style.boxShadow = ready
-      ? "0 0 12px rgba(255,216,107,0.9), 0 2px 12px rgba(0,0,0,0.4)"
-      : "0 2px 12px rgba(0,0,0,0.4)";
+    this.el.style.boxShadow = ready ? READY_SHADOW : BASE_SHADOW;
     if (this.frames.length > 1) {
       if (ready) this.startAnim();
       else this.stopAnim();
