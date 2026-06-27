@@ -1167,23 +1167,17 @@ export class TrainingMode extends GameMode {
       }),
     );
 
-    // Attack-button lockout readout: guard disables attacking for the stance; otherwise
-    // show the attack-interval "swing timer" (Addition recovery), or the ranged cadence.
-    if (p.guardActive) {
-      this.attackBtn?.setCooldown(p.guardRemaining / settings.combatSpeed, p.guardFraction);
-    } else if (this.runner.recovering) {
-      this.attackBtn?.setCooldown(this.runner.recoveryRemaining / settings.combatSpeed, this.runner.recoveryFraction);
-    } else if (this.rangedCooldownT > 0) {
-      this.attackBtn?.setCooldown(this.rangedCooldownT / settings.combatSpeed, this.rangedCooldownT / RANGED_COOLDOWN);
-    } else {
-      this.attackBtn?.setCooldown(0, 0);
-    }
-
-    // The action set swaps with the form (human: Guard/Item/Transform · Dragoon:
-    // Magic/Return). Each is usable only with a full gauge and no combo running, plus its
-    // own precondition; dim otherwise. Transform only appears once SP is full.
+    // ATB progress lives on the party HUD bar (single source of truth) — no radial timer
+    // on the buttons. They only reflect ready/not-ready; ⚔ glows gold when an action can
+    // begin. The action set swaps with the form (human: Guard/Item/Transform · Dragoon:
+    // Magic/Return); each also needs its own precondition. Transform appears once SP is full.
     const transformed = p.transformed;
-    const ready = this.runner.gauge.isReady && !this.runner.active;
+    const ready = this.runner.gauge.isReady && !this.runner.active; // ATB full, no combo
+    const canStart = ready && !p.guardActive && this.rangedCooldownT <= 0;
+
+    // Attack stays usable mid-combo (timing presses) and when ready to begin; glow = ready.
+    this.attackBtn?.setAvailable(this.runner.active || canStart);
+    this.attackBtn?.setReady(canStart);
 
     this.guardBtn?.setVisible(!transformed);
     this.guardBtn?.setAvailable(ready && !p.guardActive);

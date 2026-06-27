@@ -101,6 +101,13 @@ export class ActionButton {
     this.el.style.display = visible ? "block" : "none";
   }
 
+  /** Highlight the button with a gold "ready to act" glow (ATB full). */
+  setReady(ready: boolean): void {
+    this.el.style.boxShadow = ready
+      ? "0 0 12px rgba(255,216,107,0.9), 0 2px 12px rgba(0,0,0,0.4)"
+      : "0 2px 12px rgba(0,0,0,0.4)";
+  }
+
   dispose(): void {
     this.el.remove();
   }
