@@ -46,9 +46,13 @@ import { ActionButton } from "../ui/ActionButton";
 import attackFrame0 from "../assets/icons/attack_0.png";
 import attackFrame1 from "../assets/icons/attack_1.png";
 import attackFrame2 from "../assets/icons/attack_2.png";
-import guardIcon from "../assets/icons/guard.png";
+// Green shield, 3 frames (a glinting shine) — animates while the ATB is ready.
+import guardFrame0 from "../assets/icons/guard_0.png";
+import guardFrame1 from "../assets/icons/guard_1.png";
+import guardFrame2 from "../assets/icons/guard_2.png";
 
 const ATTACK_ICON_FRAMES = [attackFrame0, attackFrame1, attackFrame2];
+const GUARD_ICON_FRAMES = [guardFrame0, guardFrame1, guardFrame2];
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { TimingSight } from "../ui/TimingSight";
@@ -209,7 +213,7 @@ export class TrainingMode extends GameMode {
         ATTACK_ICON_FRAMES,
       );
     // Slot 0 (above attack): Guard ⇄ Magic. Slot 1 (diagonal): Item ⇄ Return.
-    this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.85)", "rgba(150,190,255,0.55)", "#e6f0ff", [guardIcon]);
+    this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.85)", "rgba(150,190,255,0.55)", "#e6f0ff", GUARD_ICON_FRAMES);
     this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");
     this.itemBtn = this.actionArcButton("🧪", "Item", 1, "rgba(40,110,70,0.82)", "rgba(150,230,180,0.6)", "#e6fff0");
     this.revertBtn = this.actionArcButton("⮌", "Revert", 1, "rgba(120,80,40,0.82)", "rgba(230,190,150,0.6)", "#fff0e0");
@@ -1202,6 +1206,7 @@ export class TrainingMode extends GameMode {
 
     this.guardBtn?.setVisible(!transformed);
     this.guardBtn?.setAvailable(ready && !p.guardActive);
+    this.guardBtn?.setReady(ready && !p.guardActive);
     this.itemBtn?.setVisible(!transformed);
     this.itemBtn?.setAvailable(ready && this.hasHealItem());
     this.transformBtn?.setVisible(!transformed && p.canTransform);
