@@ -212,11 +212,11 @@ export class SystemMenu {
     const header = document.createElement("div");
     Object.assign(header.style, { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" } satisfies Partial<CSSStyleDeclaration>);
     header.append(
-      arrowButton("‹", () => goto(-1)),
       charHeaderButton(entry, () => {
         this.charListOpen = true;
         this.render();
       }),
+      arrowButton("‹", () => goto(-1)),
       arrowButton("›", () => goto(1)),
     );
     box.appendChild(header);
@@ -846,10 +846,15 @@ function arrowButton(glyph: string, onClick: () => void): HTMLButtonElement {
   return btn;
 }
 
-/** A mini portrait tile (background image, or the name's initial as a fallback). */
-function miniPortrait(name: string, portrait: string | undefined, size: number): HTMLDivElement {
+/**
+ * A mini portrait tile (background image, or the name's initial as a fallback). An optional
+ * `mark` colour draws a small status dot in the corner (active/controlled) without using any
+ * horizontal space.
+ */
+function miniPortrait(name: string, portrait: string | undefined, size: number, mark?: string): HTMLDivElement {
   const port = document.createElement("div");
   Object.assign(port.style, {
+    position: "relative",
     width: `${size}px`,
     height: `${size}px`,
     flex: "0 0 auto",
@@ -867,16 +872,32 @@ function miniPortrait(name: string, portrait: string | undefined, size: number):
   } satisfies Partial<CSSStyleDeclaration>);
   if (portrait) port.style.backgroundImage = `url(${portrait})`;
   else port.textContent = name.charAt(0);
+  if (mark) {
+    const dot = document.createElement("div");
+    Object.assign(dot.style, {
+      position: "absolute",
+      top: "1px",
+      right: "1px",
+      width: "8px",
+      height: "8px",
+      borderRadius: "50%",
+      background: mark,
+      border: "1px solid rgba(0,0,0,0.7)",
+    } satisfies Partial<CSSStyleDeclaration>);
+    port.appendChild(dot);
+  }
   return port;
 }
 
 /**
- * The focused character's header card (between the ‹ › arrows): same look as a roster row
- * (element-colour accent + portrait + name + badge) with a ☰ hint that it opens the list.
+ * The focused character's header card (full width, with the ‹ › arrows beside it): the
+ * roster-row look — element-colour accent + portrait (status dot) + name — plus a ▾ chevron
+ * hinting it opens the list. Full width so the name never gets squeezed.
  */
 function charHeaderButton(e: CharacterListEntry, onClick: () => void): HTMLButtonElement {
   const [cr, cg, cb] = e.color;
   const rgb = `rgb(${(cr * 255) | 0},${(cg * 255) | 0},${(cb * 255) | 0})`;
+  const mark = e.controlled ? "#ffe08a" : e.active ? "#9fe6a0" : undefined;
   const btn = document.createElement("button");
   Object.assign(btn.style, {
     display: "flex",
@@ -895,10 +916,6 @@ function charHeaderButton(e: CharacterListEntry, onClick: () => void): HTMLButto
     touchAction: "manipulation",
   } satisfies Partial<CSSStyleDeclaration>);
 
-  const burger = document.createElement("span");
-  burger.textContent = "☰";
-  Object.assign(burger.style, { flex: "0 0 auto", opacity: "0.6", font: "700 14px/1 system-ui, sans-serif" } satisfies Partial<CSSStyleDeclaration>);
-
   const name = document.createElement("span");
   Object.assign(name.style, {
     flex: "1",
@@ -911,10 +928,11 @@ function charHeaderButton(e: CharacterListEntry, onClick: () => void): HTMLButto
   } satisfies Partial<CSSStyleDeclaration>);
   name.textContent = e.name;
 
-  btn.append(burger, miniPortrait(e.name, e.portrait, 28), name);
-  if (e.controlled) btn.appendChild(badge(t("char.controlled"), "#ffe08a"));
-  else if (e.active) btn.appendChild(badge(t("char.active"), "#9fe6a0"));
+  const chevron = document.createElement("span");
+  chevron.textContent = "▾";
+  Object.assign(chevron.style, { flex: "0 0 auto", opacity: "0.6", font: "700 13px/1 system-ui, sans-serif" } satisfies Partial<CSSStyleDeclaration>);
 
+  btn.append(miniPortrait(e.name, e.portrait, 28, mark), name, chevron);
   btn.addEventListener("pointerup", (ev) => {
     ev.preventDefault();
     onClick();
