@@ -57,8 +57,8 @@ gear SPD`). SPD is fixed (does not level). Calibrate `REF_SPEED` once all values
 (Dart=50 is the likely reference → 2.8s). Collected so far:
 
 - Red-Eye (Dart/Zieg): **50**
-- Jade (Lavitz/Albert): **40**
-- White-Silver (Shana/Miranda): ?
+- Jade (Lavitz/Albert/Syuveil/Greham): **40**
+- White-Silver (Shana/Miranda): **65**
 - Darkness (Rose): ?
 - Violet (Haschel): ?
 - Blue-Sea (Meru): ?
