@@ -23,7 +23,6 @@ import {
   additionMultiplier,
   additionPresses,
   BASIC_ATTACK,
-  type AdditionDef,
 } from "../data/additions";
 import { RosterStore, EQUIP_SLOTS } from "../data/roster";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
@@ -31,7 +30,7 @@ import { estimateDps } from "../combat/balance";
 import { elementMultiplier } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { t } from "../core/i18n";
-import type { ModeMenuData, AdditionEntry } from "../core/menu";
+import type { ModeMenuData, AdditionEntry, StatusView, EquipView, CharacterSheet } from "../core/menu";
 import {
   type EquipSlot,
   equipById,
@@ -39,6 +38,8 @@ import {
   equipSummary,
 } from "../data/equipment";
 import { type Bearer, DEFAULT_BEARER, bearerById, selectableBearers } from "../data/bearers";
+import { dragoonClass } from "../data/dragoonClasses";
+import { computeCharacterStats } from "../data/characterStats";
 import { ActionButton } from "../ui/ActionButton";
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
@@ -957,43 +958,21 @@ export class TrainingMode extends GameMode {
     enemy.dispose();
   }
 
-  /** Data for the System menu's Status / Addition / Equipment tabs. */
+  /** Data for the System menu's Characters / Party / Gambits tabs. */
   menuData(): ModeMenuData {
-    const p = this.player;
     return {
-      status: {
-        name: p.bearer.name,
-        portrait: p.bearer.portrait,
-        level: p.level,
-        exp: p.exp,
-        nextExp: p.nextExp,
-        hp: p.hp,
-        maxHp: p.maxHp,
-        sp: p.sp,
-        maxSp: p.maxSp,
-        mp: p.mp,
-        maxMp: p.maxMp,
-        gold: p.gold,
-        combat: [
-          { label: t("stat.at"), base: p.stats.at, gear: p.atk - p.stats.at, total: p.atk },
-          { label: t("stat.df"), base: p.stats.df, gear: p.def - p.stats.df, total: p.def },
-          { label: t("stat.mat"), base: p.stats.mat, gear: p.matk - p.stats.mat, total: p.matk },
-          { label: t("stat.mdf"), base: p.stats.mdf, gear: p.mdef - p.stats.mdf, total: p.mdef },
-        ],
-        gearExtras: (
-          [
-            ["SPD", p.gearTotal("spd")],
-            ["A-HIT", p.gearTotal("aHit")],
-            ["M-HIT", p.gearTotal("mHit")],
-            ["A-AV", p.gearTotal("aAv")],
-            ["M-AV", p.gearTotal("mAv")],
-          ] as [string, number][]
-        )
-          .filter(([, v]) => v !== 0)
-          .map(([label, value]) => ({ label, value })),
+      characters: {
+        controlledId: this.player.bearer.id,
+        list: selectableBearers().map((b) => ({
+          id: b.id,
+          name: b.name,
+          portrait: b.portrait,
+          element: dragoonClass(b.classId)?.element ?? b.classId,
+          active: this.partyBearers.some((pb) => pb.id === b.id),
+          controlled: b.id === this.player.bearer.id,
+        })),
+        sheet: (id) => this.characterSheet(id),
       },
-      additions: this.additionEntries(),
-      equipAddition: (def) => this.equipAddition(def),
       party: {
         slots: this.partyBearers.map((b, i) => ({
           id: b.id,
@@ -1017,25 +996,78 @@ export class TrainingMode extends GameMode {
         })),
         cycle: (mi, ri) => this.cycleGambit(mi, ri),
       },
-      equipment: {
-        slots: (["weapon", "head", "body", "feet", "accessory"] as EquipSlot[]).map((slot) => ({
-          slot,
-          equippedName: p.equipment[slot]?.name,
-        })),
-        options: (slot) =>
-          equipmentForSlot(slot, p.equipmentUser).map((def) => ({
-            id: def.id,
-            name: def.name,
-            detail: equipSummary(def),
-            equipped: p.equipment[slot]?.id === def.id,
-          })),
-        equip: (slot, id) => this.setEquip(p.bearer.id, slot, id),
-      },
     };
   }
 
-  private equipAddition(def: AdditionDef): void {
-    this.setAddition(this.player.bearer.id, def.name);
+  /**
+   * Per-character sheet (Stats / Equipment / Additions) for any roster member, active or
+   * reserve. Stats and gear come from the character's stored config (computed without a 3D
+   * avatar); for an active member, live HP/SP/MP are overlaid. Edits route through the store.
+   */
+  private characterSheet(id: string): CharacterSheet {
+    const bearer = bearerById(id)!;
+    const cls = dragoonClass(bearer.classId)!;
+    const cfg = this.roster.get(bearer);
+    const live = this.party.find((m) => m.avatar.bearer.id === id)?.avatar;
+    const cs = computeCharacterStats(cfg, bearer.classId, this.partyLevel);
+
+    const gearExtras = (
+      [
+        ["SPD", cs.spd],
+        ["A-HIT", cs.aHit],
+        ["M-HIT", cs.mHit],
+        ["A-AV", cs.aAv],
+        ["M-AV", cs.mAv],
+      ] as [string, number][]
+    )
+      .filter(([, v]) => v !== 0)
+      .map(([label, value]) => ({ label, value }));
+
+    const status: StatusView = {
+      name: bearer.name,
+      portrait: bearer.portrait,
+      level: this.partyLevel,
+      exp: cs.exp,
+      nextExp: cs.nextExp,
+      hp: live ? live.hp : cs.maxHp,
+      maxHp: cs.maxHp,
+      sp: live ? live.sp : 0,
+      maxSp: 100,
+      mp: live ? live.mp : cs.maxMp,
+      maxMp: cs.maxMp,
+      gold: this.player.gold,
+      combat: [
+        { label: t("stat.at"), base: cs.at.base, gear: cs.at.gear, total: cs.at.base + cs.at.gear },
+        { label: t("stat.df"), base: cs.df.base, gear: cs.df.gear, total: cs.df.base + cs.df.gear },
+        { label: t("stat.mat"), base: cs.mat.base, gear: cs.mat.gear, total: cs.mat.base + cs.mat.gear },
+        { label: t("stat.mdf"), base: cs.mdf.base, gear: cs.mdf.gear, total: cs.mdf.base + cs.mdf.gear },
+      ],
+      gearExtras,
+    };
+
+    const additions: AdditionEntry[] = cls.additions.map((def) => ({
+      def,
+      unlocked: def.acquireLevel <= this.partyLevel,
+      level: live ? live.additionLevel(def) : 1,
+      equipped: def.name === cfg.additionName,
+    }));
+
+    const equipment: EquipView = {
+      slots: EQUIP_SLOTS.map((slot) => ({
+        slot,
+        equippedName: cfg.equipment[slot] ? equipById(cfg.equipment[slot]!)?.name : undefined,
+      })),
+      options: (slot) =>
+        equipmentForSlot(slot, cls.equipmentUser).map((def) => ({
+          id: def.id,
+          name: def.name,
+          detail: equipSummary(def),
+          equipped: cfg.equipment[slot] === def.id,
+        })),
+      equip: (slot, eid) => this.setEquip(id, slot, eid),
+    };
+
+    return { status, additions, equipAddition: (def) => this.setAddition(id, def.name), equipment };
   }
 
   // --- Roster config (gear / Addition persistence per character) -------------
@@ -1075,17 +1107,6 @@ export class TrainingMode extends GameMode {
       live.addition = live.additions.find((a) => a.name === name) ?? BASIC_ATTACK;
       if (live === this.player) this.runner.cancel(); // never keep a running combo on the old Addition
     }
-  }
-
-  /** Build the Addition rows from the player's unlock/level state. */
-  private additionEntries(): AdditionEntry[] {
-    const unlocked = this.player.unlockedAdditions();
-    return this.player.additions.map((def) => ({
-      def,
-      unlocked: unlocked.includes(def),
-      level: this.player.additionLevel(def),
-      equipped: this.player.addition === def,
-    }));
   }
 
   /** Spawn a non-canon training dummy: an immortal, inert damage-test target. */

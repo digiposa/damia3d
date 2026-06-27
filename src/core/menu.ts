@@ -77,6 +77,36 @@ export interface GambitsView {
   cycle: (memberIndex: number, ruleIndex: number) => void;
 }
 
+/** One character's per-member sheet (Stats / Equipment / Additions). */
+export interface CharacterSheet {
+  status: StatusView;
+  additions: AdditionEntry[];
+  equipAddition: (def: AdditionDef) => void;
+  equipment: EquipView;
+}
+
+/** One row in the roster list. */
+export interface CharacterListEntry {
+  id: string;
+  name: string;
+  portrait?: string;
+  /** Dragoon element (for grouping). */
+  element: string;
+  /** In the active party. */
+  active: boolean;
+  /** The player-controlled member. */
+  controlled: boolean;
+}
+
+/** The whole manageable roster + per-character sheets, for the System menu's Characters tab. */
+export interface CharacterRosterView {
+  list: CharacterListEntry[];
+  /** Per-character sheet by bearer id. */
+  sheet: (bearerId: string) => CharacterSheet;
+  /** Bearer id of the controlled member (the default focus). */
+  controlledId: string;
+}
+
 /** One slot of the party-composition view. */
 export interface PartySlotView {
   /** Bearer id currently in the slot. */
@@ -97,12 +127,10 @@ export interface PartyComposeView {
   assign: (bearerId: string) => void;
 }
 
-/** Per-mode data the System menu reads to populate the Status / Addition / Equipment tabs. */
+/** Per-mode data the System menu reads. */
 export interface ModeMenuData {
-  status: StatusView;
-  additions: AdditionEntry[];
-  equipAddition: (def: AdditionDef) => void;
-  equipment: EquipView;
+  /** The manageable character roster + per-character sheets (party modes only). */
+  characters?: CharacterRosterView;
   /** Party composition (Training/party modes only; absent elsewhere). */
   party?: PartyComposeView;
   /** AI party gambits (Training/party modes only; absent elsewhere). */
@@ -110,7 +138,7 @@ export interface ModeMenuData {
 }
 
 /** A section of the in-game System menu. */
-export type SystemSection = "status" | "party" | "equip" | "addition" | "gambits" | "config";
+export type SystemSection = "characters" | "party" | "gambits" | "config";
 
 /** Services the running game exposes to its modes (e.g. opening the System menu). */
 export interface GameHost {

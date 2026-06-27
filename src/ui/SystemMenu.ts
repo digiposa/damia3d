@@ -1,7 +1,16 @@
 import { settings } from "../core/settings";
 import { hasTouch } from "../core/device";
 import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
-import type { ModeMenuData, AdditionEntry, SystemSection, StatBreakdown } from "../core/menu";
+import type {
+  ModeMenuData,
+  AdditionEntry,
+  SystemSection,
+  StatBreakdown,
+  StatusView,
+  EquipView,
+  CharacterSheet,
+  CharacterRosterView,
+} from "../core/menu";
 import type { EquipSlot } from "../data/equipment";
 import {
   type AdditionDef,
@@ -16,13 +25,13 @@ import { dragoonClass } from "../data/dragoonClasses";
 type Section = SystemSection;
 
 const SECTIONS: { id: Section; labelKey: string; icon: string }[] = [
-  { id: "status", labelKey: "section.status", icon: "📊" },
+  { id: "characters", labelKey: "section.characters", icon: "📊" },
   { id: "party", labelKey: "section.party", icon: "👥" },
-  { id: "equip", labelKey: "section.equip", icon: "🛡️" },
-  { id: "addition", labelKey: "section.addition", icon: "💥" },
   { id: "gambits", labelKey: "section.gambits", icon: "🧠" },
   { id: "config", labelKey: "section.config", icon: "⚙" },
 ];
+
+type CharTab = "stats" | "equip" | "additions";
 
 const COMBAT_SPEEDS = [0.5, 1, 1.5, 2];
 const ZOOM_LEVELS = [1, 1.25, 1.5, 2];
@@ -45,14 +54,18 @@ export class SystemMenu {
   private root: HTMLDivElement;
   private nav: HTMLDivElement;
   private content: HTMLDivElement;
-  private section: Section = "status";
+  private section: Section = "characters";
   private compact = hasTouch();
   /** When opened from the title screen there is no mode: Config only, no "Main menu". */
   private atMainMenu = false;
-  /** Equipment tab sub-state: which slot is being chosen (undefined = slot list). */
+  /** Equipment sub-state: which slot is being chosen (undefined = slot list). */
   private equipSlot?: EquipSlot;
   /** Gambits tab sub-state: which party member is being edited. */
   private gambitMember = 0;
+  /** Characters tab: focused character (bearer id), the sub-tab, and roster-list mode. */
+  private focusedChar?: string;
+  private charTab: CharTab = "stats";
+  private charListOpen = false;
 
   constructor(private cb: SystemMenuCallbacks) {
     this.root = document.createElement("div");
@@ -132,12 +145,12 @@ export class SystemMenu {
   private render(): void {
     const data = this.cb.data();
     // Character tabs only exist once a mode has player state; otherwise Config only.
-    // The Gambits tab only shows when the mode exposes a party (Training/party modes).
     let available = data ? SECTIONS : SECTIONS.filter((s) => s.id === "config");
+    if (!data?.characters) available = available.filter((s) => s.id !== "characters");
     if (!data?.party) available = available.filter((s) => s.id !== "party");
     if (!data?.gambits) available = available.filter((s) => s.id !== "gambits");
     if (!available.some((s) => s.id === this.section)) this.section = available[0].id;
-    if (this.section !== "equip") this.equipSlot = undefined;
+    if (this.charTab !== "equip") this.equipSlot = undefined;
 
     this.renderNav(available);
     this.content.replaceChildren(
@@ -147,11 +160,7 @@ export class SystemMenu {
           ? this.renderParty(data)
           : this.section === "gambits"
             ? this.renderGambits(data)
-            : this.section === "addition"
-              ? this.renderAddition(data)
-              : this.section === "equip"
-                ? this.renderEquip(data)
-                : this.renderStatus(data),
+            : this.renderCharacters(data),
     );
   }
 
@@ -177,11 +186,73 @@ export class SystemMenu {
     this.nav.replaceChildren(...items);
   }
 
-  private renderStatus(data?: ModeMenuData): HTMLElement {
-    if (!data) return note(t("status.unavailable"));
-    const s = data.status;
-    const box = section(t("section.status"));
-    box.appendChild(heading(`${s.name}   LV ${s.level}`));
+  /** Characters tab: the roster list, or a focused character's sheet (Stats/Equip/Additions). */
+  private renderCharacters(data?: ModeMenuData): HTMLElement {
+    const c = data?.characters;
+    if (!c || c.list.length === 0) return note(t("status.unavailable"));
+    if (this.focusedChar === undefined || !c.list.some((e) => e.id === this.focusedChar)) {
+      this.focusedChar = c.controlledId;
+    }
+    if (this.charListOpen) return this.renderCharList(c);
+
+    const entry = c.list.find((e) => e.id === this.focusedChar)!;
+    const sheet = c.sheet(this.focusedChar);
+    const badge = entry.controlled ? "  ⓟ" : entry.active ? "  ●" : "";
+    const box = section(`${sheet.status.name}${badge}`);
+
+    box.appendChild(
+      navButton("☰", t("char.roster"), false, () => {
+        this.charListOpen = true;
+        this.render();
+      }),
+    );
+    box.appendChild(
+      choiceRow(
+        ["stats", "equip", "additions"] as CharTab[],
+        this.charTab,
+        (tab) => {
+          this.charTab = tab;
+          this.equipSlot = undefined;
+          this.render();
+        },
+        (tab) => t(`char.${tab}`),
+      ),
+    );
+    box.appendChild(divider());
+    box.appendChild(
+      this.charTab === "stats"
+        ? this.renderStatusBody(sheet.status)
+        : this.charTab === "equip"
+          ? this.renderEquipBody(sheet.equipment)
+          : this.renderAdditionBody(sheet),
+    );
+    return box;
+  }
+
+  /** The whole roster, grouped by element; tap a character to open its sheet. */
+  private renderCharList(c: CharacterRosterView): HTMLElement {
+    const box = section(t("section.characters"));
+    let currentEl: string | undefined;
+    for (const e of c.list) {
+      if (e.element !== currentEl) {
+        currentEl = e.element;
+        box.appendChild(label(e.element));
+      }
+      const sub = e.controlled ? t("char.controlled") : e.active ? t("char.active") : "";
+      box.appendChild(
+        listRow(e.name, sub, e.id === this.focusedChar, true, () => {
+          this.focusedChar = e.id;
+          this.charListOpen = false;
+          this.render();
+        }),
+      );
+    }
+    return box;
+  }
+
+  private renderStatusBody(s: StatusView): HTMLElement {
+    const box = document.createElement("div");
+    box.appendChild(heading(`LV ${s.level}`));
     box.appendChild(statLines([
       [t("stat.hp"), `${s.hp} / ${s.maxHp}`],
       [t("stat.sp"), `${s.sp} / ${s.maxSp}`],
@@ -199,27 +270,17 @@ export class SystemMenu {
     return box;
   }
 
-  private renderEquip(data?: ModeMenuData): HTMLElement {
-    const box = section(t("section.equip"));
-    if (!data) {
-      box.appendChild(note(t("equip.unavailable")));
-      return box;
-    }
+  private renderEquipBody(equip: EquipView): HTMLElement {
+    const box = document.createElement("div");
 
     // Slot list.
     if (!this.equipSlot) {
-      for (const s of data.equipment.slots) {
+      for (const s of equip.slots) {
         box.appendChild(
-          listRow(
-            t(`equip.slot.${s.slot}`),
-            s.equippedName ?? t("equip.empty"),
-            false,
-            true,
-            () => {
-              this.equipSlot = s.slot;
-              this.render();
-            },
-          ),
+          listRow(t(`equip.slot.${s.slot}`), s.equippedName ?? t("equip.empty"), false, true, () => {
+            this.equipSlot = s.slot;
+            this.render();
+          }),
         );
       }
       return box;
@@ -235,14 +296,14 @@ export class SystemMenu {
     const slot = this.equipSlot;
     box.appendChild(
       listRow(t("equip.none"), "", false, true, () => {
-        data.equipment.equip(slot, undefined);
+        equip.equip(slot, undefined);
         this.render();
       }),
     );
-    for (const opt of data.equipment.options(slot)) {
+    for (const opt of equip.options(slot)) {
       box.appendChild(
         listRow(opt.name, opt.detail, opt.equipped, true, () => {
-          data.equipment.equip(slot, opt.id);
+          equip.equip(slot, opt.id);
           this.render();
         }),
       );
@@ -250,18 +311,14 @@ export class SystemMenu {
     return box;
   }
 
-  private renderAddition(data?: ModeMenuData): HTMLElement {
-    const box = section(t("section.addition"));
-    if (!data) {
-      box.appendChild(note(t("addition.unavailable")));
-      return box;
-    }
-    if (data.additions.length === 0) {
+  private renderAdditionBody(sheet: CharacterSheet): HTMLElement {
+    const box = document.createElement("div");
+    if (sheet.additions.length === 0) {
       box.appendChild(note(t("addition.none")));
       return box;
     }
-    for (const entry of data.additions) {
-      box.appendChild(this.additionRow(entry, data.equipAddition));
+    for (const entry of sheet.additions) {
+      box.appendChild(this.additionRow(entry, sheet.equipAddition));
     }
     return box;
   }
