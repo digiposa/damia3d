@@ -203,18 +203,17 @@ export class SystemMenu {
     const sheet = c.sheet(this.focusedChar);
     const box = document.createElement("div");
 
-    // Header: ‹ name (tap → roster) ›, flipping through the roster.
+    // Header: ‹ [portrait + name card → roster] ›, flipping through the roster.
     const goto = (delta: number): void => {
       const n = c.list.length;
       this.focusedChar = c.list[(idx + delta + n) % n].id;
       this.render();
     };
-    const badge = entry.controlled ? " ⓟ" : entry.active ? " ●" : "";
     const header = document.createElement("div");
     Object.assign(header.style, { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" } satisfies Partial<CSSStyleDeclaration>);
     header.append(
       arrowButton("‹", () => goto(-1)),
-      nameButton(`☰  ${entry.name}${badge}`, () => {
+      charHeaderButton(entry, () => {
         this.charListOpen = true;
         this.render();
       }),
@@ -783,25 +782,7 @@ function charRow(e: CharacterListEntry, focused: boolean, onClick: () => void): 
     touchAction: "manipulation",
   } satisfies Partial<CSSStyleDeclaration>);
 
-  const port = document.createElement("div");
-  Object.assign(port.style, {
-    width: "30px",
-    height: "30px",
-    flex: "0 0 auto",
-    borderRadius: "5px",
-    border: "1px solid rgba(0,0,0,0.5)",
-    overflow: "hidden",
-    background: "rgba(20,28,44,0.7)",
-    backgroundSize: "cover",
-    backgroundPosition: "center top",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    font: "800 14px/1 system-ui, sans-serif",
-    color: "rgba(207,227,255,0.85)",
-  } satisfies Partial<CSSStyleDeclaration>);
-  if (e.portrait) port.style.backgroundImage = `url(${e.portrait})`;
-  else port.textContent = e.name.charAt(0);
+  const port = miniPortrait(e.name, e.portrait, 30);
 
   const name = document.createElement("span");
   Object.assign(name.style, {
@@ -865,28 +846,77 @@ function arrowButton(glyph: string, onClick: () => void): HTMLButtonElement {
   return btn;
 }
 
-/** The focused character's name button (taps open the roster list). */
-function nameButton(text: string, onClick: () => void): HTMLButtonElement {
+/** A mini portrait tile (background image, or the name's initial as a fallback). */
+function miniPortrait(name: string, portrait: string | undefined, size: number): HTMLDivElement {
+  const port = document.createElement("div");
+  Object.assign(port.style, {
+    width: `${size}px`,
+    height: `${size}px`,
+    flex: "0 0 auto",
+    borderRadius: "5px",
+    border: "1px solid rgba(0,0,0,0.5)",
+    overflow: "hidden",
+    background: "rgba(20,28,44,0.7)",
+    backgroundSize: "cover",
+    backgroundPosition: "center top",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    font: `800 ${Math.round(size * 0.46)}px/1 system-ui, sans-serif`,
+    color: "rgba(207,227,255,0.85)",
+  } satisfies Partial<CSSStyleDeclaration>);
+  if (portrait) port.style.backgroundImage = `url(${portrait})`;
+  else port.textContent = name.charAt(0);
+  return port;
+}
+
+/**
+ * The focused character's header card (between the ‹ › arrows): same look as a roster row
+ * (element-colour accent + portrait + name + badge) with a ☰ hint that it opens the list.
+ */
+function charHeaderButton(e: CharacterListEntry, onClick: () => void): HTMLButtonElement {
+  const [cr, cg, cb] = e.color;
+  const rgb = `rgb(${(cr * 255) | 0},${(cg * 255) | 0},${(cb * 255) | 0})`;
   const btn = document.createElement("button");
-  btn.textContent = text;
   Object.assign(btn.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
     flex: "1",
     minWidth: "0",
-    font: "800 17px/1 system-ui, sans-serif",
-    color: "#ffe08a",
+    textAlign: "left",
+    color: "#f0e6cf",
     background: "rgba(40,34,16,0.7)",
     border: "1px solid #6b551f",
+    borderLeft: `4px solid ${rgb}`,
     borderRadius: "8px",
-    padding: "10px 12px",
-    textAlign: "center",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
+    padding: "7px 10px",
     cursor: "pointer",
     touchAction: "manipulation",
   } satisfies Partial<CSSStyleDeclaration>);
-  btn.addEventListener("pointerup", (e) => {
-    e.preventDefault();
+
+  const burger = document.createElement("span");
+  burger.textContent = "☰";
+  Object.assign(burger.style, { flex: "0 0 auto", opacity: "0.6", font: "700 14px/1 system-ui, sans-serif" } satisfies Partial<CSSStyleDeclaration>);
+
+  const name = document.createElement("span");
+  Object.assign(name.style, {
+    flex: "1",
+    minWidth: "0",
+    font: "800 16px/1 system-ui, sans-serif",
+    color: "#ffe08a",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  } satisfies Partial<CSSStyleDeclaration>);
+  name.textContent = e.name;
+
+  btn.append(burger, miniPortrait(e.name, e.portrait, 28), name);
+  if (e.controlled) btn.appendChild(badge(t("char.controlled"), "#ffe08a"));
+  else if (e.active) btn.appendChild(badge(t("char.active"), "#9fe6a0"));
+
+  btn.addEventListener("pointerup", (ev) => {
+    ev.preventDefault();
     onClick();
   });
   return btn;
