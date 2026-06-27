@@ -23,7 +23,6 @@ export interface StatusView {
   maxSp: number;
   mp: number;
   maxMp: number;
-  gold: number;
   /** AT / DF / MAT / MDF with Body + Gear = Total. */
   combat: StatBreakdown[];
   /** Equipment-only stats that are non-zero (SPD, A-HIT, A-AV, M-AV). */
@@ -131,6 +130,8 @@ export interface PartyComposeView {
 
 /** Per-mode data the System menu reads. */
 export interface ModeMenuData {
+  /** Shared party wallet (gold) — a game-wide resource, shown globally in the menu. */
+  gold?: number;
   /** The manageable character roster + per-character sheets (party modes only). */
   characters?: CharacterRosterView;
   /** Party composition (Training/party modes only; absent elsewhere). */

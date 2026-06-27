@@ -153,7 +153,7 @@ export class SystemMenu {
     if (!available.some((s) => s.id === this.section)) this.section = available[0].id;
     if (this.charTab !== "equip") this.equipSlot = undefined;
 
-    this.renderNav(available);
+    this.renderNav(available, data?.gold);
     this.content.replaceChildren(
       this.section === "config"
         ? this.renderConfig()
@@ -165,7 +165,7 @@ export class SystemMenu {
     );
   }
 
-  private renderNav(available: typeof SECTIONS): void {
+  private renderNav(available: typeof SECTIONS, gold?: number): void {
     const items: HTMLElement[] = available.map((s) =>
       navButton(s.icon, t(s.labelKey), this.compact, () => {
         this.section = s.id;
@@ -175,8 +175,10 @@ export class SystemMenu {
 
     const spacer = document.createElement("div");
     spacer.style.flex = "1";
+    items.push(spacer);
+    // Shared party wallet (game-wide), pinned above the Resume button.
+    if (gold !== undefined) items.push(goldChip(gold, this.compact));
     items.push(
-      spacer,
       navButton("▶", t("common.resume"), this.compact, () => this.cb.onResume(), "#2f6b3e"),
     );
     if (!this.atMainMenu) {
@@ -291,8 +293,6 @@ export class SystemMenu {
       box.appendChild(divider());
       box.appendChild(statLines(s.gearExtras.map((e) => [e.label, `+${e.value}`])));
     }
-    box.appendChild(divider());
-    box.appendChild(statLines([[t("stat.gold"), `${s.gold} G`]]));
     return box;
   }
 
@@ -734,6 +734,31 @@ function pill(text: string, onClick: () => void): HTMLButtonElement {
     onClick();
   });
   return btn;
+}
+
+/** The shared party wallet chip for the nav rail (coin + amount; stacks when compact). */
+function goldChip(gold: number, compact: boolean): HTMLDivElement {
+  const el = document.createElement("div");
+  Object.assign(el.style, {
+    display: "flex",
+    flexDirection: compact ? "column" : "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: compact ? "1px" : "6px",
+    font: "800 13px/1.1 ui-monospace, monospace",
+    color: "#ffe08a",
+    background: "rgba(40,34,16,0.85)",
+    border: "1px solid #6b551f",
+    borderRadius: "8px",
+    padding: compact ? "8px 0" : "9px 12px",
+    textShadow: "0 1px 2px #000",
+  } satisfies Partial<CSSStyleDeclaration>);
+  const coin = document.createElement("span");
+  coin.textContent = "🪙";
+  const amount = document.createElement("span");
+  amount.textContent = compact ? `${gold}` : `${gold} G`;
+  el.append(coin, amount);
+  return el;
 }
 
 /** A roster-list row: element-colour accent + mini portrait + name + active/controlled badge. */

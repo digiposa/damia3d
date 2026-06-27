@@ -961,6 +961,7 @@ export class TrainingMode extends GameMode {
   /** Data for the System menu's Characters / Party / Gambits tabs. */
   menuData(): ModeMenuData {
     return {
+      gold: this.player.gold,
       characters: {
         controlledId: this.player.bearer.id,
         list: selectableBearers().map((b) => ({
@@ -1036,7 +1037,6 @@ export class TrainingMode extends GameMode {
       maxSp: 100,
       mp: live ? live.mp : cs.maxMp,
       maxMp: cs.maxMp,
-      gold: this.player.gold,
       combat: [
         { label: "AT", base: cs.at.base, gear: cs.at.gear, total: cs.at.base + cs.at.gear },
         { label: "DF", base: cs.df.base, gear: cs.df.gear, total: cs.df.base + cs.df.gear },
