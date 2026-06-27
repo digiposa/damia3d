@@ -1,15 +1,14 @@
 # Albert — Jade Dragoon (class `jade`)
 
-Bearers sharing this class: **Lavitz, Albert** (Albert replaces Lavitz; they share the Jade
-Dragoon Spirit). Albert joins at Lavitz's level.
+Bearers sharing this class: **Lavitz, Albert, Syuveil, Greham** (the Wind/Jade Dragoon line —
+all `classId: "jade"`). Albert joins at Lavitz's level.
 
 - Element: **Wind**
 - Species: Human · Age 26 · Height 175 cm · King of Serdio
 - Dragoon Spirit: **Jade Dragon**
 
-> ⚠️ Albert's level table below is **his own canon** and differs from Lavitz's. Our `jade`
-> class currently uses `LAVITZ_LEVELS` for both (the shared-stat simplification), so this
-> table is stored here for reference, not implemented separately.
+> ✅ Verified: this level table is **identical to Lavitz's** and matches our implemented
+> `src/data/lavitz.ts` (used by the whole `jade` line). Kept here in full for completeness.
 
 ## Base / auxiliary stats (fixed — do not level up)
 
