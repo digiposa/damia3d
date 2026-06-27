@@ -245,6 +245,13 @@ export class SystemMenu {
   /** The whole roster, grouped by element; tap a character to open its sheet. */
   private renderCharList(c: CharacterRosterView): HTMLElement {
     const box = section(t("section.characters"));
+    // Back to the focused character's sheet (without changing the selection).
+    box.appendChild(
+      navButton("‹", t("common.back"), false, () => {
+        this.charListOpen = false;
+        this.render();
+      }),
+    );
     let currentEl: string | undefined;
     for (const e of c.list) {
       if (e.element !== currentEl) {

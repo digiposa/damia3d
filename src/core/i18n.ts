@@ -28,6 +28,7 @@ const en: Dict = {
   // Common
   "common.resume": "Resume",
   "common.mainMenu": "Main menu",
+  "common.back": "Back",
 
   // System menu sections
   "section.status": "Status",
@@ -179,6 +180,7 @@ const fr: Dict = {
 
   "common.resume": "Reprendre",
   "common.mainMenu": "Menu principal",
+  "common.back": "Retour",
 
   "section.status": "Statut",
   "section.characters": "Personnages",
