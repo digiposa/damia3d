@@ -61,7 +61,7 @@ gear SPD`). SPD is fixed (does not level). Calibrate `REF_SPEED` once all values
 - White-Silver (Shana/Miranda): **65**
 - Darkness (Rose): **55**
 - Violet (Haschel): **60**
-- Blue-Sea (Meru): ?
+- Blue-Sea (Meru): **70**
 - Golden (Kongol): ?
 
 ## Non-canon / invented — full audit (any subject)
