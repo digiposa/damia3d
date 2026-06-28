@@ -321,6 +321,46 @@ export class Player {
     return SP_PER_BASIC_ATTACK[i];
   }
 
+  /** Archers (Shana / Miranda): no D'Attack timing minigame — a single ranged strike. */
+  get isArcher(): boolean {
+    return this.bearer.weapon === "bow";
+  }
+
+  /** Max D'Attack strikes: archers 1, Kongol (Golden) 4, everyone else 5. */
+  get dragoonStrikes(): number {
+    if (this.isArcher) return 1;
+    return this.cls.id === "golden" ? 4 : 5;
+  }
+
+  /** Base AT (Body + Gear, no Dragoon multiplier) — the D'Attack/Magic formulas apply the
+   *  Dragoon % themselves, so they take this rather than the boosted {@link atk}. */
+  get baseAtk(): number {
+    return this.stats.at + this.bonus("at");
+  }
+
+  /** Dragoon-form AT multiplier (%) at the current D'Level (DRGNAT% in the canon formula). */
+  get dragoonAtPct(): number {
+    const i = Math.min(Math.max(this.dragoonLevel, 1), MAX_DRAGOON_LEVEL) - 1;
+    return this.cls.dragoonStats[i].at;
+  }
+
+  /** Synthetic combo for the D'Attack: drives the timing runner (only its length matters —
+   *  the damage uses {@link dragoonAttack}, not the hit %s). Length = {@link dragoonStrikes}. */
+  get dragoonAttackDef(): AdditionDef {
+    const n = this.dragoonStrikes;
+    if (!this._dragoonDef || this._dragoonDef.hits.length !== n) {
+      this._dragoonDef = {
+        name: "D'Attack",
+        hits: Array.from({ length: n }, () => 100),
+        multiplier: [100, 100, 100, 100, 100],
+        spMax: 0,
+        acquireLevel: 1,
+      };
+    }
+    return this._dragoonDef;
+  }
+  private _dragoonDef?: AdditionDef;
+
   /** Award SP, clamped to the gauge. */
   /** Award SP: fills the gauge (capped) and accrues toward the next Dragoon Level. SP keeps
    *  counting toward level-up even when the gauge is full, so D'level can rise without ever

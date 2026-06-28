@@ -25,7 +25,13 @@ import {
   BASIC_ATTACK,
 } from "../data/additions";
 import { RosterStore, EQUIP_SLOTS } from "../data/roster";
-import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
+import {
+  additionAttack,
+  dragoonAttack,
+  DRAGOON_OUTPUT,
+  enemyPhysicalAttack,
+  enemyMagicalAttack,
+} from "../combat/formula";
 import { estimateDps } from "../combat/balance";
 import { elementMultiplier, type Element } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
@@ -130,6 +136,9 @@ export class TrainingMode extends GameMode {
   /** Last form/element the attack & transform icons were set for (avoids per-frame swaps). */
   private attackDragoon = false;
   private transformElement?: Element;
+  /** Whether the in-progress combo is a Dragoon D'Attack (snapshot at start, so a mid-combo
+   *  auto-revert doesn't switch the damage formula). */
+  private comboIsDragoon = false;
 
   /** Shared consumable pool (Training sandbox). */
   private items = startingItems();
@@ -694,21 +703,27 @@ export class TrainingMode extends GameMode {
     // In reach: ranged bearers fire on a fixed cadence — one arrow per draw, no spraying.
     if (this.isRanged() && this.rangedCooldownT > 0) return;
 
-    const res = this.runner.press(this.player.addition);
+    // In Dragoon form the Attack command is the D'Attack (its own combo + damage formula).
+    this.comboIsDragoon = this.player.transformed;
+    const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
+    const res = this.runner.press(def);
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
     this.player.face(target.position.subtract(this.player.position));
     this.player.tickDragoon(); // one attack = one Dragoon turn
     this.applyHit(target, res.hits); // guaranteed hit 1
-    // Bow users (no Additions) charge SP per attack, scaled by Dragoon Level; Addition
-    // users instead earn SP through the timing presses (see resolveTimingPress).
-    if (this.player.usesBasicAttack) this.player.gainSp(this.player.spPerBasicAttack);
+    // Bow users (no Additions) charge SP per attack, scaled by Dragoon Level; Addition users
+    // earn SP through their timing presses. No SP while transformed (the gauge is draining).
+    if (this.player.usesBasicAttack && !this.comboIsDragoon) {
+      this.player.gainSp(this.player.spPerBasicAttack);
+    }
   }
 
   /** Resolve a timing-sight press against the locked combo target. */
   private resolveTimingPress(): void {
     const target = this.comboTarget;
-    const add = this.player.addition;
+    const dragoon = this.comboIsDragoon;
+    const add = dragoon ? this.player.dragoonAttackDef : this.player.addition;
     const res = this.runner.press(add);
 
     if (res.kind === "miss") {
@@ -719,12 +734,15 @@ export class TrainingMode extends GameMode {
     if (res.kind !== "hit" || !target || !target.alive) return;
 
     this.applyHit(target, res.hits);
-    // SP accrues per landed input (hit 1 is free); award an even share of spMax.
-    const share = Math.floor(add.spMax / additionPresses(add));
-    this.player.gainSp(share);
+    // Additions accrue SP per landed input (hit 1 free). A D'Attack earns no SP (the gauge
+    // is draining) and is not recorded as an Addition.
+    if (!dragoon) {
+      const share = Math.floor(add.spMax / additionPresses(add));
+      this.player.gainSp(share);
+    }
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), "#ffffff");
     if (res.completed) {
-      this.player.recordAddition(add);
+      if (!dragoon) this.player.recordAddition(add);
       this.comboTarget = undefined;
     }
   }
@@ -736,16 +754,13 @@ export class TrainingMode extends GameMode {
    */
   private applyHit(target: Enemy, k: number): void {
     this.player.strike(); // play the weapon's strike/draw animation on every blow
-    const add = this.player.addition;
-    const atk = { at: this.player.atk, lv: this.player.level };
     const df = target.def.stats.df;
-    const mult = additionMultiplier(add, this.player.additionLevel(add));
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
     const element = elementMultiplier(this.player.attackElement, target.def.element);
     const mods = { element };
-    const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult, mods) : 0;
-    const now = additionAttack(atk, df, additionHitsPercent(add, k), mult, mods);
-    const dmg = Math.max(1, now - before);
+    const dmg = this.comboIsDragoon
+      ? this.dragoonHitDamage(k, df, mods)
+      : this.additionHitDamage(k, df, mods);
 
     // Ranged bearers loose an arrow: damage lands when it reaches the target.
     if (this.isRanged()) {
@@ -769,6 +784,29 @@ export class TrainingMode extends GameMode {
     }
 
     this.landDamage(target, dmg, element);
+  }
+
+  /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
+   *  so a completed combo sums to a perfect Addition. */
+  private additionHitDamage(k: number, df: number, mods: { element: number }): number {
+    const add = this.player.addition;
+    const atk = { at: this.player.atk, lv: this.player.level };
+    const mult = additionMultiplier(add, this.player.additionLevel(add));
+    const before = k > 1 ? additionAttack(atk, df, additionHitsPercent(add, k - 1), mult, mods) : 0;
+    const now = additionAttack(atk, df, additionHitsPercent(add, k), mult, mods);
+    return Math.max(1, now - before);
+  }
+
+  /** Incremental damage of D'Attack strike `k`, using the Output table and the line's DRGNAT%.
+   *  Base AT (un-boosted) goes in — the Dragoon formula applies the % itself. */
+  private dragoonHitDamage(k: number, df: number, mods: { element: number }): number {
+    const atk = { at: this.player.baseAtk, lv: this.player.level };
+    const pct = this.player.dragoonAtPct;
+    const archer = this.player.isArcher;
+    const out = (i: number): number => DRAGOON_OUTPUT[Math.min(i, DRAGOON_OUTPUT.length) - 1];
+    const now = dragoonAttack(atk, df, out(k), pct, mods, archer);
+    const before = k > 1 ? dragoonAttack(atk, df, out(k - 1), pct, mods, archer) : 0;
+    return Math.max(1, now - before);
   }
 
   /** Apply a computed hit to the target: damage, floating text, and death handling. */

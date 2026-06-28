@@ -79,6 +79,37 @@ export function additionAttack(
   return d;
 }
 
+/** D'Attack damage multiplier (Output) by number of successful inputs (1→5). The wiki's
+ *  `0.05·n² − 0.05·n + 1` term ×100, as the documented lookup. */
+export const DRAGOON_OUTPUT = [100, 110, 130, 160, 200];
+
+/**
+ * Dragoon D'Attack damage.
+ *   Non-archers: round{ floor[ floor{Output · DRGNAT%/100} · AT/100 ] · (LV+5)·5 / DF }
+ *   Archers:     round{ floor[ AT · DRGNAT%/100 ] · (LV+5)·5 / DF }
+ * then floors for (Target Fear · Power), Field, Element. `AT` is the status-screen total
+ * (NOT pre-multiplied by DRGNAT% — the formula applies it). `dragoonAtPct` is the line's
+ * DRGNAT% at the current D'Level.
+ */
+export function dragoonAttack(
+  attacker: AttackerStats,
+  targetDf: number,
+  output: number,
+  dragoonAtPct: number,
+  mods: Partial<Modifiers> = {},
+  archer = false,
+): number {
+  const m = modifiers(mods);
+  const scaled = archer
+    ? f((attacker.at * dragoonAtPct) / 100)
+    : f((f((output * dragoonAtPct) / 100) * attacker.at) / 100);
+  const base = lodRound(scaled * (attacker.lv + 5) * 5, targetDf);
+  let d = f(base * m.targetFear * m.power);
+  d = f(d * m.field);
+  d = f(d * m.element);
+  return d;
+}
+
 // ---------------------------------------------------------------------------
 // Enemy formulas
 // ---------------------------------------------------------------------------

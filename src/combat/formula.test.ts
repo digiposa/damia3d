@@ -4,6 +4,8 @@ import {
   lodRound,
   physicalAttack,
   additionAttack,
+  dragoonAttack,
+  DRAGOON_OUTPUT,
   enemyPhysicalAttack,
   enemyMagicalAttack,
   hauntingBolt,
@@ -56,6 +58,28 @@ describe("additionAttack", () => {
     );
     // inner=202, scaled=202, base=round(202*75/100)=152
     expect(dmg).toBe(152);
+  });
+});
+
+describe("dragoonAttack (D'Attack)", () => {
+  it("output table matches canon inputs→output (1→100 … 5→200)", () => {
+    expect(DRAGOON_OUTPUT).toEqual([100, 110, 130, 160, 200]);
+  });
+
+  it("non-archer: 5-input D'Attack at DRGNAT% 170", () => {
+    // a=floor(200*170/100)=340, scaled=floor(340*100/100)=340,
+    // base=round(340*15*5,100)=round(25500,100)=255
+    expect(dragoonAttack({ at: 100, lv: 10 }, 100, 200, 170)).toBe(255);
+  });
+
+  it("archer: ignores Output, uses AT·DRGNAT% directly", () => {
+    // scaled=floor(100*200/100)=200, base=round(200*75,100)=150
+    expect(dragoonAttack({ at: 100, lv: 10 }, 100, 999, 200, {}, true)).toBe(150);
+  });
+
+  it("applies the Element modifier with truncation", () => {
+    // 255 × 1.5 (opposite element) → floor(382.5) = 382
+    expect(dragoonAttack({ at: 100, lv: 10 }, 100, 200, 170, { element: 1.5 })).toBe(382);
   });
 });
 
