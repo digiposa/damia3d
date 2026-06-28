@@ -299,13 +299,23 @@ export class Player {
     return heal;
   }
 
-  /** Advance guard timers (use combat-scaled dt). */
+  /** Rose/Blossom Storm: while active, incoming damage is halved (the Power-Up modifier). */
+  private damageHalveTimer = 0;
+  get damageHalved(): boolean {
+    return this.damageHalveTimer > 0;
+  }
+  applyDamageHalve(seconds: number): void {
+    this.damageHalveTimer = Math.max(this.damageHalveTimer, seconds);
+  }
+
+  /** Advance guard + buff timers (use combat-scaled dt). */
   tickGuard(dt: number): void {
     if (this.guardTimer > 0) {
       this.guardTimer = Math.max(0, this.guardTimer - dt);
       if (this.guardTimer === 0) this.guardShield.isVisible = false;
     }
     if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
+    if (this.damageHalveTimer > 0) this.damageHalveTimer = Math.max(0, this.damageHalveTimer - dt);
   }
 
   // --- Dragoon transformation ----------------------------------------------

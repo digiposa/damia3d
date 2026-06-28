@@ -153,6 +153,42 @@ export class Enemy {
     this.hp = Math.min(this.def.stats.maxHp, this.hp + amount);
   }
 
+  // --- Status ailments (Dragoon Magic) --------------------------------------
+
+  private fearTimer = 0;
+  private stunTimer = 0;
+
+  /** Feared targets take double damage (the Target Fear ×2 modifier). */
+  get feared(): boolean {
+    return this.fearTimer > 0;
+  }
+  /** Stunned targets can't move or act. */
+  get stunned(): boolean {
+    return this.stunTimer > 0;
+  }
+  inflictFear(seconds: number): void {
+    this.fearTimer = Math.max(this.fearTimer, seconds);
+  }
+  inflictStun(seconds: number): void {
+    this.stunTimer = Math.max(this.stunTimer, seconds);
+  }
+  /** Instant Death: kills a normal foe outright. Bosses and the immortal dummy resist. */
+  kill(): boolean {
+    if (this.def.immortal || this.def.isBoss) return false;
+    this.hp = 0;
+    return true;
+  }
+  /** Tick status timers and refresh their glow — call once per frame for every enemy. */
+  tickStatus(dt: number): void {
+    if (this.fearTimer > 0) this.fearTimer = Math.max(0, this.fearTimer - dt);
+    if (this.stunTimer > 0) this.stunTimer = Math.max(0, this.stunTimer - dt);
+    this.bodyMat.emissiveColor = this.stunned
+      ? new Color3(0.5, 0.42, 0.06) // amber = stunned
+      : this.feared
+        ? new Color3(0.34, 0.1, 0.46) // violet = feared
+        : Color3.Black();
+  }
+
   /**
    * Chase the target and, when in range and off cooldown, return the action to
    * perform this turn (or null when just moving / waiting).
@@ -160,6 +196,11 @@ export class Enemy {
   aiUpdate(dt: number, targetPos: Vector3, ctx: EnemyContext): EnemyAction | null {
     // The training dummy just stands there: no chasing, no attacks.
     if (this.def.behavior === "dummy") return null;
+    // Stunned: frozen — no chase, no attack (cooldown still thaws).
+    if (this.stunned) {
+      this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+      return null;
+    }
 
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
 

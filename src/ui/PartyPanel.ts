@@ -186,8 +186,8 @@ export class PartyPanel {
 
       if (v.controlled) {
         row.extras.style.display = "flex";
-        // SP gauge label carries the Dragoon Level (gauge length = D'Lv × 100).
-        fillGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, `D'${v.dragoonLevel ?? 1} · ${t("stat.sp")}`);
+        // SP gauge: segmented into 100-SP blocks (each = one Dragoon turn); label carries D'Lv.
+        fillSpGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, `D'${v.dragoonLevel ?? 1} · ${t("stat.sp")}`);
         // MP only matters in Dragoon form — show it then.
         row.mp.track.style.display = v.transformed ? "block" : "none";
         if (v.transformed) fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));
@@ -245,6 +245,41 @@ function fillGauge(g: Gauge, value: number, max: number, label: string): void {
   const ratio = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   g.fill.style.transform = `scaleX(${ratio})`;
   g.text.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span><span>${value}/${max}</span>`;
+}
+
+/**
+ * The SP gauge, segmented into 100-SP blocks (each block = one Dragoon turn). Draws a divider
+ * at every 100 boundary up to maxSp, and lights the track gold once at least one block is full
+ * (transform becomes available). Dividers are rebuilt only when the block count changes.
+ */
+function fillSpGauge(g: Gauge, value: number, max: number, label: string): void {
+  fillGauge(g, value, max, label);
+  const ready = value >= 100;
+  g.fill.style.background = ready
+    ? "linear-gradient(90deg, #6a4bb0, #ffd86b)"
+    : "linear-gradient(90deg, #3a2f73, #6f7fd0)";
+  g.track.style.boxShadow = ready ? "0 0 5px rgba(255,216,107,0.55)" : "none";
+
+  const segments = Math.max(1, Math.round(max / 100));
+  if (g.track.dataset.segs !== String(segments)) {
+    g.track.dataset.segs = String(segments);
+    g.track.querySelectorAll(".sp-seg").forEach((e) => e.remove());
+    for (let k = 1; k < segments; k++) {
+      const d = document.createElement("div");
+      d.className = "sp-seg";
+      Object.assign(d.style, {
+        position: "absolute",
+        top: "0",
+        bottom: "0",
+        left: `${(k / segments) * 100}%`,
+        width: "1px",
+        background: "rgba(0,0,0,0.7)",
+        boxShadow: "1px 0 0 rgba(255,255,255,0.18)",
+        pointerEvents: "none",
+      } satisfies Partial<CSSStyleDeclaration>);
+      g.track.insertBefore(d, g.text);
+    }
+  }
 }
 
 /** The ATB gauge: cyan while charging, gold + glow when full (ready to act). */

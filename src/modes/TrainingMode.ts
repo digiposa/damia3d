@@ -110,6 +110,11 @@ const BALANCE_REF_DF = 20;
 /** SP gained by an AI member per auto-attack (so it can charge up to transform). */
 const AI_SP_PER_HIT = 20;
 
+// Dragoon-Magic status / buff durations (seconds of combat time).
+const FEAR_SECONDS = 12;
+const STUN_SECONDS = 5;
+const DAMAGE_HALVE_SECONDS = 15; // Rose/Blossom Storm (~3 turns)
+
 /** Accent colour per element, for the spell picker rows / cast popups. */
 const ELEMENT_COLOR: Record<Element, string> = {
   Fire: "#ff6b4a",
@@ -635,33 +640,47 @@ export class TrainingMode extends GameMode {
   }
 
   /**
-   * Resolve a Dragoon spell: magic damage to enemy target(s), recovery to ally target(s), and
-   * (Phase 3b) flag status/buff effects we can't model yet. Shared by the player and AI casts.
+   * Resolve a Dragoon spell: magic damage to enemy target(s), status ailments, recovery /
+   * buffs to ally target(s). Shared by the player and AI casts.
    */
   private castSpell(caster: Player, spell: DragoonSpell, primaryEnemy: Enemy | undefined, allies: Player[]): void {
     caster.mp = Math.max(0, caster.mp - spell.mp);
     caster.strike();
     this.popText(caster.position.add(new Vector3(0, 2.6, 0)), spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
 
-    // --- Damage to enemies ---
+    // Foe target set (used for damage, status and instant-death alike).
+    const foes =
+      spell.target === "allEnemies"
+        ? this.enemies.filter((e) => e.alive)
+        : spell.target === "enemy" && primaryEnemy && primaryEnemy.alive
+          ? [primaryEnemy]
+          : [];
+
+    // --- Damage to enemies (Feared foes take ×2) ---
     let totalDamage = 0;
     if (spell.multiplier !== undefined) {
-      const foes =
-        spell.target === "allEnemies"
-          ? this.enemies.filter((e) => e.alive)
-          : primaryEnemy && primaryEnemy.alive
-            ? [primaryEnemy]
-            : [];
       for (const foe of foes) {
         const elem = elementMultiplier(spell.element, foe.def.element);
         const dmg = Math.max(
           1,
           magicAttack(caster.baseMat, foe.def.stats.mdf, caster.dragoonMatPct, spell.multiplier, caster.level, {
             element: elem,
+            targetFear: foe.feared ? 2 : 1,
           }),
         );
         totalDamage += dmg;
         this.landDamage(foe, dmg, elem);
+      }
+    }
+
+    // --- Status ailments on the (still-living) foes ---
+    if (spell.status) {
+      for (const foe of foes) {
+        if (!foe.alive) continue;
+        if (spell.status === "fear") foe.inflictFear(FEAR_SECONDS);
+        else if (spell.status === "stun") foe.inflictStun(STUN_SECONDS);
+        else if (spell.status === "death" && foe.kill()) this.rewardKill(foe);
+        this.popText(foe.headPosition, spell.status.toUpperCase(), "#d8b0ff");
       }
     }
 
@@ -687,13 +706,15 @@ export class TrainingMode extends GameMode {
           this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(amount)}`, "#9fe6a0");
         }
       }
-      // cure is a no-op until status ailments exist (Phase 3b).
+      // cure has no effect yet — allies can't be afflicted in the sandbox.
     }
 
-    // --- Status / buff (Phase 3b — flagged only) ---
-    if (spell.status || spell.buff) {
-      const note = spell.status ?? spell.buff ?? "";
-      this.popText(caster.position.add(new Vector3(0, 3.2, 0)), `(${note})`, "#d8c8ff");
+    // --- Rose / Blossom Storm: halve incoming damage for the ally target(s) ---
+    if (spell.buff === "damageHalve") {
+      for (const a of healTargets) {
+        a.applyDamageHalve(DAMAGE_HALVE_SECONDS);
+        this.popText(a.position.add(new Vector3(0, 3.0, 0)), "½ DMG", "#9ad0ff");
+      }
     }
   }
 
@@ -878,7 +899,8 @@ export class TrainingMode extends GameMode {
     const df = target.def.stats.df;
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
     const element = elementMultiplier(this.player.attackElement, target.def.element);
-    const mods = { element };
+    // Feared targets take double damage (Target Fear ×2).
+    const mods = { element, targetFear: target.feared ? 2 : 1 };
     const dmg = this.comboIsDragoon
       ? this.dragoonHitDamage(k, df, mods)
       : this.additionHitDamage(k, df, mods);
@@ -909,7 +931,7 @@ export class TrainingMode extends GameMode {
 
   /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
    *  so a completed combo sums to a perfect Addition. */
-  private additionHitDamage(k: number, df: number, mods: { element: number }): number {
+  private additionHitDamage(k: number, df: number, mods: { element: number; targetFear?: number }): number {
     const add = this.player.addition;
     const atk = { at: this.player.atk, lv: this.player.level };
     const mult = additionMultiplier(add, this.player.additionLevel(add));
@@ -920,7 +942,7 @@ export class TrainingMode extends GameMode {
 
   /** Incremental damage of D'Attack strike `k`, using the Output table and the line's DRGNAT%.
    *  Base AT (un-boosted) goes in — the Dragoon formula applies the % itself. */
-  private dragoonHitDamage(k: number, df: number, mods: { element: number }): number {
+  private dragoonHitDamage(k: number, df: number, mods: { element: number; targetFear?: number }): number {
     const atk = { at: this.player.baseAtk, lv: this.player.level };
     const pct = this.player.dragoonAtPct;
     const archer = this.player.isArcher;
@@ -934,25 +956,28 @@ export class TrainingMode extends GameMode {
   private landDamage(target: Enemy, dmg: number, element: number): void {
     target.takeDamage(dmg);
     this.popText(target.headPosition, `${dmg}`, damageColor(element));
+    if (!target.alive) this.rewardKill(target);
+  }
 
-    if (!target.alive) {
-      this.player.gainExp(target.def.expReward);
-      this.player.gold += target.def.goldReward;
-      this.popText(target.headPosition, `+${target.def.expReward} EXP`, "#9fe6a0");
-      // Only cancel the player's combo if it's the one that just died (an ally kill
-      // must not abort the player's in-progress Addition).
-      if (this.comboTarget === target) {
-        this.runner.cancel();
-        this.comboTarget = undefined;
-      }
-      this.removeEnemy(target);
+  /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
+  private rewardKill(target: Enemy): void {
+    this.player.gainExp(target.def.expReward);
+    this.player.gold += target.def.goldReward;
+    this.popText(target.headPosition, `+${target.def.expReward} EXP`, "#9fe6a0");
+    // Only cancel the player's combo if it's the one that just died (an ally kill
+    // must not abort the player's in-progress Addition).
+    if (this.comboTarget === target) {
+      this.runner.cancel();
+      this.comboTarget = undefined;
     }
+    this.removeEnemy(target);
   }
 
   private updateEnemies(cdt: number): void {
     const knightsAlive = this.enemies.filter((e) => e.def.id.startsWith("knight_of_sandora")).length;
     const ctx = { knightsAlive };
     for (const enemy of this.enemies) {
+      enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
       const action = enemy.aiUpdate(cdt, this.player.position, ctx);
       enemy.syncHud(this.scene);
       if (action) this.resolveEnemyAction(enemy, action);
@@ -975,8 +1000,9 @@ export class TrainingMode extends GameMode {
     const raw = magical
       ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard, element })
       : enemyPhysicalAttack(enemy.def.stats.at, this.player.def, action.multiplier, { guard });
-    // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…).
-    const dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
+    // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…), then Rose/Blossom Storm.
+    let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
+    if (this.player.damageHalved) dmg = Math.floor(dmg * 0.5);
     this.player.hp = Math.max(0, this.player.hp - dmg);
     this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
 

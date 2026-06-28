@@ -6,9 +6,9 @@ export type SpellTarget = "enemy" | "allEnemies" | "ally" | "allAllies";
 
 /**
  * One Dragoon Magic spell (canon — see docs/canon/dragoon.md). `multiplier` drives the magic
- * damage formula; the recovery/effect fields layer on top. Status ailments (fear/stun/death)
- * and the `damageHalve` buff have no engine support yet (Phase 3b) — they still cast and deal
- * any damage, but the ailment/buff is only flagged.
+ * damage formula; the recovery/effect fields layer on top. Status ailments (fear → ×2 damage,
+ * stun → skip turns, death → instant kill) and the `damageHalve` buff are applied in combat;
+ * `cure` is a no-op until allies can be afflicted.
  */
 export interface DragoonSpell {
   id: string;
