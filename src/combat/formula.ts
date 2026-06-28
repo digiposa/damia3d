@@ -110,6 +110,31 @@ export function dragoonAttack(
   return d;
 }
 
+/**
+ * Dragoon Magic damage.
+ *   floor{ floor[ floor{ floor[ floor{ floor[MAT · DRGNMAT%/100] · (LV+5)·5 / MDF } · Multiplier/100 ] · Fear · Power } · Field ] · Element }
+ * `mat` is the caster's status-screen MAT (NOT pre-multiplied by DRGNMAT% — the formula
+ * applies it); `targetMdf` is the target's Magic Defense; `dragoonMatPct` is the line's
+ * DRGNMAT% at the current D'Level; `multiplier` is the spell's.
+ */
+export function magicAttack(
+  casterMat: number,
+  targetMdf: number,
+  dragoonMatPct: number,
+  multiplier: number,
+  lv: number,
+  mods: Partial<Modifiers> = {},
+): number {
+  const m = modifiers(mods);
+  const a = f((casterMat * dragoonMatPct) / 100);
+  const b = f((a * (lv + 5) * 5) / targetMdf);
+  const c = f((b * multiplier) / 100);
+  let d = f(c * m.targetFear * m.power);
+  d = f(d * m.field);
+  d = f(d * m.element);
+  return d;
+}
+
 // ---------------------------------------------------------------------------
 // Enemy formulas
 // ---------------------------------------------------------------------------

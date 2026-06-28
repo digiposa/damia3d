@@ -10,6 +10,7 @@ import { statsForLevel, levelForExp, nextLevelExp, type CharacterLevel } from ".
 import { BASIC_ATTACK, type AdditionDef } from "../data/additions";
 import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/equipment";
 import { type DragoonClass, type DragoonStatMult, dragoonClass } from "../data/dragoonClasses";
+import { type DragoonSpell, spellsForClass } from "../data/dragoonSpells";
 import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
@@ -340,8 +341,32 @@ export class Player {
 
   /** Dragoon-form AT multiplier (%) at the current D'Level (DRGNAT% in the canon formula). */
   get dragoonAtPct(): number {
+    return this.dragoonStatAt("at");
+  }
+
+  /** Base MAT (Body + Gear, no Dragoon multiplier) — the Magic formula applies the % itself. */
+  get baseMat(): number {
+    return this.stats.mat + this.bonus("mat");
+  }
+
+  /** Dragoon-form MAT multiplier (%) at the current D'Level (DRGNMAT% in the Magic formula). */
+  get dragoonMatPct(): number {
+    return this.dragoonStatAt("mat");
+  }
+
+  private dragoonStatAt(key: "at" | "mat"): number {
     const i = Math.min(Math.max(this.dragoonLevel, 1), MAX_DRAGOON_LEVEL) - 1;
-    return this.cls.dragoonStats[i].at;
+    return this.cls.dragoonStats[i][key];
+  }
+
+  /** Dragoon spells this member could ever learn (full list, in learn order). */
+  get spells(): DragoonSpell[] {
+    return spellsForClass(this.cls.id);
+  }
+
+  /** Spells castable right now: learned by the current D'Level and affordable in MP. */
+  castableSpells(): DragoonSpell[] {
+    return this.spells.filter((s) => s.dLevel <= this.dragoonLevel && s.mp <= this.mp);
   }
 
   /** Synthetic combo for the D'Attack: drives the timing runner (only its length matters —
@@ -418,12 +443,9 @@ export class Player {
 
   // --- Magic / healing ------------------------------------------------------
 
-  /** MP cost of one Dragoon magic cast. */
-  readonly magicCost = 10;
-
-  /** True when Dragoon magic can be cast: in Dragoon form with enough MP. */
+  /** True when Dragoon magic can be cast: in Dragoon form with at least one castable spell. */
   get canCastMagic(): boolean {
-    return this.transformed && this.mp >= this.magicCost;
+    return this.transformed && this.castableSpells().length > 0;
   }
 
   /** Restore HP (clamped to Max HP). Returns the amount actually healed. */

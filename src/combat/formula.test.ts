@@ -6,6 +6,7 @@ import {
   additionAttack,
   dragoonAttack,
   DRAGOON_OUTPUT,
+  magicAttack,
   enemyPhysicalAttack,
   enemyMagicalAttack,
   hauntingBolt,
@@ -80,6 +81,19 @@ describe("dragoonAttack (D'Attack)", () => {
   it("applies the Element modifier with truncation", () => {
     // 255 × 1.5 (opposite element) → floor(382.5) = 382
     expect(dragoonAttack({ at: 100, lv: 10 }, 100, 200, 170, { element: 1.5 })).toBe(382);
+  });
+});
+
+describe("magicAttack (Dragoon Magic)", () => {
+  it("applies DRGNMAT%, MDF division and the spell multiplier with truncation", () => {
+    // a=floor(100*150/100)=150, b=floor(150*15*5/100)=floor(112.5)=112,
+    // c=floor(112*200/100)=224
+    expect(magicAttack(100, 100, 150, 200, 10)).toBe(224);
+  });
+
+  it("scales with the spell multiplier and applies Element", () => {
+    // multiplier 100 → c=floor(112*100/100)=112; ×1.5 element → 168
+    expect(magicAttack(100, 100, 150, 100, 10, { element: 1.5 })).toBe(168);
   });
 });
 

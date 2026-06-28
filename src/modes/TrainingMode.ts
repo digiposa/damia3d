@@ -29,9 +29,12 @@ import {
   additionAttack,
   dragoonAttack,
   DRAGOON_OUTPUT,
+  magicAttack,
   enemyPhysicalAttack,
   enemyMagicalAttack,
 } from "../combat/formula";
+import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
+import type { DragoonSpell } from "../data/dragoonSpells";
 import { estimateDps } from "../combat/balance";
 import { elementMultiplier, type Element } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
@@ -104,11 +107,40 @@ const ARROW_SPEED = 26;
 /** Reference enemy defence used by the Training balance/DPS readout. */
 const BALANCE_REF_DF = 20;
 
-/** Damage multiplier of one Dragoon magic cast (MAT²·5/MDF × this). */
-const DRAGOON_MAGIC_MULT = 2;
-
 /** SP gained by an AI member per auto-attack (so it can charge up to transform). */
 const AI_SP_PER_HIT = 20;
+
+/** Accent colour per element, for the spell picker rows / cast popups. */
+const ELEMENT_COLOR: Record<Element, string> = {
+  Fire: "#ff6b4a",
+  Water: "#4aa6ff",
+  Wind: "#5fd17a",
+  Earth: "#e0a93f",
+  Light: "#ece6c8",
+  Darkness: "#b066e0",
+  Thunder: "#8f6bff",
+  "Non-Elemental": "#bdbdc8",
+};
+
+/** One-line effect tag for a spell row. */
+function spellDetail(s: DragoonSpell): string {
+  if (s.multiplier !== undefined) {
+    const extra = s.drainHeal ? " · drain" : s.allyHealFull ? " · heal" : s.status ? ` · ${s.status}` : "";
+    return `${s.element} · ${s.multiplier}%${extra}`;
+  }
+  if (s.buff === "damageHalve") return "Guard ½ dmg";
+  const parts: string[] = [];
+  if (s.heal) parts.push(`Heal ${Math.round(s.heal * 100)}%`);
+  if (s.revive) parts.push("Revive");
+  if (s.cure) parts.push("Cure");
+  if (s.status) parts.push(s.status);
+  return parts.join(" · ") || "—";
+}
+
+/** The most-hurt ally (lowest HP fraction); a downed ally (0 HP) sorts first. */
+function lowestHp(allies: Player[]): Player | undefined {
+  return allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+}
 
 /**
  * Training arena: a Diablo-style real-time hack-and-slash sandbox with
@@ -132,6 +164,7 @@ export class TrainingMode extends GameMode {
   private itemBtn?: ActionButton;
   private magicBtn?: ActionButton;
   private switchBtn?: ActionButton;
+  private spellMenu!: SpellMenu;
 
   /** Last form/element the attack & transform icons were set for (avoids per-frame swaps). */
   private attackDragoon = false;
@@ -241,6 +274,11 @@ export class TrainingMode extends GameMode {
     // SWAP with the form — human: Guard/Item/Transform · Dragoon: Magic/Return (shared arc
     // slots). Desktop also has key shortcuts (G/R/T/F, Tab to switch).
     const touch = hasTouch();
+    // Dragoon-Magic spell picker (paused overlay): pick → cast, backdrop/Cancel → resume.
+    this.spellMenu = new SpellMenu(
+      (id) => this.onSpellPicked(id),
+      () => this.closeSpellMenu(),
+    );
     if (touch)
       this.attackBtn = new ActionButton(
         "⚔",
@@ -554,14 +592,109 @@ export class TrainingMode extends GameMode {
     return this.useHealItem(m);
   }
 
+  /** Magic opens the spell picker (combat pauses); it does not itself spend the turn — the
+   *  chosen spell does. Returns false so playerAct leaves the ATB gauge charged. */
   private doMagic(m: PartyMember): boolean {
     if (!m.avatar.canCastMagic) return false;
-    const target =
+    this.openSpellMenu();
+    return false;
+  }
+
+  private openSpellMenu(): void {
+    const p = this.player;
+    const entries: SpellEntry[] = p.spells.map((s) => ({
+      id: s.id,
+      name: s.name,
+      mp: s.mp,
+      enabled: s.dLevel <= p.dragoonLevel && s.mp <= p.mp,
+      detail: spellDetail(s),
+      color: ELEMENT_COLOR[s.element] ?? "#b9a7ff",
+    }));
+    this.paused = true;
+    this.spellMenu.show(entries, p.mp, p.maxMp);
+  }
+
+  private closeSpellMenu(): void {
+    this.spellMenu.close();
+    this.paused = false;
+  }
+
+  /** A spell was chosen from the picker: resume, then cast it (spends MP + one Dragoon turn). */
+  private onSpellPicked(id: string): void {
+    this.paused = false;
+    const p = this.player;
+    const spell = p.spells.find((s) => s.id === id);
+    if (!spell || !this.runner.gauge.isReady || spell.mp > p.mp) return;
+    const primary =
       this.attackTarget && this.attackTarget.alive ? this.attackTarget : this.nearestEnemy(ACQUIRE_RANGE);
-    if (!target) return false;
-    m.avatar.face(target.position.subtract(m.position));
-    this.castMagic(m.avatar, target);
-    return true;
+    if (primary) this.player.face(primary.position.subtract(this.player.position));
+    this.castSpell(p, spell, primary, this.party.map((m) => m.avatar));
+    this.runner.gauge.spend(); // a cast costs the ATB action…
+    p.tickDragoon(); // …and one Dragoon turn
+    this.refreshHud();
+  }
+
+  /**
+   * Resolve a Dragoon spell: magic damage to enemy target(s), recovery to ally target(s), and
+   * (Phase 3b) flag status/buff effects we can't model yet. Shared by the player and AI casts.
+   */
+  private castSpell(caster: Player, spell: DragoonSpell, primaryEnemy: Enemy | undefined, allies: Player[]): void {
+    caster.mp = Math.max(0, caster.mp - spell.mp);
+    caster.strike();
+    this.popText(caster.position.add(new Vector3(0, 2.6, 0)), spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
+
+    // --- Damage to enemies ---
+    let totalDamage = 0;
+    if (spell.multiplier !== undefined) {
+      const foes =
+        spell.target === "allEnemies"
+          ? this.enemies.filter((e) => e.alive)
+          : primaryEnemy && primaryEnemy.alive
+            ? [primaryEnemy]
+            : [];
+      for (const foe of foes) {
+        const elem = elementMultiplier(spell.element, foe.def.element);
+        const dmg = Math.max(
+          1,
+          magicAttack(caster.baseMat, foe.def.stats.mdf, caster.dragoonMatPct, spell.multiplier, caster.level, {
+            element: elem,
+          }),
+        );
+        totalDamage += dmg;
+        this.landDamage(foe, dmg, elem);
+      }
+    }
+
+    // --- Recovery to allies ---
+    const healTargets: Player[] =
+      spell.target === "allAllies" || spell.allyHealFull
+        ? allies
+        : spell.target === "ally"
+          ? [lowestHp(allies)].filter((a): a is Player => !!a)
+          : spell.drainHeal
+            ? allies.filter((a) => a.hp > 0)
+            : [];
+    for (const a of healTargets) {
+      if (a.hp === 0 && spell.revive !== undefined) {
+        a.hp = Math.max(1, Math.floor(a.maxHp * spell.revive));
+        this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.hp}`, "#9fe6a0");
+      } else if (a.hp > 0) {
+        const amount = spell.allyHealFull ? a.maxHp : spell.heal ? Math.floor(a.maxHp * spell.heal) : 0;
+        if (spell.drainHeal) {
+          const share = Math.floor(totalDamage / Math.max(1, healTargets.length));
+          if (share > 0) this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(share)}`, "#9fe6a0");
+        } else if (amount > 0) {
+          this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(amount)}`, "#9fe6a0");
+        }
+      }
+      // cure is a no-op until status ailments exist (Phase 3b).
+    }
+
+    // --- Status / buff (Phase 3b — flagged only) ---
+    if (spell.status || spell.buff) {
+      const note = spell.status ?? spell.buff ?? "";
+      this.popText(caster.position.add(new Vector3(0, 3.2, 0)), `(${note})`, "#d8c8ff");
+    }
   }
 
   /** Consume the first available healing item on `m`. Returns false if none/full. */
@@ -574,18 +707,6 @@ export class TrainingMode extends GameMode {
     return true;
   }
 
-  /** Cast Dragoon magic: spend MP and deal magical damage (the Dragoon's element) to a foe. */
-  private castMagic(attacker: Player, target: Enemy): void {
-    attacker.mp = Math.max(0, attacker.mp - attacker.magicCost);
-    attacker.strike();
-    const element = elementMultiplier(attacker.element, target.def.element);
-    const dmg = Math.max(
-      1,
-      enemyMagicalAttack(attacker.matk, target.def.stats.mdf, DRAGOON_MAGIC_MULT, { element }),
-    );
-    this.popText(attacker.position.add(new Vector3(0, 2.6, 0)), t("action.magic"), "#c8a6ff");
-    this.landDamage(target, dmg, element);
-  }
 
   private updateSight(): void {
     if (this.runner.active && this.comboTarget) {
@@ -936,11 +1057,15 @@ export class TrainingMode extends GameMode {
         avatar.face(decision.target.position.subtract(member.position));
         this.autoStrike(avatar, decision.target);
         return true;
-      case "magic":
+      case "magic": {
         if (!decision.target || !avatar.canCastMagic) return false;
+        // AI casts its cheapest available damage spell at the target.
+        const spell = avatar.castableSpells().find((s) => s.multiplier !== undefined);
+        if (!spell) return false;
         avatar.face(decision.target.position.subtract(member.position));
-        this.castMagic(avatar, decision.target);
+        this.castSpell(avatar, spell, decision.target, [avatar]);
         return true;
+      }
       case "guard": {
         if (avatar.guardActive) return false;
         const heal = avatar.startGuard();
@@ -1325,6 +1450,7 @@ export class TrainingMode extends GameMode {
     this.itemBtn?.dispose();
     this.magicBtn?.dispose();
     this.switchBtn?.dispose();
+    this.spellMenu.dispose();
   }
 }
 
