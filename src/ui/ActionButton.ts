@@ -39,6 +39,7 @@ export class ActionButton {
     onPress: () => void,
     style?: Partial<CSSStyleDeclaration>,
     iconFrames?: string[],
+    restFrameIndex = 0,
   ) {
     this.el = document.createElement("button");
     Object.assign(this.el.style, {
@@ -76,18 +77,18 @@ export class ActionButton {
     } satisfies Partial<CSSStyleDeclaration>);
     if (iconFrames && iconFrames.length > 0) {
       // Pixel-art sprite icon: show it crisp (no smoothing) and centred. With several
-      // frames the icon animates (a sword swing) while ready and freezes on the rest
-      // pose otherwise — see setReady(). Frame 0 is the resting pose (sword lowered);
-      // later frames raise it, so the swing reads as "I'm ready to strike".
+      // frames the icon animates while ready and freezes on the rest pose otherwise —
+      // see setReady(). The rest frame (default 0) is the idle pose; the others play out
+      // the action (sword raising, eye opening, …) so the loop reads as "ready to act".
       this.frames = iconFrames;
-      this.restFrame = 0;
-      this.frameIndex = 0;
+      this.restFrame = Math.min(restFrameIndex, iconFrames.length - 1);
+      this.frameIndex = this.restFrame;
       Object.assign(this.label.style, {
         display: "block",
         // Scale with the button so the sprite fills it nicely whatever the size.
         width: "60%",
         height: "60%",
-        backgroundImage: `url(${iconFrames[0]})`,
+        backgroundImage: `url(${iconFrames[this.restFrame]})`,
         backgroundSize: "contain",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -193,6 +194,21 @@ export class ActionButton {
 
   private showFrame(i: number): void {
     this.label.style.backgroundImage = `url(${this.frames[i]})`;
+  }
+
+  /** Swap the sprite frame set at runtime (e.g. attack sword by form, transform eye by
+   *  archetype). Keeps animating if currently ready; otherwise settles on the rest pose. */
+  setFrames(frames: string[], restFrameIndex = 0): void {
+    if (frames.length === 0) return;
+    this.frames = frames;
+    this.restFrame = Math.min(restFrameIndex, frames.length - 1);
+    this.frameIndex = Math.min(this.frameIndex, frames.length - 1);
+    this.showFrame(this.animating ? this.frameIndex : this.restFrame);
+  }
+
+  /** Update the button's solid colour (the gloss image stays on top). */
+  setColor(backgroundColor: string): void {
+    this.el.style.backgroundColor = backgroundColor;
   }
 
   dispose(): void {

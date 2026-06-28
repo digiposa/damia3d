@@ -27,7 +27,7 @@ import {
 import { RosterStore, EQUIP_SLOTS } from "../data/roster";
 import { additionAttack, enemyPhysicalAttack, enemyMagicalAttack } from "../combat/formula";
 import { estimateDps } from "../combat/balance";
-import { elementMultiplier } from "../combat/element";
+import { elementMultiplier, type Element } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { t } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry, StatusView, EquipView, CharacterSheet } from "../core/menu";
@@ -41,18 +41,39 @@ import { type Bearer, DEFAULT_BEARER, bearerById, selectableBearers } from "../d
 import { dragoonClass } from "../data/dragoonClasses";
 import { computeCharacterStats } from "../data/characterStats";
 import { ActionButton } from "../ui/ActionButton";
-// Blue-handled sword sprite, 3 frames (diagonal → vertical) ripped from the LoD icon
-// sheet — animates a swing while the ATB is ready, freezes on the upright rest pose.
-import attackFrame0 from "../assets/icons/attack_0.png";
-import attackFrame1 from "../assets/icons/attack_1.png";
-import attackFrame2 from "../assets/icons/attack_2.png";
-// Green shield, 3 frames (a glinting shine) — animates while the ATB is ready.
-import guardFrame0 from "../assets/icons/guard_0.png";
-import guardFrame1 from "../assets/icons/guard_1.png";
-import guardFrame2 from "../assets/icons/guard_2.png";
 
-const ATTACK_ICON_FRAMES = [attackFrame0, attackFrame1, attackFrame2];
-const GUARD_ICON_FRAMES = [guardFrame0, guardFrame1, guardFrame2];
+// 3-frame sprite icon sets ripped from the LoD icon sheet — each animates while the ATB
+// is ready and freezes on its rest pose. Loaded eagerly as URLs via Vite glob so the set
+// stays in sync with the files in assets/icons without 30 import lines.
+const ICON_URLS = import.meta.glob("../assets/icons/*.png", {
+  eager: true,
+  query: "?url",
+  import: "default",
+}) as Record<string, string>;
+const iconFrames = (prefix: string, n = 3): string[] =>
+  Array.from({ length: n }, (_, i) => ICON_URLS[`../assets/icons/${prefix}_${i}.png`]);
+
+const ATTACK_ICON_FRAMES = iconFrames("attack"); // blue sword (human form)
+const ATTACK_DRAGOON_FRAMES = iconFrames("redsword"); // red sword (dragoon form)
+const GUARD_ICON_FRAMES = iconFrames("guard"); // green shield
+const ITEM_ICON_FRAMES = iconFrames("chest"); // treasure chest (opens)
+const MAGIC_ICON_FRAMES = iconFrames("wand"); // green wand (waves)
+/** Dragoon-eye sprite (closed → opens) per element, for the Transform button.
+ *  Non-Elemental has no eye — those archetypes fall back to Fire. */
+const EYE_FRAMES: Partial<Record<Element, string[]>> & { Fire: string[] } = {
+  Fire: iconFrames("eye_fire"),
+  Wind: iconFrames("eye_wind"),
+  Light: iconFrames("eye_light"),
+  Thunder: iconFrames("eye_thunder"),
+  Darkness: iconFrames("eye_darkness"),
+  Water: iconFrames("eye_water"),
+  Earth: iconFrames("eye_earth"),
+};
+
+/** A 0–1 RGB archetype colour as a CSS rgba() string. */
+function rgba(c: [number, number, number], a: number): string {
+  return `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
+}
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { TimingSight } from "../ui/TimingSight";
@@ -106,6 +127,10 @@ export class TrainingMode extends GameMode {
   private magicBtn?: ActionButton;
   private revertBtn?: ActionButton;
   private switchBtn?: ActionButton;
+
+  /** Last form/element the attack & transform icons were set for (avoids per-frame swaps). */
+  private attackDragoon = false;
+  private transformElement?: Element;
 
   /** Shared consumable pool (Training sandbox). */
   private items = startingItems();
@@ -214,11 +239,13 @@ export class TrainingMode extends GameMode {
       );
     // Slot 0 (above attack): Guard ⇄ Magic. Slot 1 (diagonal): Item ⇄ Return.
     this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.85)", "rgba(150,190,255,0.55)", "#e6f0ff", GUARD_ICON_FRAMES);
-    this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.82)", "rgba(200,170,255,0.6)", "#f0e6ff");
-    this.itemBtn = this.actionArcButton("🧪", "Item", 1, "rgba(40,110,70,0.82)", "rgba(150,230,180,0.6)", "#e6fff0");
+    // Magic uses the green wand; rest pose = the upright glowing wand (frame 1).
+    this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.85)", "rgba(200,170,255,0.55)", "#f0e6ff", MAGIC_ICON_FRAMES, 1);
+    this.itemBtn = this.actionArcButton("🧪", "Item", 1, "rgba(40,110,70,0.85)", "rgba(150,230,180,0.55)", "#e6fff0", ITEM_ICON_FRAMES);
     this.revertBtn = this.actionArcButton("⮌", "Revert", 1, "rgba(120,80,40,0.82)", "rgba(230,190,150,0.6)", "#fff0e0");
-    // Slot 2 (left of attack): Transform (human only, appears at full SP).
-    this.transformBtn = this.actionArcButton("✨", "Transform", 2, "rgba(150,120,40,0.82)", "rgba(255,225,140,0.6)", "#fff4d8");
+    // Slot 2 (left of attack): Transform (human only, appears at full SP) — a Dragoon eye
+    // that opens; its frames + colour are set per controlled archetype in refreshHud.
+    this.transformBtn = this.actionArcButton("✨", "Transform", 2, "rgba(150,120,40,0.85)", "rgba(255,225,140,0.55)", "#fff4d8", EYE_FRAMES.Fire);
     // Switch controlled member — occasional, kept out of the combat cluster (top-right).
     this.switchBtn = new ActionButton("⇄", () => this.input.pressVirtual("Switch"), {
       top: "calc(env(safe-area-inset-top, 0px) + 104px)",
@@ -248,6 +275,7 @@ export class TrainingMode extends GameMode {
     borderColor: string,
     color: string,
     iconFrames?: string[],
+    restFrame = 0,
   ): ActionButton {
     const slots = [
       { right: 34, bottom: 142 }, // above the attack button
@@ -270,6 +298,7 @@ export class TrainingMode extends GameMode {
         color,
       },
       iconFrames,
+      restFrame,
     );
   }
 
@@ -1201,6 +1230,11 @@ export class TrainingMode extends GameMode {
     const canStart = ready && !p.guardActive && this.rangedCooldownT <= 0;
 
     // Attack stays usable mid-combo (timing presses) and when ready to begin; glow = ready.
+    // Its icon swaps with the form: blue sword (human) ↔ red sword (dragoon).
+    if (transformed !== this.attackDragoon) {
+      this.attackDragoon = transformed;
+      this.attackBtn?.setFrames(transformed ? ATTACK_DRAGOON_FRAMES : ATTACK_ICON_FRAMES);
+    }
     this.attackBtn?.setAvailable(this.runner.active || canStart);
     this.attackBtn?.setReady(canStart);
 
@@ -1209,11 +1243,21 @@ export class TrainingMode extends GameMode {
     this.guardBtn?.setReady(ready && !p.guardActive);
     this.itemBtn?.setVisible(!transformed);
     this.itemBtn?.setAvailable(ready && this.hasHealItem());
+    this.itemBtn?.setReady(ready && this.hasHealItem());
+
+    // Transform: the Dragoon eye + button colour follow the controlled archetype.
+    if (p.element !== this.transformElement) {
+      this.transformElement = p.element;
+      this.transformBtn?.setFrames(EYE_FRAMES[p.element] ?? EYE_FRAMES.Fire);
+      this.transformBtn?.setColor(rgba(p.bearer.color, 0.85));
+    }
     this.transformBtn?.setVisible(!transformed && p.canTransform);
     this.transformBtn?.setAvailable(ready);
+    this.transformBtn?.setReady(ready && p.canTransform);
 
     this.magicBtn?.setVisible(transformed);
     this.magicBtn?.setAvailable(ready && p.canCastMagic);
+    this.magicBtn?.setReady(ready && p.canCastMagic);
     this.revertBtn?.setVisible(transformed);
     this.revertBtn?.setAvailable(true);
 
