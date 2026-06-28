@@ -10,7 +10,7 @@ import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { createGround } from "../world/Ground";
 import { projectToScreen } from "../world/project";
-import { Player } from "../entities/Player";
+import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
@@ -206,10 +206,13 @@ export class TrainingMode extends GameMode {
       state: () => ({
         level: this.partyLevel,
         maxLevel: this.player.maxLevel,
+        dragoonLevel: this.player.dragoonLevel,
+        maxDragoonLevel: MAX_DRAGOON_LEVEL,
         refDf: BALANCE_REF_DF,
         balance: this.balanceRows(),
       }),
       onSetLevel: (lv) => this.setLevel(lv),
+      onSetDragoonLevel: (dlv) => this.setDragoonLevel(dlv),
       onSpawnDummy: () => this.spawnDummy(),
       onSpawnKnight: () => this.spawnKnight(),
       onSpawnCommander: () => this.spawnCommander(),
@@ -410,6 +413,12 @@ export class TrainingMode extends GameMode {
   private setLevel(level: number): void {
     this.partyLevel = level;
     for (const m of this.party) m.avatar.setLevel(level);
+    this.refreshHud();
+  }
+
+  /** Set the whole party's Dragoon Level (debug) — drives the SP gained per basic attack. */
+  private setDragoonLevel(dlv: number): void {
+    for (const m of this.party) m.avatar.setDragoonLevel(dlv);
     this.refreshHud();
   }
 
@@ -701,6 +710,9 @@ export class TrainingMode extends GameMode {
     this.player.face(target.position.subtract(this.player.position));
     this.player.tickDragoon(); // one attack = one Dragoon turn
     this.applyHit(target, res.hits); // guaranteed hit 1
+    // Bow users (no Additions) charge SP per attack, scaled by Dragoon Level; Addition
+    // users instead earn SP through the timing presses (see resolveTimingPress).
+    if (this.player.usesBasicAttack) this.player.gainSp(this.player.spPerBasicAttack);
   }
 
   /** Resolve a timing-sight press against the locked combo target. */
@@ -929,7 +941,9 @@ export class TrainingMode extends GameMode {
    */
   private autoStrike(attacker: Player, target: Enemy): void {
     attacker.strike();
-    attacker.sp = Math.min(attacker.maxSp, attacker.sp + AI_SP_PER_HIT); // charge toward transform
+    // Charge toward transform: bow users (no Additions) by their Dragoon-Level table,
+    // Addition users by a flat per-hit amount (they can't perform real Additions as AI).
+    attacker.gainSp(attacker.usesBasicAttack ? attacker.spPerBasicAttack : AI_SP_PER_HIT);
     const add = attacker.addition;
     const atk = { at: attacker.atk, lv: attacker.level };
     const df = target.def.stats.df;

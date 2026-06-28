@@ -14,6 +14,9 @@ export interface BalanceRow {
 export interface TrainingState {
   level: number;
   maxLevel: number;
+  /** Current Dragoon Level (D'Lv) and its cap — drives SP gained per basic attack. */
+  dragoonLevel: number;
+  maxDragoonLevel: number;
   /** Reference enemy defence the balance figures are computed against. */
   refDf: number;
   /** Per-Addition DPS comparison for the balance tab. */
@@ -23,6 +26,7 @@ export interface TrainingState {
 export interface TrainingCallbacks {
   state: () => TrainingState;
   onSetLevel: (level: number) => void;
+  onSetDragoonLevel: (level: number) => void;
   onSpawnDummy: () => void;
   onSpawnKnight: () => void;
   onSpawnCommander: () => void;
@@ -202,6 +206,20 @@ export class TrainingMenu {
     Object.assign(presets.style, { display: "flex", gap: "6px" } satisfies Partial<CSSStyleDeclaration>);
     for (const lv of [1, 20, 40, s.maxLevel]) presets.appendChild(stepBtn(`${lv}`, () => setTo(lv)));
     box.append(presets);
+
+    // Dragoon Level (drives SP gained per basic attack — visible on bow users like Shana).
+    box.append(label(`${t("debug.dragoonLevel")} · D'Lv ${s.dragoonLevel}`));
+    const dlv = document.createElement("div");
+    Object.assign(dlv.style, { display: "flex", gap: "6px" } satisfies Partial<CSSStyleDeclaration>);
+    for (let l = 1; l <= s.maxDragoonLevel; l++) {
+      dlv.appendChild(
+        stepBtn(`${l}`, () => {
+          this.cb.onSetDragoonLevel(l);
+          this.render();
+        }),
+      );
+    }
+    box.append(dlv);
     return box;
   }
 

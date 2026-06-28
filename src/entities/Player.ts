@@ -28,6 +28,13 @@ const DRAGOON_TURNS = 3;
 /** Physical attack multiplier while transformed into Dragoon form. */
 const DRAGOON_ATK_MULT = 1.5;
 
+/** Highest Dragoon Level (D'Lv) a Spirit reaches. */
+export const MAX_DRAGOON_LEVEL = 5;
+/** SP gained per basic attack (no Addition), indexed by Dragoon Level 1–5. Canon: bow
+ *  users (Shana / Miranda) charge their gauge entirely from this — the higher their D'Lv,
+ *  the faster they can re-transform. Addition users charge from their Additions instead. */
+const SP_PER_BASIC_ATTACK = [35, 50, 75, 100, 150];
+
 /**
  * The player avatar. Placeholder capsule body with a "nose" marker so facing is
  * visible; swap for a rigged glTF model later. Driven by a {@link Bearer} (the
@@ -50,10 +57,12 @@ export class Player {
   /** Equipped Addition performed by the real-time combo system. */
   addition: AdditionDef;
 
-  /** Dragoon Spirit Points accumulated from landing Addition hits. */
+  /** Dragoon Spirit Points accumulated from landing Addition hits / basic attacks. */
   sp = 0;
   /** SP gauge cap (one Dragoon level early on; rises later). */
   readonly maxSp = 100;
+  /** Dragoon Level (D'Lv, 1–{@link MAX_DRAGOON_LEVEL}): scales the SP gained per basic attack. */
+  dragoonLevel = 1;
   /** Magic points (placeholder — uses items/SP in LoD; tune later). */
   mp = 0;
   /** Gold carried (awarded from defeated enemies). */
@@ -293,6 +302,28 @@ export class Player {
   }
 
   // --- Dragoon transformation ----------------------------------------------
+
+  /** True for members with no Additions (Shana / Miranda): they use the basic attack and
+   *  charge SP per attack instead of through Addition combos. */
+  get usesBasicAttack(): boolean {
+    return this.cls.additions.length === 0;
+  }
+
+  /** SP this member gains per basic attack, by current Dragoon Level (canon table). */
+  get spPerBasicAttack(): number {
+    const i = Math.min(Math.max(this.dragoonLevel, 1), MAX_DRAGOON_LEVEL) - 1;
+    return SP_PER_BASIC_ATTACK[i];
+  }
+
+  /** Award SP, clamped to the gauge. */
+  gainSp(amount: number): void {
+    this.sp = Math.min(this.maxSp, this.sp + Math.max(0, amount));
+  }
+
+  /** Set the Dragoon Level (clamped 1–{@link MAX_DRAGOON_LEVEL}). */
+  setDragoonLevel(level: number): void {
+    this.dragoonLevel = Math.min(Math.max(Math.floor(level), 1), MAX_DRAGOON_LEVEL);
+  }
 
   /** True while in Dragoon form (boosted ATK, Dragoon magic available). */
   get transformed(): boolean {

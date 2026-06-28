@@ -28,13 +28,18 @@ many enemies that react to being hit by an Addition do **not** react to arrows.
 
 ### D'levels
 
-| D'Level | SP to reach | AT | DF | MAT | MDF |
-|--:|--:|--:|--:|--:|--:|
-| 1 | — | 200% | 200% | 150% | 200% |
-| 2 | 1,000 | 205% | 210% | 155% | 210% |
-| 3 | 6,000 | 210% | 220% | 160% | 220% |
-| 4 | 12,000 | 215% | 230% | 165% | 230% |
-| 5 | 20,000 | 220% | 250% | 170% | 250% |
+The **SP/attack** column is key for Shana/Miranda: with **no Additions**, the SP they gain
+per attack is *entirely* determined by their Dragoon Level — 35 at D'Lv 1 up to 150 at D'Lv 5,
+so they re-fill (and re-transform) much faster at high D'Lv. Modelled in
+`src/entities/Player.ts` (`SP_PER_BASIC_ATTACK`), awarded on each basic attack.
+
+| D'Level | SP to reach | SP/attack | AT | DF | MAT | MDF |
+|--:|--:|--:|--:|--:|--:|--:|
+| 1 | — | 35 | 200% | 200% | 150% | 200% |
+| 2 | 1,000 | 50 | 205% | 210% | 155% | 210% |
+| 3 | 6,000 | 75 | 210% | 220% | 160% | 220% |
+| 4 | 12,000 | 100 | 215% | 230% | 165% | 230% |
+| 5 | 20,000 | 150 | 220% | 250% | 170% | 250% |
 
 ### Dragoon Magic — Silver Dragon DS
 
