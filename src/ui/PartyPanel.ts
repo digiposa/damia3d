@@ -16,6 +16,8 @@ export interface PartyRowView {
   // Controlled-member extras:
   sp?: number;
   maxSp?: number;
+  /** Dragoon Level (D'Lv) — shown on the SP gauge. */
+  dragoonLevel?: number;
   mp?: number;
   maxMp?: number;
 }
@@ -184,7 +186,8 @@ export class PartyPanel {
 
       if (v.controlled) {
         row.extras.style.display = "flex";
-        fillGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, t("stat.sp"));
+        // SP gauge label carries the Dragoon Level (gauge length = D'Lv × 100).
+        fillGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, `D'${v.dragoonLevel ?? 1} · ${t("stat.sp")}`);
         // MP only matters in Dragoon form — show it then.
         row.mp.track.style.display = v.transformed ? "block" : "none";
         if (v.transformed) fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));

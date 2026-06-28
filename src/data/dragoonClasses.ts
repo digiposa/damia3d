@@ -28,6 +28,27 @@ export type DragoonClassId =
   | "blueSea"
   | "golden";
 
+/** Dragoon-form stat multiplier (%) for one D'Level (e.g. at: 160 → ×1.6). */
+export interface DragoonStatMult {
+  at: number;
+  df: number;
+  mat: number;
+  mdf: number;
+}
+
+/** DF & MDF multipliers (%) by D'Level 1→5 — identical across every Dragoon line. */
+const DEF_SERIES = [200, 210, 220, 230, 250];
+/** Build a class's 5-entry D'level table from its AT and MAT base (150- or 200-series). */
+function dragoonStatTable(atBase: number, matBase: number): DragoonStatMult[] {
+  const ramp = (b: number): number[] => [b, b + 5, b + 10, b + 15, b + 20];
+  const at = ramp(atBase);
+  const mat = ramp(matBase);
+  return DEF_SERIES.map((df, i) => ({ at: at[i], df, mat: mat[i], mdf: df }));
+}
+/** Cumulative SP to reach D'Lv 2/3/4/5. Standard for most; Dart & Rose start at 1,200. */
+const TH_STD = [1000, 6000, 12000, 20000];
+const TH_DART = [1200, 6000, 12000, 20000];
+
 export interface DragoonClass {
   id: DragoonClassId;
   dragoonName: string;
@@ -40,6 +61,10 @@ export interface DragoonClass {
   additions: AdditionDef[];
   /** Default equipment loadout (item ids per slot). */
   loadout: Partial<Record<EquipSlot, string>>;
+  /** Dragoon-form AT/DF/MAT/MDF multipliers (%) per D'Level 1→5. */
+  dragoonStats: DragoonStatMult[];
+  /** Cumulative SP thresholds to reach D'Lv 2/3/4/5 (raises D'level when accrued). */
+  dLevelThresholds: number[];
 }
 
 export const RED_EYE: DragoonClass = {
@@ -51,6 +76,8 @@ export const RED_EYE: DragoonClass = {
   levels: DART_LEVELS,
   additions: DART_ADDITION_LIST,
   loadout: { weapon: "broad_sword", head: "bandana", body: "leather_armor", feet: "leather_boots", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(150,150),
+  dLevelThresholds: TH_DART,
 };
 
 export const JADE: DragoonClass = {
@@ -62,6 +89,8 @@ export const JADE: DragoonClass = {
   levels: LAVITZ_LEVELS,
   additions: LAVITZ_ADDITION_LIST,
   loadout: { weapon: "spear", head: "sallet", body: "scale_armor", feet: "leather_boots", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(150,200),
+  dLevelThresholds: TH_STD,
 };
 
 export const WHITE_SILVER: DragoonClass = {
@@ -74,6 +103,8 @@ export const WHITE_SILVER: DragoonClass = {
   // Shana / Miranda have no Additions — they fight with a plain bow attack.
   additions: [],
   loadout: { weapon: "short_bow", head: "felt_hat", body: "leather_jacket", feet: "leather_shoes", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(200,150),
+  dLevelThresholds: TH_STD,
 };
 
 export const DARKNESS: DragoonClass = {
@@ -85,6 +116,8 @@ export const DARKNESS: DragoonClass = {
   levels: ROSE_LEVELS,
   additions: ROSE_ADDITION_LIST,
   loadout: { weapon: "rapier", head: "felt_hat", body: "leather_jacket", feet: "leather_shoes", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(150,150),
+  dLevelThresholds: TH_DART,
 };
 
 export const VIOLET: DragoonClass = {
@@ -96,6 +129,8 @@ export const VIOLET: DragoonClass = {
   levels: HASCHEL_LEVELS,
   additions: HASCHEL_ADDITION_LIST,
   loadout: { weapon: "iron_knuckle", head: "bandana", body: "disciple_vest", feet: "leather_boots", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(150,200),
+  dLevelThresholds: TH_STD,
 };
 
 export const BLUE_SEA: DragoonClass = {
@@ -107,6 +142,8 @@ export const BLUE_SEA: DragoonClass = {
   levels: MERU_LEVELS,
   additions: MERU_ADDITION_LIST,
   loadout: { weapon: "mace", head: "felt_hat", body: "clothes", feet: "leather_shoes", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(200,150),
+  dLevelThresholds: TH_STD,
 };
 
 export const GOLDEN: DragoonClass = {
@@ -118,6 +155,8 @@ export const GOLDEN: DragoonClass = {
   levels: KONGOL_LEVELS,
   additions: KONGOL_ADDITION_LIST,
   loadout: { weapon: "axe", head: "bandana", body: "lion_fur", feet: "leather_boots", accessory: "bracelet" },
+  dragoonStats: dragoonStatTable(150,200),
+  dLevelThresholds: TH_STD,
 };
 
 /** Implemented Dragoon classes (all eight party archetypes). */

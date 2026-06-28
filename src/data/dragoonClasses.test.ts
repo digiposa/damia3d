@@ -64,6 +64,31 @@ describe("dragoon classes", () => {
   it("models the White-Silver line as Additionless (Shana / Miranda)", () => {
     expect(WHITE_SILVER.additions).toEqual([]);
   });
+
+  it("carries canon Dragoon-form stat multipliers per D'Level", () => {
+    for (const cls of [RED_EYE, JADE, WHITE_SILVER, DARKNESS, VIOLET, BLUE_SEA, GOLDEN]) {
+      expect(cls.dragoonStats).toHaveLength(5);
+      // DF & MDF are identical across every line: 200/210/220/230/250.
+      expect(cls.dragoonStats.map((d) => d.df)).toEqual([200, 210, 220, 230, 250]);
+      expect(cls.dragoonStats.map((d) => d.mdf)).toEqual([200, 210, 220, 230, 250]);
+    }
+    // Dart / Rose: AT & MAT both ramp from 150 (balanced lines).
+    expect(RED_EYE.dragoonStats[0]).toEqual({ at: 150, df: 200, mat: 150, mdf: 200 });
+    expect(RED_EYE.dragoonStats[4]).toEqual({ at: 170, df: 250, mat: 170, mdf: 250 });
+    // Shana / Meru: AT ramps from 200, MAT from 150 (physical Dragoons).
+    expect(WHITE_SILVER.dragoonStats[0]).toEqual({ at: 200, df: 200, mat: 150, mdf: 200 });
+    expect(WHITE_SILVER.dragoonStats[4].at).toBe(220);
+    // Albert / Haschel / Kongol: MAT ramps from 200 (magic Dragoons).
+    expect(JADE.dragoonStats[0]).toEqual({ at: 150, df: 200, mat: 200, mdf: 200 });
+    expect(JADE.dragoonStats[4].mat).toBe(220);
+  });
+
+  it("carries canon D'level SP thresholds (Dart & Rose start at 1,200)", () => {
+    expect(RED_EYE.dLevelThresholds).toEqual([1200, 6000, 12000, 20000]);
+    expect(DARKNESS.dLevelThresholds).toEqual([1200, 6000, 12000, 20000]);
+    expect(WHITE_SILVER.dLevelThresholds).toEqual([1000, 6000, 12000, 20000]);
+    expect(JADE.dLevelThresholds).toEqual([1000, 6000, 12000, 20000]);
+  });
 });
 
 describe("bearers", () => {

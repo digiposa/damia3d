@@ -125,7 +125,6 @@ export class TrainingMode extends GameMode {
   private transformBtn?: ActionButton;
   private itemBtn?: ActionButton;
   private magicBtn?: ActionButton;
-  private revertBtn?: ActionButton;
   private switchBtn?: ActionButton;
 
   /** Last form/element the attack & transform icons were set for (avoids per-frame swaps). */
@@ -245,7 +244,6 @@ export class TrainingMode extends GameMode {
     // Magic uses the green wand; rest pose = the upright glowing wand (frame 1).
     this.magicBtn = this.actionArcButton("🔮", "Magic", 0, "rgba(95,55,140,0.85)", "rgba(200,170,255,0.55)", "#f0e6ff", MAGIC_ICON_FRAMES, 1);
     this.itemBtn = this.actionArcButton("🧪", "Item", 1, "rgba(40,110,70,0.85)", "rgba(150,230,180,0.55)", "#e6fff0", ITEM_ICON_FRAMES);
-    this.revertBtn = this.actionArcButton("⮌", "Revert", 1, "rgba(120,80,40,0.82)", "rgba(230,190,150,0.6)", "#fff0e0");
     // Slot 2 (left of attack): Transform (human only, appears at full SP) — a Dragoon eye
     // that opens; its frames + colour are set per controlled archetype in refreshHud.
     this.transformBtn = this.actionArcButton("✨", "Transform", 2, "rgba(150,120,40,0.85)", "rgba(255,225,140,0.55)", "#fff4d8", EYE_FRAMES.Fire);
@@ -463,11 +461,8 @@ export class TrainingMode extends GameMode {
     if (this.guardPressed()) this.playerAct("guard");
     if (this.input.wasPressed("Item") || this.input.wasPressed("KeyR")) this.playerAct("item");
     if (this.input.wasPressed("Magic") || this.input.wasPressed("KeyF")) this.playerAct("magic");
-    if (this.input.wasPressed("Revert")) this.playerAct("revert");
-    // T toggles form: transform in human form, return to human in Dragoon form.
-    if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) {
-      this.playerAct(this.player.transformed ? "revert" : "transform");
-    }
+    // Transform (human form only) — canon: no manual de-transform, it ends when SP runs out.
+    if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) this.playerAct("transform");
     if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
 
     // Combat time scales with the Options "combat speed" setting.
@@ -507,11 +502,6 @@ export class TrainingMode extends GameMode {
    * turn (except the transform itself). Attack is handled separately (the timed combo).
    */
   private playerAct(id: ActionId): void {
-    // Returning to human form is a free stance change — not gated by the ATB gauge.
-    if (id === "revert") {
-      if (this.player.transformed) this.player.revert();
-      return;
-    }
     if (this.runner.active || !this.runner.gauge.isReady) return;
     const m = this.controlled;
     let ok = false;
@@ -529,7 +519,7 @@ export class TrainingMode extends GameMode {
         ok = this.doMagic(m);
         break;
       case "attack":
-        break; // attack uses the timed-combo path; revert handled above
+        break; // attack uses the timed-combo path
     }
     if (ok) {
       this.runner.gauge.spend();
@@ -731,7 +721,7 @@ export class TrainingMode extends GameMode {
     this.applyHit(target, res.hits);
     // SP accrues per landed input (hit 1 is free); award an even share of spMax.
     const share = Math.floor(add.spMax / additionPresses(add));
-    this.player.sp = Math.min(this.player.maxSp, this.player.sp + share);
+    this.player.gainSp(share);
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), "#ffffff");
     if (res.completed) {
       this.player.recordAddition(add);
@@ -832,6 +822,7 @@ export class TrainingMode extends GameMode {
     this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
 
     if (this.player.hp === 0) {
+      this.player.revert(); // HP 0 forces de-transformation (canon)
       this.player.hp = this.player.maxHp; // sandbox: revive instead of game-over
     }
   }
@@ -1101,7 +1092,7 @@ export class TrainingMode extends GameMode {
       hp: live ? live.hp : cs.maxHp,
       maxHp: cs.maxHp,
       sp: live ? live.sp : 0,
-      maxSp: 100,
+      maxSp: live ? live.maxSp : 100,
       mp: live ? live.mp : cs.maxMp,
       maxMp: cs.maxMp,
       speed: cs.speed,
@@ -1228,6 +1219,7 @@ export class TrainingMode extends GameMode {
         if (controlled) {
           row.sp = a.sp;
           row.maxSp = a.maxSp;
+          row.dragoonLevel = a.dragoonLevel;
           row.mp = a.mp;
           row.maxMp = a.maxMp;
         }
@@ -1272,8 +1264,6 @@ export class TrainingMode extends GameMode {
     this.magicBtn?.setVisible(transformed);
     this.magicBtn?.setAvailable(ready && p.canCastMagic);
     this.magicBtn?.setReady(ready && p.canCastMagic);
-    this.revertBtn?.setVisible(transformed);
-    this.revertBtn?.setAvailable(true);
 
     this.switchBtn?.setAvailable(this.party.length > 1);
   }
@@ -1296,7 +1286,6 @@ export class TrainingMode extends GameMode {
     this.transformBtn?.dispose();
     this.itemBtn?.dispose();
     this.magicBtn?.dispose();
-    this.revertBtn?.dispose();
     this.switchBtn?.dispose();
   }
 }

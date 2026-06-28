@@ -9,7 +9,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { statsForLevel, levelForExp, nextLevelExp, type CharacterLevel } from "../data/dart";
 import { BASIC_ATTACK, type AdditionDef } from "../data/additions";
 import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/equipment";
-import { type DragoonClass, dragoonClass } from "../data/dragoonClasses";
+import { type DragoonClass, type DragoonStatMult, dragoonClass } from "../data/dragoonClasses";
 import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
@@ -22,11 +22,6 @@ const BASE_MAX_MP = 60; // base MP before equipment % bonuses (placeholder)
 const GUARD_DURATION = 2; // seconds the stance lasts
 const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activation)
 const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
-
-/** Dragoon transformation: lasts this many of the member's own actions. */
-const DRAGOON_TURNS = 3;
-/** Physical attack multiplier while transformed into Dragoon form. */
-const DRAGOON_ATK_MULT = 1.5;
 
 /** Highest Dragoon Level (D'Lv) a Spirit reaches. */
 export const MAX_DRAGOON_LEVEL = 5;
@@ -57,12 +52,17 @@ export class Player {
   /** Equipped Addition performed by the real-time combo system. */
   addition: AdditionDef;
 
-  /** Dragoon Spirit Points accumulated from landing Addition hits / basic attacks. */
+  /** Dragoon Spirit Points in the gauge: charge in human form, remaining turns×100 in Dragoon form. */
   sp = 0;
-  /** SP gauge cap (one Dragoon level early on; rises later). */
-  readonly maxSp = 100;
-  /** Dragoon Level (D'Lv, 1–{@link MAX_DRAGOON_LEVEL}): scales the SP gained per basic attack. */
+  /** Lifetime SP earned — drives Dragoon-Level progression (never spent). */
+  lifetimeSp = 0;
+  /** Dragoon Level (D'Lv, 1–{@link MAX_DRAGOON_LEVEL}): SP gauge size, per-attack SP, stat multipliers. */
   dragoonLevel = 1;
+
+  /** SP gauge cap = one full level (100) per Dragoon Level. */
+  get maxSp(): number {
+    return this.dragoonLevel * 100;
+  }
   /** Magic points (placeholder — uses items/SP in LoD; tune later). */
   mp = 0;
   /** Gold carried (awarded from defeated enemies). */
@@ -210,17 +210,23 @@ export class Player {
     return Math.floor(BASE_MAX_MP * (1 + this.bonusPct("mpPct")));
   }
   get atk(): number {
-    const base = this.stats.at + this.bonus("at");
-    return this.transformed ? Math.floor(base * DRAGOON_ATK_MULT) : base;
+    return this.withDragoon(this.stats.at + this.bonus("at"), "at");
   }
   get def(): number {
-    return this.stats.df + this.bonus("df");
+    return this.withDragoon(this.stats.df + this.bonus("df"), "df");
   }
   get matk(): number {
-    return this.stats.mat + this.bonus("mat");
+    return this.withDragoon(this.stats.mat + this.bonus("mat"), "mat");
   }
   get mdef(): number {
-    return this.stats.mdf + this.bonus("mdf");
+    return this.withDragoon(this.stats.mdf + this.bonus("mdf"), "mdf");
+  }
+
+  /** Apply the Dragoon-form stat multiplier (% by D'Level) when transformed, else identity. */
+  private withDragoon(base: number, key: keyof DragoonStatMult): number {
+    if (!this.transformed) return base;
+    const i = Math.min(Math.max(this.dragoonLevel, 1), MAX_DRAGOON_LEVEL) - 1;
+    return Math.floor((base * this.cls.dragoonStats[i][key]) / 100);
   }
 
   /** Element imbued on physical attacks by the equipped weapon (Non-Elemental if none). */
@@ -316,44 +322,57 @@ export class Player {
   }
 
   /** Award SP, clamped to the gauge. */
+  /** Award SP: fills the gauge (capped) and accrues toward the next Dragoon Level. SP keeps
+   *  counting toward level-up even when the gauge is full, so D'level can rise without ever
+   *  transforming. */
   gainSp(amount: number): void {
-    this.sp = Math.min(this.maxSp, this.sp + Math.max(0, amount));
+    const amt = Math.max(0, amount);
+    this.sp = Math.min(this.maxSp, this.sp + amt);
+    this.lifetimeSp += amt;
+    const th = this.cls.dLevelThresholds;
+    let lvl = 1;
+    while (lvl - 1 < th.length && this.lifetimeSp >= th[lvl - 1]) lvl += 1;
+    if (lvl > this.dragoonLevel) this.dragoonLevel = Math.min(lvl, MAX_DRAGOON_LEVEL);
   }
 
-  /** Set the Dragoon Level (clamped 1–{@link MAX_DRAGOON_LEVEL}). */
+  /** Set the Dragoon Level (clamped 1–{@link MAX_DRAGOON_LEVEL}). Debug/training override. */
   setDragoonLevel(level: number): void {
     this.dragoonLevel = Math.min(Math.max(Math.floor(level), 1), MAX_DRAGOON_LEVEL);
   }
 
-  /** True while in Dragoon form (boosted ATK, Dragoon magic available). */
+  /** True while in Dragoon form (boosted stats, D'Attack + Magic available). */
   get transformed(): boolean {
     return this.dragoonTurns > 0;
   }
 
-  /** True when the Dragoon Spirit is full and the member can transform. */
+  /** True when the SP gauge holds at least one full level (100) and we're not already transformed. */
   get canTransform(): boolean {
-    return !this.transformed && this.sp >= this.maxSp;
+    return !this.transformed && this.sp >= 100;
   }
 
-  /** Spend the full SP gauge to enter Dragoon form for {@link DRAGOON_TURNS} actions. */
+  /** Enter Dragoon form. Each full 100-SP block becomes one turn; any remainder is lost
+   *  (180 → 100). The gauge then drains 100 per action until it empties. */
   transform(): void {
     if (!this.canTransform) return;
-    this.dragoonTurns = DRAGOON_TURNS;
-    this.sp = 0;
+    this.dragoonTurns = Math.floor(this.sp / 100);
+    this.sp = this.dragoonTurns * 100;
     this.dragoonAura.isVisible = true;
   }
 
-  /** Count one performed action against the transformation; revert at zero. */
+  /** Count one performed action against the transformation: spend one 100-SP block; when the
+   *  gauge empties the member auto-reverts to human form (canon — no manual de-transform). */
   tickDragoon(): void {
     if (this.dragoonTurns > 0) {
       this.dragoonTurns -= 1;
+      this.sp = this.dragoonTurns * 100;
       if (this.dragoonTurns === 0) this.dragoonAura.isVisible = false;
     }
   }
 
-  /** Manually return to human form (ends the transformation immediately). */
+  /** Forced return to human form (only on death — HP reaching 0). */
   revert(): void {
     this.dragoonTurns = 0;
+    this.sp = 0;
     this.dragoonAura.isVisible = false;
   }
 
