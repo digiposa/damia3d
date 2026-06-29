@@ -628,9 +628,10 @@ export class TrainingMode extends GameMode {
   // --- Player ATB actions (FF12-style: any one action spends the gauge) -----
 
   /**
-   * Perform a non-attack ATB action for the controlled member. Requires the ATB gauge
-   * full and no combo in progress; on success it spends the gauge and counts a Dragoon
-   * turn (except the transform itself). Attack is handled separately (the timed combo).
+   * Perform a non-attack ATB action for the controlled member. Requires the ATB gauge full
+   * and no combo in progress; on success it spends the gauge and counts a Dragoon turn —
+   * EXCEPT transform, which keeps the turn so the player can act in Dragoon form right away.
+   * Attack is handled separately (the timed combo).
    */
   private playerAct(id: ActionId): void {
     if (this.runner.active || !this.runner.gauge.isReady) return;
@@ -652,9 +653,11 @@ export class TrainingMode extends GameMode {
       case "attack":
         break; // attack uses the timed-combo path
     }
-    if (ok) {
+    // Transforming keeps the ATB turn (a free stance change): the gauge stays full so you can
+    // immediately act in Dragoon form. Every other action spends the gauge and counts a turn.
+    if (ok && id !== "transform") {
       this.runner.gauge.spend();
-      if (id !== "transform") m.avatar.tickDragoon();
+      m.avatar.tickDragoon();
     }
   }
 
@@ -1244,8 +1247,11 @@ export class TrainingMode extends GameMode {
     } else {
       // An ATB action — only when the gauge is full; otherwise hold (face the target).
       if (member.ready && this.performAiAction(member, decision)) {
-        member.gauge.spend();
-        if (decision.kind !== "transform") member.avatar.tickDragoon();
+        // Transforming keeps the turn (free stance change); other actions spend it + tick.
+        if (decision.kind !== "transform") {
+          member.gauge.spend();
+          member.avatar.tickDragoon();
+        }
       } else if ("target" in decision) {
         member.avatar.face(decision.target.position.subtract(member.position));
       }
