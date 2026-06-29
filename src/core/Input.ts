@@ -45,13 +45,17 @@ export class Input {
   }
 
   /**
-   * Movement axis on the ground plane, normalized to length <= 1. Driven solely
-   * by the virtual (touch) joystick — desktop uses click-to-move instead, so no
-   * keyboard movement keys are read here.
+   * Movement axis on the ground plane, normalized to length <= 1. The touch joystick feeds
+   * the virtual axis; on desktop, WASD / arrow keys drive it too (y points "up"/forward).
+   * Click-to-move still works when no movement key is held.
    */
   axis(): { x: number; y: number } {
     let x = this.virtual.x;
     let y = this.virtual.y;
+    if (this.held.has("KeyW") || this.held.has("ArrowUp")) y += 1;
+    if (this.held.has("KeyS") || this.held.has("ArrowDown")) y -= 1;
+    if (this.held.has("KeyD") || this.held.has("ArrowRight")) x += 1;
+    if (this.held.has("KeyA") || this.held.has("ArrowLeft")) x -= 1;
     const len = Math.hypot(x, y);
     if (len > 1) {
       x /= len;
