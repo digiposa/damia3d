@@ -4,8 +4,14 @@ import { AtbGauge, BASE_FILL_TIME } from "./AtbGauge";
 
 // --- Timing-sight tuning (seconds / progress fractions) --------------------
 
-/** Per-window collapse time — comfortable and fixed for every Addition. */
+/** Per-window collapse time — the comfortable MAX. The actual window shrinks so the whole
+ *  Addition executes within the member's ATB fill time (see {@link AdditionRunner.press}),
+ *  which keeps higher-rank (longer) Additions strictly better DPS and stops fast characters'
+ *  Speed from being eaten by long combos. */
 export const SIGHT_DURATION = 0.7;
+
+/** Floor on the window collapse time, so the longest combos stay humanly timeable. */
+export const MIN_SIGHT_DURATION = 0.35;
 
 /** Success window, as a fraction of the window duration (1 = perfect alignment). */
 export const WINDOW_LO = 0.8;
@@ -126,6 +132,14 @@ export class AdditionRunner {
       this.presses = 0;
       this.sightTimer = 0;
       if (multiHit) {
+        // Scale the window so the combo executes in ~one fill: window = fill / presses,
+        // clamped to a comfortable range. The whole Addition then takes ~the member's ATB
+        // cadence regardless of length → one Addition = one turn, longer = strictly better.
+        const presses = additionPresses(def);
+        this.sightDuration = Math.min(
+          SIGHT_DURATION,
+          Math.max(MIN_SIGHT_DURATION, this.gauge.fillTime / presses),
+        );
         this.gauge.spend(); // start refilling from empty — this attack's cadence
       } else {
         // A single-hit Addition (basic attack) resolves instantly and leaves the
