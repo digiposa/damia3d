@@ -7,7 +7,8 @@ Living list of agreed reworks and open design questions. Not user-facing.
 We will revisit each of these one at a time and decide what to rework. Nothing here is
 final. Details for every item are in the sections below.
 
-- [ ] Dragoon system — SP generation, MP, stats, spells, transform duration (full rework)
+- [ ] Dragoon system — SP/MP/stats/spells/transform/D'Attack/Special/Dragoon Space (Phases 1–5 done; see section below)
+- [ ] **Status / buff / debuff system — proper general rework needed** (only the Dragoon-magic ones exist, ad-hoc; see section below)
 - [ ] ATB / attack-interval model — values & feel (3.0s @ SPD 50, REF_SPEED 50, Speed→recharge)
 - [ ] Movement / spacing constants (speeds, reaches, ranges, rooting, auto-approach)
 - [ ] Real-time ranged combat (arrows, reach, cadence) — keep / tune / rework
@@ -24,6 +25,12 @@ final. Details for every item are in the sections below.
 - [ ] Character models & 2D portraits (procedural placeholders / extrapolations)
 
 ## ⚠️ Dragoon system — full rework needed (agreed)
+
+> **UPDATE:** the canon rework was implemented in Phases 1–5 (SP gauge = D'Lv×100,
+> per-attack SP by D'Lv, D'level stat multipliers + progression, D'Attack timed combo,
+> Dragoon Magic spell menu + formula, status ailments, Special + Dragoon Space, SP-source
+> items/accessories). The notes below are the original placeholder description, kept for
+> history. Still pending review: the Special command, and remaining SP-on-damage equipment.
 
 The whole **Dragoon subsystem is placeholder** and must be completely redesigned for
 coherence/canon. Nothing in it is settled — revisit all of:
@@ -49,6 +56,33 @@ rules). Treat all of these constants/effects as throwaway until the rework.
 **Canon reference for the rework** lives in `docs/canon/` (Wiki Project data per character:
 SPD + aux stats, Dragoon D'levels & multipliers, Dragoon magic spells). Transcribe from
 there when building the real Dragoon system.
+
+## ⚠️ Status / buff / debuff system — proper rework needed (agreed)
+
+The status effects implemented so far were built **ad-hoc, only for Dragoon magic** (Phase
+3b) and are NOT a real system. We must design and build a **proper general status framework**,
+because statuses come from many sources beyond Dragoon spells:
+
+- **Items** (e.g. cure/heal-status items, attack items that inflict ailments).
+- **Certain enemy & player attacks / Additions** that apply ailments.
+- **Equipment** (status resistance/immunity; gear that inflicts on hit).
+- The full canon ailment roster (Poison, Stun, Fear, Confusion, Bewitchment, Petrification,
+  Arm Block, Sleep, Instant Death, stat up/down, etc.) — not just the few we have.
+
+What exists today (to be folded into the real system, treat as throwaway):
+- `Enemy.ts`: `fearTimer`/`stunTimer` + `feared`/`stunned`, `inflictFear/Stun`, `kill()`,
+  `tickStatus()` (timers + emissive glow). Only Fear (×2 dmg), Stun (skip turn), Instant
+  Death are modelled, with second-based durations we invented.
+- `Player.ts`: `damageHalveTimer` + `damageHalved` + `applyDamageHalve()` (Rose/Blossom
+  Storm only). No other player/ally ailments; **`cure` is a no-op** because allies can't be
+  afflicted yet.
+- Applied ad-hoc in `TrainingMode` (`FEAR_SECONDS`/`STUN_SECONDS`/`DAMAGE_HALVE_SECONDS`,
+  `castSpell`, `applyHit` targetFear, `resolveEnemyAction` halve).
+
+Rework should give: a shared status model on **any combatant** (enemy AND ally/player),
+sourced from spells/items/attacks/equipment, with durations expressed in the right unit
+(turns vs seconds — reconcile with the real-time ATB), resistances/immunities, cure/cleanse,
+and consistent visuals. The Dragoon-magic ailments then become just one source feeding it.
 
 ## Per-character Speed (SPD) — DONE
 
