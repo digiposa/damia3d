@@ -105,6 +105,7 @@ const en: Dict = {
   "action.item": "Item",
   "action.magic": "Magic",
   "combat.dragoon": "Dragoon!",
+  "combat.special": "Special!",
   "item.healingPotion": "Healing Potion",
 
   // Gambits (AI rules)
@@ -249,6 +250,7 @@ const fr: Dict = {
   "action.item": "Objet",
   "action.magic": "Magie",
   "combat.dragoon": "Dragoon !",
+  "combat.special": "Spécial !",
   "item.healingPotion": "Potion de soin",
   "gambit.rulesFor": "Règles IA — {name}",
   "gambit.note": "Règles évaluées de haut en bas ; la 1ère valide s'applique. Touche une règle pour la changer.",

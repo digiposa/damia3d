@@ -36,7 +36,7 @@ import {
 import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
 import type { DragoonSpell } from "../data/dragoonSpells";
 import { estimateDps } from "../combat/balance";
-import { elementMultiplier, type Element } from "../combat/element";
+import { elementMultiplier, fieldMultiplier, type Element } from "../combat/element";
 import { AdditionRunner } from "../combat/AdditionRunner";
 import { t } from "../core/i18n";
 import type { ModeMenuData, AdditionEntry, StatusView, EquipView, CharacterSheet } from "../core/menu";
@@ -115,6 +115,18 @@ const FEAR_SECONDS = 12;
 const STUN_SECONDS = 5;
 const DAMAGE_HALVE_SECONDS = 15; // Rose/Blossom Storm (~3 turns)
 
+/** Element colour as a 0–1 RGB triplet, for the Dragoon Space arena tint. */
+const ELEMENT_RGB: Record<Element, [number, number, number]> = {
+  Fire: [0.9, 0.35, 0.22],
+  Water: [0.25, 0.6, 0.95],
+  Wind: [0.35, 0.82, 0.45],
+  Earth: [0.85, 0.66, 0.25],
+  Light: [0.92, 0.9, 0.78],
+  Darkness: [0.62, 0.32, 0.86],
+  Thunder: [0.55, 0.42, 0.95],
+  "Non-Elemental": [0.6, 0.6, 0.7],
+};
+
 /** Accent colour per element, for the spell picker rows / cast popups. */
 const ELEMENT_COLOR: Record<Element, string> = {
   Fire: "#ff6b4a",
@@ -169,7 +181,14 @@ export class TrainingMode extends GameMode {
   private itemBtn?: ActionButton;
   private magicBtn?: ActionButton;
   private switchBtn?: ActionButton;
+  private specialBtn?: ActionButton;
   private spellMenu!: SpellMenu;
+
+  /** Active Dragoon Space element (Special command) — its Field modifier boosts matching
+   *  elements / weakens the opposite, and tints the arena. Cleared when the initiator reverts. */
+  private dragoonSpace?: Element;
+  private spaceInitiator?: PartyMember;
+  private spaceOverlay!: HTMLDivElement;
 
   /** Last form/element the attack & transform icons were set for (avoids per-frame swaps). */
   private attackDragoon = false;
@@ -311,6 +330,32 @@ export class TrainingMode extends GameMode {
       border: "1px solid rgba(180,170,255,0.6)",
       color: "#ece6ff",
     });
+    // Special (all-party transform): appears only when every member's SP is full and none are
+    // transformed. Distinct gold button, top-right under the switch button.
+    this.specialBtn = new ActionButton("★", () => this.input.pressVirtual("Special"), {
+      top: "calc(env(safe-area-inset-top, 0px) + 160px)",
+      right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+      bottom: "auto",
+      width: "48px",
+      height: "48px",
+      font: "700 22px/1 system-ui, sans-serif",
+      backgroundColor: "rgba(150,120,30,0.9)",
+      border: "1px solid rgba(255,225,120,0.7)",
+      color: "#fff6d8",
+    });
+    this.specialBtn.setVisible(false);
+
+    // Dragoon Space arena tint (Special) — a soft full-screen element-coloured overlay.
+    this.spaceOverlay = document.createElement("div");
+    Object.assign(this.spaceOverlay.style, {
+      position: "fixed",
+      inset: "0",
+      display: "none",
+      pointerEvents: "none",
+      mixBlendMode: "screen",
+      zIndex: "5",
+    } satisfies Partial<CSSStyleDeclaration>);
+    document.body.appendChild(this.spaceOverlay);
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
@@ -515,6 +560,7 @@ export class TrainingMode extends GameMode {
     if (this.input.wasPressed("Magic") || this.input.wasPressed("KeyF")) this.playerAct("magic");
     // Transform (human form only) — canon: no manual de-transform, it ends when SP runs out.
     if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) this.playerAct("transform");
+    if (this.input.wasPressed("Special") || this.input.wasPressed("KeyX")) this.doSpecial();
     if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
 
     // Combat time scales with the Options "combat speed" setting.
@@ -533,6 +579,7 @@ export class TrainingMode extends GameMode {
       if (m !== this.controlled) this.updateAiMember(m, dt, cdt);
     }
     this.updateSight();
+    this.updateDragoonSpace(); // end the Space once its initiator reverts
 
     this.refreshHud();
   }
@@ -597,6 +644,46 @@ export class TrainingMode extends GameMode {
     return this.useHealItem(m);
   }
 
+  /** True when the Special command is available: every member's SP gauge is full and none are
+   *  transformed (canon). */
+  private get canSpecial(): boolean {
+    return (
+      this.party.length > 0 &&
+      this.party.every((m) => !m.avatar.transformed && m.avatar.sp >= m.avatar.maxSp)
+    );
+  }
+
+  /** Special: transform the whole party at once and open the controlled member's Dragoon Space
+   *  (its element's Field modifier + arena tint), which lasts until that member reverts. */
+  private doSpecial(): void {
+    if (!this.canSpecial || !this.runner.gauge.isReady || this.runner.active) return;
+    const initiator = this.controlled;
+    for (const m of this.party) m.avatar.transform();
+    this.dragoonSpace = initiator.avatar.element;
+    this.spaceInitiator = initiator;
+    this.showSpace(this.dragoonSpace);
+    this.popText(initiator.position.add(new Vector3(0, 3.0, 0)), t("combat.special"), "#ffe08a");
+    this.runner.gauge.spend(); // Special is the controlled member's action
+    this.refreshHud();
+  }
+
+  /** Tint the arena for the active Dragoon Space (soft element-coloured screen overlay). */
+  private showSpace(element: Element): void {
+    const [r, g, b] = ELEMENT_RGB[element] ?? [0.6, 0.6, 0.7];
+    const c = (v: number): number => Math.round(v * 255);
+    this.spaceOverlay.style.background = `radial-gradient(circle at 50% 40%, rgba(${c(r)},${c(g)},${c(b)},0.32), rgba(${c(r * 0.5)},${c(g * 0.5)},${c(b * 0.5)},0.16))`;
+    this.spaceOverlay.style.display = "block";
+  }
+
+  /** End Dragoon Space once its initiator has reverted (SP ran out). */
+  private updateDragoonSpace(): void {
+    if (this.dragoonSpace && (!this.spaceInitiator || !this.spaceInitiator.avatar.transformed)) {
+      this.dragoonSpace = undefined;
+      this.spaceInitiator = undefined;
+      this.spaceOverlay.style.display = "none";
+    }
+  }
+
   /** Magic opens the spell picker (combat pauses); it does not itself spend the turn — the
    *  chosen spell does. Returns false so playerAct leaves the ATB gauge charged. */
   private doMagic(m: PartyMember): boolean {
@@ -656,9 +743,11 @@ export class TrainingMode extends GameMode {
           ? [primaryEnemy]
           : [];
 
-    // --- Damage to enemies (Feared foes take ×2) ---
+    // --- Damage to enemies (Feared foes take ×2; Dragoon Space scales by element) ---
     let totalDamage = 0;
     if (spell.multiplier !== undefined) {
+      // "Dragon"-named spells ignore the Dragoon-Space Field modifier (canon).
+      const field = spell.name.includes("Dragon") ? 1 : fieldMultiplier(this.dragoonSpace, spell.element);
       for (const foe of foes) {
         const elem = elementMultiplier(spell.element, foe.def.element);
         const dmg = Math.max(
@@ -666,6 +755,7 @@ export class TrainingMode extends GameMode {
           magicAttack(caster.baseMat, foe.def.stats.mdf, caster.dragoonMatPct, spell.multiplier, caster.level, {
             element: elem,
             targetFear: foe.feared ? 2 : 1,
+            field,
           }),
         );
         totalDamage += dmg;
@@ -899,8 +989,12 @@ export class TrainingMode extends GameMode {
     const df = target.def.stats.df;
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
     const element = elementMultiplier(this.player.attackElement, target.def.element);
-    // Feared targets take double damage (Target Fear ×2).
-    const mods = { element, targetFear: target.feared ? 2 : 1 };
+    // Feared targets take double damage (Target Fear ×2); Dragoon Space scales by element.
+    const mods = {
+      element,
+      targetFear: target.feared ? 2 : 1,
+      field: fieldMultiplier(this.dragoonSpace, this.player.attackElement),
+    };
     const dmg = this.comboIsDragoon
       ? this.dragoonHitDamage(k, df, mods)
       : this.additionHitDamage(k, df, mods);
@@ -931,7 +1025,7 @@ export class TrainingMode extends GameMode {
 
   /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
    *  so a completed combo sums to a perfect Addition. */
-  private additionHitDamage(k: number, df: number, mods: { element: number; targetFear?: number }): number {
+  private additionHitDamage(k: number, df: number, mods: { element: number; targetFear?: number; field?: number }): number {
     const add = this.player.addition;
     const atk = { at: this.player.atk, lv: this.player.level };
     const mult = additionMultiplier(add, this.player.additionLevel(add));
@@ -942,7 +1036,7 @@ export class TrainingMode extends GameMode {
 
   /** Incremental damage of D'Attack strike `k`, using the Output table and the line's DRGNAT%.
    *  Base AT (un-boosted) goes in — the Dragoon formula applies the % itself. */
-  private dragoonHitDamage(k: number, df: number, mods: { element: number; targetFear?: number }): number {
+  private dragoonHitDamage(k: number, df: number, mods: { element: number; targetFear?: number; field?: number }): number {
     const atk = { at: this.player.baseAtk, lv: this.player.level };
     const pct = this.player.dragoonAtPct;
     const archer = this.player.isArcher;
@@ -997,8 +1091,9 @@ export class TrainingMode extends GameMode {
     const magical = action.kind === "magical";
     // Element only applies to magical attacks (attack element vs Dart's element).
     const element = magical ? elementMultiplier(action.element ?? "Non-Elemental", this.player.element) : 1;
+    const field = magical ? fieldMultiplier(this.dragoonSpace, action.element ?? "Non-Elemental") : 1;
     const raw = magical
-      ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard, element })
+      ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard, element, field })
       : enemyPhysicalAttack(enemy.def.stats.at, this.player.def, action.multiplier, { guard });
     // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…), then Rose/Blossom Storm.
     let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
@@ -1455,6 +1550,10 @@ export class TrainingMode extends GameMode {
     this.magicBtn?.setReady(ready && p.canCastMagic);
 
     this.switchBtn?.setAvailable(this.party.length > 1);
+    // Special: only when the whole party is charged and human (and the gauge is ready).
+    const special = this.canSpecial && ready;
+    this.specialBtn?.setVisible(special);
+    this.specialBtn?.setReady(special);
   }
 
   dispose(): void {
@@ -1476,7 +1575,9 @@ export class TrainingMode extends GameMode {
     this.itemBtn?.dispose();
     this.magicBtn?.dispose();
     this.switchBtn?.dispose();
+    this.specialBtn?.dispose();
     this.spellMenu.dispose();
+    this.spaceOverlay.remove();
   }
 }
 

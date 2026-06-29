@@ -39,3 +39,15 @@ export function elementMultiplier(attack: Element, target: Element): number {
   if (attack === target) return 0.5;
   return OPPOSITE[attack] === target ? 1.5 : 1;
 }
+
+/**
+ * Dragoon-Space "Field" modifier — an attack's element vs the active Dragoon Space element:
+ * - matches the Space → ×1.5 (the Space empowers its own element)
+ * - opposes the Space → ×0.5
+ * - otherwise (or no Space) → ×1
+ */
+export function fieldMultiplier(space: Element | undefined, attack: Element): number {
+  if (!space || space === "Non-Elemental" || attack === "Non-Elemental") return 1;
+  if (attack === space) return 1.5;
+  return OPPOSITE[space] === attack ? 0.5 : 1;
+}

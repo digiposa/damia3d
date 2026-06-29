@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { elementMultiplier, oppositeOf } from "./element";
+import { elementMultiplier, fieldMultiplier, oppositeOf } from "./element";
 
 describe("elementMultiplier", () => {
   it("boosts opposites ×1.5", () => {
@@ -29,5 +29,18 @@ describe("elementMultiplier", () => {
     expect(oppositeOf("Fire")).toBe("Water");
     expect(oppositeOf("Thunder")).toBeUndefined();
     expect(oppositeOf("Non-Elemental")).toBeUndefined();
+  });
+});
+
+describe("fieldMultiplier (Dragoon Space)", () => {
+  it("boosts matching element ×1.5, weakens the opposite ×0.5", () => {
+    expect(fieldMultiplier("Fire", "Fire")).toBe(1.5);
+    expect(fieldMultiplier("Fire", "Water")).toBe(0.5);
+  });
+
+  it("is neutral for unrelated elements or no active Space", () => {
+    expect(fieldMultiplier("Fire", "Wind")).toBe(1);
+    expect(fieldMultiplier(undefined, "Fire")).toBe(1);
+    expect(fieldMultiplier("Thunder", "Thunder")).toBe(1.5);
   });
 });
