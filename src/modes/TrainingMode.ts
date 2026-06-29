@@ -112,6 +112,10 @@ const BALANCE_REF_DF = 20;
 /** SP gained by an AI member per auto-attack (so it can charge up to transform). */
 const AI_SP_PER_HIT = 20;
 
+/** Fixed breather after every action (combat seconds), on top of max(exec, ATB fill). Keeps a
+ *  rhythm/enemy window after long Additions without inverting the canon Addition ranking. */
+const ACTION_RECOVERY = 0.5;
+
 // Dragoon-Magic status / buff durations (seconds of combat time).
 const FEAR_SECONDS = 12;
 const STUN_SECONDS = 5;
@@ -201,6 +205,8 @@ export class TrainingMode extends GameMode {
   /** Whether the in-progress combo is a Dragoon D'Attack (snapshot at start, so a mid-combo
    *  auto-revert doesn't switch the damage formula). */
   private comboIsDragoon = false;
+  /** Post-action breather (combat seconds) — blocks the next action start while counting down. */
+  private actionRecoveryT = 0;
 
   /** Shared consumable pool (Training sandbox). */
   private items = startingItems();
@@ -580,12 +586,14 @@ export class TrainingMode extends GameMode {
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
     this.player.tickGuard(cdt);
+    if (this.actionRecoveryT > 0) this.actionRecoveryT = Math.max(0, this.actionRecoveryT - cdt);
     // Keep the ATB gauge's fill time in sync with the bearer's Speed (gear can change it).
     this.runner.setFillTime(this.player.atbFillTime);
     if (this.runner.tick(cdt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.comboTarget = undefined;
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
+      this.finishAction(); // a lapsed combo closes the action too
     }
     this.updateEnemies(cdt);
     // AI party members (everyone except the controlled one) run their Brain.
@@ -634,7 +642,7 @@ export class TrainingMode extends GameMode {
    * Attack is handled separately (the timed combo).
    */
   private playerAct(id: ActionId): void {
-    if (this.runner.active || !this.runner.gauge.isReady) return;
+    if (this.runner.active || !this.runner.gauge.isReady || this.actionRecoveryT > 0) return;
     const m = this.controlled;
     let ok = false;
     switch (id) {
@@ -658,7 +666,16 @@ export class TrainingMode extends GameMode {
     if (ok && id !== "transform") {
       this.runner.gauge.spend();
       m.avatar.tickDragoon();
+      this.finishAction();
     }
+  }
+
+  /** Close out the controlled member's action: arm the post-action breather, and — if the
+   *  Dragoon form just spent its last turn — revert now (at the action's END, so the boosted
+   *  stats covered the whole action). Death (HP 0) reverts separately and immediately. */
+  private finishAction(): void {
+    this.actionRecoveryT = ACTION_RECOVERY;
+    if (this.player.dragoonSpent) this.player.revert();
   }
 
   private doGuard(m: PartyMember): boolean {
@@ -708,6 +725,7 @@ export class TrainingMode extends GameMode {
     if (!stock || stock.count <= 0 || !this.runner.gauge.isReady) return;
     this.useItem(this.controlled, stock);
     this.runner.gauge.spend(); // using an item is the member's ATB action
+    this.finishAction();
     this.refreshHud();
   }
 
@@ -811,6 +829,7 @@ export class TrainingMode extends GameMode {
     this.castSpell(p, spell, primary, this.party.map((m) => m.avatar));
     this.runner.gauge.spend(); // a cast costs the ATB action…
     p.tickDragoon(); // …and one Dragoon turn
+    this.finishAction(); // cast resolves at once → breather + revert if it was the last turn
     this.refreshHud();
   }
 
@@ -1022,6 +1041,7 @@ export class TrainingMode extends GameMode {
 
     // In reach: ranged bearers fire on a fixed cadence — one arrow per draw, no spraying.
     if (this.isRanged() && this.rangedCooldownT > 0) return;
+    if (this.actionRecoveryT > 0) return; // post-action breather
 
     // In Dragoon form the Attack command is the D'Attack (its own combo + damage formula).
     this.comboIsDragoon = this.player.transformed;
@@ -1037,6 +1057,9 @@ export class TrainingMode extends GameMode {
     if (this.player.usesBasicAttack && !this.comboIsDragoon) {
       this.player.gainSp(this.player.spPerBasicAttack);
     }
+    // A single-hit attack (basic / archer D'Attack) resolves at once → close it out now;
+    // multi-hit combos close in resolveTimingPress when they complete or break.
+    if (!this.runner.active) this.finishAction();
   }
 
   /** Resolve a timing-sight press against the locked combo target. */
@@ -1049,6 +1072,7 @@ export class TrainingMode extends GameMode {
     if (res.kind === "miss") {
       this.comboTarget = undefined;
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
+      this.finishAction(); // a broken combo still closes the action (breather + Dragoon revert)
       return;
     }
     if (res.kind !== "hit" || !target || !target.alive) return;
@@ -1064,6 +1088,7 @@ export class TrainingMode extends GameMode {
     if (res.completed) {
       if (!dragoon) this.player.recordAddition(add);
       this.comboTarget = undefined;
+      this.finishAction(); // combo finished cleanly → breather + Dragoon revert if spent
     }
   }
 
@@ -1251,6 +1276,8 @@ export class TrainingMode extends GameMode {
         if (decision.kind !== "transform") {
           member.gauge.spend();
           member.avatar.tickDragoon();
+          // AI actions resolve at once, so revert here if that spent the last Dragoon turn.
+          if (member.avatar.dragoonSpent) member.avatar.revert();
         }
       } else if ("target" in decision) {
         member.avatar.face(decision.target.position.subtract(member.position));

@@ -425,37 +425,49 @@ export class Player {
     this.dragoonLevel = Math.min(Math.max(Math.floor(level), 1), MAX_DRAGOON_LEVEL);
   }
 
+  /** Whether the Dragoon form is currently active. Kept distinct from {@link dragoonTurns} so the
+   *  form (and its boosted DEF/MDF) persists through the whole of an action — the revert happens
+   *  at the action's END once the last turn is spent (see {@link dragoonSpent}), not at its start. */
+  private dragoonActive = false;
+
   /** True while in Dragoon form (boosted stats, D'Attack + Magic available). */
   get transformed(): boolean {
-    return this.dragoonTurns > 0;
+    return this.dragoonActive;
   }
 
   /** True when the SP gauge holds at least one full level (100) and we're not already transformed. */
   get canTransform(): boolean {
-    return !this.transformed && this.sp >= 100;
+    return !this.dragoonActive && this.sp >= 100;
   }
 
   /** Enter Dragoon form. Each full 100-SP block becomes one turn; any remainder is lost
    *  (180 → 100). The gauge then drains 100 per action until it empties. */
   transform(): void {
     if (!this.canTransform) return;
+    this.dragoonActive = true;
     this.dragoonTurns = Math.floor(this.sp / 100);
     this.sp = this.dragoonTurns * 100;
     this.dragoonAura.isVisible = true;
   }
 
-  /** Count one performed action against the transformation: spend one 100-SP block; when the
-   *  gauge empties the member auto-reverts to human form (canon — no manual de-transform). */
+  /** Spend one 100-SP block when an action begins. The form stays active (boosted) through the
+   *  action; call {@link revert} at the action's end if {@link dragoonSpent} is then true. */
   tickDragoon(): void {
     if (this.dragoonTurns > 0) {
       this.dragoonTurns -= 1;
       this.sp = this.dragoonTurns * 100;
-      if (this.dragoonTurns === 0) this.dragoonAura.isVisible = false;
     }
   }
 
-  /** Forced return to human form (only on death — HP reaching 0). */
+  /** True once the form has spent its last turn — the member should revert when the current
+   *  action finishes (so the boosted stats covered the whole action). */
+  get dragoonSpent(): boolean {
+    return this.dragoonActive && this.dragoonTurns === 0;
+  }
+
+  /** Return to human form: at an action's end once SP runs out, or forced on death (HP 0). */
   revert(): void {
+    this.dragoonActive = false;
     this.dragoonTurns = 0;
     this.sp = 0;
     this.dragoonAura.isVisible = false;
