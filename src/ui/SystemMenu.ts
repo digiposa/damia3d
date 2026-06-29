@@ -129,6 +129,10 @@ export class SystemMenu {
   show(atMainMenu = false, section?: Section): void {
     this.atMainMenu = atMainMenu;
     if (section) this.section = section; // clamped in render() if unavailable
+    // Each open lands the Characters tab on the controlled member (renderCharacters defaults
+    // focusedChar to controlledId when it's unset), not wherever it was last browsed.
+    this.focusedChar = undefined;
+    this.charListOpen = false;
     this.root.style.display = "flex";
     this.render();
   }
