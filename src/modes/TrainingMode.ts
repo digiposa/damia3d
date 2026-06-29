@@ -116,6 +116,12 @@ const AI_SP_PER_HIT = 20;
  *  rhythm/enemy window after long Additions without inverting the canon Addition ranking. */
 const ACTION_RECOVERY = 0.5;
 
+/** How fast the world (enemies, allies, every ATB gauge) runs WHILE the player is executing a
+ *  combo. 0 = full freeze (a combo costs no game time → length-independent, perfectly canon);
+ *  ~0.2 = slow-mo (combo still costs a little, world stays alive); 1 = no slow-down (the old
+ *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
+const COMBO_TIME_SCALE = 0.2;
+
 // Dragoon-Magic status / buff durations (seconds of combat time).
 const FEAR_SECONDS = 12;
 const STUN_SECONDS = 5;
@@ -585,20 +591,28 @@ export class TrainingMode extends GameMode {
 
     // Combat time scales with the Options "combat speed" setting.
     const cdt = dt * settings.combatSpeed;
+    // While the player executes a combo, the rest of the world (enemies, allies, every ATB
+    // gauge) runs at COMBO_TIME_SCALE — so the combo's length costs ~no game time and long
+    // Additions aren't penalised. The combo's own timing keeps running at real `cdt`.
+    const worldScale = this.runner.active ? COMBO_TIME_SCALE : 1;
+    const worldDt = cdt * worldScale;
     this.player.tickGuard(cdt);
     if (this.actionRecoveryT > 0) this.actionRecoveryT = Math.max(0, this.actionRecoveryT - cdt);
     // Keep the ATB gauge's fill time in sync with the bearer's Speed (gear can change it).
     this.runner.setFillTime(this.player.atbFillTime);
-    if (this.runner.tick(cdt)) {
+    if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.comboTarget = undefined;
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
       this.finishAction(); // a lapsed combo closes the action too
     }
-    this.updateEnemies(cdt);
-    // AI party members (everyone except the controlled one) run their Brain.
-    for (const m of this.party) {
-      if (m !== this.controlled) this.updateAiMember(m, dt, cdt);
+    // Slowed (or frozen, at scale 0) while the player combos.
+    if (worldScale > 0) {
+      this.updateEnemies(worldDt);
+      // AI party members (everyone except the controlled one) run their Brain.
+      for (const m of this.party) {
+        if (m !== this.controlled) this.updateAiMember(m, dt * worldScale, worldDt);
+      }
     }
     this.updateSight();
     this.updateDragoonSpace(); // end the Space once its initiator reverts
