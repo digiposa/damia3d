@@ -20,10 +20,15 @@ export class VirtualJoystick {
   private knob: HTMLDivElement;
   private pointerId: number | null = null;
   private centre = { x: 0, y: 0 };
+  private enabled = true;
 
   constructor(private input: Input) {
     // Transparent capture zone: lower-left, leaving the right half and the top status
     // panel free. Lower z-index than the buttons/status bar so those still take taps.
+    // The zone only marks the joystick region; it never captures pointer events (pointer-events
+    // none) so mouse clicks fall through to the canvas (desktop click-to-move). Touch is caught
+    // on window and filtered to this region — so a touch-capable laptop driven by a mouse still
+    // gets click-to-move, while real touches spawn the stick.
     this.zone = document.createElement("div");
     Object.assign(this.zone.style, {
       position: "fixed",
@@ -32,6 +37,7 @@ export class VirtualJoystick {
       width: "50%",
       bottom: "0",
       touchAction: "none",
+      pointerEvents: "none",
       zIndex: "8",
     } satisfies Partial<CSSStyleDeclaration>);
 
@@ -68,7 +74,7 @@ export class VirtualJoystick {
     } satisfies Partial<CSSStyleDeclaration>);
     this.base.appendChild(this.knob);
 
-    this.zone.addEventListener("pointerdown", this.onDown);
+    window.addEventListener("pointerdown", this.onDown);
     window.addEventListener("pointermove", this.onMove);
     window.addEventListener("pointerup", this.onUp);
     window.addEventListener("pointercancel", this.onUp);
@@ -78,7 +84,11 @@ export class VirtualJoystick {
   }
 
   private onDown = (e: PointerEvent): void => {
-    if (this.pointerId !== null) return;
+    if (!this.enabled || this.pointerId !== null) return;
+    // Only real touches drive the stick (mouse/pen = desktop click-to-move), and only within
+    // the lower-left zone (clear of the action cluster / status panel).
+    if (e.pointerType !== "touch") return;
+    if (e.clientX > window.innerWidth * 0.5 || e.clientY < window.innerHeight * 0.34) return;
     this.pointerId = e.pointerId;
     // Spawn the stick at the finger (clamped so the base stays fully on-screen).
     const half = BASE / 2;
@@ -123,6 +133,7 @@ export class VirtualJoystick {
 
   /** Show or hide the stick (e.g. while the main menu is open). */
   setVisible(visible: boolean): void {
+    this.enabled = visible;
     this.zone.style.display = visible ? "block" : "none";
     if (!visible) {
       this.pointerId = null;
@@ -132,7 +143,7 @@ export class VirtualJoystick {
   }
 
   dispose(): void {
-    this.zone.removeEventListener("pointerdown", this.onDown);
+    window.removeEventListener("pointerdown", this.onDown);
     window.removeEventListener("pointermove", this.onMove);
     window.removeEventListener("pointerup", this.onUp);
     window.removeEventListener("pointercancel", this.onUp);

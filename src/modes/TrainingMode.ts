@@ -5,7 +5,6 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import "@babylonjs/core/Meshes/meshBuilder";
 
 import { GameMode } from "../core/GameMode";
-import { hasTouch } from "../core/device";
 import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { createGround } from "../world/Ground";
@@ -950,7 +949,10 @@ export class TrainingMode extends GameMode {
   // --- Navigation (desktop click-to-move) ----------------------------------
 
   private onPointerDown = (e: PointerEvent): void => {
-    if (hasTouch()) {
+    // Branch on the ACTUAL pointer (not device capability): touch taps = attack and use the
+    // joystick to move; mouse/pen = Diablo-style click-to-move / click-to-attack. This keeps
+    // click-to-move working on touch-capable laptops (maxTouchPoints > 0) driven by a mouse.
+    if (e.pointerType === "touch") {
       this.input.pressVirtual("Space"); // tap = attack / timing press
       return;
     }
