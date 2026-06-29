@@ -751,7 +751,7 @@ export class TrainingMode extends GameMode {
     this.spaceInitiator = initiator;
     this.showSpace(this.dragoonSpace);
     this.popText(initiator.position.add(new Vector3(0, 3.0, 0)), t("combat.special"), "#ffe08a");
-    this.runner.gauge.spend(); // Special is the controlled member's action
+    // Like Transform, Special keeps the ATB turn — the initiator acts in Dragoon form at once.
     this.refreshHud();
   }
 
