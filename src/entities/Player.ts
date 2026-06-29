@@ -190,6 +190,16 @@ export class Player {
     return this.equipped.reduce((sum, e) => sum + (e[key] ?? 0), 0);
   }
 
+  /** SP granted at the start of each turn by equipment (Spirit Ring). */
+  get spPerTurn(): number {
+    return this.equipped.reduce((sum, e) => sum + (e.spPerTurn ?? 0), 0);
+  }
+
+  /** Multiplier on SP earned from Additions (Wargod's Sash → 1.5). */
+  get additionSpMultiplier(): number {
+    return 1 + this.equipped.reduce((sum, e) => sum + (e.additionSpPct ?? 0), 0) / 100;
+  }
+
   /**
    * Action speed: reference base + equipment Speed bonuses. Drives the ATB gauge
    * recharge rate (the future party will each have their own). At base speed with no

@@ -50,6 +50,10 @@ export interface EquipDef {
   mpPct?: number;
   /** Fractional reduction of incoming damage (0.5 = −50%). */
   dmgReduce?: { phys?: number; magic?: number };
+  /** SP gained at the start of each of the wearer's turns (Spirit Ring). */
+  spPerTurn?: number;
+  /** Extra % SP from Additions / attacks (Wargod's Sash = 50). */
+  additionSpPct?: number;
   /** Elemental weapons imbue physical attacks with this element. */
   element?: Element;
   /** Members who can equip it; omitted = all. */
@@ -214,8 +218,8 @@ export const EQUIPMENT: EquipDef[] = [
   // Per-turn recovery / SP
   { id: "therapy_ring", name: "Therapy Ring", slot: "accessory", effect: "Recover 10% max HP each turn." },
   { id: "mage_ring", name: "Mage Ring", slot: "accessory", effect: "Recover 10% max MP each turn." },
-  { id: "spirit_ring", name: "Spirit Ring", slot: "accessory", effect: "Gain 20 SP each turn." },
-  { id: "wargods_sash", name: "Wargod's Sash", slot: "accessory", effect: "Additions award 50% more SP." },
+  { id: "spirit_ring", name: "Spirit Ring", slot: "accessory", spPerTurn: 20, effect: "Gain 20 SP each turn." },
+  { id: "wargods_sash", name: "Wargod's Sash", slot: "accessory", additionSpPct: 50, effect: "Additions award 50% more SP." },
   { id: "emerald_earring", name: "Emerald Ring", slot: "accessory", price: 1000, effect: "When physically damaged, gain 20 SP." },
   { id: "ruby_ring", name: "Ruby Ring", slot: "accessory", price: 1000, effect: "When magically damaged, gain 20 SP." },
   { id: "platinum_collar", name: "Platinum Collar", slot: "accessory", price: 1000, effect: "When physically damaged, recover 10% max MP." },

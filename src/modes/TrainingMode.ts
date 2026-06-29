@@ -16,7 +16,7 @@ import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
 import { GambitBrain, resolveGambit, nextGambitId, DEFAULT_GAMBIT_IDS } from "../combat/Gambit";
 import type { ActionId } from "../combat/Action";
-import { startingItems } from "../data/items";
+import { startingItems, type ItemDef } from "../data/items";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
@@ -34,6 +34,7 @@ import {
   enemyMagicalAttack,
 } from "../combat/formula";
 import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
+import { ItemMenu, type ItemEntry } from "../ui/ItemMenu";
 import type { DragoonSpell } from "../data/dragoonSpells";
 import { estimateDps } from "../combat/balance";
 import { elementMultiplier, fieldMultiplier, type Element } from "../combat/element";
@@ -183,6 +184,9 @@ export class TrainingMode extends GameMode {
   private switchBtn?: ActionButton;
   private specialBtn?: ActionButton;
   private spellMenu!: SpellMenu;
+  private itemMenu!: ItemMenu;
+  /** Party members whose ATB gauge was full last frame, for "start of turn" SP (Spirit Ring). */
+  private turnReady = new WeakSet<PartyMember>();
 
   /** Active Dragoon Space element (Special command) — its Field modifier boosts matching
    *  elements / weakens the opposite, and tints the arena. Cleared when the initiator reverts. */
@@ -302,6 +306,10 @@ export class TrainingMode extends GameMode {
     this.spellMenu = new SpellMenu(
       (id) => this.onSpellPicked(id),
       () => this.closeSpellMenu(),
+    );
+    this.itemMenu = new ItemMenu(
+      (id) => this.onItemPicked(id),
+      () => this.closeItemMenu(),
     );
     if (touch)
       this.attackBtn = new ActionButton(
@@ -580,8 +588,26 @@ export class TrainingMode extends GameMode {
     }
     this.updateSight();
     this.updateDragoonSpace(); // end the Space once its initiator reverts
+    this.grantTurnSp(); // Spirit Ring: +SP at the start of each member's turn
 
     this.refreshHud();
+  }
+
+  /** Spirit Ring & co.: grant per-turn SP when a member's ATB gauge becomes ready (edge). */
+  private grantTurnSp(): void {
+    for (const m of this.party) {
+      const ready = m.gauge.isReady;
+      if (ready && !this.turnReady.has(m)) {
+        this.turnReady.add(m);
+        const sp = m.avatar.spPerTurn;
+        if (sp > 0) {
+          m.avatar.gainSp(sp);
+          this.popText(m.position.add(new Vector3(0, 2.4, 0)), `+${sp} ${t("stat.sp")}`, "#9ad0ff");
+        }
+      } else if (!ready) {
+        this.turnReady.delete(m);
+      }
+    }
   }
 
   private guardPressed(): boolean {
@@ -640,8 +666,61 @@ export class TrainingMode extends GameMode {
     return true;
   }
 
-  private doItem(m: PartyMember): boolean {
-    return this.useHealItem(m);
+  /** Item opens the picker (combat pauses); the chosen item spends the turn, not the open. */
+  private doItem(_m: PartyMember): boolean {
+    this.openItemMenu();
+    return false;
+  }
+
+  private openItemMenu(): void {
+    const a = this.player;
+    const entries: ItemEntry[] = this.items.map((s) => ({
+      id: s.def.id,
+      name: t(s.def.nameKey),
+      count: s.count,
+      enabled: s.count > 0 && this.itemUseful(s.def, a),
+      detail: s.def.spRestore
+        ? `+${s.def.spRestore} ${t("stat.sp")}`
+        : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
+      color: s.def.spRestore ? "#9ad0ff" : "#9fe6a0",
+    }));
+    this.paused = true;
+    this.itemMenu.show(entries);
+  }
+
+  private closeItemMenu(): void {
+    this.itemMenu.close();
+    this.paused = false;
+  }
+
+  private onItemPicked(id: string): void {
+    this.paused = false;
+    const stock = this.items.find((s) => s.def.id === id);
+    if (!stock || stock.count <= 0 || !this.runner.gauge.isReady) return;
+    this.useItem(this.controlled, stock);
+    this.runner.gauge.spend(); // using an item is the member's ATB action
+    this.refreshHud();
+  }
+
+  /** True when an item would do something for `a` (don't offer a full-HP heal / full-SP charge). */
+  private itemUseful(def: ItemDef, a: Player): boolean {
+    if (def.healFraction > 0 && a.hp < a.maxHp) return true;
+    if ((def.spRestore ?? 0) > 0 && a.sp < a.maxSp) return true;
+    return false;
+  }
+
+  /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
+  private useItem(m: PartyMember, stock: { def: ItemDef; count: number }): void {
+    const a = m.avatar;
+    if (stock.def.healFraction > 0) {
+      const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
+      if (healed > 0) this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, "#9fe6a0");
+    }
+    if (stock.def.spRestore) {
+      a.gainSp(stock.def.spRestore);
+      this.popText(m.position.add(new Vector3(0, 2.6, 0)), `+${stock.def.spRestore} ${t("stat.sp")}`, "#9ad0ff");
+    }
+    stock.count -= 1;
   }
 
   /** True when the Special command is available: every member's SP gauge is full and none are
@@ -969,7 +1048,7 @@ export class TrainingMode extends GameMode {
     // Additions accrue SP per landed input (hit 1 free). A D'Attack earns no SP (the gauge
     // is draining) and is not recorded as an Addition.
     if (!dragoon) {
-      const share = Math.floor(add.spMax / additionPresses(add));
+      const share = Math.floor((add.spMax / additionPresses(add)) * this.player.additionSpMultiplier);
       this.player.gainSp(share);
     }
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), "#ffffff");
@@ -1205,9 +1284,14 @@ export class TrainingMode extends GameMode {
     }
   }
 
-  /** True when at least one healing item is in stock. */
+  /** True when at least one healing item is in stock (AI gambit / Brain view). */
   private hasHealItem(): boolean {
     return this.items.some((s) => s.count > 0 && s.def.healFraction > 0);
+  }
+
+  /** True when the controlled member has any usable item (heal when hurt, Spirit when low SP). */
+  private hasUsableItem(): boolean {
+    return this.items.some((s) => s.count > 0 && this.itemUseful(s.def, this.player));
   }
 
   /**
@@ -1532,8 +1616,8 @@ export class TrainingMode extends GameMode {
     this.guardBtn?.setAvailable(ready && !p.guardActive);
     this.guardBtn?.setReady(ready && !p.guardActive);
     this.itemBtn?.setVisible(!transformed);
-    this.itemBtn?.setAvailable(ready && this.hasHealItem());
-    this.itemBtn?.setReady(ready && this.hasHealItem());
+    this.itemBtn?.setAvailable(ready && this.hasUsableItem());
+    this.itemBtn?.setReady(ready && this.hasUsableItem());
 
     // Transform: the Dragoon eye + button colour follow the controlled archetype.
     if (p.element !== this.transformElement) {
@@ -1577,6 +1661,7 @@ export class TrainingMode extends GameMode {
     this.switchBtn?.dispose();
     this.specialBtn?.dispose();
     this.spellMenu.dispose();
+    this.itemMenu.dispose();
     this.spaceOverlay.remove();
   }
 }

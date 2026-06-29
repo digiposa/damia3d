@@ -8,6 +8,11 @@ describe("equipment data", () => {
     expect(equipById("dragon_helm")?.hpPct).toBe(0.5);
   });
 
+  it("wires the SP accessories: Spirit Ring +20/turn, Wargod's Sash +50% Addition SP", () => {
+    expect(equipById("spirit_ring")?.spPerTurn).toBe(20);
+    expect(equipById("wargods_sash")?.additionSpPct).toBe(50);
+  });
+
   it("lists the eight Dart weapons, all wieldable by Dart", () => {
     const weapons = equipmentForSlot("weapon", "Dart");
     expect(weapons).toHaveLength(8);
