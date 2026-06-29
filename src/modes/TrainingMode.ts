@@ -761,13 +761,10 @@ export class TrainingMode extends GameMode {
     stock.count -= 1;
   }
 
-  /** True when the Special command is available: every member's SP gauge is full and none are
-   *  transformed (canon). */
+  /** True when the Special command is available: every member can transform (≥1 SP block and
+   *  not already in Dragoon form). Looser than canon (which needs full SP meters) by design. */
   private get canSpecial(): boolean {
-    return (
-      this.party.length > 0 &&
-      this.party.every((m) => !m.avatar.transformed && m.avatar.sp >= m.avatar.maxSp)
-    );
+    return this.party.length > 0 && this.party.every((m) => m.avatar.canTransform);
   }
 
   /** Special: transform the whole party at once and open the controlled member's Dragoon Space
