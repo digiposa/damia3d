@@ -966,6 +966,7 @@ export class TrainingMode extends GameMode {
       this.attackTarget = picked;
       this.moveTarget = undefined;
       this.pendingAttack = true;
+      this.popText(picked.headPosition, "⚔ CLICK", "#ff9090"); // DEBUG
       return;
     }
     const ground = this.groundPoint(e);
@@ -973,6 +974,10 @@ export class TrainingMode extends GameMode {
       this.moveTarget = ground;
       this.attackTarget = undefined;
       this.pendingAttack = false;
+      this.popText(ground.add(new Vector3(0, 0.4, 0)), "◎ MOVE", "#7fd0ff"); // DEBUG
+    } else {
+      // DEBUG: handler fired but no ground point (pick/ray failed) — mark over the player.
+      this.popText(this.player.position.add(new Vector3(0, 3, 0)), "✖ NO GROUND", "#ffd070");
     }
   };
 
