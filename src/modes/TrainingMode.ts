@@ -66,6 +66,7 @@ const iconFrames = (prefix: string, n = 3): string[] =>
 const ATTACK_ICON_FRAMES = iconFrames("attack"); // blue sword (human form)
 const ATTACK_DRAGOON_FRAMES = iconFrames("redsword"); // red sword (dragoon form)
 const GUARD_ICON_FRAMES = iconFrames("guard"); // green shield
+const SPECIAL_ICON_FRAMES = iconFrames("special"); // yin-yang (all-party Special)
 const ITEM_ICON_FRAMES = iconFrames("chest"); // treasure chest (opens)
 const MAGIC_ICON_FRAMES = iconFrames("wand"); // green wand (waves)
 /** Dragoon-eye sprite (closed → opens) per element, for the Transform button.
@@ -340,17 +341,22 @@ export class TrainingMode extends GameMode {
     });
     // Special (all-party transform): appears only when every member's SP is full and none are
     // transformed. Distinct gold button, top-right under the switch button.
-    this.specialBtn = new ActionButton("★", () => this.input.pressVirtual("Special"), {
-      top: "calc(env(safe-area-inset-top, 0px) + 160px)",
-      right: "calc(env(safe-area-inset-right, 0px) + 10px)",
-      bottom: "auto",
-      width: "48px",
-      height: "48px",
-      font: "700 22px/1 system-ui, sans-serif",
-      backgroundColor: "rgba(150,120,30,0.9)",
-      border: "1px solid rgba(255,225,120,0.7)",
-      color: "#fff6d8",
-    });
+    this.specialBtn = new ActionButton(
+      "★",
+      () => this.input.pressVirtual("Special"),
+      {
+        top: "calc(env(safe-area-inset-top, 0px) + 160px)",
+        right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+        bottom: "auto",
+        width: "48px",
+        height: "48px",
+        font: "700 22px/1 system-ui, sans-serif",
+        backgroundColor: "rgba(60,60,72,0.9)",
+        border: "1px solid rgba(220,220,230,0.6)",
+        color: "#fff6d8",
+      },
+      SPECIAL_ICON_FRAMES,
+    );
     this.specialBtn.setVisible(false);
 
     // Dragoon Space arena tint (Special) — a soft full-screen element-coloured overlay.
@@ -1634,10 +1640,11 @@ export class TrainingMode extends GameMode {
     this.magicBtn?.setReady(ready && p.canCastMagic);
 
     this.switchBtn?.setAvailable(this.party.length > 1);
-    // Special: only when the whole party is charged and human (and the gauge is ready).
-    const special = this.canSpecial && ready;
-    this.specialBtn?.setVisible(special);
-    this.specialBtn?.setReady(special);
+    // Special: appears once the whole party is charged & human — greyed until the controlled
+    // member's ATB is also full, then it lights up (and the yin-yang animates).
+    this.specialBtn?.setVisible(this.canSpecial);
+    this.specialBtn?.setAvailable(this.canSpecial && ready);
+    this.specialBtn?.setReady(this.canSpecial && ready);
   }
 
   dispose(): void {
