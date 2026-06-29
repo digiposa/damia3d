@@ -310,11 +310,10 @@ export class TrainingMode extends GameMode {
         padding: "10px 14px",
       },
     });
-    // Right-hand action cluster (the left thumb drives the floating joystick). Touch gets
-    // a big ⚔ attack button bottom-right; the secondary actions sit in an arc above it and
-    // SWAP with the form — human: Guard/Item/Transform · Dragoon: Magic/Return (shared arc
-    // slots). Desktop also has key shortcuts (G/R/T/F, Tab to switch).
-    const touch = hasTouch();
+    // On-screen action cluster: a big ⚔ attack button bottom-right, with the secondary
+    // actions in an arc above it that SWAP with the form (human: Guard/Item/Transform ·
+    // Dragoon: Magic). Shown on every platform (clickable); desktop also has key shortcuts
+    // (Space attack, G/R/F/T, X special, Tab switch). The floating joystick stays touch-only.
     // Dragoon-Magic spell picker (paused overlay): pick → cast, backdrop/Cancel → resume.
     this.spellMenu = new SpellMenu(
       (id) => this.onSpellPicked(id),
@@ -324,13 +323,12 @@ export class TrainingMode extends GameMode {
       (id) => this.onItemPicked(id),
       () => this.closeItemMenu(),
     );
-    if (touch)
-      this.attackBtn = new ActionButton(
-        "⚔",
-        () => this.input.pressVirtual("Space"),
-        undefined,
-        ATTACK_ICON_FRAMES,
-      );
+    this.attackBtn = new ActionButton(
+      "⚔",
+      () => this.input.pressVirtual("Space"),
+      undefined,
+      ATTACK_ICON_FRAMES,
+    );
     // Slot 0 (above attack): Guard ⇄ Magic. Slot 1 (diagonal): Item ⇄ Return.
     this.guardBtn = this.actionArcButton("🛡", "Guard", 0, "rgba(40,90,150,0.85)", "rgba(150,190,255,0.55)", "#e6f0ff", GUARD_ICON_FRAMES);
     // Magic uses the green wand; rest pose = the upright glowing wand (frame 1).
