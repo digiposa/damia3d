@@ -10,8 +10,10 @@ import { AtbGauge, BASE_FILL_TIME } from "./AtbGauge";
  *  Speed from being eaten by long combos. */
 export const SIGHT_DURATION = 0.7;
 
-/** Floor on the window collapse time, so the longest combos stay humanly timeable. */
-export const MIN_SIGHT_DURATION = 0.35;
+/** Floor on the window collapse time, so the longest combos stay humanly timeable. Above this
+ *  floor a long combo may run a bit past one fill — but its high DAM% keeps it the best DPS, so
+ *  canon ranking still holds without forcing brutal sub-0.5s windows. */
+export const MIN_SIGHT_DURATION = 0.5;
 
 /** Success window, as a fraction of the window duration (1 = perfect alignment). */
 export const WINDOW_LO = 0.8;
