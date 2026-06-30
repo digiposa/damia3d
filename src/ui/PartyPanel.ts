@@ -191,9 +191,9 @@ export class PartyPanel {
         row.extras.style.display = "flex";
         // SP gauge: segmented into 100-SP blocks (each = one Dragoon turn); label carries D'Lv.
         fillSpGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, `D'${v.dragoonLevel ?? 1} · ${t("stat.sp")}`);
-        // MP only matters in Dragoon form — show it then.
-        row.mp.track.style.display = v.transformed ? "block" : "none";
-        if (v.transformed) fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));
+        // MP shown alongside SP once the Dragoon is unlocked (it powers Dragoon magic).
+        row.mp.track.style.display = "block";
+        fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));
       } else {
         row.extras.style.display = "none";
       }
