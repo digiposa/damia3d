@@ -474,6 +474,7 @@ export class TrainingMode extends GameMode {
       const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
       const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
       m.avatar.unlockDragoon(); // Training: everyone has their Dragoon Spirit (SP/MP/transform)
+      m.avatar.sp = m.avatar.maxSp; // Training: start with a full SP gauge (transform right away)
       this.applyConfig(m.avatar, b); // restore this character's stored gear / Addition
       m.setControlled(i === this.controlledIndex);
       return m;
