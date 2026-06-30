@@ -122,19 +122,18 @@ export class DragoonForm {
       const bandGem = box("dgBandGem", 0.05, 0.05, 0.04, gem, scene, new Vector3(dx, 1.74, 0.17), this.body);
       void bandGem;
     }
-    // Spiky tan/blond hair fanning up and back over the band.
-    const hairAngles: [number, number, number][] = [
-      [0, -0.2, 0.9],
-      [-0.12, -0.1, 1.0],
-      [0.12, -0.1, 1.0],
-      [-0.2, 0.0, 0.85],
-      [0.2, 0.0, 0.85],
-      [0, 0.05, 0.7],
+    // Spiky tan/blond hair — modest spikes swept back over the head (not a tall crown).
+    const spikes: [number, number, number][] = [
+      [0, 0.32, 0],
+      [-0.11, 0.28, 0.18],
+      [0.11, 0.28, -0.18],
+      [-0.18, 0.22, 0.34],
+      [0.18, 0.22, -0.34],
     ];
-    for (const [dx, rz, len] of hairAngles) {
-      const spike = cone("dgHair", len * 0.55, 0.13, blond, scene);
-      spike.position = new Vector3(dx, 1.82, -0.02);
-      spike.rotation.x = -0.6 - len * 0.2; // sweep up/back
+    for (const [dx, len, rz] of spikes) {
+      const spike = cone("dgHair", len, 0.1, blond, scene);
+      spike.position = new Vector3(dx, 1.8, -0.05);
+      spike.rotation.x = -1.5; // sweep strongly back over the crown
       spike.rotation.z = rz;
       spike.parent = this.body;
     }
@@ -170,50 +169,44 @@ export class DragoonForm {
     for (const w of [this.leftWing, this.rightWing]) w.parent = this.body;
   }
 
-  /** One pauldron: a fan of layered claw-ribs sweeping OUTWARD (top points up-out, lower ribs
-   *  sweep down-out), each a red plate over a steel under-edge — the canon stacked-blade look. */
+  /** One pauldron: a compact rounded shoulder guard (flattened dome) with two short layered
+   *  ridge plates on top, angled up-out — a clean, canon-ish big shoulder (not long spokes). */
   private buildPauldron(scene: Scene, sx: number, red: StandardMaterial, steel: StandardMaterial, parent: TransformNode): void {
-    const pivot = new TransformNode("dgPauldronPivot", scene);
-    pivot.position = new Vector3(sx * 0.33, 1.5, 0.02);
-    pivot.parent = parent;
-    const angles = [0.5, 0.26, 0.0, -0.28, -0.56]; // top → bottom fan
-    angles.forEach((a, i) => {
-      const len = 0.52 - i * 0.05;
-      const rp = new TransformNode("dgRibPivot", scene);
-      rp.parent = pivot;
-      rp.position.y = 0.1 - i * 0.075;
-      rp.rotation.z = sx * a;
-      // Red rib extending outward, with a steel under-edge (the grey gap between ribs).
-      box("dgRib", len, 0.09, 0.4, red, scene, new Vector3(sx * (len / 2 + 0.04), 0, 0), rp);
-      box("dgRibEdge", len * 0.96, 0.03, 0.42, steel, scene, new Vector3(sx * (len / 2 + 0.04), -0.06, 0), rp);
-    });
+    const dome = MeshBuilder.CreateSphere("dgPauldron", { diameter: 0.42, segments: 8 }, scene);
+    dome.material = red;
+    dome.isPickable = false;
+    dome.scaling = new Vector3(1.2, 0.72, 1.05);
+    dome.position = new Vector3(sx * 0.4, 1.5, 0);
+    dome.parent = parent;
+    for (let i = 0; i < 2; i++) {
+      const plate = box("dgPauldronRidge", 0.28 - i * 0.07, 0.06, 0.42 - i * 0.08, red, scene, new Vector3(sx * (0.38 + i * 0.05), 1.6 + i * 0.09, 0), parent);
+      plate.rotation.z = sx * (0.35 + i * 0.25);
+      const rim = box("dgPauldronRim", 0.29 - i * 0.07, 0.03, 0.44 - i * 0.08, steel, scene, new Vector3(sx * (0.38 + i * 0.05), 1.55 + i * 0.09, 0), parent);
+      rim.rotation.z = sx * (0.35 + i * 0.25);
+    }
   }
 
-  /** One dragon wing, swept OUTWARD (and a little up/back): a red leading-edge bone running to
-   *  the tip, three pale-teal translucent membrane panels (shrinking toward the tip) hung under
-   *  it, and red rib seams between them. The returned pivot is animated (flap); the base sweep
-   *  sits on an inner node so the beat doesn't wipe it. */
+  /** One wing: a fan of pale translucent teal triangular blades radiating UP-and-out from
+   *  behind the shoulder and leaning back, each fronted by a thin red rib — the angular
+   *  crystalline look of the canon close-up. The pivot is animated (flap). */
   private buildWing(scene: Scene, sx: number, membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
-    pivot.position = new Vector3(sx * 0.16, 1.46, -0.16);
-    const swept = new TransformNode("dgWingSwept", scene); // holds the base orientation
-    swept.parent = pivot;
-    swept.rotation = new Vector3(-0.12, sx * -0.5, sx * 0.32); // out, a touch back + raised outer
-
-    // Red leading-edge bone (outward), with an up-curved tip segment.
-    box("dgWingBone", 1.3, 0.07, 0.07, rib, scene, new Vector3(sx * 0.62, 0.18, 0), swept);
-    const tip = box("dgWingBoneTip", 0.4, 0.06, 0.06, rib, scene, new Vector3(sx * 1.18, 0.3, 0), swept);
-    tip.rotation.z = sx * 0.5;
-
-    // Teal membrane panels under the bone (shorter toward the tip) + red rib seams.
-    const segs: [number, number][] = [
-      [0.3, 0.72],
-      [0.62, 0.56],
-      [0.92, 0.4],
+    pivot.position = new Vector3(sx * 0.1, 1.55, -0.22); // high and behind the shoulder
+    const blades: [number, number][] = [
+      [0.18, 1.05],
+      [0.5, 1.18],
+      [0.84, 1.05],
+      [1.2, 0.85],
+      [1.55, 0.62],
     ];
-    segs.forEach(([cx, h]) => {
-      box("dgWingMem", 0.34, h, 0.03, membrane, scene, new Vector3(sx * cx, 0.18 - h / 2, 0), swept);
-      box("dgWingSeam", 0.04, h, 0.06, rib, scene, new Vector3(sx * (cx - 0.17), 0.18 - h / 2, 0), swept);
+    blades.forEach(([za, len]) => {
+      const bp = new TransformNode("dgWingBladePivot", scene);
+      bp.parent = pivot;
+      bp.rotation.z = sx * za; // fan from near-vertical (inner) to swept-out
+      bp.rotation.x = -0.65; // lean back
+      const blade = cone("dgWingBlade", len, 0.18, membrane, scene);
+      blade.parent = bp;
+      box("dgWingRib", 0.035, len * 0.92, 0.05, rib, scene, new Vector3(0, len * 0.46, 0.03), bp);
     });
     return pivot;
   }
