@@ -150,6 +150,20 @@ const ELEMENT_COLOR: Record<Element, string> = {
   "Non-Elemental": "#bdbdc8",
 };
 
+/** Floating combat-text palette — one colour per feedback type (tweak here only). */
+const TEXT = {
+  damage: "#ffcf5c", // OR — all damage (dealt to enemies or taken by the player)
+  hp: "#5fd66f", // green — HP restored
+  sp: "#6fe3c0", // mint — SP gained
+  mp: "#b3a8ff", // light blue/mauve — MP gained
+  miss: "#ff6a1a", // LoD orange — MISS / whiff
+  dragoon: "#ffe08a", // amber — Dragoon! / Special!
+  perfect: "#ffffff", // white — perfect timing
+  status: "#d8b0ff", // violet — FEAR / STUN / DEATH
+  buff: "#9ad0ff", // light blue — defensive buff (Rose Storm)
+  exp: "#bfe8ff", // pale cyan — EXP gained
+};
+
 /** One-line effect tag for a spell row. */
 function spellDetail(s: DragoonSpell): string {
   if (s.multiplier !== undefined) {
@@ -600,7 +614,7 @@ export class TrainingMode extends GameMode {
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.comboTarget = undefined;
-      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
       this.finishAction(); // a lapsed combo closes the action too
     }
     // Slowed (or frozen, at scale 0) while the player combos.
@@ -627,7 +641,7 @@ export class TrainingMode extends GameMode {
         const sp = m.avatar.spPerTurn;
         if (sp > 0) {
           m.avatar.gainSp(sp);
-          this.popText(m.position.add(new Vector3(0, 2.4, 0)), `+${sp} ${t("stat.sp")}`, "#9ad0ff");
+          this.popText(m.position.add(new Vector3(0, 2.4, 0)), `+${sp} ${t("stat.sp")}`, TEXT.sp);
         }
       } else if (!ready) {
         this.turnReady.delete(m);
@@ -692,14 +706,14 @@ export class TrainingMode extends GameMode {
   private doGuard(m: PartyMember): boolean {
     if (m.avatar.guardActive) return false;
     const heal = m.avatar.startGuard();
-    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
+    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, TEXT.hp);
     return true;
   }
 
   private doTransform(m: PartyMember): boolean {
     if (!m.avatar.canTransform) return false;
     m.avatar.transform();
-    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), "#ffe08a");
+    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), TEXT.dragoon);
     return true;
   }
 
@@ -719,7 +733,7 @@ export class TrainingMode extends GameMode {
       detail: s.def.spRestore
         ? `+${s.def.spRestore} ${t("stat.sp")}`
         : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
-      color: s.def.spRestore ? "#9ad0ff" : "#9fe6a0",
+      color: s.def.spRestore ? TEXT.sp : TEXT.hp,
     }));
     this.paused = true;
     this.itemMenu.show(entries);
@@ -752,11 +766,11 @@ export class TrainingMode extends GameMode {
     const a = m.avatar;
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
-      if (healed > 0) this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, "#9fe6a0");
+      if (healed > 0) this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, TEXT.hp);
     }
     if (stock.def.spRestore) {
       a.gainSp(stock.def.spRestore);
-      this.popText(m.position.add(new Vector3(0, 2.6, 0)), `+${stock.def.spRestore} ${t("stat.sp")}`, "#9ad0ff");
+      this.popText(m.position.add(new Vector3(0, 2.6, 0)), `+${stock.def.spRestore} ${t("stat.sp")}`, TEXT.sp);
     }
     stock.count -= 1;
   }
@@ -776,7 +790,7 @@ export class TrainingMode extends GameMode {
     this.dragoonSpace = initiator.avatar.element;
     this.spaceInitiator = initiator;
     this.showSpace(this.dragoonSpace);
-    this.popText(initiator.position.add(new Vector3(0, 3.0, 0)), t("combat.special"), "#ffe08a");
+    this.popText(initiator.position.add(new Vector3(0, 3.0, 0)), t("combat.special"), TEXT.dragoon);
     // Like Transform, Special keeps the ATB turn — the initiator acts in Dragoon form at once.
     this.refreshHud();
   }
@@ -874,7 +888,7 @@ export class TrainingMode extends GameMode {
           }),
         );
         totalDamage += dmg;
-        this.landDamage(foe, dmg, elem);
+        this.landDamage(foe, dmg);
       }
     }
 
@@ -885,7 +899,7 @@ export class TrainingMode extends GameMode {
         if (spell.status === "fear") foe.inflictFear(FEAR_SECONDS);
         else if (spell.status === "stun") foe.inflictStun(STUN_SECONDS);
         else if (spell.status === "death" && foe.kill()) this.rewardKill(foe);
-        this.popText(foe.headPosition, spell.status.toUpperCase(), "#d8b0ff");
+        this.popText(foe.headPosition, spell.status.toUpperCase(), TEXT.status);
       }
     }
 
@@ -901,14 +915,14 @@ export class TrainingMode extends GameMode {
     for (const a of healTargets) {
       if (a.hp === 0 && spell.revive !== undefined) {
         a.hp = Math.max(1, Math.floor(a.maxHp * spell.revive));
-        this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.hp}`, "#9fe6a0");
+        this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.hp}`, TEXT.hp);
       } else if (a.hp > 0) {
         const amount = spell.allyHealFull ? a.maxHp : spell.heal ? Math.floor(a.maxHp * spell.heal) : 0;
         if (spell.drainHeal) {
           const share = Math.floor(totalDamage / Math.max(1, healTargets.length));
-          if (share > 0) this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(share)}`, "#9fe6a0");
+          if (share > 0) this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(share)}`, TEXT.hp);
         } else if (amount > 0) {
-          this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(amount)}`, "#9fe6a0");
+          this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(amount)}`, TEXT.hp);
         }
       }
       // cure has no effect yet — allies can't be afflicted in the sandbox.
@@ -918,7 +932,7 @@ export class TrainingMode extends GameMode {
     if (spell.buff === "damageHalve") {
       for (const a of healTargets) {
         a.applyDamageHalve(DAMAGE_HALVE_SECONDS);
-        this.popText(a.position.add(new Vector3(0, 3.0, 0)), "½ DMG", "#9ad0ff");
+        this.popText(a.position.add(new Vector3(0, 3.0, 0)), "½ DMG", TEXT.buff);
       }
     }
   }
@@ -929,7 +943,7 @@ export class TrainingMode extends GameMode {
     if (!stock) return false;
     const healed = m.avatar.heal(Math.floor(m.avatar.maxHp * stock.def.healFraction));
     stock.count -= 1;
-    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, "#9fe6a0");
+    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, TEXT.hp);
     return true;
   }
 
@@ -1087,7 +1101,7 @@ export class TrainingMode extends GameMode {
 
     if (res.kind === "miss") {
       this.comboTarget = undefined;
-      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), "#c9c9c9");
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
       this.finishAction(); // a broken combo still closes the action (breather + Dragoon revert)
       return;
     }
@@ -1100,7 +1114,7 @@ export class TrainingMode extends GameMode {
       const share = Math.floor((add.spMax / additionPresses(add)) * this.player.additionSpMultiplier);
       this.player.gainSp(share);
     }
-    if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), "#ffffff");
+    if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), TEXT.perfect);
     if (res.completed) {
       if (!dragoon) this.player.recordAddition(add);
       this.comboTarget = undefined;
@@ -1141,7 +1155,7 @@ export class TrainingMode extends GameMode {
           to,
           ARROW_SPEED,
           () => {
-            if (target.alive) this.landDamage(target, dmg, element);
+            if (target.alive) this.landDamage(target, dmg);
           },
           0.22,
         ),
@@ -1149,7 +1163,7 @@ export class TrainingMode extends GameMode {
       return;
     }
 
-    this.landDamage(target, dmg, element);
+    this.landDamage(target, dmg);
   }
 
   /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
@@ -1176,9 +1190,9 @@ export class TrainingMode extends GameMode {
   }
 
   /** Apply a computed hit to the target: damage, floating text, and death handling. */
-  private landDamage(target: Enemy, dmg: number, element: number): void {
+  private landDamage(target: Enemy, dmg: number): void {
     target.takeDamage(dmg);
-    this.popText(target.headPosition, `${dmg}`, damageColor(element));
+    this.popText(target.headPosition, `${dmg}`, TEXT.damage);
     if (!target.alive) this.rewardKill(target);
   }
 
@@ -1186,7 +1200,7 @@ export class TrainingMode extends GameMode {
   private rewardKill(target: Enemy): void {
     this.player.gainExp(target.def.expReward);
     this.player.gold += target.def.goldReward;
-    this.popText(target.headPosition, `+${target.def.expReward} EXP`, "#9fe6a0");
+    this.popText(target.headPosition, `+${target.def.expReward} EXP`, TEXT.exp);
     // Only cancel the player's combo if it's the one that just died (an ally kill
     // must not abort the player's in-progress Addition).
     if (this.comboTarget === target) {
@@ -1211,7 +1225,7 @@ export class TrainingMode extends GameMode {
   private resolveEnemyAction(enemy: Enemy, action: EnemyAction): void {
     if (action.kind === "heal") {
       enemy.heal(action.amount);
-      this.popText(enemy.headPosition, `+${action.amount}`, "#7CFC7C");
+      this.popText(enemy.headPosition, `+${action.amount}`, TEXT.hp);
       return;
     }
 
@@ -1228,7 +1242,7 @@ export class TrainingMode extends GameMode {
     let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
     if (this.player.damageHalved) dmg = Math.floor(dmg * 0.5);
     this.player.hp = Math.max(0, this.player.hp - dmg);
-    this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, "#ff6b6b");
+    this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, TEXT.damage);
 
     if (this.player.hp === 0) {
       this.player.revert(); // HP 0 forces de-transformation (canon)
@@ -1324,13 +1338,13 @@ export class TrainingMode extends GameMode {
       case "guard": {
         if (avatar.guardActive) return false;
         const heal = avatar.startGuard();
-        this.popText(member.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, "#9fe6a0");
+        this.popText(member.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, TEXT.hp);
         return true;
       }
       case "transform":
         if (!avatar.canTransform) return false;
         avatar.transform();
-        this.popText(member.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), "#ffe08a");
+        this.popText(member.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), TEXT.dragoon);
         return true;
       case "item":
         return this.useHealItem(member);
@@ -1370,12 +1384,12 @@ export class TrainingMode extends GameMode {
       const to = target.position.add(new Vector3(0, 1.2, 0));
       this.arrows.push(
         new Arrow(this.scene, from, to, ARROW_SPEED, () => {
-          if (target.alive) this.landDamage(target, dmg, element);
+          if (target.alive) this.landDamage(target, dmg);
         }, 0.22),
       );
       return;
     }
-    this.landDamage(target, dmg, element);
+    this.landDamage(target, dmg);
   }
 
   /** Per-Addition DPS readout for the Training balance tab (full vs. spam-hit-1). */
@@ -1723,8 +1737,3 @@ export class TrainingMode extends GameMode {
 }
 
 /** Floating-damage colour: orange when boosted (weakness), blue-grey when resisted, else gold. */
-function damageColor(elementMult: number): string {
-  if (elementMult > 1) return "#ff9a3c";
-  if (elementMult < 1) return "#9fb3d6";
-  return "#ffd86b";
-}
