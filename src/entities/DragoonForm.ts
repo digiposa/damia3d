@@ -186,27 +186,34 @@ export class DragoonForm {
     }
   }
 
-  /** One wing: a fan of pale translucent teal triangular blades radiating UP-and-out from
-   *  behind the shoulder and leaning back, each fronted by a thin red rib — the angular
-   *  crystalline look of the canon close-up. The pivot is animated (flap). */
+  /** One wing: a FLAT folding-fan of coplanar teal blades. The animated `pivot` sits at the
+   *  back-shoulder; an inner `fan` node tilts the whole fan plane (lean back + face out); within
+   *  that plane the blades radiate from the base, fanned by a single rotation each about the
+   *  plane normal, with a red spar along each blade's leading edge. Pale translucent membrane. */
   private buildWing(scene: Scene, sx: number, membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
-    pivot.position = new Vector3(sx * 0.1, 1.55, -0.22); // high and behind the shoulder
-    const blades: [number, number][] = [
-      [0.18, 1.05],
-      [0.5, 1.18],
-      [0.84, 1.05],
-      [1.2, 0.85],
-      [1.55, 0.62],
+    pivot.position = new Vector3(sx * 0.12, 1.5, -0.2); // upper back, behind the shoulder
+    const fan = new TransformNode("dgWingFan", scene); // the tilted fan plane
+    fan.parent = pivot;
+    fan.rotation = new Vector3(-0.32, sx * 0.22, 0); // lean the plane back + face it outward
+
+    // [fan angle (about the plane normal), blade length, blade width] — length peaks mid-fan.
+    const blades: [number, number, number][] = [
+      [0.1, 0.92, 0.18],
+      [0.36, 1.12, 0.18],
+      [0.64, 1.22, 0.17],
+      [0.93, 1.15, 0.16],
+      [1.22, 0.96, 0.14],
+      [1.5, 0.72, 0.12],
     ];
-    blades.forEach(([za, len]) => {
+    blades.forEach(([angle, len, w]) => {
       const bp = new TransformNode("dgWingBladePivot", scene);
-      bp.parent = pivot;
-      bp.rotation.z = sx * za; // fan from near-vertical (inner) to swept-out
-      bp.rotation.x = -0.65; // lean back
-      const blade = cone("dgWingBlade", len, 0.18, membrane, scene);
-      blade.parent = bp;
-      box("dgWingRib", 0.035, len * 0.92, 0.05, rib, scene, new Vector3(0, len * 0.46, 0.03), bp);
+      bp.parent = fan;
+      bp.rotation.z = sx * angle; // fan open about the plane normal (coplanar)
+      // Flat teal membrane panel (base at the fan origin, extends radially +Y).
+      box("dgWingMem", w, len, 0.02, membrane, scene, new Vector3(0, len / 2, 0), bp);
+      // Thin red spar along the blade's leading edge.
+      box("dgWingSpar", 0.03, len * 0.96, 0.04, rib, scene, new Vector3(sx * -w * 0.5, len / 2, 0.01), bp);
     });
     return pivot;
   }
@@ -224,11 +231,9 @@ export class DragoonForm {
   update(dt: number, moving: boolean): void {
     this.phase += dt * FLAP_SPEED * (moving ? 1.5 : 1);
     const beat = Math.sin(this.phase);
-    const amp = moving ? 0.32 : 0.18;
+    const amp = moving ? 0.22 : 0.1; // gentle sway of the flat fan
     this.leftWing.rotation.z = -amp * beat;
     this.rightWing.rotation.z = amp * beat;
-    this.leftWing.rotation.y = -0.1 + beat * 0.08;
-    this.rightWing.rotation.y = 0.1 - beat * 0.08;
     this.body.position.y = 0.05 + beat * 0.035; // gentle hover
 
     if (this.strikeT > 0) {
