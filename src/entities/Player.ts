@@ -15,6 +15,7 @@ import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
+import { DragoonForm } from "./DragoonForm";
 
 const SPEED = 6; // world units per second
 const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 100 at D'Lv5)
@@ -91,6 +92,8 @@ export class Player {
   private dragoonTurns = 0;
   private dragoonAura!: Mesh;
   private humanoid: Humanoid;
+  /** Procedural Dragoon-form model, shown while transformed (currently Dart's Red-Eye only). */
+  private dragoonForm?: DragoonForm;
 
   constructor(scene: Scene, bearer: Bearer, spawn = new Vector3(0, 0, 0), level = 1) {
     const cls = dragoonClass(bearer.classId);
@@ -130,6 +133,14 @@ export class Player {
     });
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);
+
+    // Dragoon-form model (first pass: Dart's Red-Eye Dragoon). Shown while transformed; the
+    // human figure is hidden. Other classes still use the glow aura until their forms exist.
+    if (cls.id === "redEye") {
+      this.dragoonForm = new DragoonForm(scene, { scale: bearer.scale });
+      this.dragoonForm.rig.parent = this.root;
+      this.dragoonForm.setEnabled(false);
+    }
 
     // Translucent barrier shown while guarding.
     this.guardShield = MeshBuilder.CreateSphere("guardShield", { diameter: 2.3, segments: 12 }, scene);
@@ -464,7 +475,13 @@ export class Player {
     this.dragoonActive = true;
     this.dragoonTurns = Math.floor(this.sp / 100);
     this.sp = this.dragoonTurns * 100;
-    this.dragoonAura.isVisible = true;
+    if (this.dragoonForm) {
+      // Swap the human figure for the Dragoon model (it carries its own glow — no aura).
+      this.humanoid.setEnabled(false);
+      this.dragoonForm.setEnabled(true);
+    } else {
+      this.dragoonAura.isVisible = true;
+    }
   }
 
   /** Spend one 100-SP block when an action begins. The form stays active (boosted) through the
@@ -488,6 +505,10 @@ export class Player {
     this.dragoonTurns = 0;
     this.sp = 0;
     this.dragoonAura.isVisible = false;
+    if (this.dragoonForm) {
+      this.dragoonForm.setEnabled(false);
+      this.humanoid.setEnabled(true);
+    }
   }
 
   // --- Magic / healing ------------------------------------------------------
@@ -552,14 +573,16 @@ export class Player {
     this.root.rotation.y = Math.atan2(dir.x, dir.z);
   }
 
-  /** Advance the placeholder's walk/idle animation (visual only). */
+  /** Advance the active figure's walk/idle animation (visual only). */
   animate(dt: number, moving: boolean): void {
-    this.humanoid.update(dt, moving);
+    if (this.dragoonActive && this.dragoonForm) this.dragoonForm.update(dt, moving);
+    else this.humanoid.update(dt, moving);
   }
 
   /** Play a one-shot strike animation (call when a blow lands). */
   strike(): void {
-    this.humanoid.strike();
+    if (this.dragoonActive && this.dragoonForm) this.dragoonForm.strike();
+    else this.humanoid.strike();
   }
 
   /**
