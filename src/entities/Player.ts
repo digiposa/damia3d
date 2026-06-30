@@ -59,10 +59,19 @@ export class Player {
   lifetimeSp = 0;
   /** Dragoon Level (D'Lv, 1–{@link MAX_DRAGOON_LEVEL}): SP gauge size, per-attack SP, stat multipliers. */
   dragoonLevel = 1;
+  /** Whether this member has obtained their Dragoon Spirit. Until then there's no SP, no MP,
+   *  and no transform/magic (Training unlocks it on spawn; Story/Survival award it later). */
+  dragoonUnlocked = false;
 
-  /** SP gauge cap = one full level (100) per Dragoon Level. */
+  /** Grant the Dragoon Spirit: the member begins at D'Lv 1 with a full MP pool. */
+  unlockDragoon(): void {
+    this.dragoonUnlocked = true;
+    this.mp = this.maxMp;
+  }
+
+  /** SP gauge cap = one full level (100) per Dragoon Level (0 until the Dragoon is unlocked). */
   get maxSp(): number {
-    return this.dragoonLevel * 100;
+    return this.dragoonUnlocked ? this.dragoonLevel * 100 : 0;
   }
   /** Magic points (placeholder — uses items/SP in LoD; tune later). */
   mp = 0;
@@ -217,8 +226,10 @@ export class Player {
   get maxHp(): number {
     return Math.floor(this.stats.maxHp * (1 + this.bonusPct("hpPct")));
   }
-  /** Max MP = Dragoon Level × 20 (canon). Some gear doubles it via mpPct (mpPct 1 → ×2). */
+  /** Max MP = Dragoon Level × 20 (canon), 0 until the Dragoon is unlocked. Some gear doubles
+   *  it via mpPct (mpPct 1 → ×2). */
   get maxMp(): number {
+    if (!this.dragoonUnlocked) return 0;
     const base = Math.min(Math.max(this.dragoonLevel, 1), MAX_DRAGOON_LEVEL) * MP_PER_DRAGOON_LEVEL;
     return Math.floor(base * (1 + this.bonusPct("mpPct")));
   }
@@ -413,6 +424,7 @@ export class Player {
    *  counting toward level-up even when the gauge is full, so D'level can rise without ever
    *  transforming. */
   gainSp(amount: number): void {
+    if (!this.dragoonUnlocked) return; // no SP until the Dragoon Spirit is obtained
     const amt = Math.max(0, amount);
     this.sp = Math.min(this.maxSp, this.sp + amt);
     this.lifetimeSp += amt;
@@ -439,9 +451,10 @@ export class Player {
     return this.dragoonActive;
   }
 
-  /** True when the SP gauge holds at least one full level (100) and we're not already transformed. */
+  /** True when the Dragoon is unlocked, the SP gauge holds ≥1 full level (100), and we're not
+   *  already transformed. */
   get canTransform(): boolean {
-    return !this.dragoonActive && this.sp >= 100;
+    return this.dragoonUnlocked && !this.dragoonActive && this.sp >= 100;
   }
 
   /** Enter Dragoon form. Each full 100-SP block becomes one turn; any remainder is lost

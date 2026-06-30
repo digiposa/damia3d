@@ -14,6 +14,8 @@ export interface PartyRowView {
   /** In Dragoon form (controlled row then also shows the MP gauge). */
   transformed?: boolean;
   // Controlled-member extras:
+  /** Whether the Dragoon Spirit is unlocked — no SP/MP gauges until it is. */
+  dragoonUnlocked?: boolean;
   sp?: number;
   maxSp?: number;
   /** Dragoon Level (D'Lv) — shown on the SP gauge. */
@@ -184,7 +186,8 @@ export class PartyPanel {
       fillGauge(row.hp, v.hp, v.maxHp, v.name);
       fillAtb(row.atb, v.atb);
 
-      if (v.controlled) {
+      // SP/MP gauges only for the controlled member, and only once the Dragoon is unlocked.
+      if (v.controlled && v.dragoonUnlocked) {
         row.extras.style.display = "flex";
         // SP gauge: segmented into 100-SP blocks (each = one Dragoon turn); label carries D'Lv.
         fillSpGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, `D'${v.dragoonLevel ?? 1} · ${t("stat.sp")}`);

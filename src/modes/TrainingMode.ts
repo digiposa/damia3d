@@ -473,6 +473,7 @@ export class TrainingMode extends GameMode {
     this.party = this.partyBearers.map((b, i) => {
       const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
       const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
+      m.avatar.unlockDragoon(); // Training: everyone has their Dragoon Spirit (SP/MP/transform)
       this.applyConfig(m.avatar, b); // restore this character's stored gear / Addition
       m.setControlled(i === this.controlledIndex);
       return m;
@@ -1654,6 +1655,7 @@ export class TrainingMode extends GameMode {
           transformed: a.transformed,
         };
         if (controlled) {
+          row.dragoonUnlocked = a.dragoonUnlocked;
           row.sp = a.sp;
           row.maxSp = a.maxSp;
           row.dragoonLevel = a.dragoonLevel;
