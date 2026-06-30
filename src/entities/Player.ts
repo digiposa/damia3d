@@ -17,7 +17,7 @@ import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 
 const SPEED = 6; // world units per second
-const BASE_MAX_MP = 60; // base MP before equipment % bonuses (placeholder)
+const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 100 at D'Lv5)
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
 const GUARD_DURATION = 2; // seconds the stance lasts
@@ -217,8 +217,10 @@ export class Player {
   get maxHp(): number {
     return Math.floor(this.stats.maxHp * (1 + this.bonusPct("hpPct")));
   }
+  /** Max MP = Dragoon Level × 20 (canon). Some gear doubles it via mpPct (mpPct 1 → ×2). */
   get maxMp(): number {
-    return Math.floor(BASE_MAX_MP * (1 + this.bonusPct("mpPct")));
+    const base = Math.min(Math.max(this.dragoonLevel, 1), MAX_DRAGOON_LEVEL) * MP_PER_DRAGOON_LEVEL;
+    return Math.floor(base * (1 + this.bonusPct("mpPct")));
   }
   get atk(): number {
     return this.withDragoon(this.stats.at + this.bonus("at"), "at");
@@ -420,9 +422,11 @@ export class Player {
     if (lvl > this.dragoonLevel) this.dragoonLevel = Math.min(lvl, MAX_DRAGOON_LEVEL);
   }
 
-  /** Set the Dragoon Level (clamped 1–{@link MAX_DRAGOON_LEVEL}). Debug/training override. */
+  /** Set the Dragoon Level (clamped 1–{@link MAX_DRAGOON_LEVEL}). Debug/training override —
+   *  refills MP to the new max (max MP scales with D'Lv). */
   setDragoonLevel(level: number): void {
     this.dragoonLevel = Math.min(Math.max(Math.floor(level), 1), MAX_DRAGOON_LEVEL);
+    this.mp = this.maxMp;
   }
 
   /** Whether the Dragoon form is currently active. Kept distinct from {@link dragoonTurns} so the
