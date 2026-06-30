@@ -153,7 +153,7 @@ const ELEMENT_COLOR: Record<Element, string> = {
 /** Floating combat-text palette — one colour per feedback type (tweak here only). */
 const TEXT = {
   damage: "#ffcf5c", // OR — all damage (dealt to enemies or taken by the player)
-  hp: "#5fd66f", // green — HP restored
+  hp: "#7ec8ff", // light blue — HP restored (provisional, awaiting exact code)
   sp: "#6fe3c0", // mint — SP gained
   mp: "#b3a8ff", // light blue/mauve — MP gained
   miss: "#ff6a1a", // LoD orange — MISS / whiff
