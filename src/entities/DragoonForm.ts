@@ -242,8 +242,8 @@ export class DragoonForm {
     const bone = box("dgWingBone", boneDelta.length() + 0.1, 0.1, 0.08, rib, scene, root.add(boneTip).scale(0.5), blade);
     bone.rotation.z = Math.atan2(boneDelta.y, boneDelta.x);
 
-    // The fan's anchor: high on the bone's outer stretch (the bone tip stays bare).
-    const anchor = Vector3.Lerp(root, boneTip, 0.88);
+    // The fan's anchor: the bone's outer tip.
+    const anchor = boneTip;
     // Panel tips draping down from the anchor — innermost beside the body, sweeping out.
     const tips: Vector3[] = [
       P(0.08, -0.12),
