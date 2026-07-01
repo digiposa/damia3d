@@ -15,7 +15,7 @@ export interface DragoonFormOptions {
   accent?: [number, number, number];
   /** Glowing chest + headband gem colour (green). */
   gem?: [number, number, number];
-  /** Wing blade colour (pale teal, rendered translucent + glowing). */
+  /** Wing membrane colour (jade green, rendered as flat unlit PS1-style panels). */
   wing?: [number, number, number];
   /** Hair colour (Dart's tan/blond). */
   hair?: [number, number, number];
@@ -29,11 +29,13 @@ const FLAP_SPEED = 2.2; // wing-beat rate (rad/s base)
 const STRIKE_DUR = 0.42;
 
 /**
- * Procedural **Dragoon form**, modelled on Dart's Red-Eye Dragoon (canon reference): ornate red
- * plate with dark filigree, a glowing green chest gem, huge ribbed pauldrons fanning out, a
- * green-gemmed headband under Dart's spiky blond hair (face exposed — no helm), and a fan of pale
- * translucent teal blade-wings that beat. Shown while transformed (the human {@link Humanoid} is
- * hidden); proportioned to stand where the human stood. Faces +Z. Tune via {@link DragoonFormOptions}.
+ * Procedural **Dragoon form**, modelled on Dart's Red-Eye Dragoon (canon reference): ornate
+ * copper-orange plate with dark filigree, a glowing green chest gem, huge rib-fanned pauldrons,
+ * a green-gemmed headband under Dart's spiky blond hair (face exposed — no helm), dark teal
+ * under-suit legs in orange boots, and — like the PS1 model — two large angular jade-green
+ * blade-wings per side (an X seen from behind), each a flat polygon membrane with an orange
+ * leading-edge spar. Shown while transformed (the human {@link Humanoid} is hidden);
+ * proportioned to stand where the human stood. Faces +Z. Tune via {@link DragoonFormOptions}.
  */
 export class DragoonForm {
   readonly rig: TransformNode;
@@ -47,10 +49,10 @@ export class DragoonForm {
   private strikeT = 0;
 
   constructor(scene: Scene, opts: DragoonFormOptions = {}) {
-    const [pr, pg, pb] = opts.primary ?? [0.86, 0.2, 0.13]; // Red-Eye red
+    const [pr, pg, pb] = opts.primary ?? [0.82, 0.3, 0.1]; // Red-Eye copper-orange
     const [mr, mg, mb] = opts.accent ?? [0.7, 0.72, 0.78]; // steel grey
     const [er, eg, eb] = opts.gem ?? [0.22, 0.95, 0.4]; // green gem
-    const [wr, wg, wb] = opts.wing ?? [0.82, 0.92, 0.5]; // pale yellow-green membrane
+    const [wr, wg, wb] = opts.wing ?? [0.34, 0.58, 0.33]; // jade-green membrane (PS1)
     const [hr, hg, hb] = opts.hair ?? [0.84, 0.62, 0.3]; // tan/blond
     const [sr, sg, sb] = opts.skin ?? [0.94, 0.79, 0.67];
 
@@ -58,31 +60,36 @@ export class DragoonForm {
     const redDk = mat("dgRedDk", pr * 0.45, pg * 0.4, pb * 0.4, scene); // filigree / engraving
     const steel = mat("dgSteel", mr, mg, mb, scene);
     const dark = mat("dgDark", 0.12, 0.1, 0.13, scene); // deep shadow / fists
-    const teal = mat("dgTeal", 0.17, 0.5, 0.52, scene); // teal under-suit / joints (canon)
+    const teal = mat("dgTeal", 0.13, 0.38, 0.36, scene); // dark teal under-suit (canon)
+    const tealDk = mat("dgTealDk", 0.09, 0.27, 0.26, scene); // shin/greave shade
     const blond = mat("dgHair", hr, hg, hb, scene);
     const skin = mat("dgSkin", sr, sg, sb, scene);
     const eyeMat = mat("dgEye", 0.08, 0.08, 0.1, scene);
     const gem = mat("dgGem", er * 0.35, eg * 0.35, eb * 0.35, scene);
     gem.emissiveColor = new Color3(er, eg, eb); // self-lit green
-    // Unlit membrane: the custom triangle meshes were rendering black because their averaged
-    // (opposite-wound) normals kill diffuse lighting — so drive the colour purely from emissive
-    // with lighting disabled. Guarantees a clean translucent yellow-green from every angle.
-    const wingMat = mat("dgWing", 0, 0, 0, scene);
-    wingMat.diffuseColor = new Color3(0, 0, 0);
-    wingMat.emissiveColor = new Color3(wr, wg, wb);
-    wingMat.disableLighting = true;
-    wingMat.alpha = 0.5; // translucent membrane
-    wingMat.backFaceCulling = false;
+    // Unlit membranes: the custom triangle meshes render black under lights because their
+    // averaged (opposite-wound) normals kill diffuse lighting — so drive the colour purely
+    // from emissive with lighting disabled. Flat unlit panels are exactly the PS1 look.
+    // The lower blade is a shade darker so the two wings per side read separately.
+    const wingUp = mat("dgWingUp", 0, 0, 0, scene);
+    wingUp.emissiveColor = new Color3(wr, wg, wb);
+    wingUp.disableLighting = true;
+    wingUp.backFaceCulling = false;
+    const wingLo = mat("dgWingLo", 0, 0, 0, scene);
+    wingLo.emissiveColor = new Color3(wr * 0.68, wg * 0.72, wb * 0.68);
+    wingLo.disableLighting = true;
+    wingLo.backFaceCulling = false;
 
     this.rig = new TransformNode("dragoonForm", scene);
     this.rig.scaling.setAll(opts.scale ?? 1);
 
-    // --- Legs: dark thighs into red greaves with a steel knee, planted on the rig. ---
+    // --- Legs: dark teal under-suit down the whole leg, orange knee cop + big orange boots
+    // (PS1: the legs stay dark, only the joints and feet flash Red-Eye orange). ---
     for (const sx of [-1, 1]) {
       box("dgThigh", 0.2, 0.42, 0.22, teal, scene, new Vector3(sx * 0.13, 0.56, 0), this.rig);
-      box("dgGreave", 0.23, 0.44, 0.24, red, scene, new Vector3(sx * 0.13, 0.2, 0.01), this.rig);
-      box("dgKnee", 0.24, 0.1, 0.25, steel, scene, new Vector3(sx * 0.13, 0.4, 0.01), this.rig);
-      box("dgFoot", 0.21, 0.13, 0.36, redDk, scene, new Vector3(sx * 0.13, 0.06, 0.08), this.rig);
+      box("dgGreave", 0.21, 0.44, 0.22, tealDk, scene, new Vector3(sx * 0.13, 0.2, 0.01), this.rig);
+      box("dgKnee", 0.24, 0.12, 0.25, red, scene, new Vector3(sx * 0.13, 0.4, 0.01), this.rig);
+      box("dgFoot", 0.22, 0.15, 0.38, red, scene, new Vector3(sx * 0.13, 0.07, 0.09), this.rig);
     }
 
     // --- Body group (torso/head/arms) — hovers gently in update(). ---
@@ -115,6 +122,7 @@ export class DragoonForm {
     const gemMesh = MeshBuilder.CreateSphere("dgGem", { diameter: 0.2, segments: 12 }, scene);
     gemMesh.material = gem;
     gemMesh.isPickable = false;
+    gemMesh.scaling = new Vector3(0.9, 1.35, 0.7); // tall oval, like the PS1 sternum gem
     gemMesh.position = new Vector3(0, 1.12, 0.23);
     gemMesh.parent = this.body;
 
@@ -162,22 +170,26 @@ export class DragoonForm {
       box("dgFist", 0.2, 0.18, 0.22, dark, scene, new Vector3(0, -0.62, 0), arm);
     }
 
-    // Sword in the right hand: silver blade, steel cross-guard, red grip (held upright).
+    // Sword in the right hand: silver blade, steel cross-guard, red grip — held tipped
+    // well forward, close to horizontal, like the PS1 flight pose.
     const sword = new TransformNode("dgSword", scene);
-    sword.position = new Vector3(0, -0.64, 0.08);
+    sword.position = new Vector3(0, -0.64, 0.12);
+    sword.rotation.x = 1.15;
     sword.parent = this.rightArm;
     box("dgBlade", 0.07, 1.2, 0.14, steel, scene, new Vector3(0, 0.62, 0), sword);
     box("dgGuard", 0.32, 0.07, 0.16, steel, scene, new Vector3(0, 0.04, 0), sword);
     box("dgGrip", 0.07, 0.2, 0.1, red, scene, new Vector3(0, -0.12, 0), sword);
 
-    // --- Wings: dragon membranes — red rib spokes with pale teal translucent webbing. ---
-    this.leftWing = this.buildWing(scene, -1, wingMat, red);
-    this.rightWing = this.buildWing(scene, 1, wingMat, red);
+    // --- Wings: two big angular jade blades per side (upper swept up, lower near-flat),
+    // an X seen from behind — the PS1 silhouette. Orange spar along each leading edge. ---
+    this.leftWing = this.buildWing(scene, -1, wingUp, wingLo, red);
+    this.rightWing = this.buildWing(scene, 1, wingUp, wingLo, red);
     for (const w of [this.leftWing, this.rightWing]) w.parent = this.body;
   }
 
   /** One pauldron: a compact rounded shoulder guard (flattened dome) with two short layered
-   *  ridge plates on top, angled up-out — a clean, canon-ish big shoulder (not long spokes). */
+   *  ridge plates on top and a pale ribbed fan flaring out-down beneath it — the PS1 model's
+   *  big shoulders read as orange plates over a fan of light ribs. */
   private buildPauldron(scene: Scene, sx: number, red: StandardMaterial, steel: StandardMaterial, parent: TransformNode): void {
     const dome = MeshBuilder.CreateSphere("dgPauldron", { diameter: 0.42, segments: 8 }, scene);
     dome.material = red;
@@ -191,40 +203,74 @@ export class DragoonForm {
       const rim = box("dgPauldronRim", 0.29 - i * 0.07, 0.03, 0.44 - i * 0.08, steel, scene, new Vector3(sx * (0.38 + i * 0.05), 1.55 + i * 0.09, 0), parent);
       rim.rotation.z = sx * (0.35 + i * 0.25);
     }
+    // Ribbed fan under the dome: three steel slats flaring outward-down over the arm.
+    for (let i = 0; i < 3; i++) {
+      const rib = box("dgPauldronFan", 0.26, 0.035, 0.26 - i * 0.04, steel, scene, new Vector3(sx * (0.44 + i * 0.04), 1.44 - i * 0.075, 0), parent);
+      rib.rotation.z = sx * (0.55 + i * 0.3);
+    }
   }
 
-  /** One wing: the main red spar bar (up-back ~45°, splayed into a V), with a row of translucent
-   *  triangles hanging straight DOWN from points spaced ALONG the whole bar — consecutive points
-   *  on the spar form each triangle's top edge and the apex drops below, giving a sawtooth
-   *  membrane running the length of the bar. Pivot is animated (flap). */
-  private buildWing(scene: Scene, sx: number, membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
+  /** One wing side (PS1 style): TWO independent blades on a shared animated pivot — a long
+   *  upper blade swept ~50° up-out-back and a shorter lower blade held near-flat, so the four
+   *  blades form an X from behind. Each blade is a flat angular membrane polygon (unlit jade)
+   *  with an orange two-segment spar along its leading edge. */
+  private buildWing(
+    scene: Scene,
+    sx: number,
+    upper: StandardMaterial,
+    lower: StandardMaterial,
+    rib: StandardMaterial,
+  ): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
-    pivot.position = new Vector3(sx * 0.14, 1.5, -0.14); // upper back
-    const bar = new TransformNode("dgWingBar", scene);
-    bar.parent = pivot;
-    bar.rotation = new Vector3(-0.8, 0, -sx * 0.5); // ~45° up-and-back, splayed outward into a V
-    const barLen = 1.3;
-    box("dgWingSpar", 0.08, barLen, 0.08, rib, scene, new Vector3(0, barLen / 2, 0), bar); // base at pivot
-
-    // Direction the bar points, expressed in the (upright) pivot frame — derived from the bar's
-    // rotation above (YXZ Euler applied to local +Y). Lets us sample points ALONG the bar and
-    // hang membrane teeth from them without walking the tilted bar's own frame.
-    const dir = new Vector3(sx * 0.479, 0.611, -0.63); // ~unit vector up-back-out
-    const along = (d: number) => dir.scale(d);
-
-    // Sawtooth membrane along the bar: sample N+1 points from near the base to the outer tip;
-    // each adjacent pair is the top edge of a downward triangle whose apex drops below the bar.
-    const N = 5;
-    const d0 = 0.12; // start a little out from the shoulder
-    const d1 = 1.28; // out to the bar's tip
-    for (let i = 0; i < N; i++) {
-      const pa = along(d0 + (d1 - d0) * (i / N));
-      const pb = along(d0 + (d1 - d0) * ((i + 1) / N));
-      const drop = 0.7 + 0.5 * (i / (N - 1)); // teeth grow toward the outer tip → fan silhouette
-      const apex = pa.add(pb).scale(0.5).add(new Vector3(0, -drop, 0));
-      triangle("dgWingTooth", pa, pb, apex, membrane, scene).parent = pivot;
-    }
+    pivot.position = new Vector3(sx * 0.12, 1.46, -0.17); // upper back
+    this.buildBlade(scene, pivot, sx, 1.7, 0.78, 0.85, 0.42, upper, rib);
+    this.buildBlade(scene, pivot, sx, 1.45, 0.62, -0.28, 0.5, lower, rib);
     return pivot;
+  }
+
+  /** One wing blade: a flat six-point membrane polygon built in the XY plane (span along ±X,
+   *  chord hanging in -Y), then raised by `elev` (roll toward vertical) and swept back by
+   *  `sweep` (yaw toward -Z). The leading edge carries an orange spar in two segments,
+   *  kinked like the PS1 wing bone. */
+  private buildBlade(
+    scene: Scene,
+    parent: TransformNode,
+    sx: number,
+    len: number,
+    chord: number,
+    elev: number,
+    sweep: number,
+    membrane: StandardMaterial,
+    rib: StandardMaterial,
+  ): void {
+    const blade = new TransformNode("dgWingBlade", scene);
+    blade.parent = parent;
+    blade.rotation = new Vector3(0, sx * sweep, sx * elev);
+
+    const P = (x: number, y: number): Vector3 => new Vector3(sx * x, y, 0);
+    const p0 = P(0.05, 0); // root, leading edge
+    const p1 = P(len * 0.55, 0.06); // spar kink
+    const p2 = P(len, -0.12); // wing tip
+    const p3 = P(len * 0.72, -chord * 0.9); // trailing notch, outer
+    const p4 = P(len * 0.38, -chord); // trailing point, mid
+    const p5 = P(0.05, -chord * 0.55); // root, trailing edge
+    const panels: [Vector3, Vector3, Vector3][] = [
+      [p0, p1, p5],
+      [p1, p4, p5],
+      [p1, p2, p4],
+      [p2, p3, p4],
+    ];
+    for (const [a, b, c] of panels) triangle("dgWingPanel", a, b, c, membrane, scene).parent = blade;
+
+    // Leading-edge spar: shoulder → kink → tip.
+    for (const [a, b] of [
+      [p0, p1],
+      [p1, p2],
+    ] as [Vector3, Vector3][]) {
+      const d = b.subtract(a);
+      const seg = box("dgWingSpar", d.length() + 0.05, 0.06, 0.07, rib, scene, a.add(b).scale(0.5), blade);
+      seg.rotation.z = Math.atan2(d.y, d.x);
+    }
   }
 
   setEnabled(on: boolean): void {
