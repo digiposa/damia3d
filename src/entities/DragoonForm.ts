@@ -32,9 +32,10 @@ const STRIKE_DUR = 0.42;
  * Procedural **Dragoon form**, modelled on Dart's Red-Eye Dragoon (canon reference): ornate
  * copper-orange plate with dark filigree, a glowing green chest gem, huge rib-fanned pauldrons,
  * a green-gemmed headband under Dart's spiky blond hair (face exposed — no helm), dark teal
- * under-suit legs in orange boots, and — like the PS1 model — two large angular jade-green
- * blade-wings per side (an X seen from behind), each a flat polygon membrane with an orange
- * leading-edge spar. Shown while transformed (the human {@link Humanoid} is hidden);
+ * under-suit legs in orange boots, and — like the PS1 model — one large jade-green bat-wing
+ * per side: an orange spar sweeping up-out with a continuous angular membrane hanging from it,
+ * its trailing edge scalloped into long pointed lobes. Shown while transformed (the human
+ * {@link Humanoid} is hidden);
  * proportioned to stand where the human stood. Faces +Z. Tune via {@link DragoonFormOptions}.
  */
 export class DragoonForm {
@@ -180,8 +181,8 @@ export class DragoonForm {
     box("dgGuard", 0.32, 0.07, 0.16, steel, scene, new Vector3(0, 0.04, 0), sword);
     box("dgGrip", 0.07, 0.2, 0.1, red, scene, new Vector3(0, -0.12, 0), sword);
 
-    // --- Wings: two big angular jade blades per side (upper swept up, lower near-flat),
-    // an X seen from behind — the PS1 silhouette. Orange spar along each leading edge. ---
+    // --- Wings: one big jade bat-wing per side — orange spar up-out, continuous membrane
+    // hanging below it with pointed trailing lobes (the PS1 silhouette). ---
     this.leftWing = this.buildWing(scene, -1, wingUp, wingLo, red);
     this.rightWing = this.buildWing(scene, 1, wingUp, wingLo, red);
     for (const w of [this.leftWing, this.rightWing]) w.parent = this.body;
@@ -210,10 +211,13 @@ export class DragoonForm {
     }
   }
 
-  /** One wing side (PS1 style): TWO independent blades on a shared animated pivot — a long
-   *  upper blade swept ~50° up-out-back and a shorter lower blade held near-flat, so the four
-   *  blades form an X from behind. Each blade is a flat angular membrane polygon (unlit jade)
-   *  with an orange two-segment spar along its leading edge. */
+  /** One wing (PS1 style): a single flat bat-wing per side, built in the XY plane (span along
+   *  ±X, membrane hanging in -Y), then raised ~45° and swept back a touch. The orange spar
+   *  runs shoulder → kink → tip along the leading edge; the membrane is one continuous
+   *  polygon under it whose trailing edge is scalloped into three long pointed lobes —
+   *  the triangles hang FROM the spar (base screenshot layout), shaped like the PS1 wing.
+   *  The upper band uses the brighter jade, the lobes the darker shade, faking the PS1
+   *  panel shading. Pivot is animated (flap). */
   private buildWing(
     scene: Scene,
     sx: number,
@@ -223,54 +227,48 @@ export class DragoonForm {
   ): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
     pivot.position = new Vector3(sx * 0.12, 1.46, -0.17); // upper back
-    this.buildBlade(scene, pivot, sx, 1.7, 0.78, 0.85, 0.42, upper, rib);
-    this.buildBlade(scene, pivot, sx, 1.45, 0.62, -0.28, 0.5, lower, rib);
-    return pivot;
-  }
-
-  /** One wing blade: a flat six-point membrane polygon built in the XY plane (span along ±X,
-   *  chord hanging in -Y), then raised by `elev` (roll toward vertical) and swept back by
-   *  `sweep` (yaw toward -Z). The leading edge carries an orange spar in two segments,
-   *  kinked like the PS1 wing bone. */
-  private buildBlade(
-    scene: Scene,
-    parent: TransformNode,
-    sx: number,
-    len: number,
-    chord: number,
-    elev: number,
-    sweep: number,
-    membrane: StandardMaterial,
-    rib: StandardMaterial,
-  ): void {
     const blade = new TransformNode("dgWingBlade", scene);
-    blade.parent = parent;
-    blade.rotation = new Vector3(0, sx * sweep, sx * elev);
+    blade.parent = pivot;
+    blade.rotation = new Vector3(0, sx * 0.45, sx * 0.8); // swept back, raised ~45°
 
-    const P = (x: number, y: number): Vector3 => new Vector3(sx * x, y, 0);
-    const p0 = P(0.05, 0); // root, leading edge
-    const p1 = P(len * 0.55, 0.06); // spar kink
-    const p2 = P(len, -0.12); // wing tip
-    const p3 = P(len * 0.72, -chord * 0.9); // trailing notch, outer
-    const p4 = P(len * 0.38, -chord); // trailing point, mid
-    const p5 = P(0.05, -chord * 0.55); // root, trailing edge
-    const panels: [Vector3, Vector3, Vector3][] = [
-      [p0, p1, p5],
-      [p1, p4, p5],
-      [p1, p2, p4],
-      [p2, p3, p4],
+    const len = 1.9; // span along the spar
+    const P = (x: number, y: number): Vector3 => new Vector3(sx * x * len, y, 0);
+    // Leading edge (spar line)…
+    const L0 = P(0.03, 0); // root at the shoulder
+    const L1 = P(0.62, 0.05); // spar kink (wing "wrist")
+    const L2 = P(1.0, -0.06); // wing tip
+    // …and the scalloped trailing edge: three pointed lobes separated by notches.
+    const T1 = P(0.8, -0.72); // outer lobe tip
+    const N1 = P(0.58, -0.4); // notch
+    const T2 = P(0.4, -0.94); // middle lobe tip (longest)
+    const N2 = P(0.2, -0.46); // notch
+    const T3 = P(0.06, -0.74); // inner lobe tip, close to the body
+
+    // Upper band along the spar (brighter jade)…
+    const band: [Vector3, Vector3, Vector3][] = [
+      [L0, L1, N2],
+      [L1, N1, N2],
+      [L1, L2, N1],
     ];
-    for (const [a, b, c] of panels) triangle("dgWingPanel", a, b, c, membrane, scene).parent = blade;
+    for (const [a, b, c] of band) triangle("dgWingBand", a, b, c, upper, scene).parent = blade;
+    // …and the three hanging lobes (darker jade).
+    const lobes: [Vector3, Vector3, Vector3][] = [
+      [N1, L2, T1],
+      [N2, N1, T2],
+      [L0, N2, T3],
+    ];
+    for (const [a, b, c] of lobes) triangle("dgWingLobe", a, b, c, lower, scene).parent = blade;
 
     // Leading-edge spar: shoulder → kink → tip.
     for (const [a, b] of [
-      [p0, p1],
-      [p1, p2],
+      [L0, L1],
+      [L1, L2],
     ] as [Vector3, Vector3][]) {
       const d = b.subtract(a);
       const seg = box("dgWingSpar", d.length() + 0.05, 0.06, 0.07, rib, scene, a.add(b).scale(0.5), blade);
       seg.rotation.z = Math.atan2(d.y, d.x);
     }
+    return pivot;
   }
 
   setEnabled(on: boolean): void {
