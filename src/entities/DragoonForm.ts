@@ -211,12 +211,13 @@ export class DragoonForm {
     }
   }
 
-  /** One wing (PS1 style): the orange leading-edge band ("membrane rouge") sweeps up-out
-   *  from the shoulder — shoulder → kink → tip — and the jade membrane hangs from its OUTER
-   *  edge as three large obtuse triangles: each tooth's base covers a stretch of the band
-   *  and its point hangs down leaning outward (apex pushed toward the wing tip), with deep
-   *  notches between teeth. Built in the XY plane (span along ±X), then raised ~45° and
-   *  swept back; teeth alternate the two jade shades. Pivot is animated (flap). */
+  /** One wing (PS1 reference, annotated): ONE thick orange bone sweeps up-out from the
+   *  shoulder, protruding well past the membrane — and the membrane is a FAN of long thin
+   *  isosceles triangles all radiating from the wing root beneath the bone. Adjacent panels
+   *  share their radiating edges; the outer rim sags deeply back toward the root between
+   *  the panel tips (V notches). No bones between panels — just the naked membrane fan.
+   *  Built in the XY plane (span along ±X), then swept back and raised; panels alternate
+   *  the two jade shades. Pivot is animated (flap). */
   private buildWing(
     scene: Scene,
     sx: number,
@@ -228,44 +229,34 @@ export class DragoonForm {
     pivot.position = new Vector3(sx * 0.12, 1.46, -0.17); // upper back
     const blade = new TransformNode("dgWingBlade", scene);
     blade.parent = pivot;
-    blade.rotation = new Vector3(0, sx * 0.45, sx * 0.8); // raised ~45°, swept back
+    blade.rotation = new Vector3(0, sx * 0.35, sx * 0.38); // swept back a touch, wide-open V
 
-    const len = 1.9; // span along the band
-    const P = (x: number, y: number): Vector3 => new Vector3(sx * x * len, y, 0);
-    const L0 = P(0.03, 0); // root at the shoulder
-    const L1 = P(0.62, 0.05); // band kink (wing "wrist")
-    const L2 = P(1.0, -0.06); // wing tip
+    const root = new Vector3(sx * 0.03, 0, 0);
+    const ray = (ang: number, len: number): Vector3 =>
+      new Vector3(sx * Math.cos(ang) * len, Math.sin(ang) * len, 0);
 
-    // The orange leading-edge band, in two kinked segments.
-    for (const [a, b] of [
-      [L0, L1],
-      [L1, L2],
-    ] as [Vector3, Vector3][]) {
-      const d = b.subtract(a);
-      const seg = box("dgWingSpar", d.length() + 0.05, 0.09, 0.05, rib, scene, a.add(b).scale(0.5), blade);
-      seg.rotation.z = Math.atan2(d.y, d.x);
-    }
+    // The single bone: thick, along the fan's top edge, sticking far past the membrane.
+    const boneTip = ray(0.55, 1.85);
+    const bone = box("dgWingBone", boneTip.length() + 0.1, 0.1, 0.08, rib, scene, root.add(boneTip).scale(0.5), blade);
+    bone.rotation.z = Math.atan2(boneTip.y, boneTip.x);
 
-    // A point a fraction `f` of the way along the kinked band polyline.
-    const l1 = L1.subtract(L0).length();
-    const l2 = L2.subtract(L1).length();
-    const along = (f: number): Vector3 => {
-      const d = f * (l1 + l2);
-      return d <= l1 ? Vector3.Lerp(L0, L1, d / l1) : Vector3.Lerp(L1, L2, (d - l1) / l2);
-    };
-
-    // Three big membrane teeth hanging from the band's outer edge: base along the band,
-    // apex dropped below and leaned outward (obtuse inner corner), deepest mid-wing.
-    const teeth: { f0: number; f1: number; drop: number; shade: StandardMaterial }[] = [
-      { f0: 0.02, f1: 0.36, drop: 0.72, shade: upper },
-      { f0: 0.36, f1: 0.68, drop: 0.95, shade: lower },
-      { f0: 0.68, f1: 1.0, drop: 0.78, shade: upper },
+    // Membrane fan: five rays from the root (top one lying along the bone, well short of
+    // its tip), giving four long broad panels; the rim sags to ~64% between tips.
+    const rays: { ang: number; len: number }[] = [
+      { ang: 0.55, len: 1.55 },
+      { ang: 0.25, len: 1.5 },
+      { ang: -0.05, len: 1.42 },
+      { ang: -0.35, len: 1.3 },
+      { ang: -0.65, len: 1.18 },
     ];
-    for (const t of teeth) {
-      const a = along(t.f0);
-      const b = along(t.f1);
-      const apex = new Vector3(a.x + (b.x - a.x) * 0.72, Math.min(a.y, b.y) - t.drop, 0);
-      triangle("dgWingTooth", a, b, apex, t.shade, scene).parent = blade;
+    for (let i = 0; i < rays.length - 1; i++) {
+      const a = ray(rays[i].ang, rays[i].len);
+      const b = ray(rays[i + 1].ang, rays[i + 1].len);
+      const sag = 0.64 * ((rays[i].len + rays[i + 1].len) / 2);
+      const m = a.add(b).normalize().scale(sag);
+      const shade = i % 2 === 0 ? upper : lower;
+      triangle("dgWingWebA", root, a, m, shade, scene).parent = blade;
+      triangle("dgWingWebB", root, m, b, shade, scene).parent = blade;
     }
     return pivot;
   }
