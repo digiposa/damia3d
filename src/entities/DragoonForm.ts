@@ -253,9 +253,12 @@ export class DragoonForm {
       P(1.52, -0.28),
     ];
     for (let i = 0; i < tips.length - 1; i++) {
-      // One flat obtuse triangle per panel — straight rim between tips, no notch.
+      // Sawtooth panels: each tooth's OUTER radiating edge runs the full ray (the long
+      // side), while its inner edge stops partway down the shared ray — so the lower rim
+      // slants down-outward then steps back up at every ray, a saw-blade zigzag.
+      const inner = Vector3.Lerp(anchor, tips[i], 0.78);
       const shade = i % 2 === 0 ? upper : lower;
-      triangle("dgWingWeb", anchor, tips[i], tips[i + 1], shade, scene).parent = blade;
+      triangle("dgWingWeb", anchor, inner, tips[i + 1], shade, scene).parent = blade;
     }
     return pivot;
   }
