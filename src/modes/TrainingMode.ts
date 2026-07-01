@@ -3,11 +3,14 @@ import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import "@babylonjs/core/Meshes/meshBuilder";
+// Side-effect import: scene.pick / createPickingRay need Ray registered, else
+// every click throws "Ray needs to be imported before" and click-to-move dies.
+import "@babylonjs/core/Culling/ray";
 
 import { GameMode } from "../core/GameMode";
 import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
-import { createGround } from "../world/Ground";
+import { createArena, clampToArena } from "../world/Arena";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -281,8 +284,9 @@ export class TrainingMode extends GameMode {
 
     const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), this.scene);
     sun.intensity = 0.85;
+    sun.diffuse = new Color3(1.0, 0.92, 0.8); // warm torch-lit tint for the night arena
 
-    createGround(this.scene, 40);
+    createArena(this.scene);
 
     this.partyBearers = this.defaultParty();
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
@@ -582,6 +586,7 @@ export class TrainingMode extends GameMode {
       } else {
         this.navigate(dt);
       }
+      clampToArena(this.player.position); // the wall is a hard boundary
     }
     this.camera.follow(this.player.position);
     // Procedural walk/idle animation (visual only, uses real time).
@@ -1039,6 +1044,7 @@ export class TrainingMode extends GameMode {
     if (t < 0) return undefined;
     const p = ray.origin.add(ray.direction.scale(t));
     p.y = 0;
+    clampToArena(p); // clicks beyond the wall walk to the arena edge
     return p;
   }
 
@@ -1218,6 +1224,7 @@ export class TrainingMode extends GameMode {
     for (const enemy of this.enemies) {
       enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
       const action = enemy.aiUpdate(cdt, this.player.position, ctx);
+      clampToArena(enemy.position);
       enemy.syncHud(this.scene);
       if (action) this.resolveEnemyAction(enemy, action);
     }
@@ -1315,6 +1322,7 @@ export class TrainingMode extends GameMode {
         member.avatar.face(decision.target.position.subtract(member.position));
       }
     }
+    clampToArena(member.position);
     member.avatar.animate(dt, Vector3.DistanceSquared(before, member.position) > 1e-6);
     member.syncHud(this.scene);
   }
@@ -1626,11 +1634,13 @@ export class TrainingMode extends GameMode {
     this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
   }
 
-  /** A random spawn position on a ring around the player. */
+  /** A random spawn position on a ring around the player, kept inside the arena. */
   private ringPosition(radius = 6): Vector3 {
     const angle = Math.random() * Math.PI * 2;
     const r = radius + Math.random() * 2;
-    return this.player.position.add(new Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
+    const p = this.player.position.add(new Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
+    clampToArena(p);
+    return p;
   }
 
   private popText(world: Vector3, text: string, color: string): void {
