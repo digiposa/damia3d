@@ -121,6 +121,12 @@ export class DragoonForm {
       v.rotation.z = -sx * 0.5;
     }
     box("dgCollar", 0.34, 0.14, 0.3, redDk, scene, new Vector3(0, 1.46, 0), this.body);
+    // Back armour: a broad engraved backplate the wing bones socket into, with a dark
+    // spine ridge + upper trim, and a rear tasset closing the fauld.
+    box("dgBackPlate", 0.52, 0.52, 0.12, red, scene, new Vector3(0, 1.19, -0.15), this.body);
+    box("dgBackTrim", 0.4, 0.1, 0.04, redDk, scene, new Vector3(0, 1.42, -0.22), this.body);
+    box("dgSpine", 0.09, 0.44, 0.04, redDk, scene, new Vector3(0, 1.14, -0.22), this.body);
+    box("dgBackTasset", 0.44, 0.15, 0.12, red, scene, new Vector3(0, 0.72, -0.14), this.body);
     // Big glowing GREEN dragon-eye gem at the sternum, set in an ornate diamond mount.
     const mount = box("dgGemMount", 0.3, 0.3, 0.04, redDk, scene, new Vector3(0, 1.12, 0.19), this.body);
     mount.rotation.z = Math.PI / 4;
