@@ -249,12 +249,12 @@ export class DragoonForm {
     // ray shortens and steepens, so every triangle gets a smaller hypotenuse and a less
     // obtuse angle than its outer neighbour.
     const rays: { ang: number; len: number }[] = [
-      { ang: 0.78, len: 1.35 },
-      { ang: 0.47, len: 1.22 },
-      { ang: 0.17, len: 1.08 },
-      { ang: -0.12, len: 0.92 },
-      { ang: -0.4, len: 0.78 },
-      { ang: -0.66, len: 0.66 },
+      { ang: 0.75, len: 1.35 },
+      { ang: 0.4, len: 1.22 },
+      { ang: 0.05, len: 1.08 },
+      { ang: -0.3, len: 0.92 },
+      { ang: -0.62, len: 0.78 },
+      { ang: -0.92, len: 0.66 },
     ];
     const WEB_SCALE = 1.6; // global membrane size (ratios between panels preserved)
     const tips = rays.map(
