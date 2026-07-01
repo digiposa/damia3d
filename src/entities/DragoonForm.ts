@@ -186,35 +186,16 @@ export class DragoonForm {
     }
   }
 
-  /** One wing: a FLAT folding-fan of coplanar teal blades. The animated `pivot` sits at the
-   *  back-shoulder; an inner `fan` node tilts the whole fan plane (lean back + face out); within
-   *  that plane the blades radiate from the base, fanned by a single rotation each about the
-   *  plane normal, with a red spar along each blade's leading edge. Pale translucent membrane. */
-  private buildWing(scene: Scene, sx: number, membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
+  /** One wing — STEP 1: just the main red spar bar, anchored at the upper back and rising at
+   *  ~45° up-and-back, splayed to its side (the two bars form a V). Membrane comes later. The
+   *  returned pivot is animated (flap). */
+  private buildWing(scene: Scene, sx: number, _membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
-    pivot.position = new Vector3(sx * 0.12, 1.5, -0.2); // upper back, behind the shoulder
-    const fan = new TransformNode("dgWingFan", scene); // the tilted fan plane
-    fan.parent = pivot;
-    fan.rotation = new Vector3(-0.32, sx * 0.22, 0); // lean the plane back + face it outward
-
-    // [fan angle (about the plane normal), blade length, blade width] — length peaks mid-fan.
-    const blades: [number, number, number][] = [
-      [0.1, 0.92, 0.18],
-      [0.36, 1.12, 0.18],
-      [0.64, 1.22, 0.17],
-      [0.93, 1.15, 0.16],
-      [1.22, 0.96, 0.14],
-      [1.5, 0.72, 0.12],
-    ];
-    blades.forEach(([angle, len, w]) => {
-      const bp = new TransformNode("dgWingBladePivot", scene);
-      bp.parent = fan;
-      bp.rotation.z = sx * angle; // fan open about the plane normal (coplanar)
-      // Flat teal membrane panel (base at the fan origin, extends radially +Y).
-      box("dgWingMem", w, len, 0.02, membrane, scene, new Vector3(0, len / 2, 0), bp);
-      // Thin red spar along the blade's leading edge.
-      box("dgWingSpar", 0.03, len * 0.96, 0.04, rib, scene, new Vector3(sx * -w * 0.5, len / 2, 0.01), bp);
-    });
+    pivot.position = new Vector3(sx * 0.14, 1.5, -0.14); // upper back
+    const bar = new TransformNode("dgWingBar", scene);
+    bar.parent = pivot;
+    bar.rotation = new Vector3(-0.8, 0, sx * 0.5); // ~45° up-and-back, splayed outward into a V
+    box("dgWingSpar", 0.08, 1.3, 0.08, rib, scene, new Vector3(0, 0.65, 0), bar); // base at pivot, extends up
     return pivot;
   }
 
