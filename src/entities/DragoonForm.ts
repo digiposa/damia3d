@@ -194,7 +194,7 @@ export class DragoonForm {
     pivot.position = new Vector3(sx * 0.14, 1.5, -0.14); // upper back
     const bar = new TransformNode("dgWingBar", scene);
     bar.parent = pivot;
-    bar.rotation = new Vector3(-0.8, 0, sx * 0.5); // ~45° up-and-back, splayed outward into a V
+    bar.rotation = new Vector3(-0.8, 0, -sx * 0.5); // ~45° up-and-back, splayed outward into a V
     box("dgWingSpar", 0.08, 1.3, 0.08, rib, scene, new Vector3(0, 0.65, 0), bar); // base at pivot, extends up
     return pivot;
   }
