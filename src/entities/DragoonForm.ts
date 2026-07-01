@@ -236,7 +236,7 @@ export class DragoonForm {
     const root = P(0.03, 0);
     // The single bone, angled up-out within the blade plane.
     const BONE_ANG = 0.55;
-    const BONE_LEN = 1.85;
+    const BONE_LEN = 1.3; // shortened 30% (was 1.85)
     const boneTip = root.add(P(Math.cos(BONE_ANG) * BONE_LEN, Math.sin(BONE_ANG) * BONE_LEN));
     const boneDelta = boneTip.subtract(root);
     const bone = box("dgWingBone", boneDelta.length() + 0.1, 0.1, 0.08, rib, scene, root.add(boneTip).scale(0.5), blade);
