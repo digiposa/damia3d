@@ -50,7 +50,7 @@ export class DragoonForm {
     const [pr, pg, pb] = opts.primary ?? [0.86, 0.2, 0.13]; // Red-Eye red
     const [mr, mg, mb] = opts.accent ?? [0.7, 0.72, 0.78]; // steel grey
     const [er, eg, eb] = opts.gem ?? [0.22, 0.95, 0.4]; // green gem
-    const [wr, wg, wb] = opts.wing ?? [0.6, 0.95, 0.86]; // pale teal wing
+    const [wr, wg, wb] = opts.wing ?? [0.82, 0.92, 0.5]; // pale yellow-green membrane
     const [hr, hg, hb] = opts.hair ?? [0.84, 0.62, 0.3]; // tan/blond
     const [sr, sg, sb] = opts.skin ?? [0.94, 0.79, 0.67];
 
@@ -64,9 +64,9 @@ export class DragoonForm {
     const eyeMat = mat("dgEye", 0.08, 0.08, 0.1, scene);
     const gem = mat("dgGem", er * 0.35, eg * 0.35, eb * 0.35, scene);
     gem.emissiveColor = new Color3(er, eg, eb); // self-lit green
-    const wingMat = mat("dgWing", wr * 0.5, wg * 0.5, wb * 0.5, scene);
-    wingMat.emissiveColor = new Color3(wr * 0.6, wg * 0.7, wb * 0.7);
-    wingMat.alpha = 0.62; // crystalline / translucent
+    const wingMat = mat("dgWing", wr * 0.55, wg * 0.55, wb * 0.4, scene);
+    wingMat.emissiveColor = new Color3(wr * 0.5, wg * 0.55, wb * 0.35);
+    wingMat.alpha = 0.5; // translucent membrane
     wingMat.backFaceCulling = false;
 
     this.rig = new TransformNode("dragoonForm", scene);
@@ -200,17 +200,19 @@ export class DragoonForm {
     const barLen = 1.3;
     box("dgWingSpar", 0.08, barLen, 0.08, rib, scene, new Vector3(0, barLen / 2, 0), bar); // base at pivot
 
-    // Sawtooth fan: 4 obtuse isosceles triangles hanging from the bar's outer tip, each turned
-    // progressively toward the interior.
-    const tip = new TransformNode("dgWingTip", scene);
-    tip.parent = bar;
-    tip.position = new Vector3(0, barLen, 0); // outer end of the bar
-    const w = 0.5; // triangle base width (wide → obtuse apex)
-    const h = 0.55; // triangle drop
+    // Sawtooth fan hanging from the bar's OUTER tip: 4 big translucent triangles dropping
+    // straight DOWN (world-down — parented to the pivot, not the tilted bar), each turned a
+    // bit more toward the interior.
+    const tipFan = new TransformNode("dgWingTipFan", scene);
+    tipFan.parent = pivot; // ~upright frame, so -Y is world-down (not along the tilted bar)
+    tipFan.position = new Vector3(sx * 0.45, 0.85, -0.75); // near the bar's outer tip
+    tipFan.rotation.y = -sx * 0.3; // turn the fan to face outward so the faces read
+    const w = 0.5; // triangle base width
+    const h = 1.35; // triangle drop (long teeth)
     for (let i = 0; i < 4; i++) {
       const tooth = new TransformNode("dgToothPivot", scene);
-      tooth.parent = tip;
-      tooth.rotation.z = -sx * (0.15 + i * 0.32); // each leans a bit more inward
+      tooth.parent = tipFan;
+      tooth.rotation.z = sx * (0.5 - i * 0.3); // fan across a downward arc, biased inward
       triangle(
         "dgWingTooth",
         new Vector3(-w / 2, 0, 0),
