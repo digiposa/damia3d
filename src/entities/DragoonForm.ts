@@ -1,7 +1,5 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -188,35 +186,16 @@ export class DragoonForm {
     }
   }
 
-  /** One wing: a fan of red spars sharing the back-shoulder root, with a translucent teal
-   *  triangle webbed between each pair of adjacent spars (apex at the root, wide outer edge).
-   *  The whole fan plane leans back + faces outward (the validated up-back V). Pivot animated. */
-  private buildWing(scene: Scene, sx: number, membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
+  /** One wing — STEP 1: just the main red spar bar, anchored at the upper back and rising at
+   *  ~45° up-and-back, splayed to its side (the two bars form a V). Membrane comes later. The
+   *  returned pivot is animated (flap). */
+  private buildWing(scene: Scene, sx: number, _membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
     pivot.position = new Vector3(sx * 0.14, 1.5, -0.14); // upper back
-    const wing = new TransformNode("dgWing", scene); // the fan plane: leaned back + faced out
-    wing.parent = pivot;
-    wing.rotation = new Vector3(-0.55, -sx * 0.4, 0);
-
-    const N = 4; // spars → N-1 membrane triangles
-    const th0 = 0.05;
-    const th1 = 1.15; // fan spread (radians from vertical)
-    const tips: Vector3[] = [];
-    for (let i = 0; i < N; i++) {
-      const t = i / (N - 1);
-      const th = th0 + t * (th1 - th0);
-      const len = 1.3 - t * 0.4; // outer spars a touch shorter
-      const sp = new TransformNode("dgSparPivot", scene);
-      sp.parent = wing;
-      sp.rotation.z = -sx * th; // fan out about the plane normal
-      box("dgWingSpar", 0.06, len, 0.06, rib, scene, new Vector3(0, len / 2, 0), sp);
-      tips.push(new Vector3(len * Math.sin(sx * th), len * Math.cos(sx * th), 0));
-    }
-    // Translucent triangle membrane in each wedge: root → tip[i] → tip[i+1].
-    const root = new Vector3(0, 0, 0);
-    for (let i = 0; i < N - 1; i++) {
-      triangle("dgWingMem", root, tips[i], tips[i + 1], membrane, scene).parent = wing;
-    }
+    const bar = new TransformNode("dgWingBar", scene);
+    bar.parent = pivot;
+    bar.rotation = new Vector3(-0.8, 0, -sx * 0.5); // ~45° up-and-back, splayed outward into a V
+    box("dgWingSpar", 0.08, 1.3, 0.08, rib, scene, new Vector3(0, 0.65, 0), bar); // base at pivot, extends up
     return pivot;
   }
 
@@ -301,19 +280,4 @@ function cone(name: string, len: number, baseD: number, material: StandardMateri
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
-}
-
-/** A flat, double-sided triangle from three local-space points (for wing membranes). */
-function triangle(name: string, a: Vector3, b: Vector3, c: Vector3, material: StandardMaterial, scene: Scene): Mesh {
-  const m = new Mesh(name, scene);
-  const vd = new VertexData();
-  vd.positions = [a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z];
-  vd.indices = [0, 1, 2, 0, 2, 1]; // both windings → visible from both sides
-  const normals: number[] = [];
-  VertexData.ComputeNormals(vd.positions, vd.indices, normals);
-  vd.normals = normals;
-  vd.applyToMesh(m);
-  m.material = material;
-  m.isPickable = false;
-  return m;
 }
