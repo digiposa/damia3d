@@ -63,6 +63,8 @@ export class DragoonForm {
     const dark = mat("dgDark", 0.12, 0.1, 0.13, scene); // deep shadow / fists
     const teal = mat("dgTeal", 0.13, 0.38, 0.36, scene); // dark teal under-suit (canon)
     const tealDk = mat("dgTealDk", 0.09, 0.27, 0.26, scene); // shin/greave shade
+    const gold = mat("dgGold", 0.85, 0.62, 0.22, scene); // headband / gem mount / trim
+    const paleRib = mat("dgPaleRib", 0.76, 0.84, 0.82, scene); // pale fluted pauldron ribs
     const blond = mat("dgHair", hr, hg, hb, scene);
     const skin = mat("dgSkin", sr, sg, sb, scene);
     const eyeMat = mat("dgEye", 0.08, 0.08, 0.1, scene);
@@ -103,23 +105,27 @@ export class DragoonForm {
     // Segmented tasset plates (abdomen / front skirt).
     box("dgTasset", 0.5, 0.16, 0.16, red, scene, new Vector3(0, 0.74, 0.16), this.body);
     box("dgTasset2", 0.42, 0.14, 0.14, redDk, scene, new Vector3(0, 0.62, 0.17), this.body);
+    // Bright red centre tabard hanging over the dark fauld (PS1 front cloth).
+    box("dgTabardTrim", 0.24, 0.42, 0.02, redDk, scene, new Vector3(0, 0.52, 0.185), this.body);
+    box("dgTabard", 0.19, 0.36, 0.03, red, scene, new Vector3(0, 0.5, 0.2), this.body);
 
     box("dgTorso", 0.46, 0.6, 0.3, teal, scene, new Vector3(0, 1.14, 0), this.body);
-    box("dgChest", 0.5, 0.52, 0.14, red, scene, new Vector3(0, 1.2, 0.14), this.body); // breastplate, proud
+    box("dgChest", 0.56, 0.54, 0.14, red, scene, new Vector3(0, 1.2, 0.14), this.body); // breastplate, broad
     // Dark-red engraved filigree on the chest: a flame-fan at the top + side scrolls.
-    box("dgFiliTop", 0.34, 0.1, 0.04, redDk, scene, new Vector3(0, 1.4, 0.22), this.body);
+    box("dgFiliTop", 0.38, 0.1, 0.04, redDk, scene, new Vector3(0, 1.42, 0.22), this.body);
     for (const sx of [-1, 1]) {
-      const scroll = box("dgFiliS", 0.06, 0.3, 0.04, redDk, scene, new Vector3(sx * 0.14, 1.22, 0.22), this.body);
+      const scroll = box("dgFiliS", 0.06, 0.32, 0.04, redDk, scene, new Vector3(sx * 0.17, 1.2, 0.22), this.body);
       scroll.rotation.z = sx * 0.4;
+      // Gold V-collar plates converging from the shoulders down to the sternum gem.
+      const v = box("dgVCollar", 0.3, 0.08, 0.05, gold, scene, new Vector3(sx * 0.13, 1.33, 0.21), this.body);
+      v.rotation.z = -sx * 0.5;
     }
-    box("dgCollar", 0.34, 0.14, 0.3, steel, scene, new Vector3(0, 1.46, 0), this.body);
-    // Big glowing GREEN dragon-eye gem at the sternum (set in a steel ring).
-    const ring = MeshBuilder.CreateTorus("dgGemRing", { diameter: 0.26, thickness: 0.05, tessellation: 16 }, scene);
-    ring.material = steel;
-    ring.isPickable = false;
-    ring.rotation.x = Math.PI / 2;
-    ring.position = new Vector3(0, 1.12, 0.21);
-    ring.parent = this.body;
+    box("dgCollar", 0.34, 0.14, 0.3, redDk, scene, new Vector3(0, 1.46, 0), this.body);
+    // Big glowing GREEN dragon-eye gem at the sternum, set in an ornate diamond mount.
+    const mount = box("dgGemMount", 0.3, 0.3, 0.04, redDk, scene, new Vector3(0, 1.12, 0.19), this.body);
+    mount.rotation.z = Math.PI / 4;
+    const mountRim = box("dgGemMountRim", 0.22, 0.22, 0.05, gold, scene, new Vector3(0, 1.12, 0.195), this.body);
+    mountRim.rotation.z = Math.PI / 4;
     const gemMesh = MeshBuilder.CreateSphere("dgGem", { diameter: 0.2, segments: 12 }, scene);
     gemMesh.material = gem;
     gemMesh.isPickable = false;
@@ -132,31 +138,35 @@ export class DragoonForm {
     for (const dx of [-0.08, 0.08]) {
       box("dgEyeM", 0.06, 0.07, 0.04, eyeMat, scene, new Vector3(dx, 1.67, 0.16), this.body);
     }
-    // Headband across the brow with five green gems.
-    box("dgBand", 0.34, 0.07, 0.32, redDk, scene, new Vector3(0, 1.74, 0.02), this.body);
+    // Gold headband/tiara across the brow with five green gems.
+    box("dgBand", 0.34, 0.07, 0.32, gold, scene, new Vector3(0, 1.74, 0.02), this.body);
     for (const dx of [-0.13, -0.065, 0, 0.065, 0.13]) {
       const bandGem = box("dgBandGem", 0.05, 0.05, 0.04, gem, scene, new Vector3(dx, 1.74, 0.17), this.body);
       void bandGem;
     }
-    // Spiky tan/blond hair — modest spikes swept back over the head (not a tall crown).
-    const spikes: [number, number, number][] = [
-      [0, 0.32, 0],
-      [-0.11, 0.28, 0.18],
-      [0.11, 0.28, -0.18],
-      [-0.18, 0.22, 0.34],
-      [0.18, 0.22, -0.34],
+    // Big blocky blond hair (PS1: wide angular wedges): a volume cap + chunky spikes
+    // swept back over the crown, flaring wider at the sides.
+    box("dgHairCap", 0.34, 0.14, 0.3, blond, scene, new Vector3(0, 1.85, -0.03), this.body);
+    const spikes: [number, number, number, number][] = [
+      [0, 0.42, 0, 0.2],
+      [-0.12, 0.38, 0.25, 0.18],
+      [0.12, 0.38, -0.25, 0.18],
+      [-0.2, 0.3, 0.55, 0.16],
+      [0.2, 0.3, -0.55, 0.16],
+      [-0.24, 0.24, 0.9, 0.14],
+      [0.24, 0.24, -0.9, 0.14],
     ];
-    for (const [dx, len, rz] of spikes) {
-      const spike = cone("dgHair", len, 0.1, blond, scene);
-      spike.position = new Vector3(dx, 1.8, -0.05);
+    for (const [dx, len, rz, baseD] of spikes) {
+      const spike = cone("dgHair", len, baseD, blond, scene);
+      spike.position = new Vector3(dx, 1.84, -0.05);
       spike.rotation.x = -1.5; // sweep strongly back over the crown
       spike.rotation.z = rz;
       spike.parent = this.body;
     }
 
-    // --- Pauldrons: huge ribbed plates fanning outward & up (steel-edged red ribs). ---
-    this.buildPauldron(scene, -1, red, steel, this.body);
-    this.buildPauldron(scene, 1, red, steel, this.body);
+    // --- Pauldrons: huge PS1 clamshells — stacked copper plates over a pale rib fan. ---
+    this.buildPauldron(scene, -1, red, redDk, paleRib, this.body);
+    this.buildPauldron(scene, 1, red, redDk, paleRib, this.body);
 
     // --- Arms: ribbed red vambraces down to dark fists (right arm strikes). ---
     this.leftArm = limb("dgArmL", red, scene);
@@ -168,7 +178,7 @@ export class DragoonForm {
     for (const arm of [this.leftArm, this.rightArm]) {
       box("dgSleeve", 0.21, 0.26, 0.21, teal, scene, new Vector3(0, -0.08, 0), arm); // teal upper arm
       for (const y of [-0.26, -0.4, -0.52]) box("dgRib", 0.22, 0.04, 0.22, steel, scene, new Vector3(0, y, 0), arm);
-      box("dgFist", 0.2, 0.18, 0.22, dark, scene, new Vector3(0, -0.62, 0), arm);
+      box("dgFist", 0.23, 0.2, 0.25, red, scene, new Vector3(0, -0.64, 0), arm); // big red gauntlet fist
     }
 
     // Sword in the right hand: silver blade, steel cross-guard, red grip — held tipped
@@ -188,26 +198,34 @@ export class DragoonForm {
     for (const w of [this.leftWing, this.rightWing]) w.parent = this.body;
   }
 
-  /** One pauldron: a compact rounded shoulder guard (flattened dome) with two short layered
-   *  ridge plates on top and a pale ribbed fan flaring out-down beneath it — the PS1 model's
-   *  big shoulders read as orange plates over a fan of light ribs. */
-  private buildPauldron(scene: Scene, sx: number, red: StandardMaterial, steel: StandardMaterial, parent: TransformNode): void {
-    const dome = MeshBuilder.CreateSphere("dgPauldron", { diameter: 0.42, segments: 8 }, scene);
+  /** One pauldron: the PS1 clamshell — a copper dome crowned by three stacked shell plates
+   *  tilting up toward the neck (dark trim under each), over a fan of four pale fluted ribs
+   *  flaring out-down across the upper arm. Rises proud of the shoulder line. */
+  private buildPauldron(
+    scene: Scene,
+    sx: number,
+    red: StandardMaterial,
+    redDk: StandardMaterial,
+    paleRib: StandardMaterial,
+    parent: TransformNode,
+  ): void {
+    // Pale fluted rib fan first — it sits beneath the shell plates, sweeping over the arm.
+    for (let i = 0; i < 4; i++) {
+      const rib = box("dgPauldronFan", 0.3, 0.05, 0.36 - i * 0.05, paleRib, scene, new Vector3(sx * (0.42 + i * 0.05), 1.5 - i * 0.09, 0), parent);
+      rib.rotation.z = sx * (0.45 + i * 0.28);
+    }
+    const dome = MeshBuilder.CreateSphere("dgPauldron", { diameter: 0.46, segments: 8 }, scene);
     dome.material = red;
     dome.isPickable = false;
-    dome.scaling = new Vector3(1.2, 0.72, 1.05);
-    dome.position = new Vector3(sx * 0.4, 1.5, 0);
+    dome.scaling = new Vector3(1.3, 0.75, 1.1);
+    dome.position = new Vector3(sx * 0.42, 1.52, 0);
     dome.parent = parent;
-    for (let i = 0; i < 2; i++) {
-      const plate = box("dgPauldronRidge", 0.28 - i * 0.07, 0.06, 0.42 - i * 0.08, red, scene, new Vector3(sx * (0.38 + i * 0.05), 1.6 + i * 0.09, 0), parent);
-      plate.rotation.z = sx * (0.35 + i * 0.25);
-      const rim = box("dgPauldronRim", 0.29 - i * 0.07, 0.03, 0.44 - i * 0.08, steel, scene, new Vector3(sx * (0.38 + i * 0.05), 1.55 + i * 0.09, 0), parent);
-      rim.rotation.z = sx * (0.35 + i * 0.25);
-    }
-    // Ribbed fan under the dome: three steel slats flaring outward-down over the arm.
+    // Three stacked shell plates, biggest at the base, tilting up-in toward the neck.
     for (let i = 0; i < 3; i++) {
-      const rib = box("dgPauldronFan", 0.26, 0.035, 0.26 - i * 0.04, steel, scene, new Vector3(sx * (0.44 + i * 0.04), 1.44 - i * 0.075, 0), parent);
-      rib.rotation.z = sx * (0.55 + i * 0.3);
+      const trim = box("dgPauldronTrim", 0.42 - i * 0.08, 0.04, 0.54 - i * 0.1, redDk, scene, new Vector3(sx * (0.42 - i * 0.015), 1.56 + i * 0.1, 0), parent);
+      trim.rotation.z = sx * (0.3 + i * 0.18);
+      const plate = box("dgPauldronPlate", 0.4 - i * 0.08, 0.08, 0.52 - i * 0.1, red, scene, new Vector3(sx * (0.42 - i * 0.015), 1.6 + i * 0.1, 0), parent);
+      plate.rotation.z = sx * (0.3 + i * 0.18);
     }
   }
 
