@@ -256,7 +256,7 @@ export class DragoonForm {
       { ang: -0.62, len: 0.78 },
       { ang: -0.92, len: 0.66 },
     ];
-    const WEB_SCALE = 2; // global membrane size (ratios between panels preserved)
+    const WEB_SCALE = 1.6; // global membrane size (ratios between panels preserved)
     const tips = rays.map(
       (r) =>
         new Vector3(
