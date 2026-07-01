@@ -215,8 +215,8 @@ export class DragoonForm {
    *  shoulder in a wide V, protruding past the membrane — and the membrane is a FAN of
    *  long thin triangles all converging at a point high on the bone's OUTER stretch.
    *  From that top anchor the panels drape DOWNWARD, the innermost reaching down beside
-   *  the body, the outer ones shorter; adjacent panels share their radiating edges and
-   *  the lower rim sags back up toward the anchor between tips (V notches). Built in the
+   *  the body, the outer ones shorter; adjacent panels share their radiating edges, each
+   *  one a single flat obtuse triangle with a straight rim between tips. Built in the
    *  XY plane, then swept back a touch and opened into the V; panels alternate the two
    *  jade shades. Pivot is animated (flap). */
   private buildWing(
@@ -253,13 +253,9 @@ export class DragoonForm {
       P(1.52, -0.28),
     ];
     for (let i = 0; i < tips.length - 1; i++) {
-      const a = tips[i];
-      const b = tips[i + 1];
-      // The rim between two tips sags back up toward the anchor (V notch).
-      const m = anchor.add(a.add(b).scale(0.5).subtract(anchor).scale(0.62));
+      // One flat obtuse triangle per panel — straight rim between tips, no notch.
       const shade = i % 2 === 0 ? upper : lower;
-      triangle("dgWingWebA", anchor, a, m, shade, scene).parent = blade;
-      triangle("dgWingWebB", anchor, m, b, shade, scene).parent = blade;
+      triangle("dgWingWeb", anchor, tips[i], tips[i + 1], shade, scene).parent = blade;
     }
     return pivot;
   }
