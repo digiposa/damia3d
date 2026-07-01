@@ -211,13 +211,12 @@ export class DragoonForm {
     }
   }
 
-  /** One wing (PS1 style): a single flat bat-wing per side, built in the XY plane (span along
-   *  ±X, membrane hanging in -Y), then raised ~45° and swept back a touch. The orange spar
-   *  runs shoulder → kink → tip along the leading edge; the membrane is one continuous
-   *  polygon under it whose trailing edge is scalloped into three long pointed lobes —
-   *  the triangles hang FROM the spar (base screenshot layout), shaped like the PS1 wing.
-   *  The upper band uses the brighter jade, the lobes the darker shade, faking the PS1
-   *  panel shading. Pivot is animated (flap). */
+  /** One wing (PS1 style): a flat FAN radiating from the shoulder — five orange bone spars
+   *  spread ~70° apart-to-down in the wing plane, and between each adjacent pair a long thin
+   *  membrane triangle (root → just short of the two spar tips): elongated isosceles "fingers"
+   *  with the orange spar tips protruding beyond the webbing, exactly like the PS1 wings.
+   *  Built in the XY plane (span along ±X), then raised ~45° and swept back. The membrane
+   *  panels alternate the two jade shades (PS1 panel shading). Pivot is animated (flap). */
   private buildWing(
     scene: Scene,
     sx: number,
@@ -229,44 +228,38 @@ export class DragoonForm {
     pivot.position = new Vector3(sx * 0.12, 1.46, -0.17); // upper back
     const blade = new TransformNode("dgWingBlade", scene);
     blade.parent = pivot;
-    blade.rotation = new Vector3(0, sx * 0.45, sx * 0.8); // swept back, raised ~45°
+    blade.rotation = new Vector3(0, sx * 0.45, sx * 0.8); // fan plane: raised ~45°, swept back
 
-    const len = 1.9; // span along the spar
-    const P = (x: number, y: number): Vector3 => new Vector3(sx * x * len, y, 0);
-    // Leading edge (spar line)…
-    const L0 = P(0.03, 0); // root at the shoulder
-    const L1 = P(0.62, 0.05); // spar kink (wing "wrist")
-    const L2 = P(1.0, -0.06); // wing tip
-    // …and the scalloped trailing edge: three pointed lobes separated by notches.
-    const T1 = P(0.8, -0.72); // outer lobe tip
-    const N1 = P(0.58, -0.4); // notch
-    const T2 = P(0.4, -0.94); // middle lobe tip (longest)
-    const N2 = P(0.2, -0.46); // notch
-    const T3 = P(0.06, -0.74); // inner lobe tip, close to the body
-
-    // Upper band along the spar (brighter jade)…
-    const band: [Vector3, Vector3, Vector3][] = [
-      [L0, L1, N2],
-      [L1, N1, N2],
-      [L1, L2, N1],
+    // The radiating bone spars: angle below the span axis (rad) and length of each.
+    // Longest at the leading edge, shortening as the fan folds down toward the body.
+    const spars: { ang: number; len: number }[] = [
+      { ang: 0.16, len: 1.85 },
+      { ang: -0.14, len: 1.75 },
+      { ang: -0.45, len: 1.55 },
+      { ang: -0.76, len: 1.3 },
+      { ang: -1.06, len: 1.05 },
     ];
-    for (const [a, b, c] of band) triangle("dgWingBand", a, b, c, upper, scene).parent = blade;
-    // …and the three hanging lobes (darker jade).
-    const lobes: [Vector3, Vector3, Vector3][] = [
-      [N1, L2, T1],
-      [N2, N1, T2],
-      [L0, N2, T3],
-    ];
-    for (const [a, b, c] of lobes) triangle("dgWingLobe", a, b, c, lower, scene).parent = blade;
+    const root = new Vector3(sx * 0.04, 0, 0);
+    const tip = (s: { ang: number; len: number }, scale = 1): Vector3 =>
+      new Vector3(sx * Math.cos(s.ang) * s.len * scale, Math.sin(s.ang) * s.len * scale, 0);
 
-    // Leading-edge spar: shoulder → kink → tip.
-    for (const [a, b] of [
-      [L0, L1],
-      [L1, L2],
-    ] as [Vector3, Vector3][]) {
-      const d = b.subtract(a);
-      const seg = box("dgWingSpar", d.length() + 0.05, 0.06, 0.07, rib, scene, a.add(b).scale(0.5), blade);
-      seg.rotation.z = Math.atan2(d.y, d.x);
+    for (const s of spars) {
+      const t = tip(s);
+      const d = t.subtract(root);
+      const seg = box("dgWingSpar", d.length() + 0.04, 0.05, 0.05, rib, scene, root.add(t).scale(0.5), blade);
+      seg.rotation.z = Math.atan2(d.y, d.x); // in-plane angle (x already carries sx)
+    }
+    // Membrane webbing between each adjacent spar pair, sagging inward between the tips:
+    // two long thin triangles meeting at a pulled-in midpoint, so every spar ends in a
+    // protruding point with a scalloped notch between fingers — the PS1 bat-wing edge.
+    for (let i = 0; i < spars.length - 1; i++) {
+      const a = tip(spars[i], 0.96);
+      const b = tip(spars[i + 1], 0.96);
+      const sag = 0.74 * ((spars[i].len + spars[i + 1].len) / 2);
+      const m = a.add(b).normalize().scale(sag);
+      const shade = i % 2 === 0 ? upper : lower;
+      triangle("dgWingWebA", root, a, m, shade, scene).parent = blade;
+      triangle("dgWingWebB", root, m, b, shade, scene).parent = blade;
     }
     return pivot;
   }
