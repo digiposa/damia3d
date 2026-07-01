@@ -244,21 +244,28 @@ export class DragoonForm {
 
     // The fan's anchor: the bone's outer tip.
     const anchor = boneTip;
-    // Panel tips draping down from the anchor — innermost beside the body, sweeping out.
-    const tips: Vector3[] = [
-      P(0.08, -0.12),
-      P(0.44, -0.34),
-      P(0.82, -0.44),
-      P(1.2, -0.42),
-      P(1.52, -0.28),
+    // Panel rays, OUTER → INNER: polar angle from straight-down (positive = outward)
+    // and length. The outer panels are the longest and most obtuse; moving inward each
+    // ray shortens and steepens, so every triangle gets a smaller hypotenuse and a less
+    // obtuse angle than its outer neighbour.
+    const rays: { ang: number; len: number }[] = [
+      { ang: 0.75, len: 1.35 },
+      { ang: 0.4, len: 1.22 },
+      { ang: 0.05, len: 1.08 },
+      { ang: -0.3, len: 0.92 },
+      { ang: -0.62, len: 0.78 },
+      { ang: -0.92, len: 0.66 },
     ];
+    const tips = rays.map(
+      (r) => new Vector3(anchor.x + sx * Math.sin(r.ang) * r.len, anchor.y - Math.cos(r.ang) * r.len, 0),
+    );
     for (let i = 0; i < tips.length - 1; i++) {
-      // Sawtooth panels: each tooth's OUTER radiating edge runs the full ray (the long
-      // side), while its inner edge stops partway down the shared ray — so the lower rim
-      // slants down-outward then steps back up at every ray, a saw-blade zigzag.
-      const inner = Vector3.Lerp(anchor, tips[i], 0.78);
+      // Sawtooth panels (5): each tooth's OUTER radiating edge runs the full ray (the
+      // long side), while its inner edge stops partway down the shared ray — the lower
+      // rim slants down-outward then steps back up at every ray, a saw-blade zigzag.
+      const inner = Vector3.Lerp(anchor, tips[i + 1], 0.78);
       const shade = i % 2 === 0 ? upper : lower;
-      triangle("dgWingWeb", anchor, inner, tips[i + 1], shade, scene).parent = blade;
+      triangle("dgWingWeb", anchor, tips[i], inner, shade, scene).parent = blade;
     }
     return pivot;
   }
