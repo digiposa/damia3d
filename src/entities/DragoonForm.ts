@@ -211,12 +211,12 @@ export class DragoonForm {
     }
   }
 
-  /** One wing (PS1 style): a flat FAN radiating from the shoulder — five orange bone spars
-   *  spread ~70° apart-to-down in the wing plane, and between each adjacent pair a long thin
-   *  membrane triangle (root → just short of the two spar tips): elongated isosceles "fingers"
-   *  with the orange spar tips protruding beyond the webbing, exactly like the PS1 wings.
-   *  Built in the XY plane (span along ±X), then raised ~45° and swept back. The membrane
-   *  panels alternate the two jade shades (PS1 panel shading). Pivot is animated (flap). */
+  /** One wing (PS1 style): the orange leading-edge band ("membrane rouge") sweeps up-out
+   *  from the shoulder — shoulder → kink → tip — and the jade membrane hangs from its OUTER
+   *  edge as three large obtuse triangles: each tooth's base covers a stretch of the band
+   *  and its point hangs down leaning outward (apex pushed toward the wing tip), with deep
+   *  notches between teeth. Built in the XY plane (span along ±X), then raised ~45° and
+   *  swept back; teeth alternate the two jade shades. Pivot is animated (flap). */
   private buildWing(
     scene: Scene,
     sx: number,
@@ -228,38 +228,44 @@ export class DragoonForm {
     pivot.position = new Vector3(sx * 0.12, 1.46, -0.17); // upper back
     const blade = new TransformNode("dgWingBlade", scene);
     blade.parent = pivot;
-    blade.rotation = new Vector3(0, sx * 0.45, sx * 0.8); // fan plane: raised ~45°, swept back
+    blade.rotation = new Vector3(0, sx * 0.45, sx * 0.8); // raised ~45°, swept back
 
-    // The radiating bone spars: angle below the span axis (rad) and length of each.
-    // Longest at the leading edge, shortening as the fan folds down toward the body.
-    const spars: { ang: number; len: number }[] = [
-      { ang: 0.16, len: 1.85 },
-      { ang: -0.14, len: 1.75 },
-      { ang: -0.45, len: 1.55 },
-      { ang: -0.76, len: 1.3 },
-      { ang: -1.06, len: 1.05 },
-    ];
-    const root = new Vector3(sx * 0.04, 0, 0);
-    const tip = (s: { ang: number; len: number }, scale = 1): Vector3 =>
-      new Vector3(sx * Math.cos(s.ang) * s.len * scale, Math.sin(s.ang) * s.len * scale, 0);
+    const len = 1.9; // span along the band
+    const P = (x: number, y: number): Vector3 => new Vector3(sx * x * len, y, 0);
+    const L0 = P(0.03, 0); // root at the shoulder
+    const L1 = P(0.62, 0.05); // band kink (wing "wrist")
+    const L2 = P(1.0, -0.06); // wing tip
 
-    for (const s of spars) {
-      const t = tip(s);
-      const d = t.subtract(root);
-      const seg = box("dgWingSpar", d.length() + 0.04, 0.05, 0.05, rib, scene, root.add(t).scale(0.5), blade);
-      seg.rotation.z = Math.atan2(d.y, d.x); // in-plane angle (x already carries sx)
+    // The orange leading-edge band, in two kinked segments.
+    for (const [a, b] of [
+      [L0, L1],
+      [L1, L2],
+    ] as [Vector3, Vector3][]) {
+      const d = b.subtract(a);
+      const seg = box("dgWingSpar", d.length() + 0.05, 0.09, 0.05, rib, scene, a.add(b).scale(0.5), blade);
+      seg.rotation.z = Math.atan2(d.y, d.x);
     }
-    // Membrane webbing between each adjacent spar pair, sagging inward between the tips:
-    // two long thin triangles meeting at a pulled-in midpoint, so every spar ends in a
-    // protruding point with a scalloped notch between fingers — the PS1 bat-wing edge.
-    for (let i = 0; i < spars.length - 1; i++) {
-      const a = tip(spars[i], 0.96);
-      const b = tip(spars[i + 1], 0.96);
-      const sag = 0.74 * ((spars[i].len + spars[i + 1].len) / 2);
-      const m = a.add(b).normalize().scale(sag);
-      const shade = i % 2 === 0 ? upper : lower;
-      triangle("dgWingWebA", root, a, m, shade, scene).parent = blade;
-      triangle("dgWingWebB", root, m, b, shade, scene).parent = blade;
+
+    // A point a fraction `f` of the way along the kinked band polyline.
+    const l1 = L1.subtract(L0).length();
+    const l2 = L2.subtract(L1).length();
+    const along = (f: number): Vector3 => {
+      const d = f * (l1 + l2);
+      return d <= l1 ? Vector3.Lerp(L0, L1, d / l1) : Vector3.Lerp(L1, L2, (d - l1) / l2);
+    };
+
+    // Three big membrane teeth hanging from the band's outer edge: base along the band,
+    // apex dropped below and leaned outward (obtuse inner corner), deepest mid-wing.
+    const teeth: { f0: number; f1: number; drop: number; shade: StandardMaterial }[] = [
+      { f0: 0.02, f1: 0.36, drop: 0.72, shade: upper },
+      { f0: 0.36, f1: 0.68, drop: 0.95, shade: lower },
+      { f0: 0.68, f1: 1.0, drop: 0.78, shade: upper },
+    ];
+    for (const t of teeth) {
+      const a = along(t.f0);
+      const b = along(t.f1);
+      const apex = new Vector3(a.x + (b.x - a.x) * 0.72, Math.min(a.y, b.y) - t.drop, 0);
+      triangle("dgWingTooth", a, b, apex, t.shade, scene).parent = blade;
     }
     return pivot;
   }
