@@ -212,12 +212,13 @@ export class DragoonForm {
   }
 
   /** One wing (PS1 reference, annotated): ONE thick orange bone sweeps up-out from the
-   *  shoulder in a wide V, protruding well past the membrane — and the membrane hangs
-   *  FROM the bone: a row of triangles whose bases sit along the bone's upper stretch,
-   *  points dropping straight down. The inner teeth hang longest (draping beside the
-   *  body) and they shorten toward the bone tip, which sticks out bare. Built in the XY
-   *  plane, then swept back a touch and opened into the V; teeth alternate the two jade
-   *  shades. Pivot is animated (flap). */
+   *  shoulder in a wide V, protruding past the membrane — and the membrane is a FAN of
+   *  long thin triangles all converging at a point high on the bone's OUTER stretch.
+   *  From that top anchor the panels drape DOWNWARD, the innermost reaching down beside
+   *  the body, the outer ones shorter; adjacent panels share their radiating edges and
+   *  the lower rim sags back up toward the anchor between tips (V notches). Built in the
+   *  XY plane, then swept back a touch and opened into the V; panels alternate the two
+   *  jade shades. Pivot is animated (flap). */
   private buildWing(
     scene: Scene,
     sx: number,
@@ -231,30 +232,34 @@ export class DragoonForm {
     blade.parent = pivot;
     blade.rotation = new Vector3(0, sx * 0.35, sx * 0.38); // swept back a touch, wide-open V
 
-    const root = new Vector3(sx * 0.03, 0, 0);
+    const P = (x: number, y: number): Vector3 => new Vector3(sx * x, y, 0);
+    const root = P(0.03, 0);
     // The single bone, angled up-out within the blade plane.
     const BONE_ANG = 0.55;
     const BONE_LEN = 1.85;
-    const along = (f: number): Vector3 =>
-      root.add(new Vector3(sx * Math.cos(BONE_ANG) * BONE_LEN * f, Math.sin(BONE_ANG) * BONE_LEN * f, 0));
-    const boneTip = along(1);
+    const boneTip = root.add(P(Math.cos(BONE_ANG) * BONE_LEN, Math.sin(BONE_ANG) * BONE_LEN));
     const boneDelta = boneTip.subtract(root);
     const bone = box("dgWingBone", boneDelta.length() + 0.1, 0.1, 0.08, rib, scene, root.add(boneTip).scale(0.5), blade);
     bone.rotation.z = Math.atan2(boneDelta.y, boneDelta.x);
 
-    // Membrane teeth hanging from the bone: base [f0..f1] along the bone's top edge,
-    // apex dropping straight down. Longest near the body, shortening toward the tip.
-    const teeth: { f0: number; f1: number; drop: number; shade: StandardMaterial }[] = [
-      { f0: 0.02, f1: 0.3, drop: 1.15, shade: upper },
-      { f0: 0.3, f1: 0.55, drop: 0.95, shade: lower },
-      { f0: 0.55, f1: 0.76, drop: 0.72, shade: upper },
-      { f0: 0.76, f1: 0.93, drop: 0.5, shade: lower },
+    // The fan's anchor: high on the bone's outer stretch (the bone tip stays bare).
+    const anchor = Vector3.Lerp(root, boneTip, 0.88);
+    // Panel tips draping down from the anchor — innermost beside the body, sweeping out.
+    const tips: Vector3[] = [
+      P(0.08, -0.12),
+      P(0.44, -0.34),
+      P(0.82, -0.44),
+      P(1.2, -0.42),
+      P(1.52, -0.28),
     ];
-    for (const t of teeth) {
-      const a = along(t.f0);
-      const b = along(t.f1);
-      const apex = new Vector3((a.x + b.x) / 2, Math.min(a.y, b.y) - t.drop, 0);
-      triangle("dgWingTooth", a, b, apex, t.shade, scene).parent = blade;
+    for (let i = 0; i < tips.length - 1; i++) {
+      const a = tips[i];
+      const b = tips[i + 1];
+      // The rim between two tips sags back up toward the anchor (V notch).
+      const m = anchor.add(a.add(b).scale(0.5).subtract(anchor).scale(0.62));
+      const shade = i % 2 === 0 ? upper : lower;
+      triangle("dgWingWebA", anchor, a, m, shade, scene).parent = blade;
+      triangle("dgWingWebB", anchor, m, b, shade, scene).parent = blade;
     }
     return pivot;
   }
