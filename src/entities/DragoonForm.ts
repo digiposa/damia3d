@@ -256,8 +256,14 @@ export class DragoonForm {
       { ang: -0.62, len: 0.78 },
       { ang: -0.92, len: 0.66 },
     ];
+    const WEB_SCALE = 2; // global membrane size (ratios between panels preserved)
     const tips = rays.map(
-      (r) => new Vector3(anchor.x + sx * Math.sin(r.ang) * r.len, anchor.y - Math.cos(r.ang) * r.len, 0),
+      (r) =>
+        new Vector3(
+          anchor.x + sx * Math.sin(r.ang) * r.len * WEB_SCALE,
+          anchor.y - Math.cos(r.ang) * r.len * WEB_SCALE,
+          0,
+        ),
     );
     for (let i = 0; i < tips.length - 1; i++) {
       // Sawtooth panels (5): each tooth's OUTER radiating edge runs the full ray (the
