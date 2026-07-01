@@ -64,8 +64,13 @@ export class DragoonForm {
     const eyeMat = mat("dgEye", 0.08, 0.08, 0.1, scene);
     const gem = mat("dgGem", er * 0.35, eg * 0.35, eb * 0.35, scene);
     gem.emissiveColor = new Color3(er, eg, eb); // self-lit green
-    const wingMat = mat("dgWing", wr * 0.55, wg * 0.55, wb * 0.4, scene);
-    wingMat.emissiveColor = new Color3(wr * 0.5, wg * 0.55, wb * 0.35);
+    // Unlit membrane: the custom triangle meshes were rendering black because their averaged
+    // (opposite-wound) normals kill diffuse lighting — so drive the colour purely from emissive
+    // with lighting disabled. Guarantees a clean translucent yellow-green from every angle.
+    const wingMat = mat("dgWing", 0, 0, 0, scene);
+    wingMat.diffuseColor = new Color3(0, 0, 0);
+    wingMat.emissiveColor = new Color3(wr, wg, wb);
+    wingMat.disableLighting = true;
     wingMat.alpha = 0.5; // translucent membrane
     wingMat.backFaceCulling = false;
 
@@ -188,9 +193,10 @@ export class DragoonForm {
     }
   }
 
-  /** One wing: the main red spar bar (up-back ~45°, splayed into a V), and from its OUTER tip
-   *  four obtuse isosceles teal triangles hanging downward, each turned a bit more toward the
-   *  interior — a sawtooth fan. Pivot is animated (flap). */
+  /** One wing: the main red spar bar (up-back ~45°, splayed into a V), with a row of translucent
+   *  triangles hanging straight DOWN from points spaced ALONG the whole bar — consecutive points
+   *  on the spar form each triangle's top edge and the apex drops below, giving a sawtooth
+   *  membrane running the length of the bar. Pivot is animated (flap). */
   private buildWing(scene: Scene, sx: number, membrane: StandardMaterial, rib: StandardMaterial): TransformNode {
     const pivot = new TransformNode("dgWingPivot", scene); // animated by update()
     pivot.position = new Vector3(sx * 0.14, 1.5, -0.14); // upper back
@@ -200,27 +206,23 @@ export class DragoonForm {
     const barLen = 1.3;
     box("dgWingSpar", 0.08, barLen, 0.08, rib, scene, new Vector3(0, barLen / 2, 0), bar); // base at pivot
 
-    // Sawtooth fan hanging from the bar's OUTER tip: 4 big translucent triangles dropping
-    // straight DOWN (world-down — parented to the pivot, not the tilted bar), each turned a
-    // bit more toward the interior.
-    const tipFan = new TransformNode("dgWingTipFan", scene);
-    tipFan.parent = pivot; // ~upright frame, so -Y is world-down (not along the tilted bar)
-    tipFan.position = new Vector3(sx * 0.45, 0.85, -0.75); // near the bar's outer tip
-    tipFan.rotation.y = -sx * 0.3; // turn the fan to face outward so the faces read
-    const w = 0.5; // triangle base width
-    const h = 1.35; // triangle drop (long teeth)
-    for (let i = 0; i < 4; i++) {
-      const tooth = new TransformNode("dgToothPivot", scene);
-      tooth.parent = tipFan;
-      tooth.rotation.z = sx * (0.5 - i * 0.3); // fan across a downward arc, biased inward
-      triangle(
-        "dgWingTooth",
-        new Vector3(-w / 2, 0, 0),
-        new Vector3(w / 2, 0, 0),
-        new Vector3(0, -h, 0),
-        membrane,
-        scene,
-      ).parent = tooth;
+    // Direction the bar points, expressed in the (upright) pivot frame — derived from the bar's
+    // rotation above (YXZ Euler applied to local +Y). Lets us sample points ALONG the bar and
+    // hang membrane teeth from them without walking the tilted bar's own frame.
+    const dir = new Vector3(sx * 0.479, 0.611, -0.63); // ~unit vector up-back-out
+    const along = (d: number) => dir.scale(d);
+
+    // Sawtooth membrane along the bar: sample N+1 points from near the base to the outer tip;
+    // each adjacent pair is the top edge of a downward triangle whose apex drops below the bar.
+    const N = 5;
+    const d0 = 0.12; // start a little out from the shoulder
+    const d1 = 1.28; // out to the bar's tip
+    for (let i = 0; i < N; i++) {
+      const pa = along(d0 + (d1 - d0) * (i / N));
+      const pb = along(d0 + (d1 - d0) * ((i + 1) / N));
+      const drop = 0.7 + 0.5 * (i / (N - 1)); // teeth grow toward the outer tip → fan silhouette
+      const apex = pa.add(pb).scale(0.5).add(new Vector3(0, -drop, 0));
+      triangle("dgWingTooth", pa, pb, apex, membrane, scene).parent = pivot;
     }
     return pivot;
   }
