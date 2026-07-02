@@ -90,7 +90,8 @@ export class Humanoid {
       opts.outfit === "valkyrie" ||
       opts.outfit === "brawler" ||
       opts.outfit === "gigantos" ||
-      opts.outfit === "martialist";
+      opts.outfit === "martialist" ||
+      opts.outfit === "siren";
     // Skin tone (face + bare skin) — defaults to a light human tone; shaded/highlighted
     // variants keep the original ratios so existing characters are unchanged.
     const [sr, sg, sb] = opts.skinTone ?? [0.94, 0.79, 0.67];
@@ -171,6 +172,7 @@ export class Humanoid {
     else if (opts.outfit === "brawler") this.addBrawlerOutfit(scene);
     else if (opts.outfit === "gigantos") this.addGigantosOutfit(scene);
     else if (opts.outfit === "martialist") this.addMartialistOutfit(scene, opts.color);
+    else if (opts.outfit === "siren") this.addSirenOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -202,6 +204,8 @@ export class Humanoid {
       buildManeHair(scene).parent = this.body;
     } else if (opts.hair === "elder") {
       buildElderHair(scene).parent = this.body;
+    } else if (opts.hair === "siren") {
+      buildSirenHair(scene).parent = this.body;
     }
   }
 
@@ -1239,6 +1243,89 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Damia's siren outfit (her human form — the Blue-Sea/Water Dragoon), from her portrait:
+   * a sleeveless blue-grey gown with a high collar and silver flame-like filigree branching
+   * up the chest, deep-blue dragon-scale pauldrons, silver upper-arm bands set with a blue
+   * gem, and a floor-length flared gown with a silver hem. Built over the blue-skinned body
+   * (bare arms read as her scaled skin); she wields a hammer.
+   */
+  private addSirenOutfit(scene: Scene): void {
+    const dress = mat("snDress", 0.42, 0.52, 0.62, scene); // muted blue-grey gown
+    const scale = mat("snScale", 0.13, 0.19, 0.42, scene); // deep dragon-scale blue
+    const silver = mat("snSilver", 0.78, 0.8, 0.86, scene);
+    const gold = mat("snGold", 0.83, 0.67, 0.3, scene);
+    const gem = mat("snGem", 0.2, 0.42, 0.82, scene); // sea-blue gem
+    gem.emissiveColor = new Color3(0.1, 0.22, 0.5);
+
+    // High-collared sleeveless bodice.
+    const bodice = box("snBodice", 0.46, 0.56, 0.31, dress, scene);
+    bodice.position.y = 1.16;
+    bodice.parent = this.body;
+    const collar = box("snCollar", 0.26, 0.16, 0.28, dress, scene);
+    collar.position.y = 1.46;
+    collar.parent = this.body;
+
+    // Silver flame filigree branching up the chest from a central stem: a vertical spine
+    // and, each side, two upswept prongs (long low, short high) — the portrait's tribal flame.
+    const stem = box("snStem", 0.05, 0.5, 0.02, silver, scene);
+    stem.position = new Vector3(0, 1.14, 0.17);
+    stem.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const prongLo = box("snProngLo", 0.04, 0.26, 0.02, silver, scene);
+      prongLo.position = new Vector3(sx * 0.1, 1.1, 0.17);
+      prongLo.rotation.z = sx * 0.7;
+      prongLo.parent = this.body;
+      const prongHi = box("snProngHi", 0.035, 0.18, 0.02, silver, scene);
+      prongHi.position = new Vector3(sx * 0.11, 1.28, 0.17);
+      prongHi.rotation.z = sx * 0.5;
+      prongHi.parent = this.body;
+    }
+
+    // Deep-blue scaled pauldrons capping the shoulders (flattened domes).
+    for (const sx of [-1, 1]) {
+      const pauldron = MeshBuilder.CreateSphere("snPauldron", { diameter: 0.32, segments: 8 }, scene);
+      pauldron.material = scale;
+      pauldron.isPickable = false;
+      pauldron.scaling = new Vector3(1.1, 0.7, 1.0);
+      pauldron.position = new Vector3(sx * 0.32, 1.44, 0);
+      pauldron.parent = this.body;
+    }
+
+    // Silver upper-arm bands set with a blue gem (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const band = box("snArmband", 0.2, 0.1, 0.2, silver, scene);
+      band.position.y = -0.28;
+      band.parent = arm;
+      const armGem = MeshBuilder.CreateSphere("snArmGem", { diameter: 0.09, segments: 8 }, scene);
+      armGem.material = gem;
+      armGem.isPickable = false;
+      armGem.scaling.z = 0.5;
+      armGem.position = new Vector3(0, -0.28, 0.11);
+      armGem.parent = arm;
+    }
+
+    // Floor-length flared gown with a silver hem.
+    const gown = MeshBuilder.CreateCylinder(
+      "snGown",
+      { height: 1.05, diameterTop: 0.44, diameterBottom: 0.92, tessellation: 16 },
+      scene,
+    );
+    gown.material = dress;
+    gown.isPickable = false;
+    gown.position.y = 0.52;
+    gown.parent = this.body;
+    const hem = MeshBuilder.CreateTorus("snGownHem", { diameter: 0.92, thickness: 0.04, tessellation: 20 }, scene);
+    hem.material = silver;
+    hem.isPickable = false;
+    hem.position.y = 0.02;
+    hem.parent = this.body;
+    // A slim gold waist band closing the bodice over the gown.
+    const waist = box("snWaist", 0.47, 0.07, 0.33, gold, scene);
+    waist.position.y = 0.88;
+    waist.parent = this.body;
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -1910,6 +1997,72 @@ function buildElderHair(scene: Scene): TransformNode {
     const tip = coneSpike(scene, black, new Vector3(sx * 0.15, 1.34, 0.18), Math.PI - sx * 0.3, 0, 0.12, 0.05);
     tip.parent = group;
   }
+  return group;
+}
+
+/**
+ * Damia's head: turquoise wavy hair (crown cap, side locks, a back mass), large webbed
+ * fin-ears fanning up-and-out from the sides (pale membrane on blue spines), and a gold
+ * beaded brow circlet with a teardrop pendant. Rigid; bobs with the head.
+ */
+function buildSirenHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairSiren", scene);
+  const teal = mat("hairTeal", 0.16, 0.62, 0.72, scene); // turquoise
+  const finBlue = mat("finBlue", 0.22, 0.4, 0.62, scene); // fin spines
+  const gold = mat("sirenGold", 0.83, 0.67, 0.3, scene);
+  const web = mat("finWeb", 0.82, 0.87, 0.92, scene); // pale membrane
+  web.alpha = 0.72;
+  web.backFaceCulling = false;
+
+  // Turquoise wavy hair: crown, side framing to the jaw, and a fuller back mass.
+  const cap = box("hairCap", 0.4, 0.22, 0.4, teal, scene);
+  cap.position.y = 1.78;
+  cap.parent = group;
+  for (const dx of [-0.21, 0.21]) {
+    const side = box("hairSide", 0.1, 0.44, 0.34, teal, scene);
+    side.position = new Vector3(dx, 1.44, 0.02);
+    side.parent = group;
+  }
+  const back = box("hairBack", 0.38, 0.4, 0.2, teal, scene);
+  back.position = new Vector3(0, 1.5, -0.17);
+  back.parent = group;
+
+  // Large webbed fin-ears: a pale membrane panel on a fan of blue spines, leaning out
+  // and swept back from each side of the head.
+  for (const sx of [-1, 1]) {
+    const ear = new TransformNode("finEar", scene);
+    ear.position = new Vector3(sx * 0.19, 1.62, -0.03);
+    ear.rotation.z = sx * -0.6; // lean outward
+    ear.rotation.y = sx * 0.5; // sweep back
+    ear.parent = group;
+    const membrane = box("finWebPanel", 0.02, 0.34, 0.22, web, scene);
+    membrane.position = new Vector3(0, 0.15, 0);
+    membrane.parent = ear;
+    for (const z of [0.1, 0, -0.1]) {
+      const len = 0.4 - Math.abs(z) * 0.9; // longest spine at the front
+      coneSpike(scene, finBlue, new Vector3(0, 0.02, z), 0, 0, len, 0.06).parent = ear;
+    }
+  }
+
+  // Gold beaded brow circlet + a teardrop pendant at the centre of the forehead.
+  const circlet = MeshBuilder.CreateTorus("sirenCirclet", { diameter: 0.38, thickness: 0.02, tessellation: 18 }, scene);
+  circlet.material = gold;
+  circlet.isPickable = false;
+  circlet.position.y = 1.66;
+  circlet.parent = group;
+  for (const dx of [-0.12, -0.06, 0, 0.06, 0.12]) {
+    const bead = MeshBuilder.CreateSphere("sirenBead", { diameter: 0.035, segments: 6 }, scene);
+    bead.material = gold;
+    bead.isPickable = false;
+    bead.position = new Vector3(dx, 1.63, 0.19);
+    bead.parent = group;
+  }
+  const drop = MeshBuilder.CreateSphere("sirenDrop", { diameter: 0.06, segments: 8 }, scene);
+  drop.material = gold;
+  drop.isPickable = false;
+  drop.scaling = new Vector3(1, 1.5, 0.6); // teardrop
+  drop.position = new Vector3(0, 1.58, 0.19);
+  drop.parent = group;
   return group;
 }
 
