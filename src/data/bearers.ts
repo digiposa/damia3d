@@ -12,6 +12,7 @@ import ziegPortrait from "../assets/portraits/zieg.png";
 import shirleyPortrait from "../assets/portraits/shirley.png";
 import damiaPortrait from "../assets/portraits/damia.png";
 import damiaDragoonPortrait from "../assets/portraits/damia-dragoon.png";
+import belzacPortrait from "../assets/portraits/belzac.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -131,7 +132,7 @@ export const BEARERS: Bearer[] = [
   { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
   { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
   // Golden (Earth) — axe
-  { id: "belzac", name: "Belzac", classId: "golden", weapon: "axe", hair: "wrap", outfit: "brawler", color: C_EARTH, scale: 1.2, storyPlayable: false },
+  { id: "belzac", name: "Belzac", classId: "golden", portrait: belzacPortrait, weapon: "axe", hair: "wrap", outfit: "brawler", color: C_EARTH, scale: 1.2, storyPlayable: false },
   { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", hair: "topknot", outfit: "gigantos", color: C_EARTH, skinTone: [0.66, 0.5, 0.34], scale: 1.4, storyPlayable: true },
 ];
 
