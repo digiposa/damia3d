@@ -13,6 +13,7 @@ import shirleyPortrait from "../assets/portraits/shirley.png";
 import damiaPortrait from "../assets/portraits/damia.png";
 import damiaDragoonPortrait from "../assets/portraits/damia-dragoon.png";
 import belzacPortrait from "../assets/portraits/belzac.png";
+import kanzasPortrait from "../assets/portraits/kanzas.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -124,7 +125,7 @@ export const BEARERS: Bearer[] = [
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
-  { id: "kanzas", name: "Kanzas", classId: "thunder", weapon: "fist", hair: "spiky", color: C_THUNDER, storyPlayable: false },
+  { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "spiky", color: C_THUNDER, storyPlayable: false },
   { id: "doel", name: "Doel", classId: "thunder", weapon: "fist", hair: "short", color: C_THUNDER, storyPlayable: false },
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
