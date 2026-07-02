@@ -1110,10 +1110,10 @@ export class Humanoid {
     const belt = mat("mtBelt", 0.5, 0.24, 0.2, scene); // reddish-brown belt
     const red = mat("mtRed", 0.66, 0.15, 0.15, scene); // wrist wraps / boot & belt trim
 
-    // Purple vest covering the chest down to just above the waist (only a slim bare
-    // midriff shows above the belt), with a darker V-neck opening and pale violet trim.
-    const vest = box("mtVest", 0.5, 0.42, 0.33, purple, scene);
-    vest.position.y = 1.24;
+    // Purple vest covering the whole torso down to the waist (no bare midriff — it
+    // overlaps the trunks below), with a darker V-neck opening and pale violet trim.
+    const vest = box("mtVest", 0.5, 0.56, 0.33, purple, scene);
+    vest.position.y = 1.18;
     vest.parent = this.body;
     const vNeck = box("mtVNeck", 0.13, 0.22, 0.02, purpleDk, scene);
     vNeck.position = new Vector3(0, 1.34, 0.17);
@@ -1126,14 +1126,14 @@ export class Humanoid {
       scroll.parent = this.body;
     }
     const rim = box("mtVestRim", 0.51, 0.04, 0.34, swirl, scene);
-    rim.position.y = 1.04;
+    rim.position.y = 0.94;
     rim.parent = this.body;
 
-    // Purple trunks over the pelvis/hips so the waist reads as clothed (the bare skin of
-    // the revealing body would otherwise show through at the hips and crotch); shares the
-    // trouser colour so it flows straight into the legs, leaving only a slim bare midriff.
-    const trunks = box("mtTrunks", 0.47, 0.28, 0.33, purpleDk, scene);
-    trunks.position.y = 0.79;
+    // Purple trunks over the pelvis/hips so the waist reads fully clothed (the bare skin
+    // of the revealing body would otherwise show through at the hips and crotch); shares
+    // the trouser colour so it flows straight into the legs. Overlaps the vest above.
+    const trunks = box("mtTrunks", 0.47, 0.3, 0.33, purpleDk, scene);
+    trunks.position.y = 0.8;
     trunks.parent = this.body;
 
     // Rolled purple collar over the shoulders (a little heftier on the left, as in the
