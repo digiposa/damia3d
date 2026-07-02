@@ -1093,100 +1093,89 @@ export class Humanoid {
   }
 
   /**
-   * Haschel's martial-artist outfit (his human form — the Violet/Thunder Dragoon): a
-   * sleeveless purple vest with silver tribal filigree and big ringed silver shoulder
-   * yokes, worn over a black sleeveless undershirt (bare muscular arms), a red waist
-   * sash knotted with a hanging tail, purple trousers, black shin greaves with a red
-   * band + silver star and black boots with silver toe caps, and black fingerless
-   * gloves with red wrist wraps. Built over the skin-toned body; he fights bare-fisted.
+   * Haschel's martial-artist outfit (his human form — the Violet/Thunder Dragoon), from
+   * the canon PS1 art: a short sleeveless purple vest with tone-on-tone violet scrollwork
+   * (cropped high, leaving the muscular midriff BARE), bare arms, a thin reddish-brown
+   * belt low on the hips, baggy purple trousers with pale violet swirls at the thighs,
+   * steel-grey ankle boots with a red band, and dark fingerless fist-gloves with red
+   * wrist wraps. Built over the skin-toned body; he fights bare-fisted.
    */
   private addMartialistOutfit(scene: Scene, color: [number, number, number]): void {
     const [r, g, b] = color;
     const purple = mat("mtPurple", r, g, b, scene); // his violet vest
-    const purpleDk = mat("mtPurpleDk", r * 0.5, g * 0.5, b * 0.62, scene); // trousers (darker)
-    const black = mat("mtBlack", 0.12, 0.11, 0.14, scene); // undershirt / gloves / boots
-    const silver = mat("mtSilver", 0.8, 0.82, 0.86, scene); // filigree / yokes / trim
-    const red = mat("mtRed", 0.68, 0.13, 0.14, scene); // sash / wrist wraps / knee bands
+    const purpleDk = mat("mtPurpleDk", r * 0.55, g * 0.5, b * 0.6, scene); // baggy trousers (darker)
+    const swirl = mat("mtSwirl", Math.min(1, r * 1.25), Math.min(1, g * 1.3), Math.min(1, b * 1.15), scene); // pale violet scrollwork (tone-on-tone)
+    const steel = mat("mtSteel", 0.6, 0.62, 0.68, scene); // grey armoured boots
+    const dark = mat("mtDark", 0.15, 0.13, 0.17, scene); // fist-gloves
+    const belt = mat("mtBelt", 0.5, 0.24, 0.2, scene); // reddish-brown belt
+    const red = mat("mtRed", 0.66, 0.15, 0.15, scene); // wrist wraps / boot & belt trim
 
-    // Black sleeveless undershirt on the torso (shows at the open V of the vest).
-    const under = box("mtUnder", 0.44, 0.56, 0.3, black, scene);
-    under.position.y = 1.16;
-    under.parent = this.body;
-
-    // Purple vest over it, a touch proud, with a black V-neck strip left open at the
-    // chest and a silver centre seam + hem.
-    const vest = box("mtVest", 0.5, 0.5, 0.33, purple, scene);
-    vest.position.y = 1.2;
+    // Short purple vest covering the chest only (cropped at the lower ribs → bare
+    // midriff below), with a darker V-neck opening and pale violet scroll trim.
+    const vest = box("mtVest", 0.5, 0.34, 0.33, purple, scene);
+    vest.position.y = 1.28;
     vest.parent = this.body;
-    const vNeck = box("mtVNeck", 0.14, 0.3, 0.02, black, scene);
-    vNeck.position = new Vector3(0, 1.3, 0.17);
+    const vNeck = box("mtVNeck", 0.13, 0.22, 0.02, purpleDk, scene);
+    vNeck.position = new Vector3(0, 1.34, 0.17);
     vNeck.parent = this.body;
-    const hem = box("mtVestHem", 0.51, 0.06, 0.34, silver, scene);
-    hem.position.y = 0.98;
-    hem.parent = this.body;
-    // Silver tribal filigree scrolls curling up each side of the chest.
+    // Pale violet scrollwork curling on each side of the vest front + a lower rim.
     for (const sx of [-1, 1]) {
-      const scroll = box("mtFili", 0.05, 0.34, 0.02, silver, scene);
-      scroll.position = new Vector3(sx * 0.17, 1.2, 0.17);
-      scroll.rotation.z = sx * 0.35;
+      const scroll = box("mtScroll", 0.05, 0.26, 0.02, swirl, scene);
+      scroll.position = new Vector3(sx * 0.16, 1.28, 0.17);
+      scroll.rotation.z = sx * 0.4;
       scroll.parent = this.body;
-      const hook = box("mtFiliHook", 0.12, 0.05, 0.02, silver, scene);
-      hook.position = new Vector3(sx * 0.2, 1.02, 0.17);
-      hook.parent = this.body;
     }
+    const rim = box("mtVestRim", 0.51, 0.04, 0.34, swirl, scene);
+    rim.position.y = 1.12;
+    rim.parent = this.body;
 
-    // Big silver shoulder yokes with an O-ring buckle on each (the vest's heavy trim).
-    for (const sx of [-1, 1]) {
-      const yoke = box("mtYoke", 0.2, 0.16, 0.36, silver, scene);
-      yoke.position = new Vector3(sx * 0.28, 1.44, 0);
-      yoke.parent = this.body;
-      const ring = MeshBuilder.CreateTorus("mtRing", { diameter: 0.12, thickness: 0.025, tessellation: 12 }, scene);
-      ring.material = silver;
-      ring.isPickable = false;
-      ring.rotation.x = Math.PI / 2; // faces forward
-      ring.position = new Vector3(sx * 0.24, 1.34, 0.16);
-      ring.parent = this.body;
-    }
+    // Rolled purple collar over the shoulders (a little heftier on the left, as in the
+    // art), suggesting the vest's raised, ornate shoulder line — no metal, all cloth.
+    const collar = box("mtCollar", 0.56, 0.13, 0.36, purple, scene);
+    collar.position.y = 1.44;
+    collar.parent = this.body;
+    const shoulderRoll = MeshBuilder.CreateSphere("mtShoulder", { diameter: 0.26, segments: 8 }, scene);
+    shoulderRoll.material = purple;
+    shoulderRoll.isPickable = false;
+    shoulderRoll.scaling = new Vector3(1.1, 0.7, 1.1);
+    shoulderRoll.position = new Vector3(-0.3, 1.46, 0);
+    shoulderRoll.parent = this.body;
 
-    // Red waist sash: a broad wrap, a central knot, and a long tail hanging at the left.
-    const sash = box("mtSash", 0.5, 0.16, 0.34, red, scene);
-    sash.position.y = 0.86;
-    sash.parent = this.body;
-    const knot = box("mtSashKnot", 0.14, 0.16, 0.1, red, scene);
-    knot.position = new Vector3(-0.14, 0.84, 0.18);
-    knot.parent = this.body;
-    const tail = box("mtSashTail", 0.13, 0.4, 0.06, red, scene);
-    tail.position = new Vector3(-0.14, 0.6, 0.17);
-    tail.parent = this.body;
+    // Thin reddish-brown belt sitting low on the hips (no big sash), with a small buckle.
+    const beltMesh = box("mtBeltMesh", 0.48, 0.09, 0.33, belt, scene);
+    beltMesh.position.y = 0.86;
+    beltMesh.parent = this.body;
+    const buckle = box("mtBuckle", 0.1, 0.08, 0.03, steel, scene);
+    buckle.position = new Vector3(0, 0.86, 0.17);
+    buckle.parent = this.body;
 
-    // Purple trousers down the legs (skin covered), tapering to the greaves.
+    // Baggy purple trousers down the legs, with a pale violet swirl at the outer thigh.
     for (const leg of [this.leftLeg, this.rightLeg]) {
-      const pant = box("mtPant", 0.22, 0.6, 0.22, purpleDk, scene);
+      const pant = box("mtPant", 0.24, 0.62, 0.24, purpleDk, scene);
       pant.position.y = -0.3;
       pant.parent = leg;
-      // Black shin greave with a red band at the top and a silver star medallion.
-      const greave = box("mtGreave", 0.23, 0.32, 0.24, black, scene);
-      greave.position.y = -0.56;
-      greave.parent = leg;
-      const band = box("mtKneeBand", 0.24, 0.06, 0.25, red, scene);
-      band.position.y = -0.4;
-      band.parent = leg;
-      const star = box("mtStar", 0.1, 0.1, 0.02, silver, scene);
-      star.position = new Vector3(0, -0.56, 0.13);
-      star.rotation.z = Math.PI / 4; // a diamond/star face
-      star.parent = leg;
-      // Black boot with a silver toe cap (over the neutral foot).
-      const toe = box("mtToe", 0.2, 0.12, 0.2, silver, scene);
-      toe.position = new Vector3(0, -0.73, 0.16);
+      const thighSwirl = box("mtThighSwirl", 0.03, 0.2, 0.1, swirl, scene);
+      thighSwirl.position = new Vector3(0.12, -0.16, 0.06);
+      thighSwirl.rotation.z = 0.4;
+      thighSwirl.parent = leg;
+      // Steel-grey ankle boot with a red band + a grey toe cap (over the neutral foot).
+      const boot = box("mtBoot", 0.23, 0.24, 0.25, steel, scene);
+      boot.position.y = -0.62;
+      boot.parent = leg;
+      const bootBand = box("mtBootBand", 0.24, 0.05, 0.26, red, scene);
+      bootBand.position.y = -0.52;
+      bootBand.parent = leg;
+      const toe = box("mtToe", 0.2, 0.11, 0.16, steel, scene);
+      toe.position = new Vector3(0, -0.73, 0.18);
       toe.parent = leg;
     }
 
-    // Black fingerless gloves with a red wrist wrap (upper arms bare; swing with arms).
+    // Dark fingerless fist-gloves with a red wrist wrap (upper arms bare; swing with arms).
     for (const arm of [this.leftArm, this.rightArm]) {
-      const glove = box("mtGlove", 0.2, 0.22, 0.2, black, scene);
-      glove.position.y = -0.5;
+      const glove = box("mtGlove", 0.22, 0.24, 0.22, dark, scene);
+      glove.position.y = -0.52;
       glove.parent = arm;
-      const wrap = box("mtWrap", 0.22, 0.07, 0.22, red, scene);
+      const wrap = box("mtWrap", 0.23, 0.08, 0.23, red, scene);
       wrap.position.y = -0.38;
       wrap.parent = arm;
     }
@@ -1816,16 +1805,14 @@ function buildElderHair(scene: Scene): TransformNode {
     side.parent = group;
   }
 
-  // Long tail swept down the back of the neck in two tapering segments.
-  const nape = box("hairNape", 0.34, 0.24, 0.18, black, scene);
-  nape.position = new Vector3(0, 1.55, -0.18);
+  // Medium nape mass swept back, ending in a short flared tail at the neck (not long).
+  const nape = box("hairNape", 0.34, 0.26, 0.18, black, scene);
+  nape.position = new Vector3(0, 1.54, -0.18);
   nape.parent = group;
-  const t1 = box("hairElder1", 0.28, 0.44, 0.14, black, scene);
-  t1.position = new Vector3(0, 1.24, -0.2);
-  t1.parent = group;
-  const t2 = box("hairElder2", 0.2, 0.34, 0.1, black, scene);
-  t2.position = new Vector3(0, 0.92, -0.22);
-  t2.parent = group;
+  const tail = box("hairElderTail", 0.26, 0.22, 0.13, black, scene);
+  tail.position = new Vector3(0, 1.33, -0.21);
+  tail.rotation.x = -0.15; // flicks back
+  tail.parent = group;
 
   // Red headband across the forehead with a knot and two long cords trailing behind.
   const band = MeshBuilder.CreateTorus("headband", { diameter: 0.39, thickness: 0.06, tessellation: 12 }, scene);
