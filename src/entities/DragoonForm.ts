@@ -7,8 +7,13 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
+/** Which canon Dragoon this form models (selects the body build; wings are shared). */
+export type DragoonVariant = "redEye" | "blueSea";
+
 /** Tunable look of a Dragoon form. Defaults below are Dart's Red-Eye Dragoon (canon). */
 export interface DragoonFormOptions {
+  /** Which Dragoon body to build (default "redEye" — Dart). */
+  variant?: DragoonVariant;
   /** Main armour colour (RGB 0–1) — Red-Eye red. */
   primary?: [number, number, number];
   /** Metal edge / rib colour (steel grey). */
@@ -41,15 +46,23 @@ const STRIKE_DUR = 0.42;
 export class DragoonForm {
   readonly rig: TransformNode;
 
-  private body: TransformNode; // torso/head/arms (hovers)
-  private leftArm: TransformNode;
-  private rightArm: TransformNode;
-  private leftWing: TransformNode;
-  private rightWing: TransformNode;
+  private body!: TransformNode; // torso/head/arms (hovers)
+  private leftArm!: TransformNode;
+  private rightArm!: TransformNode;
+  private leftWing!: TransformNode;
+  private rightWing!: TransformNode;
   private phase = 0;
   private strikeT = 0;
 
   constructor(scene: Scene, opts: DragoonFormOptions = {}) {
+    this.rig = new TransformNode("dragoonForm", scene);
+    this.rig.scaling.setAll(opts.scale ?? 1);
+    if ((opts.variant ?? "redEye") === "blueSea") this.buildBlueSea(scene, opts);
+    else this.buildRedEye(scene, opts);
+  }
+
+  /** Dart's Red-Eye Dragoon body (copper-orange plate, spiky blond hair, sword). */
+  private buildRedEye(scene: Scene, opts: DragoonFormOptions): void {
     const [pr, pg, pb] = opts.primary ?? [0.82, 0.3, 0.1]; // Red-Eye copper-orange
     const [mr, mg, mb] = opts.accent ?? [0.7, 0.72, 0.78]; // steel grey
     const [er, eg, eb] = opts.gem ?? [0.22, 0.95, 0.4]; // green gem
@@ -82,9 +95,6 @@ export class DragoonForm {
     wingLo.emissiveColor = new Color3(wr * 0.68, wg * 0.72, wb * 0.68);
     wingLo.disableLighting = true;
     wingLo.backFaceCulling = false;
-
-    this.rig = new TransformNode("dragoonForm", scene);
-    this.rig.scaling.setAll(opts.scale ?? 1);
 
     // --- Legs: dark teal under-suit down the whole leg, orange knee cop + big orange boots
     // (PS1: the legs stay dark, only the joints and feet flash Red-Eye orange). ---
@@ -201,6 +211,158 @@ export class DragoonForm {
     // hanging below it with pointed trailing lobes (the PS1 silhouette). ---
     this.leftWing = this.buildWing(scene, -1, wingUp, wingLo, red);
     this.rightWing = this.buildWing(scene, 1, wingUp, wingLo, red);
+    for (const w of [this.leftWing, this.rightWing]) w.parent = this.body;
+  }
+
+  /**
+   * Damia's Blue-Sea Dragoon body (canon reference): deep-sapphire dragon-scale plate with
+   * glowing cyan filigree and a gold sternum gem, layered pointed scale pauldrons, a scaled
+   * face with red eyes + a pointed brow crest and gold brow gems, long teal hair with big
+   * webbed fin-ears, and a hammer. Wings reuse Dart's builder (pale iridescent membrane on a
+   * blue spar). Same proportions/animation as Red-Eye so it stands and beats identically.
+   */
+  private buildBlueSea(scene: Scene, opts: DragoonFormOptions): void {
+    const [pr, pg, pb] = opts.primary ?? [0.16, 0.3, 0.62]; // deep sapphire scale
+    const [mr, mg, mb] = opts.accent ?? [0.74, 0.78, 0.85]; // silver
+    const [er, eg, eb] = opts.gem ?? [0.95, 0.72, 0.28]; // gold gem
+    const [wr, wg, wb] = opts.wing ?? [0.74, 0.82, 0.92]; // pale iridescent membrane
+    const [hr, hg, hb] = opts.hair ?? [0.16, 0.62, 0.72]; // teal
+    const [sr, sg, sb] = opts.skin ?? [0.56, 0.76, 0.86]; // blue scaled skin
+
+    const blue = mat("dgBlue", pr, pg, pb, scene);
+    const blueDk = mat("dgBlueDk", pr * 0.55, pg * 0.55, pb * 0.62, scene);
+    const blueLt = mat("dgBlueLt", Math.min(1, pr * 1.7), Math.min(1, pg * 1.5), Math.min(1, pb * 1.2), scene);
+    const silver = mat("dgSilver", mr, mg, mb, scene);
+    const skin = mat("dgSkinBlue", sr, sg, sb, scene);
+    const teal = mat("dgTealHair", hr, hg, hb, scene);
+    const web = mat("dgFinWeb", 0.8, 0.86, 0.92, scene);
+    const cyan = mat("dgCyan", 0.05, 0.18, 0.22, scene);
+    cyan.emissiveColor = new Color3(0.18, 0.72, 0.88); // glowing filigree
+    const eyeMat = mat("dgEyeRed", 0.7, 0.08, 0.1, scene);
+    eyeMat.emissiveColor = new Color3(0.55, 0.05, 0.06); // red eyes
+    const gem = mat("dgGemGold", er * 0.4, eg * 0.4, eb * 0.35, scene);
+    gem.emissiveColor = new Color3(er, eg, eb); // self-lit gold
+    // Unlit pale membranes (see Red-Eye note): lower blade a shade darker.
+    const wingUp = mat("dgWingUp", 0, 0, 0, scene);
+    wingUp.emissiveColor = new Color3(wr, wg, wb);
+    wingUp.disableLighting = true;
+    wingUp.backFaceCulling = false;
+    const wingLo = mat("dgWingLo", 0, 0, 0, scene);
+    wingLo.emissiveColor = new Color3(wr * 0.78, wg * 0.8, wb * 0.86);
+    wingLo.disableLighting = true;
+    wingLo.backFaceCulling = false;
+
+    // --- Legs: sapphire scale, silver knee cop, dark boots. ---
+    for (const sx of [-1, 1]) {
+      box("dgThigh", 0.2, 0.42, 0.22, blueDk, scene, new Vector3(sx * 0.13, 0.56, 0), this.rig);
+      box("dgShin", 0.21, 0.44, 0.22, blue, scene, new Vector3(sx * 0.13, 0.2, 0.01), this.rig);
+      box("dgKnee", 0.24, 0.12, 0.25, silver, scene, new Vector3(sx * 0.13, 0.4, 0.01), this.rig);
+      box("dgFoot", 0.22, 0.15, 0.38, blueDk, scene, new Vector3(sx * 0.13, 0.07, 0.09), this.rig);
+    }
+
+    // --- Body group (torso/head/arms) — hovers gently in update(). ---
+    this.body = new TransformNode("dgBody", scene);
+    this.body.parent = this.rig;
+
+    box("dgHips", 0.46, 0.2, 0.3, blueDk, scene, new Vector3(0, 0.82, 0), this.body);
+    box("dgTasset", 0.5, 0.16, 0.16, blue, scene, new Vector3(0, 0.74, 0.16), this.body);
+    box("dgTassetB", 0.44, 0.15, 0.12, blue, scene, new Vector3(0, 0.72, -0.14), this.body);
+
+    box("dgTorso", 0.44, 0.6, 0.3, blue, scene, new Vector3(0, 1.14, 0), this.body);
+    box("dgChest", 0.5, 0.54, 0.14, blueLt, scene, new Vector3(0, 1.2, 0.14), this.body); // scaled breastplate
+    // Glowing cyan filigree branching up the chest (stem + upswept prongs).
+    box("dgFili", 0.05, 0.5, 0.03, cyan, scene, new Vector3(0, 1.16, 0.21), this.body);
+    for (const sx of [-1, 1]) {
+      const prong = box("dgFiliP", 0.04, 0.26, 0.03, cyan, scene, new Vector3(sx * 0.1, 1.12, 0.21), this.body);
+      prong.rotation.z = sx * 0.7;
+    }
+    box("dgCollar", 0.32, 0.14, 0.3, blueDk, scene, new Vector3(0, 1.46, 0), this.body);
+    // Back armour the wing bones socket into.
+    box("dgBackPlate", 0.5, 0.5, 0.12, blue, scene, new Vector3(0, 1.19, -0.15), this.body);
+    box("dgSpine", 0.09, 0.44, 0.04, blueDk, scene, new Vector3(0, 1.14, -0.22), this.body);
+    // Gold sternum gem (tall oval) in a diamond scale mount.
+    const mount = box("dgGemMount", 0.28, 0.28, 0.04, blueDk, scene, new Vector3(0, 1.12, 0.19), this.body);
+    mount.rotation.z = Math.PI / 4;
+    const gemMesh = MeshBuilder.CreateSphere("dgGem", { diameter: 0.2, segments: 12 }, scene);
+    gemMesh.material = gem;
+    gemMesh.isPickable = false;
+    gemMesh.scaling = new Vector3(0.85, 1.3, 0.7);
+    gemMesh.position = new Vector3(0, 1.12, 0.23);
+    gemMesh.parent = this.body;
+
+    // --- Head: blue scaled face, red eyes, scale cheek/brow markings, a pointed brow crest,
+    // gold brow gems, long teal hair and big webbed fin-ears. ---
+    box("dgHead", 0.32, 0.34, 0.3, skin, scene, new Vector3(0, 1.66, 0), this.body);
+    for (const dx of [-0.08, 0.08]) {
+      box("dgEye", 0.06, 0.07, 0.04, eyeMat, scene, new Vector3(dx, 1.67, 0.16), this.body);
+      box("dgCheek", 0.05, 0.12, 0.03, blueDk, scene, new Vector3(dx * 1.5, 1.62, 0.15), this.body); // scale mask
+    }
+    box("dgBrowMark", 0.14, 0.06, 0.03, blueDk, scene, new Vector3(0, 1.76, 0.15), this.body);
+    // Pointed scale crest rising from the brow (dragon helm crest).
+    const crest = cone("dgCrest", 0.28, 0.15, blueLt, scene);
+    crest.position = new Vector3(0, 1.82, 0.04);
+    crest.rotation.x = -0.25;
+    crest.parent = this.body;
+    // Row of gold gems down the forehead centreline.
+    for (const y of [1.8, 1.73, 1.67]) {
+      box("dgBrowGem", 0.05, 0.05, 0.04, gem, scene, new Vector3(0, y, 0.17), this.body);
+    }
+    // Long teal hair: crown cap, side locks to the jaw, a fuller back mass.
+    box("dgHairCap", 0.35, 0.16, 0.35, teal, scene, new Vector3(0, 1.8, -0.02), this.body);
+    for (const dx of [-0.2, 0.2]) {
+      box("dgHairSide", 0.1, 0.42, 0.32, teal, scene, new Vector3(dx, 1.5, 0), this.body);
+    }
+    box("dgHairBack", 0.36, 0.44, 0.2, teal, scene, new Vector3(0, 1.5, -0.16), this.body);
+    // Webbed fin-ears: pale membrane on blue spines, leaning out and swept back.
+    for (const sx of [-1, 1]) {
+      const ear = new TransformNode("dgFinEar", scene);
+      ear.position = new Vector3(sx * 0.2, 1.66, -0.02);
+      ear.rotation.z = sx * -0.6;
+      ear.rotation.y = sx * 0.5;
+      ear.parent = this.body;
+      box("dgFinWeb", 0.02, 0.34, 0.22, web, scene, new Vector3(0, 0.15, 0), ear);
+      for (const z of [0.1, 0, -0.1]) {
+        const spine = cone("dgFinSpine", 0.4 - Math.abs(z) * 0.9, 0.06, blue, scene);
+        spine.position = new Vector3(0, 0.02, z);
+        spine.parent = ear;
+      }
+    }
+
+    // --- Pauldrons: layered pointed scale plates (silver-trimmed) rising off each shoulder. ---
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const trim = box("dgPauldronTrim", 0.36 - i * 0.07, 0.03, 0.46 - i * 0.09, silver, scene, new Vector3(sx * (0.4 - i * 0.02), 1.48 + i * 0.1, 0), this.body);
+        trim.rotation.z = sx * (0.32 + i * 0.2);
+        const plate = box("dgPauldronPlate", 0.34 - i * 0.07, 0.08, 0.44 - i * 0.09, blueLt, scene, new Vector3(sx * (0.4 - i * 0.02), 1.52 + i * 0.1, 0), this.body);
+        plate.rotation.z = sx * (0.32 + i * 0.2);
+      }
+    }
+
+    // --- Arms: sapphire scale with silver ribs down to blue fists (right arm strikes). ---
+    this.leftArm = limb("dgArmL", blue, scene);
+    this.leftArm.position = new Vector3(-0.36, 1.4, 0);
+    this.leftArm.parent = this.body;
+    this.rightArm = limb("dgArmR", blue, scene);
+    this.rightArm.position = new Vector3(0.36, 1.4, 0);
+    this.rightArm.parent = this.body;
+    for (const arm of [this.leftArm, this.rightArm]) {
+      box("dgSleeve", 0.21, 0.26, 0.21, blueDk, scene, new Vector3(0, -0.08, 0), arm);
+      for (const y of [-0.26, -0.4, -0.52]) box("dgRib", 0.22, 0.04, 0.22, silver, scene, new Vector3(0, y, 0), arm);
+      box("dgFist", 0.23, 0.2, 0.25, blue, scene, new Vector3(0, -0.64, 0), arm);
+    }
+
+    // War hammer in the right hand: silver haft, big scaled head — tipped forward (flight pose).
+    const hammer = new TransformNode("dgHammer", scene);
+    hammer.position = new Vector3(0, -0.64, 0.12);
+    hammer.rotation.x = 1.15;
+    hammer.parent = this.rightArm;
+    box("dgHaft", 0.06, 1.0, 0.06, silver, scene, new Vector3(0, 0.45, 0), hammer);
+    box("dgHammerHead", 0.3, 0.32, 0.36, blueLt, scene, new Vector3(0, 0.95, 0), hammer);
+    box("dgHammerBand", 0.32, 0.09, 0.38, silver, scene, new Vector3(0, 0.95, 0), hammer);
+
+    // --- Wings: Dart's builder, pale iridescent membrane on a blue spar. ---
+    this.leftWing = this.buildWing(scene, -1, wingUp, wingLo, blue);
+    this.rightWing = this.buildWing(scene, 1, wingUp, wingLo, blue);
     for (const w of [this.leftWing, this.rightWing]) w.parent = this.body;
   }
 

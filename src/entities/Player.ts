@@ -134,10 +134,11 @@ export class Player {
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);
 
-    // Dragoon-form model (first pass: Dart's Red-Eye Dragoon). Shown while transformed; the
-    // human figure is hidden. Other classes still use the glow aura until their forms exist.
-    if (cls.id === "redEye") {
-      this.dragoonForm = new DragoonForm(scene, { scale: bearer.scale });
+    // Dragoon-form model, shown while transformed (the human figure is hidden). Classes with
+    // a built form select its variant; the rest still use the glow aura until theirs exist.
+    const formVariant = cls.id === "redEye" ? "redEye" : cls.id === "blueSea" ? "blueSea" : undefined;
+    if (formVariant) {
+      this.dragoonForm = new DragoonForm(scene, { variant: formVariant, scale: bearer.scale });
       this.dragoonForm.rig.parent = this.root;
       this.dragoonForm.setEnabled(false);
     }
