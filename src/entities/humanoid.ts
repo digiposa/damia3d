@@ -89,7 +89,8 @@ export class Humanoid {
       opts.outfit === "darkness" ||
       opts.outfit === "valkyrie" ||
       opts.outfit === "brawler" ||
-      opts.outfit === "gigantos";
+      opts.outfit === "gigantos" ||
+      opts.outfit === "martialist";
     // Skin tone (face + bare skin) — defaults to a light human tone; shaded/highlighted
     // variants keep the original ratios so existing characters are unchanged.
     const [sr, sg, sb] = opts.skinTone ?? [0.94, 0.79, 0.67];
@@ -169,6 +170,7 @@ export class Humanoid {
     else if (opts.outfit === "priestess") this.addPriestessOutfit(scene);
     else if (opts.outfit === "brawler") this.addBrawlerOutfit(scene);
     else if (opts.outfit === "gigantos") this.addGigantosOutfit(scene);
+    else if (opts.outfit === "martialist") this.addMartialistOutfit(scene, opts.color);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -198,6 +200,8 @@ export class Humanoid {
       buildTopknotHair(scene).parent = this.body;
     } else if (opts.hair === "mane") {
       buildManeHair(scene).parent = this.body;
+    } else if (opts.hair === "elder") {
+      buildElderHair(scene).parent = this.body;
     }
   }
 
@@ -1088,6 +1092,106 @@ export class Humanoid {
     brow.parent = this.body;
   }
 
+  /**
+   * Haschel's martial-artist outfit (his human form — the Violet/Thunder Dragoon): a
+   * sleeveless purple vest with silver tribal filigree and big ringed silver shoulder
+   * yokes, worn over a black sleeveless undershirt (bare muscular arms), a red waist
+   * sash knotted with a hanging tail, purple trousers, black shin greaves with a red
+   * band + silver star and black boots with silver toe caps, and black fingerless
+   * gloves with red wrist wraps. Built over the skin-toned body; he fights bare-fisted.
+   */
+  private addMartialistOutfit(scene: Scene, color: [number, number, number]): void {
+    const [r, g, b] = color;
+    const purple = mat("mtPurple", r, g, b, scene); // his violet vest
+    const purpleDk = mat("mtPurpleDk", r * 0.5, g * 0.5, b * 0.62, scene); // trousers (darker)
+    const black = mat("mtBlack", 0.12, 0.11, 0.14, scene); // undershirt / gloves / boots
+    const silver = mat("mtSilver", 0.8, 0.82, 0.86, scene); // filigree / yokes / trim
+    const red = mat("mtRed", 0.68, 0.13, 0.14, scene); // sash / wrist wraps / knee bands
+
+    // Black sleeveless undershirt on the torso (shows at the open V of the vest).
+    const under = box("mtUnder", 0.44, 0.56, 0.3, black, scene);
+    under.position.y = 1.16;
+    under.parent = this.body;
+
+    // Purple vest over it, a touch proud, with a black V-neck strip left open at the
+    // chest and a silver centre seam + hem.
+    const vest = box("mtVest", 0.5, 0.5, 0.33, purple, scene);
+    vest.position.y = 1.2;
+    vest.parent = this.body;
+    const vNeck = box("mtVNeck", 0.14, 0.3, 0.02, black, scene);
+    vNeck.position = new Vector3(0, 1.3, 0.17);
+    vNeck.parent = this.body;
+    const hem = box("mtVestHem", 0.51, 0.06, 0.34, silver, scene);
+    hem.position.y = 0.98;
+    hem.parent = this.body;
+    // Silver tribal filigree scrolls curling up each side of the chest.
+    for (const sx of [-1, 1]) {
+      const scroll = box("mtFili", 0.05, 0.34, 0.02, silver, scene);
+      scroll.position = new Vector3(sx * 0.17, 1.2, 0.17);
+      scroll.rotation.z = sx * 0.35;
+      scroll.parent = this.body;
+      const hook = box("mtFiliHook", 0.12, 0.05, 0.02, silver, scene);
+      hook.position = new Vector3(sx * 0.2, 1.02, 0.17);
+      hook.parent = this.body;
+    }
+
+    // Big silver shoulder yokes with an O-ring buckle on each (the vest's heavy trim).
+    for (const sx of [-1, 1]) {
+      const yoke = box("mtYoke", 0.2, 0.16, 0.36, silver, scene);
+      yoke.position = new Vector3(sx * 0.28, 1.44, 0);
+      yoke.parent = this.body;
+      const ring = MeshBuilder.CreateTorus("mtRing", { diameter: 0.12, thickness: 0.025, tessellation: 12 }, scene);
+      ring.material = silver;
+      ring.isPickable = false;
+      ring.rotation.x = Math.PI / 2; // faces forward
+      ring.position = new Vector3(sx * 0.24, 1.34, 0.16);
+      ring.parent = this.body;
+    }
+
+    // Red waist sash: a broad wrap, a central knot, and a long tail hanging at the left.
+    const sash = box("mtSash", 0.5, 0.16, 0.34, red, scene);
+    sash.position.y = 0.86;
+    sash.parent = this.body;
+    const knot = box("mtSashKnot", 0.14, 0.16, 0.1, red, scene);
+    knot.position = new Vector3(-0.14, 0.84, 0.18);
+    knot.parent = this.body;
+    const tail = box("mtSashTail", 0.13, 0.4, 0.06, red, scene);
+    tail.position = new Vector3(-0.14, 0.6, 0.17);
+    tail.parent = this.body;
+
+    // Purple trousers down the legs (skin covered), tapering to the greaves.
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const pant = box("mtPant", 0.22, 0.6, 0.22, purpleDk, scene);
+      pant.position.y = -0.3;
+      pant.parent = leg;
+      // Black shin greave with a red band at the top and a silver star medallion.
+      const greave = box("mtGreave", 0.23, 0.32, 0.24, black, scene);
+      greave.position.y = -0.56;
+      greave.parent = leg;
+      const band = box("mtKneeBand", 0.24, 0.06, 0.25, red, scene);
+      band.position.y = -0.4;
+      band.parent = leg;
+      const star = box("mtStar", 0.1, 0.1, 0.02, silver, scene);
+      star.position = new Vector3(0, -0.56, 0.13);
+      star.rotation.z = Math.PI / 4; // a diamond/star face
+      star.parent = leg;
+      // Black boot with a silver toe cap (over the neutral foot).
+      const toe = box("mtToe", 0.2, 0.12, 0.2, silver, scene);
+      toe.position = new Vector3(0, -0.73, 0.16);
+      toe.parent = leg;
+    }
+
+    // Black fingerless gloves with a red wrist wrap (upper arms bare; swing with arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const glove = box("mtGlove", 0.2, 0.22, 0.2, black, scene);
+      glove.position.y = -0.5;
+      glove.parent = arm;
+      const wrap = box("mtWrap", 0.22, 0.07, 0.22, red, scene);
+      wrap.position.y = -0.38;
+      wrap.parent = arm;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -1685,6 +1789,81 @@ function buildManeHair(scene: Scene): TransformNode {
     brow.position = new Vector3(dx, 1.68, 0.17);
     brow.rotation.z = dx < 0 ? -0.25 : 0.25; // angled down toward the nose
     brow.parent = group;
+  }
+  return group;
+}
+
+/**
+ * Haschel's head: long black hair swept straight back into a low tail, a red headband
+ * across the brow with two long cords trailing down behind, stern angled brows, and his
+ * signature drooping fu-manchu moustache. Rigid; bobs with the head.
+ */
+function buildElderHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairElder", scene);
+  const black = mat("hairElderBlack", 0.11, 0.1, 0.13, scene);
+  const grey = mat("hairElderGrey", 0.28, 0.26, 0.28, scene); // slight grey at the temples
+  const red = mat("headbandHaschel", 0.66, 0.13, 0.13, scene);
+
+  // Crown cap swept back (sits back off the brow so the headband reads in front).
+  const cap = box("hairCap", 0.38, 0.2, 0.42, black, scene);
+  cap.position = new Vector3(0, 1.77, -0.04);
+  cap.parent = group;
+
+  // Thin greying temples framing the upper sides of the face.
+  for (const dx of [-0.2, 0.2]) {
+    const side = box("hairSide", 0.06, 0.28, 0.38, grey, scene);
+    side.position = new Vector3(dx, 1.6, -0.04);
+    side.parent = group;
+  }
+
+  // Long tail swept down the back of the neck in two tapering segments.
+  const nape = box("hairNape", 0.34, 0.24, 0.18, black, scene);
+  nape.position = new Vector3(0, 1.55, -0.18);
+  nape.parent = group;
+  const t1 = box("hairElder1", 0.28, 0.44, 0.14, black, scene);
+  t1.position = new Vector3(0, 1.24, -0.2);
+  t1.parent = group;
+  const t2 = box("hairElder2", 0.2, 0.34, 0.1, black, scene);
+  t2.position = new Vector3(0, 0.92, -0.22);
+  t2.parent = group;
+
+  // Red headband across the forehead with a knot and two long cords trailing behind.
+  const band = MeshBuilder.CreateTorus("headband", { diameter: 0.39, thickness: 0.06, tessellation: 12 }, scene);
+  band.material = red;
+  band.isPickable = false;
+  band.position.y = 1.69;
+  band.parent = group;
+  const knot = box("headbandKnot", 0.09, 0.09, 0.1, red, scene);
+  knot.position = new Vector3(-0.16, 1.69, -0.06);
+  knot.parent = group;
+  for (const dx of [-0.2, -0.13]) {
+    const cord = box("headbandCord", 0.035, 0.4, 0.035, red, scene);
+    cord.position = new Vector3(dx, 1.5, -0.14);
+    cord.rotation.x = -0.3; // trailing back and down
+    cord.rotation.z = 0.12;
+    cord.parent = group;
+  }
+
+  // Stern angled eyebrows on the +Z face above the eyes.
+  for (const dx of [-0.09, 0.09]) {
+    const brow = box("hairBrow", 0.11, 0.03, 0.03, black, scene);
+    brow.position = new Vector3(dx, 1.69, 0.17);
+    brow.rotation.z = dx < 0 ? -0.2 : 0.2; // angled down toward the nose
+    brow.parent = group;
+  }
+
+  // Signature fu-manchu moustache: a strip under the nose and two long tapering arms
+  // drooping down past the mouth, angled outward.
+  const lip = box("moustacheLip", 0.16, 0.04, 0.05, black, scene);
+  lip.position = new Vector3(0, 1.55, 0.18);
+  lip.parent = group;
+  for (const sx of [-1, 1]) {
+    const arm = box("moustacheArm", 0.05, 0.24, 0.05, black, scene);
+    arm.position = new Vector3(sx * 0.1, 1.45, 0.18);
+    arm.rotation.z = sx * 0.28; // splay outward as they droop
+    arm.parent = group;
+    const tip = coneSpike(scene, black, new Vector3(sx * 0.15, 1.34, 0.18), Math.PI - sx * 0.3, 0, 0.12, 0.05);
+    tip.parent = group;
   }
   return group;
 }

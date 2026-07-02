@@ -31,7 +31,8 @@ export type HairStyle =
   | "wavy"
   | "wrap"
   | "topknot"
-  | "mane";
+  | "mane"
+  | "elder";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
 export type OutfitStyle =
@@ -47,7 +48,8 @@ export type OutfitStyle =
   | "scholar"
   | "priestess"
   | "brawler"
-  | "gigantos";
+  | "gigantos"
+  | "martialist";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -112,7 +114,7 @@ export const BEARERS: Bearer[] = [
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", weapon: "fist", hair: "spiky", color: C_THUNDER, storyPlayable: false },
   { id: "doel", name: "Doel", classId: "thunder", weapon: "fist", hair: "short", color: C_THUNDER, storyPlayable: false },
-  { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", color: C_THUNDER, storyPlayable: true },
+  { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
   { id: "damia", name: "Damia", classId: "blueSea", weapon: "hammer", hair: "flow", color: C_WATER, storyPlayable: false },
   { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
