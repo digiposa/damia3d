@@ -5,6 +5,8 @@ import { scaleHud } from "../core/device";
 export interface PartyRowView {
   name: string;
   portrait?: string;
+  /** Alternate portrait used only while {@link transformed} (Dragoon form); falls back to {@link portrait}. */
+  dragoonPortrait?: string;
   level: number;
   hp: number;
   maxHp: number;
@@ -175,8 +177,11 @@ export class PartyPanel {
       row.root.style.background = v.controlled ? "rgba(26,22,8,0.78)" : "rgba(8,11,17,0.72)";
 
       row.lvBadge.textContent = `${v.level}`;
-      if (v.portrait) {
-        row.portrait.style.backgroundImage = `url(${v.portrait})`;
+      // In Dragoon form the HUD swaps to the Dragoon portrait if the bearer has one
+      // (menus keep the human portrait); otherwise the normal portrait is used.
+      const portrait = (v.transformed && v.dragoonPortrait) || v.portrait;
+      if (portrait) {
+        row.portrait.style.backgroundImage = `url(${portrait})`;
         row.portraitInitial.style.display = "none";
       } else {
         row.portrait.style.backgroundImage = "none";

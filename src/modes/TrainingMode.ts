@@ -1658,6 +1658,7 @@ export class TrainingMode extends GameMode {
         const row: PartyRowView = {
           name: a.bearer.name,
           portrait: a.bearer.portrait,
+          dragoonPortrait: a.bearer.dragoonPortrait,
           level: a.level,
           hp: a.hp,
           maxHp: a.maxHp,

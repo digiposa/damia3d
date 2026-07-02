@@ -64,6 +64,12 @@ export interface Bearer {
   name: string;
   classId: DragoonClassId;
   portrait?: string;
+  /**
+   * Optional alternate portrait shown ONLY in the in-game party HUD while this bearer is
+   * in Dragoon form (menus always keep {@link portrait}). Falls back to {@link portrait}
+   * when absent, so it can be filled in per character as Dragoon art arrives.
+   */
+  dragoonPortrait?: string;
   /** Optional rigged glTF/GLB model URL; falls back to the procedural placeholder when absent. */
   model?: string;
   /** Weapon the placeholder figure carries (default "sword"). */
