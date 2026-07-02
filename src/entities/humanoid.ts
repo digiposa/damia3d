@@ -1110,24 +1110,31 @@ export class Humanoid {
     const belt = mat("mtBelt", 0.5, 0.24, 0.2, scene); // reddish-brown belt
     const red = mat("mtRed", 0.66, 0.15, 0.15, scene); // wrist wraps / boot & belt trim
 
-    // Short purple vest covering the chest only (cropped at the lower ribs → bare
-    // midriff below), with a darker V-neck opening and pale violet scroll trim.
-    const vest = box("mtVest", 0.5, 0.34, 0.33, purple, scene);
-    vest.position.y = 1.28;
+    // Purple vest covering the chest down to just above the waist (only a slim bare
+    // midriff shows above the belt), with a darker V-neck opening and pale violet trim.
+    const vest = box("mtVest", 0.5, 0.42, 0.33, purple, scene);
+    vest.position.y = 1.24;
     vest.parent = this.body;
     const vNeck = box("mtVNeck", 0.13, 0.22, 0.02, purpleDk, scene);
     vNeck.position = new Vector3(0, 1.34, 0.17);
     vNeck.parent = this.body;
     // Pale violet scrollwork curling on each side of the vest front + a lower rim.
     for (const sx of [-1, 1]) {
-      const scroll = box("mtScroll", 0.05, 0.26, 0.02, swirl, scene);
-      scroll.position = new Vector3(sx * 0.16, 1.28, 0.17);
+      const scroll = box("mtScroll", 0.05, 0.28, 0.02, swirl, scene);
+      scroll.position = new Vector3(sx * 0.16, 1.26, 0.17);
       scroll.rotation.z = sx * 0.4;
       scroll.parent = this.body;
     }
     const rim = box("mtVestRim", 0.51, 0.04, 0.34, swirl, scene);
-    rim.position.y = 1.12;
+    rim.position.y = 1.04;
     rim.parent = this.body;
+
+    // Purple trunks over the pelvis/hips so the waist reads as clothed (the bare skin of
+    // the revealing body would otherwise show through at the hips and crotch); shares the
+    // trouser colour so it flows straight into the legs, leaving only a slim bare midriff.
+    const trunks = box("mtTrunks", 0.47, 0.28, 0.33, purpleDk, scene);
+    trunks.position.y = 0.79;
+    trunks.parent = this.body;
 
     // Rolled purple collar over the shoulders (a little heftier on the left, as in the
     // art), suggesting the vest's raised, ornate shoulder line — no metal, all cloth.
@@ -1141,9 +1148,10 @@ export class Humanoid {
     shoulderRoll.position = new Vector3(-0.3, 1.46, 0);
     shoulderRoll.parent = this.body;
 
-    // Thin reddish-brown belt sitting low on the hips (no big sash), with a small buckle.
-    const beltMesh = box("mtBeltMesh", 0.48, 0.09, 0.33, belt, scene);
-    beltMesh.position.y = 0.86;
+    // Thin reddish-brown belt sitting low on the hips (no big sash), with a small buckle;
+    // a touch deeper than the trunks so it reads proud (no coplanar z-fighting).
+    const beltMesh = box("mtBeltMesh", 0.49, 0.09, 0.35, belt, scene);
+    beltMesh.position.y = 0.9;
     beltMesh.parent = this.body;
     const buckle = box("mtBuckle", 0.1, 0.08, 0.03, steel, scene);
     buckle.position = new Vector3(0, 0.86, 0.17);
