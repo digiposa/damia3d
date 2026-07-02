@@ -1,3 +1,5 @@
+import { scaleHud } from "../core/device";
+
 /** Color-independent gloss laid over each button's solid colour: a soft top
  *  highlight + a darker bottom, giving the flat disc some depth. */
 const GLOSS =
@@ -128,6 +130,7 @@ export class ActionButton {
       e.preventDefault();
       onPress();
     });
+    scaleHud(this.el); // desktop: enlarge the phone-tuned HUD (scales size + corner offset)
     document.body.appendChild(this.el);
   }
 

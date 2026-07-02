@@ -1,3 +1,5 @@
+import { scaleHud } from "../core/device";
+
 export interface ButtonOptions {
   label: string;
   onClick: () => void;
@@ -34,6 +36,7 @@ export class Button {
       e.preventDefault();
       opts.onClick();
     });
+    scaleHud(this.el); // desktop: enlarge the phone-tuned HUD (scales size + corner offset)
     document.body.appendChild(this.el);
   }
 

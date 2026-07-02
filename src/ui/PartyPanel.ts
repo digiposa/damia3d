@@ -1,4 +1,5 @@
 import { t } from "../core/i18n";
+import { scaleHud } from "../core/device";
 
 /** One party member's row in the HUD panel. */
 export interface PartyRowView {
@@ -73,6 +74,7 @@ export class PartyPanel {
 
     for (let i = 0; i < MAX_ROWS; i++) this.rows.push(this.buildRow(i));
     this.root.append(...this.rows.map((r) => r.root));
+    scaleHud(this.root); // desktop: enlarge the phone-tuned HUD
     document.body.appendChild(this.root);
   }
 
