@@ -831,62 +831,111 @@ export class Humanoid {
   }
 
   /**
-   * Shirley's priestess gown (her extrapolated human form — the Light Dragoon): a
-   * white bodice with gold filigree, a gold collar necklace with a blue gem, gold
-   * shoulder ornaments and waist band, a floor-length flared white gown with a gold
-   * hem, and long draped sleeves. Built over the (cream) body; she carries a bow.
+   * Shirley's mage robe (her extrapolated human form — the Light Dragoon), from her
+   * portrait: an icy-blue robe with heavy gold trim studded with ruby-pink cabochon
+   * gems, worn over a white high-necked blouse; a tall standing gold-edged collar
+   * rising behind the neck with a navy back-cape; gold shoulder plates and wrist cuffs
+   * each set with a pink gem; a gold waist clasp with a large oval pink gem; and a
+   * floor-length flared gown with a gold hem. Built over the (cream) body; carries a bow.
    */
   private addPriestessOutfit(scene: Scene): void {
-    const cloth = mat("prCloth", 0.8, 0.87, 0.96, scene); // very pale icy blue
-    const gold = mat("prGold", 0.82, 0.66, 0.3, scene);
-    const blue = mat("prBlue", 0.5, 0.68, 0.85, scene);
+    const cloth = mat("prCloth", 0.72, 0.82, 0.9, scene); // icy blue robe
+    const navy = mat("prNavy", 0.16, 0.24, 0.4, scene); // dark cape outer / robe shadow
+    const white = mat("prWhite", 0.92, 0.93, 0.95, scene); // inner blouse
+    const gold = mat("prGold", 0.83, 0.67, 0.3, scene);
+    const gem = mat("prGem", 0.42, 0.08, 0.2, scene); // ruby-pink cabochon
+    gem.emissiveColor = new Color3(0.5, 0.1, 0.25); // faint inner glow
 
-    // Pale-blue bodice with a column of gold medallions down the front.
-    const bodice = box("prBodice", 0.46, 0.5, 0.31, cloth, scene);
-    bodice.position.y = 1.18;
-    bodice.parent = this.body;
-    for (const y of [1.3, 1.16, 1.02]) {
-      const medal = MeshBuilder.CreateCylinder("prMedal", { height: 0.03, diameter: 0.1, tessellation: 12 }, scene);
-      medal.material = gold;
-      medal.isPickable = false;
-      medal.rotation.x = Math.PI / 2; // faces forward
-      medal.position = new Vector3(0, y, 0.17);
-      medal.parent = this.body;
+    const pinkGem = (name: string, d: number, pos: Vector3, parent: TransformNode) => {
+      const g = MeshBuilder.CreateSphere(name, { diameter: d, segments: 10 }, scene);
+      g.material = gem;
+      g.isPickable = false;
+      g.scaling.z = 0.5; // flattened cabochon, sitting proud of its gold mount
+      g.position = pos;
+      g.parent = parent;
+      return g;
+    };
+
+    // White high-necked blouse under the robe (shows at the open chest V and the throat).
+    const blouse = box("prBlouse", 0.4, 0.52, 0.3, white, scene);
+    blouse.position.y = 1.2;
+    blouse.parent = this.body;
+    const neck = box("prNeck", 0.22, 0.16, 0.24, white, scene);
+    neck.position.y = 1.44;
+    neck.parent = this.body;
+
+    // Icy-blue robe front (open over the blouse) with gold trim converging into a
+    // pointed V-bib down the chest, studded with ruby-pink gems along the trim.
+    const robe = box("prRobe", 0.5, 0.54, 0.32, cloth, scene);
+    robe.position.y = 1.18;
+    robe.parent = this.body;
+    for (const sx of [-1, 1]) {
+      // Gold lapel running from the shoulder down to the sternum (the V of the bib).
+      const lapel = box("prLapel", 0.06, 0.5, 0.02, gold, scene);
+      lapel.position = new Vector3(sx * 0.12, 1.2, 0.17);
+      lapel.rotation.z = sx * 0.28;
+      lapel.parent = this.body;
+      pinkGem("prLapelGem", 0.09, new Vector3(sx * 0.17, 1.34, 0.18), this.body);
     }
+    // Pointed gold tip of the bib at the sternum, with a central gem.
+    const bibTip = box("prBibTip", 0.1, 0.16, 0.03, gold, scene);
+    bibTip.position = new Vector3(0, 1.0, 0.18);
+    bibTip.rotation.z = Math.PI / 4;
+    bibTip.parent = this.body;
+    pinkGem("prBibGem", 0.09, new Vector3(0, 1.08, 0.18), this.body);
 
-    // Layered gold collar draping over the shoulders + a neck ring, with a hanging
-    // blue pendant; and a gold brow circlet with a small gem.
-    const yoke = MeshBuilder.CreateTorus("prYoke", { diameter: 0.5, thickness: 0.05, tessellation: 18 }, scene);
-    yoke.material = gold;
-    yoke.isPickable = false;
-    yoke.position.y = 1.36; // horizontal, draped over the shoulders
-    yoke.parent = this.body;
-    const collar = MeshBuilder.CreateTorus("prCollar", { diameter: 0.34, thickness: 0.035, tessellation: 16 }, scene);
-    collar.material = gold;
-    collar.isPickable = false;
-    collar.position.y = 1.42; // around the neck base
-    collar.parent = this.body;
-    const pendant = box("prPendant", 0.06, 0.1, 0.05, blue, scene);
-    pendant.position = new Vector3(0, 1.3, 0.17);
-    pendant.parent = this.body;
+    // Tall standing collar rising behind the neck: two icy-blue panels flaring up-and-out
+    // with a gold leading edge, plus a navy back-cape draping from the shoulders (sways).
+    for (const sx of [-1, 1]) {
+      const wing = box("prCollar", 0.12, 0.36, 0.06, cloth, scene);
+      wing.position = new Vector3(sx * 0.17, 1.66, -0.12);
+      wing.rotation.z = sx * 0.3;
+      wing.rotation.x = -0.35; // lean back behind the head
+      wing.parent = this.body;
+      const edge = box("prCollarEdge", 0.03, 0.36, 0.07, gold, scene);
+      edge.position = new Vector3(sx * 0.23, 1.66, -0.12);
+      edge.rotation.z = sx * 0.3;
+      edge.rotation.x = -0.35;
+      edge.parent = this.body;
+    }
+    const cape = new TransformNode("prCapePivot", scene);
+    cape.position = new Vector3(0, 1.46, -0.14);
+    cape.parent = this.body;
+    this.cape = cape;
+    const capeTop = box("prCapeTop", 0.5, 0.5, 0.05, navy, scene);
+    capeTop.position = new Vector3(0, -0.24, -0.02);
+    capeTop.rotation.x = -0.06;
+    capeTop.parent = cape;
+    const capeHem = box("prCapeHem", 0.6, 0.6, 0.05, navy, scene);
+    capeHem.position = new Vector3(0, -0.74, -0.06);
+    capeHem.parent = cape;
+
+    // Gold brow circlet with a pink gem.
     const circlet = MeshBuilder.CreateTorus("prCirclet", { diameter: 0.37, thickness: 0.022, tessellation: 18 }, scene);
     circlet.material = gold;
     circlet.isPickable = false;
     circlet.position.y = 1.69; // around the brow
     circlet.parent = this.body;
-    const browGem = box("prBrowGem", 0.05, 0.05, 0.04, blue, scene);
-    browGem.position = new Vector3(0, 1.69, 0.19);
-    browGem.parent = this.body;
+    pinkGem("prBrowGem", 0.06, new Vector3(0, 1.69, 0.19), this.body);
 
-    // Gold shoulder ornaments and a gold waist band.
+    // Gold shoulder plates each set with a pink gem.
     for (const sx of [-1, 1]) {
-      const orn = box("prShoulder", 0.18, 0.1, 0.3, gold, scene);
-      orn.position = new Vector3(sx * 0.3, 1.42, 0);
-      orn.parent = this.body;
+      const plate = box("prShoulder", 0.22, 0.12, 0.34, gold, scene);
+      plate.position = new Vector3(sx * 0.3, 1.44, 0);
+      plate.parent = this.body;
+      pinkGem("prShoulderGem", 0.11, new Vector3(sx * 0.3, 1.46, 0.16), this.body);
     }
-    const waist = box("prWaist", 0.47, 0.09, 0.33, gold, scene);
+
+    // Gold waist clasp with a large oval pink gem at the centre.
+    const waist = box("prWaist", 0.48, 0.1, 0.34, gold, scene);
     waist.position.y = 0.9;
     waist.parent = this.body;
+    const clasp = MeshBuilder.CreateSphere("prClasp", { diameter: 0.2, segments: 12 }, scene);
+    clasp.material = gem;
+    clasp.isPickable = false;
+    clasp.scaling = new Vector3(0.8, 1.15, 0.45); // tall oval cabochon
+    clasp.position = new Vector3(0, 0.9, 0.18);
+    clasp.parent = this.body;
 
     // Floor-length flared gown with a gold hem.
     const gown = MeshBuilder.CreateCylinder(
@@ -904,7 +953,7 @@ export class Humanoid {
     hem.position.y = 0.02;
     hem.parent = this.body;
 
-    // Long bell sleeves (flaring at the wrist) with a gold cuff (swing with the arms).
+    // Long bell sleeves (flaring at the wrist) with a gold cuff + a pink gem (swing with arms).
     for (const arm of [this.leftArm, this.rightArm]) {
       const sleeve = box("prSleeve", 0.21, 0.5, 0.21, cloth, scene);
       sleeve.position.y = -0.26;
@@ -912,9 +961,10 @@ export class Humanoid {
       const bell = box("prBell", 0.29, 0.2, 0.29, cloth, scene);
       bell.position.y = -0.54;
       bell.parent = arm;
-      const cuff = box("prCuff", 0.3, 0.06, 0.3, gold, scene);
+      const cuff = box("prCuff", 0.3, 0.07, 0.3, gold, scene);
       cuff.position.y = -0.63;
       cuff.parent = arm;
+      pinkGem("prCuffGem", 0.08, new Vector3(0, -0.63, 0.16), arm);
     }
   }
 
@@ -1492,7 +1542,7 @@ function buildWrapHair(scene: Scene): TransformNode {
  */
 function buildWavyHair(scene: Scene): TransformNode {
   const group = new TransformNode("hairWavy", scene);
-  const auburn = mat("hairAuburnShirley", 0.66, 0.3, 0.18, scene);
+  const auburn = mat("hairAuburnShirley", 0.62, 0.16, 0.12, scene); // deep crimson-red (portrait)
 
   const cap = box("hairCap", 0.4, 0.22, 0.4, auburn, scene);
   cap.position.y = 1.78;
