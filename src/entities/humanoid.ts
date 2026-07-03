@@ -39,6 +39,7 @@ const STRIKE_STYLE: Record<WeaponKind, StrikeStyle> = {
   spear: "thrust",
   fist: "thrust",
   bow: "draw",
+  dualsword: "swing",
 };
 
 /**
@@ -154,13 +155,20 @@ export class Humanoid {
 
     // The bow is held in the off (left) hand and drawn with the right; every other
     // weapon is wielded in the right hand. Attach it at the hand (bottom of the arm).
+    const dual = weapon === "dualsword";
     const wieldArm = weapon === "bow" ? this.leftArm : this.rightArm;
     this.strikeArm = this.rightArm;
     if (weapon === "bow") this.bowArm = this.leftArm;
-    const weaponNode = buildWeapon(weapon, main, scene, opts.weaponVariant);
+    // Dual-wield builds a sword per hand (sword geometry); everything else is single-handed.
+    const weaponNode = buildWeapon(dual ? "sword" : weapon, main, scene, opts.weaponVariant);
     weaponNode.position = new Vector3(0, -0.58, 0.06); // hand, just forward
     weaponNode.parent = wieldArm;
     this.weaponNode = weaponNode;
+    if (dual) {
+      const offHand = buildWeapon("sword", main, scene);
+      offHand.position = new Vector3(0, -0.58, 0.06);
+      offHand.parent = this.leftArm;
+    }
 
     if (opts.outfit === "dancer") this.addDancerOutfit(scene, opts.color);
     else if (opts.outfit === "archer") this.addArcherOutfit(scene);

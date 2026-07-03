@@ -18,7 +18,7 @@ import doelPortrait from "../assets/portraits/doel.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
-export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer" | "axe";
+export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer" | "axe" | "dualsword";
 
 /** Optional weapon variant overlaid on a {@link WeaponKind} for a signature silhouette. */
 export type WeaponVariant = "spiked";
@@ -131,7 +131,7 @@ export const BEARERS: Bearer[] = [
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
-  { id: "doel", name: "Doel", classId: "thunder", portrait: doelPortrait, weapon: "fist", hair: "imperial", outfit: "warlord", color: C_THUNDER, bodyColor: [0.16, 0.14, 0.2], storyPlayable: false },
+  { id: "doel", name: "Doel", classId: "thunder", portrait: doelPortrait, weapon: "dualsword", hair: "imperial", outfit: "warlord", color: C_THUNDER, bodyColor: [0.16, 0.14, 0.2], storyPlayable: false },
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
   { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
