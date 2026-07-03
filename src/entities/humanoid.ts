@@ -91,7 +91,8 @@ export class Humanoid {
       opts.outfit === "brawler" ||
       opts.outfit === "gigantos" ||
       opts.outfit === "martialist" ||
-      opts.outfit === "siren";
+      opts.outfit === "siren" ||
+      opts.outfit === "enforcer";
     // Skin tone (face + bare skin) — defaults to a light human tone; shaded/highlighted
     // variants keep the original ratios so existing characters are unchanged.
     const [sr, sg, sb] = opts.skinTone ?? [0.94, 0.79, 0.67];
@@ -173,6 +174,7 @@ export class Humanoid {
     else if (opts.outfit === "gigantos") this.addGigantosOutfit(scene);
     else if (opts.outfit === "martialist") this.addMartialistOutfit(scene, opts.color);
     else if (opts.outfit === "siren") this.addSirenOutfit(scene);
+    else if (opts.outfit === "enforcer") this.addEnforcerOutfit(scene, opts.color);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -206,6 +208,8 @@ export class Humanoid {
       buildElderHair(scene).parent = this.body;
     } else if (opts.hair === "siren") {
       buildSirenHair(scene).parent = this.body;
+    } else if (opts.hair === "firebrand") {
+      buildFirebrandHair(scene).parent = this.body;
     }
   }
 
@@ -1326,6 +1330,85 @@ export class Humanoid {
     waist.parent = this.body;
   }
 
+  /**
+   * Kanzas's enforcer outfit (his human form — the Violet/Thunder Dragoon), from his portrait:
+   * a sleeveless purple vest with a high silver-edged collar and two studded strap clasps across
+   * the chest, over a black leather waist cincher laced up the front; a studded leather bicep
+   * band and wrapped forearms on the bare muscular arms; dark trousers and boots. Built over the
+   * skin-toned body; he fights bare-fisted.
+   */
+  private addEnforcerOutfit(scene: Scene, color: [number, number, number]): void {
+    const [r, g, b] = color;
+    const purple = mat("enPurple", r, g, b, scene); // his violet vest
+    const black = mat("enBlack", 0.13, 0.12, 0.16, scene); // leather cincher / collar inner / boots
+    const silver = mat("enSilver", 0.74, 0.77, 0.83, scene); // studs / collar edge / lacing
+    const wrap = mat("enWrap", 0.68, 0.64, 0.56, scene); // forearm bandages
+    const pants = mat("enPants", 0.22, 0.19, 0.26, scene); // dark trousers
+
+    // High collar: black inner with a silver top edge, standing at the neck.
+    const collar = box("enCollar", 0.3, 0.18, 0.28, black, scene);
+    collar.position.y = 1.46;
+    collar.parent = this.body;
+    const collarEdge = box("enCollarEdge", 0.31, 0.04, 0.29, silver, scene);
+    collarEdge.position.y = 1.55;
+    collarEdge.parent = this.body;
+
+    // Sleeveless purple vest covering the chest down to the cincher (bare arms/shoulders).
+    const vest = box("enVest", 0.46, 0.5, 0.31, purple, scene);
+    vest.position.y = 1.22;
+    vest.parent = this.body;
+    // Two horizontal strap clasps across the upper chest, each with a pair of silver studs.
+    for (const y of [1.34, 1.2]) {
+      const strap = box("enStrap", 0.3, 0.07, 0.03, purple, scene);
+      strap.position = new Vector3(0, y, 0.17);
+      strap.parent = this.body;
+      for (const dx of [-0.1, 0.1]) {
+        const stud = box("enStud", 0.04, 0.04, 0.03, silver, scene);
+        stud.position = new Vector3(dx, y, 0.19);
+        stud.parent = this.body;
+      }
+    }
+
+    // Black leather waist cincher laced up the front (X-crossed silver laces).
+    const cincher = box("enCincher", 0.44, 0.26, 0.32, black, scene);
+    cincher.position.y = 0.92;
+    cincher.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const lace = box("enLace", 0.02, 0.26, 0.02, silver, scene);
+      lace.position = new Vector3(0, 0.92, 0.17);
+      lace.rotation.z = sx * 0.5;
+      lace.parent = this.body;
+    }
+
+    // Studded leather bicep band + wrapped forearm on each (bare upper arm; swing with arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const band = box("enBand", 0.2, 0.09, 0.2, black, scene);
+      band.position.y = -0.2;
+      band.parent = arm;
+      const stud = box("enBandStud", 0.04, 0.04, 0.03, silver, scene);
+      stud.position = new Vector3(0, -0.2, 0.11);
+      stud.parent = arm;
+      const forearm = box("enWrapArm", 0.2, 0.24, 0.2, wrap, scene);
+      forearm.position.y = -0.5;
+      forearm.parent = arm;
+      for (const y of [-0.42, -0.5, -0.58]) {
+        const bind = box("enBind", 0.21, 0.02, 0.21, black, scene);
+        bind.position.y = y;
+        bind.parent = arm;
+      }
+    }
+
+    // Dark trousers + boots (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const pant = box("enPant", 0.22, 0.6, 0.22, pants, scene);
+      pant.position.y = -0.3;
+      pant.parent = leg;
+      const boot = box("enBoot", 0.23, 0.28, 0.27, black, scene);
+      boot.position = new Vector3(0, -0.62, 0.02);
+      boot.parent = leg;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -2063,6 +2146,51 @@ function buildSirenHair(scene: Scene): TransformNode {
   drop.scaling = new Vector3(1, 1.5, 0.6); // teardrop
   drop.position = new Vector3(0, 1.58, 0.19);
   drop.parent = group;
+  return group;
+}
+
+/**
+ * Kanzas's head: dark-red hair in back-swept spikes, a full red beard framing the jaw,
+ * and a scar across the left cheek. Rigid; bobs with the head.
+ */
+function buildFirebrandHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairFirebrand", scene);
+  const red = mat("hairFireRed", 0.46, 0.13, 0.1, scene); // dark auburn-red
+  const scarMat = mat("hairScar", 0.7, 0.5, 0.46, scene);
+
+  // Low cap so the scalp reads as hair under the spikes.
+  const cap = box("hairCap", 0.37, 0.16, 0.36, red, scene);
+  cap.position.y = 1.75;
+  cap.parent = group;
+
+  // Back-swept spikes fanning up and rearward from the crown (no bandana — swept mane).
+  const spike = (x: number, y: number, z: number, rotX: number, rotZ: number, len = 0.26) =>
+    (coneSpike(scene, red, new Vector3(x, y, z), rotX, rotZ, len).parent = group);
+  spike(0, 1.84, -0.02, -0.5, 0, 0.34);
+  spike(-0.1, 1.82, -0.04, -0.5, -0.25, 0.3);
+  spike(0.1, 1.82, -0.04, -0.5, 0.25, 0.3);
+  spike(-0.17, 1.76, -0.02, -0.4, -0.7, 0.26);
+  spike(0.17, 1.76, -0.02, -0.4, 0.7, 0.26);
+  spike(0, 1.86, 0.06, -0.9, 0, 0.28); // a forelock kicking up at the front
+
+  // Full red beard: cheeks, jawline and a chin tuft framing the lower face.
+  for (const dx of [-0.15, 0.15]) {
+    const cheek = box("beardCheek", 0.07, 0.2, 0.16, red, scene);
+    cheek.position = new Vector3(dx, 1.54, 0.1);
+    cheek.parent = group;
+  }
+  const jaw = box("beardJaw", 0.3, 0.1, 0.24, red, scene);
+  jaw.position = new Vector3(0, 1.46, 0.09);
+  jaw.parent = group;
+  const chin = box("beardChin", 0.16, 0.14, 0.16, red, scene);
+  chin.position = new Vector3(0, 1.42, 0.13);
+  chin.parent = group;
+
+  // Scar slanting across the left cheek (the −X side from the front).
+  const scar = box("faceScar", 0.02, 0.16, 0.02, scarMat, scene);
+  scar.position = new Vector3(-0.1, 1.63, 0.17);
+  scar.rotation.z = 0.3;
+  scar.parent = group;
   return group;
 }
 
