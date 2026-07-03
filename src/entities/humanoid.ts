@@ -175,6 +175,7 @@ export class Humanoid {
     else if (opts.outfit === "martialist") this.addMartialistOutfit(scene, opts.color);
     else if (opts.outfit === "siren") this.addSirenOutfit(scene);
     else if (opts.outfit === "enforcer") this.addEnforcerOutfit(scene, opts.color);
+    else if (opts.outfit === "warlord") this.addWarlordOutfit(scene);
     else if (opts.outfit) this.addArmor(scene, opts.color, opts.outfit);
 
     if (opts.hair === "ponytail") {
@@ -210,6 +211,8 @@ export class Humanoid {
       buildSirenHair(scene).parent = this.body;
     } else if (opts.hair === "firebrand") {
       buildFirebrandHair(scene).parent = this.body;
+    } else if (opts.hair === "imperial") {
+      buildImperialHair(scene).parent = this.body;
     }
   }
 
@@ -1409,6 +1412,132 @@ export class Humanoid {
     }
   }
 
+  /**
+   * Emperor Doel's warlord plate (his human form — the Violet/Thunder Dragoon), from his art:
+   * heavy near-black plate with glowing copper filigree, a tall high collar with a red inner
+   * facing, big up-swept spiked pauldrons, a layered fauld, fully plated arms and legs, and a
+   * long black cape that sways. Built over the (dark) bearer-coloured body.
+   */
+  private addWarlordOutfit(scene: Scene): void {
+    const plate = mat("wlPlate", 0.17, 0.15, 0.22, scene); // near-black charcoal-violet plate
+    const plateLt = mat("wlPlateLt", 0.28, 0.25, 0.36, scene); // highlighted plates
+    const red = mat("wlRed", 0.5, 0.1, 0.12, scene); // collar inner
+    const capeMat = mat("wlCape", 0.08, 0.07, 0.1, scene); // black cape
+    const copper = mat("wlCopper", 0.72, 0.42, 0.2, scene); // filigree
+    copper.emissiveColor = new Color3(0.4, 0.18, 0.06); // faint molten glow
+
+    // Tall high collar: dark plate with a red inner facing and copper-edged wings behind.
+    const collar = box("wlCollar", 0.34, 0.2, 0.3, plate, scene);
+    collar.position.y = 1.46;
+    collar.parent = this.body;
+    const inner = box("wlCollarInner", 0.3, 0.18, 0.02, red, scene);
+    inner.position = new Vector3(0, 1.5, 0.13);
+    inner.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const wing = box("wlCollarWing", 0.1, 0.3, 0.06, plate, scene);
+      wing.position = new Vector3(sx * 0.17, 1.6, -0.06);
+      wing.rotation.z = sx * 0.3;
+      wing.rotation.x = -0.3;
+      wing.parent = this.body;
+      const edge = box("wlCollarEdge", 0.03, 0.3, 0.07, copper, scene);
+      edge.position = new Vector3(sx * 0.22, 1.6, -0.06);
+      edge.rotation.z = sx * 0.3;
+      edge.rotation.x = -0.3;
+      edge.parent = this.body;
+    }
+
+    // Breastplate with a glowing copper filigree: a central stem + a boss + upswept prongs.
+    const chest = box("wlChest", 0.48, 0.52, 0.14, plate, scene);
+    chest.position = new Vector3(0, 1.16, 0.12);
+    chest.parent = this.body;
+    const stem = box("wlFiliStem", 0.05, 0.44, 0.03, copper, scene);
+    stem.position = new Vector3(0, 1.14, 0.2);
+    stem.parent = this.body;
+    const boss = MeshBuilder.CreateSphere("wlBoss", { diameter: 0.12, segments: 10 }, scene);
+    boss.material = copper;
+    boss.isPickable = false;
+    boss.scaling.z = 0.5;
+    boss.position = new Vector3(0, 1.22, 0.2);
+    boss.parent = this.body;
+    for (const sx of [-1, 1]) {
+      const prong = box("wlFiliPr", 0.04, 0.3, 0.03, copper, scene);
+      prong.position = new Vector3(sx * 0.12, 1.12, 0.2);
+      prong.rotation.z = sx * 0.6;
+      prong.parent = this.body;
+    }
+
+    // Big up-swept spiked pauldrons: two stacked plates + a copper-edged spike, per side.
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < 2; i++) {
+        const p = box("wlPauldron", 0.32 - i * 0.08, 0.09, 0.44 - i * 0.1, plateLt, scene);
+        p.position = new Vector3(sx * (0.38 + i * 0.03), 1.5 + i * 0.11, 0);
+        p.rotation.z = sx * (0.4 + i * 0.22);
+        p.parent = this.body;
+        const trim = box("wlPauldronTrim", 0.33 - i * 0.08, 0.03, 0.45 - i * 0.1, copper, scene);
+        trim.position = new Vector3(sx * (0.38 + i * 0.03), 1.55 + i * 0.11, 0);
+        trim.rotation.z = sx * (0.4 + i * 0.22);
+        trim.parent = this.body;
+      }
+      const spike = coneSpike(scene, plate, new Vector3(sx * 0.46, 1.72, 0), 0, sx * 1.1, 0.34, 0.12);
+      spike.parent = this.body;
+    }
+
+    // Belt + a layered fauld of copper-trimmed tassets over the hips.
+    const belt = box("wlBelt", 0.48, 0.1, 0.32, plate, scene);
+    belt.position.y = 0.84;
+    belt.parent = this.body;
+    const buckle = box("wlBuckle", 0.12, 0.1, 0.04, copper, scene);
+    buckle.position = new Vector3(0, 0.84, 0.17);
+    buckle.parent = this.body;
+    for (const dx of [-0.15, 0, 0.15]) {
+      const tasset = box("wlTasset", 0.14, 0.24, 0.16, plateLt, scene);
+      tasset.position = new Vector3(dx, 0.68, 0.14);
+      tasset.parent = this.body;
+      const tt = box("wlTassetTrim", 0.15, 0.03, 0.17, copper, scene);
+      tt.position = new Vector3(dx, 0.57, 0.14);
+      tt.parent = this.body;
+    }
+
+    // Long black cape from the shoulders (sways in update()).
+    const cape = new TransformNode("wlCapePivot", scene);
+    cape.position = new Vector3(0, 1.5, -0.12);
+    cape.parent = this.body;
+    this.cape = cape;
+    const capeTop = box("wlCapeTop", 0.56, 0.6, 0.05, capeMat, scene);
+    capeTop.position = new Vector3(0, -0.3, -0.02);
+    capeTop.rotation.x = -0.05;
+    capeTop.parent = cape;
+    const capeHem = box("wlCapeHem", 0.66, 0.7, 0.05, capeMat, scene);
+    capeHem.position = new Vector3(0, -0.92, -0.06);
+    capeHem.parent = cape;
+
+    // Fully plated arms: a copper-cuffed vambrace running the forearm (swing with the arms).
+    for (const arm of [this.leftArm, this.rightArm]) {
+      const vamb = box("wlVambrace", 0.21, 0.5, 0.21, plate, scene);
+      vamb.position.y = -0.4;
+      vamb.parent = arm;
+      const cuff = box("wlCuff", 0.23, 0.05, 0.23, copper, scene);
+      cuff.position.y = -0.62;
+      cuff.parent = arm;
+      const gauntlet = box("wlGauntlet", 0.22, 0.12, 0.22, plateLt, scene);
+      gauntlet.position.y = -0.16;
+      gauntlet.parent = arm;
+    }
+
+    // Plated thighs, greaves and boots with copper knee guards (swing with the legs).
+    for (const leg of [this.leftLeg, this.rightLeg]) {
+      const thigh = box("wlThigh", 0.22, 0.42, 0.24, plate, scene);
+      thigh.position.y = -0.2;
+      thigh.parent = leg;
+      const knee = box("wlKnee", 0.23, 0.1, 0.25, copper, scene);
+      knee.position.y = -0.42;
+      knee.parent = leg;
+      const boot = box("wlBoot", 0.24, 0.32, 0.28, plateLt, scene);
+      boot.position = new Vector3(0, -0.62, 0.02);
+      boot.parent = leg;
+    }
+  }
+
   /** Hide/show the figure (e.g. when a loaded glTF model replaces it). */
   setEnabled(on: boolean): void {
     this.rig.setEnabled(on);
@@ -2194,6 +2323,38 @@ function buildFirebrandHair(scene: Scene): TransformNode {
   const scar = box("faceScar", 0.02, 0.16, 0.02, scarMat, scene);
   scar.position = new Vector3(-0.1, 1.63, 0.17);
   scar.rotation.z = 0.3;
+  scar.parent = group;
+  return group;
+}
+
+/**
+ * Emperor Doel's head: short black hair in tight upright spikes, a trimmed black mustache,
+ * and a scar down the brow. Rigid; bobs with the head.
+ */
+function buildImperialHair(scene: Scene): TransformNode {
+  const group = new TransformNode("hairImperial", scene);
+  const black = mat("hairImpBlack", 0.1, 0.09, 0.12, scene);
+  const scarMat = mat("hairImpScar", 0.66, 0.5, 0.46, scene);
+
+  // Snug cap, then short upright spikes across the crown and hairline.
+  const cap = box("hairCap", 0.37, 0.16, 0.36, black, scene);
+  cap.position.y = 1.77;
+  cap.parent = group;
+  const spike = (x: number, z: number, len = 0.16) =>
+    (coneSpike(scene, black, new Vector3(x, 1.85, z), 0, 0, len, 0.09).parent = group);
+  for (const x of [-0.12, 0, 0.12]) {
+    for (const z of [0.1, -0.05, -0.16]) spike(x, z);
+  }
+
+  // Trimmed black mustache over the lip.
+  const stache = box("impStache", 0.16, 0.03, 0.04, black, scene);
+  stache.position = new Vector3(0, 1.56, 0.16);
+  stache.parent = group;
+
+  // Scar slanting down the right brow (the +X side from the front).
+  const scar = box("impScar", 0.02, 0.16, 0.02, scarMat, scene);
+  scar.position = new Vector3(0.1, 1.66, 0.17);
+  scar.rotation.z = -0.25;
   scar.parent = group;
   return group;
 }

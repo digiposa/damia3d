@@ -14,6 +14,7 @@ import damiaPortrait from "../assets/portraits/damia.png";
 import damiaDragoonPortrait from "../assets/portraits/damia-dragoon.png";
 import belzacPortrait from "../assets/portraits/belzac.png";
 import kanzasPortrait from "../assets/portraits/kanzas.png";
+import doelPortrait from "../assets/portraits/doel.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -39,7 +40,8 @@ export type HairStyle =
   | "mane"
   | "elder"
   | "siren"
-  | "firebrand";
+  | "firebrand"
+  | "imperial";
 
 /** Outfit overlaid on the placeholder figure (armour plates, straps, boots…). */
 export type OutfitStyle =
@@ -58,7 +60,8 @@ export type OutfitStyle =
   | "gigantos"
   | "martialist"
   | "siren"
-  | "enforcer";
+  | "enforcer"
+  | "warlord";
 
 /**
  * A Dragoon Spirit bearer — a playable identity (skin) backed by a Dragoon class.
@@ -128,7 +131,7 @@ export const BEARERS: Bearer[] = [
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
-  { id: "doel", name: "Doel", classId: "thunder", weapon: "fist", hair: "short", color: C_THUNDER, storyPlayable: false },
+  { id: "doel", name: "Doel", classId: "thunder", portrait: doelPortrait, weapon: "fist", hair: "imperial", outfit: "warlord", color: C_THUNDER, bodyColor: [0.16, 0.14, 0.2], storyPlayable: false },
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
   { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
