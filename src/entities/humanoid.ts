@@ -2173,18 +2173,22 @@ function buildFirebrandHair(scene: Scene): TransformNode {
   spike(0.17, 1.76, -0.02, -0.4, 0.7, 0.26);
   spike(0, 1.86, 0.06, -0.9, 0, 0.28); // a forelock kicking up at the front
 
-  // Full red beard: cheeks, jawline and a chin tuft framing the lower face.
-  for (const dx of [-0.15, 0.15]) {
-    const cheek = box("beardCheek", 0.07, 0.2, 0.16, red, scene);
-    cheek.position = new Vector3(dx, 1.54, 0.1);
-    cheek.parent = group;
+  // Trimmed red beard hugging the jaw: slim sideburns down the cheeks, a thin jawline, a
+  // small chin tuft, and a mustache linking into it (kept close to the face, not bushy).
+  for (const dx of [-0.16, 0.16]) {
+    const side = box("beardSide", 0.05, 0.22, 0.12, red, scene);
+    side.position = new Vector3(dx, 1.55, 0.05);
+    side.parent = group;
   }
-  const jaw = box("beardJaw", 0.3, 0.1, 0.24, red, scene);
-  jaw.position = new Vector3(0, 1.46, 0.09);
+  const jaw = box("beardJaw", 0.28, 0.07, 0.16, red, scene);
+  jaw.position = new Vector3(0, 1.46, 0.08);
   jaw.parent = group;
-  const chin = box("beardChin", 0.16, 0.14, 0.16, red, scene);
-  chin.position = new Vector3(0, 1.42, 0.13);
+  const chin = box("beardChin", 0.13, 0.11, 0.12, red, scene);
+  chin.position = new Vector3(0, 1.44, 0.12);
   chin.parent = group;
+  const stache = box("beardStache", 0.15, 0.03, 0.04, red, scene);
+  stache.position = new Vector3(0, 1.56, 0.16);
+  stache.parent = group;
 
   // Scar slanting across the left cheek (the −X side from the front).
   const scar = box("faceScar", 0.02, 0.16, 0.02, scarMat, scene);
