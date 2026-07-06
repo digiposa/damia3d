@@ -10,6 +10,7 @@ import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
 import { Atmosphere } from "../world/atmosphere";
 import { LIGHTING_PRESETS } from "../world/lighting";
+import { loadEnvironment, type PropPlacement } from "../world/props";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -200,6 +201,12 @@ export class TrainingMode extends GameMode {
   private camera!: IsoCamera;
   private atmosphere?: Atmosphere;
   private hud!: PartyPanel;
+  /**
+   * Optional GLB decor layout (empty = the procedural arena only). Drop models into
+   * src/assets/models/ and add placements here to dress the scene with real low-poly assets,
+   * e.g. `{ model: "pillar", position: [0, 0, -6], scale: 1.5, receiveShadows: true }`.
+   */
+  private decor: PropPlacement[] = [];
   private sight!: TimingSight;
   private debugBtn!: Button;
   private debugMenu!: TrainingMenu;
@@ -290,6 +297,7 @@ export class TrainingMode extends GameMode {
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
     this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.arenaNight);
     this.refreshShadowCasters();
+    void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
     // Tapping a row takes control of that member.
@@ -498,6 +506,14 @@ export class TrainingMode extends GameMode {
     this.runner.attach(this.controlled.gauge);
     this.runner.setFillTime(this.player.atbFillTime);
     this.refreshShadowCasters();
+  }
+
+  /** Load the optional GLB decor layout and register it as static shadow casters. No-op while
+   *  the decor list is empty (the default) — the procedural arena stands alone. */
+  private async loadDecor(): Promise<void> {
+    if (!this.decor.length) return;
+    const meshes = await loadEnvironment(this.scene, this.decor);
+    this.atmosphere?.addStaticCasters(meshes);
   }
 
   /** Re-register every live entity as a shadow caster (party + enemies). Cheap; call after

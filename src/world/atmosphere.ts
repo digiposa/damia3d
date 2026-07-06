@@ -12,6 +12,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { type LightingPreset, lerpPreset } from "./lighting";
 
@@ -55,6 +56,8 @@ export class Atmosphere {
   private readonly sparks: ParticleSystem;
   private current: LightingPreset;
   private transitionObs?: Observer<Scene>;
+  /** Static (decor) shadow casters, kept so the dynamic rebuild in setCasters never drops them. */
+  private staticCasters: AbstractMesh[] = [];
 
   constructor(scene: Scene, camera: Camera, preset: LightingPreset) {
     this.scene = scene;
@@ -160,9 +163,18 @@ export class Atmosphere {
     const map = this.shadows.getShadowMap();
     if (!map || !map.renderList) return;
     map.renderList.length = 0;
+    map.renderList.push(...this.staticCasters); // decor first, then the live entities
     for (const root of roots) {
       for (const mesh of root.getChildMeshes()) map.renderList.push(mesh);
     }
+  }
+
+  /** Register always-present decor meshes (e.g. loaded GLB props) as shadow casters. They
+   *  persist across setCasters() rebuilds. */
+  addStaticCasters(meshes: AbstractMesh[]): void {
+    this.staticCasters.push(...meshes);
+    const map = this.shadows.getShadowMap();
+    if (map?.renderList) map.renderList.push(...meshes);
   }
 
   /**
