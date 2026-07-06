@@ -1726,7 +1726,11 @@ export class TrainingMode extends GameMode {
     this.guardBtn?.setAvailable(ready && !p.guardActive);
     this.guardBtn?.setReady(ready && !p.guardActive);
     this.itemBtn?.setVisible(!transformed);
-    this.itemBtn?.setAvailable(ready && this.hasUsableItem());
+    // Openable whenever you can act and hold any item — the item menu greys individual
+    // entries that would do nothing. The gold "ready" glow only lights when something is
+    // actually useful (a heal at < full HP, an SP restore below max), as a nudge.
+    const hasItems = this.items.some((s) => s.count > 0);
+    this.itemBtn?.setAvailable(ready && hasItems);
     this.itemBtn?.setReady(ready && this.hasUsableItem());
 
     // Transform: the Dragoon eye + button colour follow the controlled archetype.
