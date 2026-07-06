@@ -4,3 +4,6 @@ dist/
 .DS_Store
 .vscode/
 *.log
+
+# Raw 3D asset library — kept local only (too large for git; see claudeAiShare)
+claudeAiShare/
