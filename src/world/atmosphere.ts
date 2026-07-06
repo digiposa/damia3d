@@ -8,9 +8,12 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
-import type { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Observer } from "@babylonjs/core/Misc/observable";
+import { type LightingPreset, lerpPreset } from "./lighting";
 
 /**
  * A soft round particle sprite (radial white → transparent) painted on a canvas — the shared
@@ -45,45 +48,53 @@ export function softDotTexture(scene: Scene): DynamicTexture {
 export class Atmosphere {
   readonly shadows: ShadowGenerator;
   readonly dot: DynamicTexture;
+  private readonly scene: Scene;
+  private readonly ambient: HemisphericLight;
+  private readonly sun: DirectionalLight;
+  private readonly pipeline: DefaultRenderingPipeline;
   private readonly sparks: ParticleSystem;
+  private current: LightingPreset;
+  private transitionObs?: Observer<Scene>;
 
-  constructor(scene: Scene, camera: Camera, sun: DirectionalLight) {
-    // Distance gloom: the fighting floor stays clear; far wall/stands/gate sink into dark.
+  constructor(scene: Scene, camera: Camera, preset: LightingPreset) {
+    this.scene = scene;
+
+    // Lights: a hemispheric fill + a directional "sun" key. Their values come from the preset
+    // (see applyPreset); created once here so the whole mood is owned in one place.
+    this.ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), scene);
+    this.sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), scene);
+
+    // Distance fog is always LINEAR (exp reads flat under the orthographic iso camera); its
+    // start/end/colour are set per preset.
     scene.fogMode = Scene.FOGMODE_LINEAR;
-    scene.fogColor = new Color3(0.035, 0.043, 0.06);
-    scene.fogStart = 24;
-    scene.fogEnd = 62;
 
     // Real glow for emissive surfaces (chest gems, brazier flames, filigree, Dragoon wings).
     const glow = new GlowLayer("moodGlow", scene, { blurKernelSize: 32 });
     glow.intensity = 0.6;
 
-    // HDR pipeline (float buffers → tone mapping + bloom look right).
-    const pipe = new DefaultRenderingPipeline("mood", true, scene, [camera]);
-    pipe.fxaaEnabled = true; // smooth the hard low-poly edges under ortho
-    const ip = pipe.imageProcessing;
+    // HDR pipeline (float buffers → tone mapping + bloom look right). The look-shaping values
+    // (exposure/contrast/vignette weight/bloom weight) come from the preset; the rest are fixed.
+    this.pipeline = new DefaultRenderingPipeline("mood", true, scene, [camera]);
+    this.pipeline.fxaaEnabled = true; // smooth the hard low-poly edges under ortho
+    const ip = this.pipeline.imageProcessing;
     ip.toneMappingEnabled = true;
     ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; // filmic highlight roll-off
-    ip.exposure = 1.1;
-    ip.contrast = 1.45; // deeper shadows, punchier key light
     ip.vignetteEnabled = true;
     ip.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY; // darken frame edges
-    ip.vignetteWeight = 2.6;
     ip.vignetteColor = new Color4(0, 0, 0, 1);
-    pipe.bloomEnabled = true;
-    pipe.bloomThreshold = 0.55; // only bright/emissive pixels bloom
-    pipe.bloomWeight = 0.5;
-    pipe.bloomKernel = 48;
-    pipe.bloomScale = 0.5;
+    this.pipeline.bloomEnabled = true;
+    this.pipeline.bloomThreshold = 0.55; // only bright/emissive pixels bloom
+    this.pipeline.bloomKernel = 48;
+    this.pipeline.bloomScale = 0.5;
 
     // Shadows: the sun casts a crisp PCF shadow map; entities cast, the floor receives. PCF
     // is more reliable/visible than blurred ESM on a large ortho scene. Darkened well below
     // half so the cast shadow reads clearly against the lit sand (ambient still fills it a bit).
-    sun.position = new Vector3(28, 46, 22); // projection origin opposite the light direction
-    sun.autoUpdateExtends = true; // fit the shadow frustum to the casters each frame
-    sun.shadowMinZ = 1;
-    sun.shadowMaxZ = 120;
-    this.shadows = new ShadowGenerator(2048, sun);
+    this.sun.position = new Vector3(28, 46, 22); // projection origin opposite the light direction
+    this.sun.autoUpdateExtends = true; // fit the shadow frustum to the casters each frame
+    this.sun.shadowMinZ = 1;
+    this.sun.shadowMaxZ = 120;
+    this.shadows = new ShadowGenerator(2048, this.sun);
     this.shadows.usePercentageCloserFiltering = true;
     this.shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     this.shadows.setDarkness(0.25);
@@ -91,6 +102,54 @@ export class Atmosphere {
     this.dot = softDotTexture(scene);
     this.sparks = this.buildSparks(scene);
     this.spawnDust(scene);
+
+    this.current = preset;
+    this.applyPreset(preset);
+  }
+
+  /** Snap all lighting/mood to a preset (lights, backdrop, fog and post-process). */
+  applyPreset(p: LightingPreset): void {
+    this.scene.clearColor = new Color4(p.clearColor[0], p.clearColor[1], p.clearColor[2], 1);
+    this.ambient.intensity = p.ambientIntensity;
+    this.ambient.groundColor = new Color3(p.ambientGround[0], p.ambientGround[1], p.ambientGround[2]);
+    this.sun.intensity = p.sunIntensity;
+    this.sun.diffuse = new Color3(p.sunColor[0], p.sunColor[1], p.sunColor[2]);
+    this.sun.direction = new Vector3(p.sunDirection[0], p.sunDirection[1], p.sunDirection[2]);
+    const ip = this.pipeline.imageProcessing;
+    ip.exposure = p.exposure;
+    ip.contrast = p.contrast;
+    ip.vignetteWeight = p.vignetteWeight;
+    this.pipeline.bloomWeight = p.bloomWeight;
+    this.scene.fogStart = p.fogStart;
+    this.scene.fogEnd = p.fogEnd;
+    this.scene.fogColor = new Color3(p.fogColor[0], p.fogColor[1], p.fogColor[2]);
+    this.current = p;
+  }
+
+  /**
+   * Smoothly cross-fade the lighting from the current preset to `target` over `seconds` (e.g.
+   * walking from a dark corridor into a lit hall). Interrupts any transition in progress.
+   */
+  transitionTo(target: LightingPreset, seconds = 1.5): void {
+    if (this.transitionObs) {
+      this.scene.onBeforeRenderObservable.remove(this.transitionObs);
+      this.transitionObs = undefined;
+    }
+    if (seconds <= 0) {
+      this.applyPreset(target);
+      return;
+    }
+    const from = this.current;
+    let elapsed = 0;
+    this.transitionObs = this.scene.onBeforeRenderObservable.add(() => {
+      elapsed += this.scene.getEngine().getDeltaTime() / 1000;
+      const t = Math.min(1, elapsed / seconds);
+      this.applyPreset(lerpPreset(from, target, t));
+      if (t >= 1 && this.transitionObs) {
+        this.scene.onBeforeRenderObservable.remove(this.transitionObs);
+        this.transitionObs = undefined;
+      }
+    });
   }
 
   /**

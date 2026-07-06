@@ -1,7 +1,4 @@
-import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
-import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import "@babylonjs/core/Meshes/meshBuilder";
 // Side-effect import: scene.pick / createPickingRay need Ray registered, else
 // every click throws "Ray needs to be imported before" and click-to-move dies.
@@ -12,6 +9,7 @@ import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
 import { Atmosphere } from "../world/atmosphere";
+import { LIGHTING_PRESETS } from "../world/lighting";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -201,7 +199,6 @@ export class TrainingMode extends GameMode {
 
   private camera!: IsoCamera;
   private atmosphere?: Atmosphere;
-  private sun?: DirectionalLight;
   private hud!: PartyPanel;
   private sight!: TimingSight;
   private debugBtn!: Button;
@@ -279,19 +276,6 @@ export class TrainingMode extends GameMode {
   }
 
   enter(): void {
-    this.scene.clearColor = new Color4(0.043, 0.051, 0.071, 1);
-
-    // Lower, cooler fill + a stronger warm key = high contrast for the dark-fantasy mood
-    // (the atmosphere pass below leans on this contrast for tone mapping + vignette).
-    const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), this.scene);
-    ambient.intensity = 0.42;
-    ambient.groundColor = new Color3(0.06, 0.08, 0.14);
-
-    const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), this.scene);
-    sun.intensity = 1.15;
-    sun.diffuse = new Color3(1.0, 0.9, 0.74); // warm torch-lit tint for the night arena
-    this.sun = sun;
-
     createArena(this.scene);
     // The sand floor catches the characters' cast shadows.
     const floor = this.scene.getMeshByName("arenaFloor");
@@ -301,9 +285,10 @@ export class TrainingMode extends GameMode {
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
-    // Dark-fantasy rendering pass (tone map + bloom + glow + fog + shadows + dust) — pure
-    // rendering, no assets. Then register the initial party as shadow casters.
-    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, this.sun!);
+    // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
+    // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
+    // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
+    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.arenaNight);
     this.refreshShadowCasters();
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
