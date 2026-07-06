@@ -399,6 +399,15 @@ export class TrainingMode extends GameMode {
     );
     this.specialBtn.setVisible(false);
 
+    // Desktop only: a discreet keyboard-shortcut pill on each action button.
+    this.attackBtn.setShortcut("Space");
+    this.guardBtn.setShortcut("G");
+    this.magicBtn.setShortcut("F");
+    this.itemBtn.setShortcut("R");
+    this.transformBtn.setShortcut("T");
+    this.switchBtn.setShortcut("Tab");
+    this.specialBtn.setShortcut("X");
+
     // Dragoon Space arena tint (Special) — a soft full-screen element-coloured overlay.
     this.spaceOverlay = document.createElement("div");
     Object.assign(this.spaceOverlay.style, {

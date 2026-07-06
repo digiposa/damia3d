@@ -1,4 +1,4 @@
-import { scaleHud } from "../core/device";
+import { scaleHud, hasTouch } from "../core/device";
 
 /** Color-independent gloss laid over each button's solid colour: a soft top
  *  highlight + a darker bottom, giving the flat disc some depth. */
@@ -26,6 +26,8 @@ export class ActionButton {
   private label: HTMLSpanElement;
   private overlay: HTMLDivElement;
   private count: HTMLSpanElement;
+  /** Desktop-only keyboard-shortcut pill (created lazily by setShortcut). */
+  private shortcutEl?: HTMLSpanElement;
 
   /** Ordered sprite frames (≥2 → animated icon); empty for an emoji/text label. */
   private frames: string[] = [];
@@ -212,6 +214,35 @@ export class ActionButton {
   /** Update the button's solid colour (the gloss image stays on top). */
   setColor(backgroundColor: string): void {
     this.el.style.backgroundColor = backgroundColor;
+  }
+
+  /**
+   * Show a discreet keyboard-shortcut pill at the bottom of the button (desktop only — touch
+   * devices have no keyboard, so it's a no-op there). Pass e.g. "Space", "G", "Tab".
+   */
+  setShortcut(key: string): void {
+    if (hasTouch()) return;
+    if (!this.shortcutEl) {
+      const el = document.createElement("span");
+      Object.assign(el.style, {
+        position: "absolute",
+        bottom: "-3px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        font: "700 9px/1 ui-monospace, monospace",
+        color: "rgba(235,240,255,0.82)",
+        background: "rgba(0,0,0,0.6)",
+        border: "1px solid rgba(255,255,255,0.18)",
+        borderRadius: "4px",
+        padding: "1px 4px",
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+        zIndex: "3",
+      } satisfies Partial<CSSStyleDeclaration>);
+      this.el.appendChild(el);
+      this.shortcutEl = el;
+    }
+    this.shortcutEl.textContent = key;
   }
 
   dispose(): void {
