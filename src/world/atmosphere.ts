@@ -140,24 +140,27 @@ export class Atmosphere {
 
   /** Slow dust motes drifting through the arena air — cheap atmospheric depth. */
   private spawnDust(scene: Scene): void {
-    const ps = new ParticleSystem("dust", 60, scene);
+    const ps = new ParticleSystem("dust", 40, scene);
     ps.particleTexture = this.dot;
     ps.emitter = new Vector3(0, 2.4, 0);
     ps.minEmitBox = new Vector3(-14, -2, -14);
     ps.maxEmitBox = new Vector3(14, 4, 14);
-    ps.color1 = new Color4(0.8, 0.82, 0.9, 0.06);
-    ps.color2 = new Color4(0.72, 0.76, 0.9, 0.1);
-    ps.colorDead = new Color4(0.7, 0.75, 0.9, 0);
-    ps.minSize = 0.03;
-    ps.maxSize = 0.09;
-    ps.minLifeTime = 6;
-    ps.maxLifeTime = 12;
-    ps.emitRate = 8;
-    ps.gravity = new Vector3(0, 0.02, 0); // barely rising
-    ps.direction1 = new Vector3(-0.2, 0.05, -0.2);
-    ps.direction2 = new Vector3(0.2, 0.15, 0.2);
-    ps.minEmitPower = 0.05;
-    ps.maxEmitPower = 0.15;
+    // Alpha-blended (NOT additive — additive white motes glow like bright orbs on the dark
+    // floor), tiny, and barely-there: a faint warm-grey haze, not visible "smoke".
+    ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    ps.color1 = new Color4(0.5, 0.47, 0.42, 0.035);
+    ps.color2 = new Color4(0.55, 0.52, 0.48, 0.05);
+    ps.colorDead = new Color4(0.5, 0.47, 0.42, 0);
+    ps.minSize = 0.015;
+    ps.maxSize = 0.045;
+    ps.minLifeTime = 4;
+    ps.maxLifeTime = 8;
+    ps.emitRate = 3;
+    ps.gravity = new Vector3(0, 0.01, 0); // drifts almost imperceptibly
+    ps.direction1 = new Vector3(-0.15, 0.03, -0.15);
+    ps.direction2 = new Vector3(0.15, 0.1, 0.15);
+    ps.minEmitPower = 0.04;
+    ps.maxEmitPower = 0.12;
     ps.updateSpeed = 0.02;
     ps.start();
   }
