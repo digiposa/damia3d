@@ -302,7 +302,7 @@ export class TrainingMode extends GameMode {
     // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
-    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.arenaNight);
+    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.trainingArena);
     this.refreshShadowCasters();
     void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
 

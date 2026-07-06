@@ -30,7 +30,24 @@ export interface LightingPreset {
  * starting points for future zones — tune them when those zones actually exist.
  */
 export const LIGHTING_PRESETS = {
-  /** The torch-lit night arena — deep, contrasty, heavy vignette (current Training look). */
+  /** Training arena — the dark-fantasy palette but clearly lit and readable (more fill, softer
+   *  vignette/fog, less crushed shadows) so you can see the fight and the decor. */
+  trainingArena: {
+    clearColor: [0.07, 0.08, 0.11],
+    ambientIntensity: 0.78,
+    ambientGround: [0.12, 0.14, 0.2],
+    sunIntensity: 1.3,
+    sunColor: [1.0, 0.92, 0.8],
+    sunDirection: [-0.5, -1, -0.4],
+    exposure: 1.25,
+    contrast: 1.22,
+    vignetteWeight: 1.1,
+    bloomWeight: 0.4,
+    fogStart: 36,
+    fogEnd: 95,
+    fogColor: [0.07, 0.08, 0.12],
+  },
+  /** The torch-lit night arena — deep, contrasty, heavy vignette (dramatic dark version). */
   arenaNight: {
     clearColor: [0.043, 0.051, 0.071],
     ambientIntensity: 0.42,
