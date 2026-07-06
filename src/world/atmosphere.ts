@@ -77,14 +77,17 @@ export class Atmosphere {
     pipe.bloomKernel = 48;
     pipe.bloomScale = 0.5;
 
-    // Soft shadows: the sun casts a blurred shadow map; entities cast, the floor receives.
-    sun.position = new Vector3(28, 46, 22); // a projection origin opposite the light direction
+    // Shadows: the sun casts a crisp PCF shadow map; entities cast, the floor receives. PCF
+    // is more reliable/visible than blurred ESM on a large ortho scene. Darkened well below
+    // half so the cast shadow reads clearly against the lit sand (ambient still fills it a bit).
+    sun.position = new Vector3(28, 46, 22); // projection origin opposite the light direction
+    sun.autoUpdateExtends = true; // fit the shadow frustum to the casters each frame
     sun.shadowMinZ = 1;
-    sun.shadowMaxZ = 100;
-    this.shadows = new ShadowGenerator(1024, sun);
-    this.shadows.useBlurExponentialShadowMap = true;
-    this.shadows.blurKernel = 32;
-    this.shadows.setDarkness(0.5);
+    sun.shadowMaxZ = 120;
+    this.shadows = new ShadowGenerator(2048, sun);
+    this.shadows.usePercentageCloserFiltering = true;
+    this.shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+    this.shadows.setDarkness(0.25);
 
     this.dot = softDotTexture(scene);
     this.spawnDust(scene);
@@ -115,17 +118,17 @@ export class Atmosphere {
     ps.color1 = new Color4(1.0, 0.95, 0.7, 1);
     ps.color2 = new Color4(1.0, 0.7, 0.3, 1);
     ps.colorDead = new Color4(1.0, 0.4, 0.1, 0);
-    ps.minSize = 0.05;
-    ps.maxSize = 0.14;
-    ps.minLifeTime = 0.15;
-    ps.maxLifeTime = 0.35;
-    ps.emitRate = 400;
+    ps.minSize = 0.08;
+    ps.maxSize = 0.22;
+    ps.minLifeTime = 0.2;
+    ps.maxLifeTime = 0.45;
+    ps.emitRate = 700;
     ps.blendMode = ParticleSystem.BLENDMODE_ADD;
     ps.gravity = new Vector3(0, -6, 0);
-    ps.minEmitPower = 2;
-    ps.maxEmitPower = 5;
+    ps.minEmitPower = 2.5;
+    ps.maxEmitPower = 6;
     ps.updateSpeed = 0.02;
-    ps.targetStopDuration = 0.06; // emit for a blink…
+    ps.targetStopDuration = 0.09; // emit for a blink…
     ps.disposeOnStop = true; // …then clean itself up
     ps.start();
   }
