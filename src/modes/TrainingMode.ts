@@ -543,6 +543,28 @@ export class TrainingMode extends GameMode {
     this.paused = false;
   }
 
+  /** GameMode: is one of this mode's overlays open? (mutually exclusive with the System menu) */
+  hasOpenMenu(): boolean {
+    return this.debugMenu.isOpen || this.itemMenu.isOpen || this.spellMenu.isOpen;
+  }
+
+  /** GameMode: Escape closes the open overlay (debug/item/spell) instead of opening System. */
+  closeTopMenu(): boolean {
+    if (this.debugMenu.isOpen) {
+      this.closeDebugMenu();
+      return true;
+    }
+    if (this.itemMenu.isOpen) {
+      this.closeItemMenu();
+      return true;
+    }
+    if (this.spellMenu.isOpen) {
+      this.closeSpellMenu();
+      return true;
+    }
+    return false;
+  }
+
   /**
    * Assign a bearer to the active party slot, then rebuild the party. Duplicates are
    * avoided by swapping: if the bearer already holds another slot, that slot inherits the

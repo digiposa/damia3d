@@ -112,6 +112,8 @@ export class Game implements GameHost {
   /** GameHost: open the System menu (also used by the ⚙ button and Escape). */
   openSystemMenu(section?: SystemSection): void {
     if (this.system.isOpen) return;
+    // The System menu and a mode's own overlay (debug/item/spell) are mutually exclusive.
+    if (this.modes.current?.hasOpenMenu?.()) return;
     const atMainMenu = this.menu.isOpen;
     if (!atMainMenu) this.paused = true; // pause gameplay (nothing runs at the title)
     this.systemBtn.setVisible(false);
@@ -132,7 +134,9 @@ export class Game implements GameHost {
   private handleHotkeys(e: KeyboardEvent): void {
     if (e.code !== "Escape") return;
     e.preventDefault();
-    if (this.system.isOpen) this.closeSystemMenu();
-    else this.openSystemMenu();
+    // Escape closes whatever menu is currently open, at any level:
+    if (this.system.isOpen) this.closeSystemMenu(); // 1) the System menu
+    else if (this.modes.current?.closeTopMenu?.()) return; // 2) a mode overlay (debug/item/spell)
+    else this.openSystemMenu(); // 3) nothing open → open the System menu
   }
 }
