@@ -753,12 +753,11 @@ export class TrainingMode extends GameMode {
   }
 
   private openItemMenu(): void {
-    const a = this.player;
     const entries: ItemEntry[] = this.items.map((s) => ({
       id: s.def.id,
       name: t(s.def.nameKey),
       count: s.count,
-      enabled: s.count > 0 && this.itemUseful(s.def, a),
+      enabled: s.count > 0, // any item in stock is usable, even if it would waste its effect
       detail: s.def.spRestore
         ? `+${s.def.spRestore} ${t("stat.sp")}`
         : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
@@ -781,13 +780,6 @@ export class TrainingMode extends GameMode {
     this.runner.gauge.spend(); // using an item is the member's ATB action
     this.finishAction();
     this.refreshHud();
-  }
-
-  /** True when an item would do something for `a` (don't offer a full-HP heal / full-SP charge). */
-  private itemUseful(def: ItemDef, a: Player): boolean {
-    if (def.healFraction > 0 && a.hp < a.maxHp) return true;
-    if ((def.spRestore ?? 0) > 0 && a.sp < a.maxSp) return true;
-    return false;
   }
 
   /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
@@ -1391,11 +1383,6 @@ export class TrainingMode extends GameMode {
     return this.items.some((s) => s.count > 0 && s.def.healFraction > 0);
   }
 
-  /** True when the controlled member has any usable item (heal when hurt, Spirit when low SP). */
-  private hasUsableItem(): boolean {
-    return this.items.some((s) => s.count > 0 && this.itemUseful(s.def, this.player));
-  }
-
   /**
    * An AI attacker auto-resolves its equipped Addition in one strike (no timed input):
    * the whole combo's damage lands at once. Ranged bearers loose an arrow as usual.
@@ -1726,12 +1713,10 @@ export class TrainingMode extends GameMode {
     this.guardBtn?.setAvailable(ready && !p.guardActive);
     this.guardBtn?.setReady(ready && !p.guardActive);
     this.itemBtn?.setVisible(!transformed);
-    // Openable whenever you can act and hold any item — the item menu greys individual
-    // entries that would do nothing. The gold "ready" glow only lights when something is
-    // actually useful (a heal at < full HP, an SP restore below max), as a nudge.
+    // Usable whenever you can act and hold any item (even wasting its effect is allowed).
     const hasItems = this.items.some((s) => s.count > 0);
     this.itemBtn?.setAvailable(ready && hasItems);
-    this.itemBtn?.setReady(ready && this.hasUsableItem());
+    this.itemBtn?.setReady(ready && hasItems);
 
     // Transform: the Dragoon eye + button colour follow the controlled archetype.
     if (p.element !== this.transformElement) {
