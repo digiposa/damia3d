@@ -202,11 +202,18 @@ export class TrainingMode extends GameMode {
   private atmosphere?: Atmosphere;
   private hud!: PartyPanel;
   /**
-   * Optional GLB decor layout (empty = the procedural arena only). Drop models into
-   * src/assets/models/ and add placements here to dress the scene with real low-poly assets,
-   * e.g. `{ model: "pillar", position: [0, 0, -6], scale: 1.5, receiveShadows: true }`.
+   * GLB decor layout (Quaternius Modular Dungeon test set). A small vignette off the left edge
+   * of the arena so we can judge real low-poly assets in our lighting. Walls are modelled
+   * centred on Y, so they sit at y:1 to rest on the ground.
    */
-  private decor: PropPlacement[] = [];
+  private decor: PropPlacement[] = [
+    { model: "column", position: [-9, 0, 1], receiveShadows: true },
+    { model: "wall", position: [-9, 1, 2.6], rotationY: Math.PI / 2, receiveShadows: true },
+    { model: "wall", position: [-9, 1, -0.6], rotationY: Math.PI / 2, receiveShadows: true },
+    { model: "torch", position: [-8.7, 1.3, 1], rotationY: -Math.PI / 2 },
+    { model: "barrel", position: [-7.6, 0, 2.2] },
+    { model: "chest", position: [-7.7, 0, 0.2], rotationY: 0.5 },
+  ];
   private sight!: TimingSight;
   private debugBtn!: Button;
   private debugMenu!: TrainingMenu;
