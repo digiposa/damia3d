@@ -11,6 +11,7 @@ import { GameMode } from "../core/GameMode";
 import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
+import { applyAtmosphere } from "../world/atmosphere";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -278,13 +279,15 @@ export class TrainingMode extends GameMode {
   enter(): void {
     this.scene.clearColor = new Color4(0.043, 0.051, 0.071, 1);
 
+    // Lower, cooler fill + a stronger warm key = high contrast for the dark-fantasy mood
+    // (the atmosphere pass below leans on this contrast for tone mapping + vignette).
     const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), this.scene);
-    ambient.intensity = 0.65;
-    ambient.groundColor = new Color3(0.1, 0.12, 0.18);
+    ambient.intensity = 0.42;
+    ambient.groundColor = new Color3(0.06, 0.08, 0.14);
 
     const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), this.scene);
-    sun.intensity = 0.85;
-    sun.diffuse = new Color3(1.0, 0.92, 0.8); // warm torch-lit tint for the night arena
+    sun.intensity = 1.15;
+    sun.diffuse = new Color3(1.0, 0.9, 0.74); // warm torch-lit tint for the night arena
 
     createArena(this.scene);
 
@@ -292,6 +295,8 @@ export class TrainingMode extends GameMode {
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
+    // Dark-fantasy rendering pass (tone map + bloom + glow + fog) — pure post, no assets.
+    applyAtmosphere(this.scene, this.camera.camera);
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
     // Tapping a row takes control of that member.
