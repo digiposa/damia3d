@@ -413,6 +413,8 @@ export class TrainingMode extends GameMode {
 
     this.canvas = this.scene.getEngine().getRenderingCanvas() ?? undefined;
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
+    this.canvas?.addEventListener("pointermove", this.onPointerMove);
+    this.canvas?.addEventListener("pointerleave", this.onPointerLeave);
     window.addEventListener("keydown", this.onKeyDown);
 
     this.spawnDummy();
@@ -1033,6 +1035,21 @@ export class TrainingMode extends GameMode {
       // DEBUG: handler fired but no ground point (pick/ray failed) — mark over the player.
       this.popText(this.player.position.add(new Vector3(0, 3, 0)), "✖ NO GROUND", "#ffd070");
     }
+  };
+
+  /** Desktop hover: show the attack (sword) cursor over a living, attackable enemy; otherwise
+   *  the normal cursor. Only enemies are pickable, so this is a cheap per-move pick. */
+  private onPointerMove = (e: PointerEvent): void => {
+    if (!this.canvas || e.pointerType === "touch") return;
+    const picked = this.scene.pick(e.offsetX, e.offsetY)?.pickedMesh?.metadata;
+    const overEnemy = picked instanceof Enemy && picked.alive && this.enemies.includes(picked);
+    // Sword hotspot near the blade tip; match the form's blade colour (blue human / red Dragoon).
+    const frame = this.player.transformed ? ATTACK_DRAGOON_FRAMES[0] : ATTACK_ICON_FRAMES[0];
+    this.canvas.style.cursor = overEnemy ? `url(${frame}) 8 4, crosshair` : "";
+  };
+
+  private onPointerLeave = (): void => {
+    if (this.canvas) this.canvas.style.cursor = "";
   };
 
   /** Walk toward the move target or attack target; strike when in reach. */
@@ -1764,6 +1781,8 @@ export class TrainingMode extends GameMode {
 
   dispose(): void {
     this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
+    this.canvas?.removeEventListener("pointermove", this.onPointerMove);
+    this.canvas?.removeEventListener("pointerleave", this.onPointerLeave);
     window.removeEventListener("keydown", this.onKeyDown);
     for (const a of this.arrows) a.dispose();
     this.arrows = [];
