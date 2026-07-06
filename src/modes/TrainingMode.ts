@@ -11,7 +11,7 @@ import { GameMode } from "../core/GameMode";
 import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
-import { applyAtmosphere } from "../world/atmosphere";
+import { Atmosphere } from "../world/atmosphere";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -200,6 +200,8 @@ export class TrainingMode extends GameMode {
   readonly name = "Training";
 
   private camera!: IsoCamera;
+  private atmosphere?: Atmosphere;
+  private sun?: DirectionalLight;
   private hud!: PartyPanel;
   private sight!: TimingSight;
   private debugBtn!: Button;
@@ -288,15 +290,21 @@ export class TrainingMode extends GameMode {
     const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), this.scene);
     sun.intensity = 1.15;
     sun.diffuse = new Color3(1.0, 0.9, 0.74); // warm torch-lit tint for the night arena
+    this.sun = sun;
 
     createArena(this.scene);
+    // The sand floor catches the characters' cast shadows.
+    const floor = this.scene.getMeshByName("arenaFloor");
+    if (floor) floor.receiveShadows = true;
 
     this.partyBearers = this.defaultParty();
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
-    // Dark-fantasy rendering pass (tone map + bloom + glow + fog) — pure post, no assets.
-    applyAtmosphere(this.scene, this.camera.camera);
+    // Dark-fantasy rendering pass (tone map + bloom + glow + fog + shadows + dust) — pure
+    // rendering, no assets. Then register the initial party as shadow casters.
+    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, this.sun!);
+    this.refreshShadowCasters();
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
     // Tapping a row takes control of that member.
@@ -493,6 +501,15 @@ export class TrainingMode extends GameMode {
     this.clearNav();
     this.runner.attach(this.controlled.gauge);
     this.runner.setFillTime(this.player.atbFillTime);
+    this.refreshShadowCasters();
+  }
+
+  /** Re-register every live entity as a shadow caster (party + enemies). Cheap; call after
+   *  any spawn/despawn or party rebuild. No-op until the atmosphere exists. */
+  private refreshShadowCasters(): void {
+    if (!this.atmosphere) return;
+    const roots = [...this.party.map((m) => m.avatar.root), ...this.enemies.map((e) => e.root)];
+    this.atmosphere.setCasters(roots);
   }
 
   /** Cycle player control to the next party member (Tab / the ⇄ button). */
@@ -1466,6 +1483,7 @@ export class TrainingMode extends GameMode {
     if (i >= 0) this.enemies.splice(i, 1);
     if (this.attackTarget === enemy) this.clearNav();
     enemy.dispose();
+    this.refreshShadowCasters();
   }
 
   /** Data for the System menu's Characters / Party / Gambits tabs. */
@@ -1624,10 +1642,12 @@ export class TrainingMode extends GameMode {
   /** Spawn a non-canon training dummy: an immortal, inert damage-test target. */
   private spawnDummy(): void {
     this.enemies.push(new Enemy(this.scene, TRAINING_DUMMY, this.ringPosition(4)));
+    this.refreshShadowCasters();
   }
 
   private spawnKnight(): void {
     this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
+    this.refreshShadowCasters();
   }
 
   /**
@@ -1637,6 +1657,7 @@ export class TrainingMode extends GameMode {
    */
   private spawnCommander(): void {
     this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
+    this.refreshShadowCasters();
   }
 
   /** A random spawn position on a ring around the player, kept inside the arena. */

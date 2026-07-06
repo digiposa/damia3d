@@ -3,9 +3,11 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
+import { softDotTexture } from "./atmosphere";
 
 /**
  * The Training arena — a torch-lit tournament colosseum in the spirit of the
@@ -243,6 +245,7 @@ function buildWall(scene: Scene, root: TransformNode): void {
 function buildPillars(scene: Scene, root: TransformNode): void {
   const stone = mat("arenaPillar", scene, new Color3(0.46, 0.43, 0.47));
   const bowl = mat("arenaBrazier", scene, new Color3(0.16, 0.14, 0.13));
+  const emberTex = softDotTexture(scene); // shared sprite for every brazier's embers
   const flames: { mesh: Mesh; phase: number }[] = [];
   const banners: { node: TransformNode; phase: number }[] = [];
 
@@ -277,6 +280,7 @@ function buildPillars(scene: Scene, root: TransformNode): void {
     basin.parent = root;
     fadeNearCamera(basin, x, z);
     flames.push({ mesh: buildFlame(scene, root, x, 3.6, z, `flame${j}`), phase: j * 2.399 });
+    buildEmbers(scene, x, 3.9, z, emberTex, `embers${j}`);
 
     // A red banner draped down the pillar's inner face, gold-barred at the top.
     banners.push({ node: buildBanner(scene, root, a, WALL_RADIUS - 0.85, 3.0, 1.1, 2.3), phase: j * 1.13 });
@@ -316,6 +320,31 @@ function buildFlame(scene: Scene, root: TransformNode, x: number, y: number, z: 
   inner.parent = flame;
   fadeNearCamera(inner, x, z); // visibility doesn't inherit — fade the core too
   return flame;
+}
+
+/** Warm embers rising from a brazier — additive orange sparks that drift up and fade out. */
+function buildEmbers(scene: Scene, x: number, y: number, z: number, tex: DynamicTexture, name: string): void {
+  const ps = new ParticleSystem(name, 40, scene);
+  ps.particleTexture = tex;
+  ps.emitter = new Vector3(x, y, z);
+  ps.minEmitBox = new Vector3(-0.12, 0, -0.12);
+  ps.maxEmitBox = new Vector3(0.12, 0.1, 0.12);
+  ps.color1 = new Color4(1.0, 0.6, 0.2, 0.9);
+  ps.color2 = new Color4(1.0, 0.85, 0.45, 0.9);
+  ps.colorDead = new Color4(0.6, 0.2, 0.05, 0);
+  ps.minSize = 0.03;
+  ps.maxSize = 0.09;
+  ps.minLifeTime = 0.6;
+  ps.maxLifeTime = 1.4;
+  ps.emitRate = 22;
+  ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+  ps.gravity = new Vector3(0, 0.6, 0); // buoyant — sparks rise
+  ps.direction1 = new Vector3(-0.3, 1.2, -0.3);
+  ps.direction2 = new Vector3(0.3, 2.0, 0.3);
+  ps.minEmitPower = 0.3;
+  ps.maxEmitPower = 0.8;
+  ps.updateSpeed = 0.02;
+  ps.start();
 }
 
 /**
