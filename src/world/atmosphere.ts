@@ -45,10 +45,9 @@ export function softDotTexture(scene: Scene): DynamicTexture {
 export class Atmosphere {
   readonly shadows: ShadowGenerator;
   readonly dot: DynamicTexture;
-  private readonly scene: Scene;
+  private readonly sparks: ParticleSystem;
 
   constructor(scene: Scene, camera: Camera, sun: DirectionalLight) {
-    this.scene = scene;
     // Distance gloom: the fighting floor stays clear; far wall/stands/gate sink into dark.
     scene.fogMode = Scene.FOGMODE_LINEAR;
     scene.fogColor = new Color3(0.035, 0.043, 0.06);
@@ -90,6 +89,7 @@ export class Atmosphere {
     this.shadows.setDarkness(0.25);
 
     this.dot = softDotTexture(scene);
+    this.sparks = this.buildSparks(scene);
     this.spawnDust(scene);
   }
 
@@ -107,14 +107,14 @@ export class Atmosphere {
   }
 
   /**
-   * One-shot hit spark at a world position — a quick radial burst of hot sparks that fall and
-   * fade. The system auto-disposes when it stops, so callers just fire and forget.
+   * One persistent hit-spark system, emitting nothing until {@link spark} fires a manual burst.
+   * (Re-triggering a single system beats spawning a throwaway system per hit — that only ever
+   * rendered once.)
    */
-  spark(position: Vector3): void {
-    const ps = new ParticleSystem("hitSpark", 30, this.scene);
+  private buildSparks(scene: Scene): ParticleSystem {
+    const ps = new ParticleSystem("hitSpark", 400, scene);
     ps.particleTexture = this.dot;
-    ps.emitter = position.clone();
-    ps.createSphereEmitter(0.2); // radial burst
+    ps.createSphereEmitter(0.2); // radial burst around the emitter point
     ps.color1 = new Color4(1.0, 0.95, 0.7, 1);
     ps.color2 = new Color4(1.0, 0.7, 0.3, 1);
     ps.colorDead = new Color4(1.0, 0.4, 0.1, 0);
@@ -122,15 +122,20 @@ export class Atmosphere {
     ps.maxSize = 0.22;
     ps.minLifeTime = 0.2;
     ps.maxLifeTime = 0.45;
-    ps.emitRate = 700;
     ps.blendMode = ParticleSystem.BLENDMODE_ADD;
     ps.gravity = new Vector3(0, -6, 0);
     ps.minEmitPower = 2.5;
     ps.maxEmitPower = 6;
     ps.updateSpeed = 0.02;
-    ps.targetStopDuration = 0.09; // emit for a blink…
-    ps.disposeOnStop = true; // …then clean itself up
+    ps.emitRate = 0; // no continuous stream — bursts only, via manualEmitCount
     ps.start();
+    return ps;
+  }
+
+  /** Fire a one-shot spark burst at a world position (every landed hit). */
+  spark(position: Vector3): void {
+    this.sparks.emitter = position.clone();
+    this.sparks.manualEmitCount = 26; // emitted once on the next frame, then auto-resets to 0
   }
 
   /** Slow dust motes drifting through the arena air — cheap atmospheric depth. */
