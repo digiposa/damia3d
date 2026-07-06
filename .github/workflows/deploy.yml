@@ -11,10 +11,12 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time; let an in-progress run finish.
+# One deploy at a time. cancel-in-progress: rapid successive pushes supersede each
+# other (only the latest main matters), which also avoids the overlapping-deployment
+# collisions that trigger Pages' "Deployment failed, try again later".
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -42,7 +44,26 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # First successful attempt's URL (skipped attempts return empty, so || falls through).
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}
     steps:
-      - id: deployment
+      # GitHub Pages' publish step is intermittently flaky ("Deployment failed, try again
+      # later") — nothing to do with the build. Retry up to 3 times with short waits so
+      # transient failures self-heal instead of needing a manual re-run. The last attempt
+      # is not continue-on-error, so a genuine persistent failure still fails the job.
+      - id: deploy1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - if: steps.deploy1.outcome == 'failure'
+        run: sleep 20
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 30
+      - id: deploy3
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
