@@ -45,8 +45,10 @@ export function softDotTexture(scene: Scene): DynamicTexture {
 export class Atmosphere {
   readonly shadows: ShadowGenerator;
   readonly dot: DynamicTexture;
+  private readonly scene: Scene;
 
   constructor(scene: Scene, camera: Camera, sun: DirectionalLight) {
+    this.scene = scene;
     // Distance gloom: the fighting floor stays clear; far wall/stands/gate sink into dark.
     scene.fogMode = Scene.FOGMODE_LINEAR;
     scene.fogColor = new Color3(0.035, 0.043, 0.06);
@@ -99,6 +101,33 @@ export class Atmosphere {
     for (const root of roots) {
       for (const mesh of root.getChildMeshes()) map.renderList.push(mesh);
     }
+  }
+
+  /**
+   * One-shot hit spark at a world position — a quick radial burst of hot sparks that fall and
+   * fade. The system auto-disposes when it stops, so callers just fire and forget.
+   */
+  spark(position: Vector3): void {
+    const ps = new ParticleSystem("hitSpark", 30, this.scene);
+    ps.particleTexture = this.dot;
+    ps.emitter = position.clone();
+    ps.createSphereEmitter(0.2); // radial burst
+    ps.color1 = new Color4(1.0, 0.95, 0.7, 1);
+    ps.color2 = new Color4(1.0, 0.7, 0.3, 1);
+    ps.colorDead = new Color4(1.0, 0.4, 0.1, 0);
+    ps.minSize = 0.05;
+    ps.maxSize = 0.14;
+    ps.minLifeTime = 0.15;
+    ps.maxLifeTime = 0.35;
+    ps.emitRate = 400;
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.gravity = new Vector3(0, -6, 0);
+    ps.minEmitPower = 2;
+    ps.maxEmitPower = 5;
+    ps.updateSpeed = 0.02;
+    ps.targetStopDuration = 0.06; // emit for a blink…
+    ps.disposeOnStop = true; // …then clean itself up
+    ps.start();
   }
 
   /** Slow dust motes drifting through the arena air — cheap atmospheric depth. */

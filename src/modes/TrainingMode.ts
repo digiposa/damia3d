@@ -1222,6 +1222,7 @@ export class TrainingMode extends GameMode {
   /** Apply a computed hit to the target: damage, floating text, and death handling. */
   private landDamage(target: Enemy, dmg: number): void {
     target.takeDamage(dmg);
+    this.atmosphere?.spark(target.headPosition); // hit-spark burst at the point of impact
     this.popText(target.headPosition, `${dmg}`, TEXT.damage);
     if (!target.alive) this.rewardKill(target);
   }
