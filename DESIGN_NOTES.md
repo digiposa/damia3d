@@ -139,6 +139,11 @@ is ours.
 ### Visuals
 - All character **models and 2D portraits are procedural placeholders / extrapolations**
   (notably Shirley, never seen in human form in canon).
+- **Enemy roster is canon-only**: only enemies/creatures that appear in The Legend of Dragoon
+  are used — **no invented mobs**. Current enemies (Knights of Sandora, Commander Seles) are
+  canon; the training dummy is a practice target. Generic asset-pack monsters (orc/yeti/alien/
+  etc. from Quaternius) are **NOT** used — for LoD creatures we approximate with fitting/generic
+  humanoid or beast models, or keep bespoke, checking canon per enemy.
 
 ## Assets on hand (not yet used)
 
