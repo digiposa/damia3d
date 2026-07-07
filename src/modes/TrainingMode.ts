@@ -202,17 +202,24 @@ export class TrainingMode extends GameMode {
   private atmosphere?: Atmosphere;
   private hud!: PartyPanel;
   /**
-   * GLB decor layout (Quaternius Modular Dungeon test set). A small vignette off the left edge
-   * of the arena so we can judge real low-poly assets in our lighting. Walls are modelled
-   * centred on Y, so they sit at y:1 to rest on the ground.
+   * GLB decor layout — Quaternius Fantasy Props dressing the medieval colosseum, placed ringside
+   * (radius ~11-13) so it frames the arena without blocking the fight. Props sit at y:0 (models
+   * are base-pivoted); scale 1 ≈ real size vs our ~1.8-unit characters. Tune from screenshots.
    */
   private decor: PropPlacement[] = [
-    { model: "column", position: [-9, 0, 1], receiveShadows: true },
-    { model: "wall", position: [-9, 1, 2.6], rotationY: Math.PI / 2, receiveShadows: true },
-    { model: "wall", position: [-9, 1, -0.6], rotationY: Math.PI / 2, receiveShadows: true },
-    { model: "torch", position: [-8.7, 1.3, 1], rotationY: -Math.PI / 2 },
-    { model: "barrel", position: [-7.6, 0, 2.2] },
-    { model: "chest", position: [-7.7, 0, 0.2], rotationY: 0.5 },
+    // Ringside supply cluster (back-left).
+    { model: "fp_crate", position: [-11.5, 0, 4] },
+    { model: "fp_crate_metal", position: [-12.3, 0, 5], rotationY: 0.6 },
+    { model: "fp_barrel", position: [-10.8, 0, 4.8] },
+    { model: "fp_barrel", position: [-11.7, 0, 5.9] },
+    // Weapon racks (right side).
+    { model: "fp_weaponstand", position: [11.8, 0, 2.5], rotationY: -2.2 },
+    { model: "fp_weaponstand", position: [12.2, 0, 4], rotationY: -2.4 },
+    // Caged beast + chains near the back.
+    { model: "fp_cage", position: [-3, 0, 12] },
+    { model: "fp_chain", position: [-4.2, 0, 11.3] },
+    // A decorative vase.
+    { model: "fp_vase", position: [5.5, 0, 12] },
   ];
   private sight!: TimingSight;
   private debugBtn!: Button;
