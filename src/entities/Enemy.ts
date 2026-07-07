@@ -4,10 +4,13 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 
 import type { EnemyDef } from "../data/enemies";
 import type { Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
+import { importModel } from "../world/props";
 
 /** Movement speed (world units / second) while chasing. */
 const SPEED = 3.2;
@@ -45,6 +48,14 @@ export class Enemy {
   private escortsSeen = false;
   private bodyMat: StandardMaterial;
 
+  /** Resolves once the optional rigged model has loaded (or immediately if there's none). */
+  readonly ready: Promise<void>;
+  /** Placeholder meshes (capsule/helm/crown), hidden when a rigged model loads. */
+  private placeholder: AbstractMesh[] = [];
+  private anims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup } = {};
+  private currentAnim?: AnimationGroup;
+  private attacking = false;
+
   private bar: HTMLDivElement;
   private barFill: HTMLDivElement;
   private nameTag?: HTMLDivElement;
@@ -67,6 +78,7 @@ export class Enemy {
     body.material = this.bodyMat;
     body.parent = this.root;
     body.metadata = this;
+    this.placeholder.push(body);
 
     const helm = MeshBuilder.CreateBox("enemyHelm", { width: 0.5, height: 0.4, depth: 0.5 }, scene);
     helm.position = new Vector3(0, 1.75, 0);
@@ -75,6 +87,7 @@ export class Enemy {
     helm.material = helmMat;
     helm.parent = this.root;
     helm.metadata = this;
+    this.placeholder.push(helm);
 
     if (def.isBoss) {
       const crown = MeshBuilder.CreateBox("bossCrown", { width: 0.55, height: 0.18, depth: 0.55 }, scene);
@@ -129,6 +142,54 @@ export class Enemy {
       } satisfies Partial<CSSStyleDeclaration>);
       document.body.appendChild(this.nameTag);
     }
+
+    // Swap the placeholder for a rigged GLB model (with idle/walk/attack) when the def has one.
+    this.ready = def.model ? this.loadModel(scene, def.model) : Promise.resolve();
+  }
+
+  /** Load the rigged model, hide the placeholder, and start the idle animation. Best-effort:
+   *  a missing/failed model keeps the placeholder capsule. */
+  private async loadModel(scene: Scene, name: string): Promise<void> {
+    const res = await importModel(scene, name).catch(() => undefined);
+    if (!res) return;
+    for (const mesh of this.placeholder) mesh.setEnabled(false); // hide the capsule/helm
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = this.root; // keep the glTF __root__ (handedness fix)
+      mesh.metadata = this; // so clicks / the hover cursor still target this enemy
+    }
+    const clip = (suffix: string) => res.animationGroups.find((a) => a.name.endsWith(suffix));
+    this.anims.idle = clip("|Idle") ?? res.animationGroups[0];
+    this.anims.walk = clip("|Walking") ?? clip("|Run");
+    this.anims.attack = clip("|Run_swordAttack") ?? clip("|swordAttackJump");
+    for (const g of res.animationGroups) g.stop(); // ImportMesh auto-plays the first — stop all
+    this.play(this.anims.idle);
+  }
+
+  /** Loop a locomotion/idle animation, replacing whatever is playing (no-op if already it). */
+  private play(group?: AnimationGroup): void {
+    if (!group || group === this.currentAnim) return;
+    this.currentAnim?.stop();
+    this.currentAnim = group;
+    group.start(true, 1.0, group.from, group.to);
+  }
+
+  /** Set the walking vs idle loop (ignored mid-attack so the swing isn't cut short). */
+  private setMoving(moving: boolean): void {
+    if (this.attacking || !this.anims.idle) return;
+    this.play(moving ? this.anims.walk ?? this.anims.idle : this.anims.idle);
+  }
+
+  /** Play the attack swing once, then fall back to idle/walk on the next frame. */
+  private playAttack(): void {
+    const a = this.anims.attack;
+    if (!a) return;
+    this.attacking = true;
+    this.currentAnim?.stop();
+    this.currentAnim = a;
+    a.start(false, 1.2, a.from, a.to);
+    a.onAnimationGroupEndObservable.addOnce(() => {
+      this.attacking = false;
+    });
   }
 
   get position(): Vector3 {
@@ -211,10 +272,13 @@ export class Enemy {
 
     if (dist > ATTACK_RANGE * this.scale) {
       this.root.position.addInPlace(to.normalize().scale(Math.min(SPEED * dt, dist)));
+      this.setMoving(true);
       return null;
     }
+    this.setMoving(false);
     if (this.attackCooldown > 0) return null;
     this.attackCooldown = ATTACK_INTERVAL;
+    this.playAttack();
     return this.chooseAction(ctx);
   }
 

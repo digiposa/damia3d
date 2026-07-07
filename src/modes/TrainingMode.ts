@@ -1690,15 +1690,21 @@ export class TrainingMode extends GameMode {
     }
   }
 
+  /** Register a spawned enemy and (re)register shadow casters — once now for the placeholder,
+   *  and again when its rigged model finishes loading (its meshes appear then). */
+  private addEnemy(e: Enemy): void {
+    this.enemies.push(e);
+    this.refreshShadowCasters();
+    void e.ready.then(() => this.refreshShadowCasters());
+  }
+
   /** Spawn a non-canon training dummy: an immortal, inert damage-test target. */
   private spawnDummy(): void {
-    this.enemies.push(new Enemy(this.scene, TRAINING_DUMMY, this.ringPosition(4)));
-    this.refreshShadowCasters();
+    this.addEnemy(new Enemy(this.scene, TRAINING_DUMMY, this.ringPosition(4)));
   }
 
   private spawnKnight(): void {
-    this.enemies.push(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
-    this.refreshShadowCasters();
+    this.addEnemy(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
   }
 
   /**
@@ -1707,8 +1713,7 @@ export class TrainingMode extends GameMode {
    * Seles behaviour.)
    */
   private spawnCommander(): void {
-    this.enemies.push(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
-    this.refreshShadowCasters();
+    this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
   }
 
   /** A random spawn position on a ring around the player, kept inside the arena. */

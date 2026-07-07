@@ -43,6 +43,11 @@ export interface EnemyDef {
   scale?: number;
   /** Body colour as RGB 0–1 (defaults to the knight's grey-blue). */
   bodyColor?: [number, number, number];
+  /**
+   * Optional rigged GLB model (base filename in src/assets/models/) replacing the placeholder
+   * capsule, with animations (idle / walk / attack). Falls back to the capsule if absent.
+   */
+  model?: string;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -90,6 +95,7 @@ export const KNIGHT_OF_SANDORA_SELES: EnemyDef = {
   ],
   expReward: 2,
   goldReward: 3,
+  model: "knight",
 };
 
 /**
@@ -111,6 +117,7 @@ export const KNIGHT_OF_SANDORA_BLACK_CASTLE: EnemyDef = {
   ],
   expReward: 24,
   goldReward: 15,
+  model: "knight",
 };
 
 /** Default Knight of Sandora used in the sandbox (the first-encountered Seles squad member). */
@@ -142,6 +149,7 @@ export const COMMANDER_SELES: EnemyDef = {
   isBoss: true,
   scale: 1.6,
   bodyColor: [0.28, 0.18, 0.42],
+  model: "knight",
 };
 
 /**
@@ -167,4 +175,5 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
   goldReward: 9,
   scale: 1.3,
   bodyColor: [0.3, 0.2, 0.4],
+  model: "knight",
 };

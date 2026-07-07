@@ -2,6 +2,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { ISceneLoaderAsyncResult } from "@babylonjs/core/Loading/sceneLoader";
 
 /**
  * GLB prop pipeline. Drop `.glb` files into `src/assets/models/` and reference them by base
@@ -35,6 +36,24 @@ export function availableModels(): string[] {
 }
 
 /**
+ * Import a GLB by base filename (from src/assets/models/), returning the full loader result
+ * (meshes + animationGroups + skeletons). The glTF loader is imported on demand and decodes
+ * meshopt/WebP automatically. Returns undefined (logged) if the model file isn't present.
+ * Shared by {@link loadProp} (static decor) and rigged entities (enemies/characters).
+ */
+export async function importModel(scene: Scene, name: string): Promise<ISceneLoaderAsyncResult | undefined> {
+  const url = MODEL_URLS[`../assets/models/${name}.glb`];
+  if (!url) {
+    console.warn(`[props] no model "${name}.glb" in src/assets/models/`);
+    return undefined;
+  }
+  await import("@babylonjs/loaders/glTF"); // on demand → out of the initial bundle
+  const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
+  const cut = url.lastIndexOf("/") + 1;
+  return SceneLoader.ImportMeshAsync("", url.slice(0, cut), url.slice(cut), scene);
+}
+
+/**
  * Load one GLB prop and place it. Returns the parent node and its meshes, or undefined if the
  * model file isn't present (logged, non-fatal — the scene keeps working without it).
  */
@@ -42,16 +61,8 @@ export async function loadProp(
   scene: Scene,
   p: PropPlacement,
 ): Promise<{ root: TransformNode; meshes: AbstractMesh[] } | undefined> {
-  const url = MODEL_URLS[`../assets/models/${p.model}.glb`];
-  if (!url) {
-    console.warn(`[props] no model "${p.model}.glb" in src/assets/models/`);
-    return undefined;
-  }
-  // Load the glTF loader on demand so it stays out of the initial bundle.
-  await import("@babylonjs/loaders/glTF");
-  const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
-  const cut = url.lastIndexOf("/") + 1;
-  const res = await SceneLoader.ImportMeshAsync("", url.slice(0, cut), url.slice(cut), scene);
+  const res = await importModel(scene, p.model);
+  if (!res) return undefined;
 
   const root = new TransformNode(`prop:${p.model}`, scene);
   for (const mesh of res.meshes) {
