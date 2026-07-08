@@ -530,7 +530,7 @@ export class TrainingMode extends GameMode {
    * file is HTTP-cached, so real spawns swap in immediately.
    */
   private async warmUpModels(): Promise<void> {
-    const res = await importModel(this.scene, "knight").catch(() => undefined);
+    const res = await importModel(this.scene, "knight_sandora").catch(() => undefined);
     if (!res) return;
     for (const g of res.animationGroups) g.dispose();
     for (const s of res.skeletons) s.dispose();

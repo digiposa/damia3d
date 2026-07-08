@@ -95,7 +95,7 @@ export const KNIGHT_OF_SANDORA_SELES: EnemyDef = {
   ],
   expReward: 2,
   goldReward: 3,
-  model: "knight",
+  model: "knight_sandora",
 };
 
 /**
@@ -117,7 +117,7 @@ export const KNIGHT_OF_SANDORA_BLACK_CASTLE: EnemyDef = {
   ],
   expReward: 24,
   goldReward: 15,
-  model: "knight",
+  model: "knight_sandora",
 };
 
 /** Default Knight of Sandora used in the sandbox (the first-encountered Seles squad member). */
