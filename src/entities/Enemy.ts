@@ -10,7 +10,7 @@ import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { EnemyDef } from "../data/enemies";
 import type { Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
-import { importModel, softenMetalness } from "../world/props";
+import { importModel, tuneImportedMetal } from "../world/props";
 
 /** Movement speed (world units / second) while chasing. */
 const SPEED = 3.2;
@@ -162,7 +162,7 @@ export class Enemy {
       if (!mesh.parent) mesh.parent = modelRoot; // the glTF __root__ (handedness fix)
       mesh.metadata = this; // so clicks / the hover cursor still target this enemy
     }
-    softenMetalness(res.meshes); // let direct/ambient light also lift a dark metallic model
+    tuneImportedMetal(res.meshes); // visible + shiny: cap metalness (diffuse lift) and roughness (sharp glint)
 
 
     let lo = Infinity;

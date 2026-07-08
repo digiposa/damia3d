@@ -34,12 +34,12 @@ export interface PropPlacement {
 }
 
 /**
- * Cap the metalness of imported PBR materials. Fully-metallic surfaces only show the (dim)
- * environment reflection and no diffuse, so a dark-albedo AI model reads near-black even with
- * IBL. Capping metalness lets our direct + ambient lights also shade it, while keeping enough
- * metal for reflections/highlights.
+ * Tune imported PBR materials for our stylized scene: cap metalness (fully-metallic shows only
+ * the dim env and no diffuse → dark-albedo models read near-black) so direct/ambient lights also
+ * shade it, and cap roughness so highlights stay sharp (a polished-metal glint) rather than a
+ * dull matte wash. Balances "visible" and "looks like shiny metal".
  */
-export function softenMetalness(meshes: AbstractMesh[], cap = 0.6): void {
+export function tuneImportedMetal(meshes: AbstractMesh[], metalCap = 0.7, roughCap = 0.4): void {
   const seen = new Set<Material>();
   const fix = (m: Material | null): void => {
     if (!m || seen.has(m)) return;
@@ -48,8 +48,9 @@ export function softenMetalness(meshes: AbstractMesh[], cap = 0.6): void {
       m.subMaterials.forEach(fix);
       return;
     }
-    if (m instanceof PBRMaterial && m.metallic !== null && m.metallic > cap) {
-      m.metallic = cap;
+    if (m instanceof PBRMaterial) {
+      if (m.metallic !== null && m.metallic > metalCap) m.metallic = metalCap;
+      if (m.roughness !== null && m.roughness > roughCap) m.roughness = roughCap;
     }
   };
   for (const mesh of meshes) fix(mesh.material);

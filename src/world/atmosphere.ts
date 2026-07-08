@@ -235,6 +235,13 @@ export class Atmosphere {
     g.addColorStop(1.0, "#22222a"); // ground
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
+    // A soft bright "key light" blob so metals catch a specular glint (reads as polished metal,
+    // not a flat matte wash).
+    const glint = ctx.createRadialGradient(w * 0.5, h * 0.3, 0, w * 0.5, h * 0.3, h * 0.55);
+    glint.addColorStop(0, "rgba(255,244,224,0.95)");
+    glint.addColorStop(1, "rgba(255,244,224,0)");
+    ctx.fillStyle = glint;
+    ctx.fillRect(0, 0, w, h);
     scene.environmentTexture = new EquiRectangularCubeTexture(c.toDataURL(), scene, 128);
     scene.environmentIntensity = 1.2;
   }
