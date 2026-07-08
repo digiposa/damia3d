@@ -153,10 +153,31 @@ export class Enemy {
     const res = await importModel(scene, name).catch(() => undefined);
     if (!res) return;
     for (const mesh of this.placeholder) mesh.setEnabled(false); // hide the capsule/helm
+
+    // Gather the model under one container so we can normalize its size: source packs come in
+    // wildly different units (this FBX knight is ~3× too tall). Auto-fit to a target height and
+    // drop its feet to y=0, so any model lands at the right scale without hand-tuning.
+    const modelRoot = new TransformNode(`enemyModel:${this.def.id}`, scene);
     for (const mesh of res.meshes) {
-      if (!mesh.parent) mesh.parent = this.root; // keep the glTF __root__ (handedness fix)
+      if (!mesh.parent) mesh.parent = modelRoot; // the glTF __root__ (handedness fix)
       mesh.metadata = this; // so clicks / the hover cursor still target this enemy
     }
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const mesh of res.meshes) {
+      if (mesh.getTotalVertices() === 0) continue; // skip the empty __root__
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      lo = Math.min(lo, bb.minimumWorld.y);
+      hi = Math.max(hi, bb.maximumWorld.y);
+    }
+    const TARGET_H = 1.8; // ≈ our characters' height
+    if (hi > lo) {
+      const factor = TARGET_H / (hi - lo);
+      modelRoot.scaling.setAll(factor);
+      modelRoot.position.y = -lo * factor; // feet on the ground
+    }
+    modelRoot.parent = this.root;
     const clip = (suffix: string) => res.animationGroups.find((a) => a.name.endsWith(suffix));
     this.anims.idle = clip("|Idle") ?? res.animationGroups[0];
     this.anims.walk = clip("|Walking") ?? clip("|Run");
