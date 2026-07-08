@@ -1,5 +1,8 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { MultiMaterial } from "@babylonjs/core/Materials/multiMaterial";
+import type { Material } from "@babylonjs/core/Materials/material";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { ISceneLoaderAsyncResult } from "@babylonjs/core/Loading/sceneLoader";
@@ -28,6 +31,28 @@ export interface PropPlacement {
   scale?: number;
   /** Whether this prop's meshes catch cast shadows (floors/large surfaces — default false). */
   receiveShadows?: boolean;
+}
+
+/**
+ * Cap the metalness of imported PBR materials. Fully-metallic surfaces only show the (dim)
+ * environment reflection and no diffuse, so a dark-albedo AI model reads near-black even with
+ * IBL. Capping metalness lets our direct + ambient lights also shade it, while keeping enough
+ * metal for reflections/highlights.
+ */
+export function softenMetalness(meshes: AbstractMesh[], cap = 0.6): void {
+  const seen = new Set<Material>();
+  const fix = (m: Material | null): void => {
+    if (!m || seen.has(m)) return;
+    seen.add(m);
+    if (m instanceof MultiMaterial) {
+      m.subMaterials.forEach(fix);
+      return;
+    }
+    if (m instanceof PBRMaterial && m.metallic !== null && m.metallic > cap) {
+      m.metallic = cap;
+    }
+  };
+  for (const mesh of meshes) fix(mesh.material);
 }
 
 /** All GLB base names currently available in src/assets/models/. */

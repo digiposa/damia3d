@@ -230,13 +230,13 @@ export class Atmosphere {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0.0, "#5a4630"); // warm dim "sky"
-    g.addColorStop(0.5, "#2a2620"); // horizon
-    g.addColorStop(1.0, "#090a0d"); // dark ground
+    g.addColorStop(0.0, "#b89a6e"); // warm "sky" — brighter so metals reflect something visible
+    g.addColorStop(0.5, "#6a5f4e"); // horizon
+    g.addColorStop(1.0, "#22222a"); // ground
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
     scene.environmentTexture = new EquiRectangularCubeTexture(c.toDataURL(), scene, 128);
-    scene.environmentIntensity = 0.75;
+    scene.environmentIntensity = 1.2;
   }
 
   /** Slow dust motes drifting through the arena air — cheap atmospheric depth. */
