@@ -8,6 +8,7 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { EquiRectangularCubeTexture } from "@babylonjs/core/Materials/Textures/equiRectangularCubeTexture";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
@@ -70,6 +71,12 @@ export class Atmosphere {
     // Distance fog is always LINEAR (exp reads flat under the orthographic iso camera); its
     // start/end/colour are set per preset.
     scene.fogMode = Scene.FOGMODE_LINEAR;
+
+    // Image-based lighting so PBR metals (AI-generated armour, etc.) have something to reflect —
+    // without it, metallic surfaces render near-black. A small procedural warm-to-dark gradient
+    // (no external file) matches the mood; only PBR materials use it, so the low-poly
+    // StandardMaterial world is unaffected.
+    this.buildEnvironment(scene);
 
     // Real glow for emissive surfaces (chest gems, brazier flames, filigree, Dragoon wings).
     const glow = new GlowLayer("moodGlow", scene, { blurKernelSize: 32 });
@@ -207,6 +214,29 @@ export class Atmosphere {
   spark(position: Vector3): void {
     this.sparks.emitter = position.clone();
     this.sparks.manualEmitCount = 26; // emitted once on the next frame, then auto-resets to 0
+  }
+
+  /**
+   * A procedural equirectangular gradient (warm dim sky → dark ground) baked to a cube texture
+   * and used as the scene's IBL. Gives PBR metals a soft, mood-matched reflection instead of
+   * black. Self-contained (canvas data URI — no asset file). Tune environmentIntensity to taste.
+   */
+  private buildEnvironment(scene: Scene): void {
+    const w = 256;
+    const h = 128;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0.0, "#5a4630"); // warm dim "sky"
+    g.addColorStop(0.5, "#2a2620"); // horizon
+    g.addColorStop(1.0, "#090a0d"); // dark ground
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    scene.environmentTexture = new EquiRectangularCubeTexture(c.toDataURL(), scene, 128);
+    scene.environmentIntensity = 0.75;
   }
 
   /** Slow dust motes drifting through the arena air — cheap atmospheric depth. */

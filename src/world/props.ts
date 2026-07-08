@@ -1,8 +1,5 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
-import { MultiMaterial } from "@babylonjs/core/Materials/multiMaterial";
-import type { Material } from "@babylonjs/core/Materials/material";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { ISceneLoaderAsyncResult } from "@babylonjs/core/Loading/sceneLoader";
@@ -31,29 +28,6 @@ export interface PropPlacement {
   scale?: number;
   /** Whether this prop's meshes catch cast shadows (floors/large surfaces — default false). */
   receiveShadows?: boolean;
-}
-
-/**
- * Make imported PBR materials readable in our IBL-less scene. A metallic surface renders
- * near-black without an environment to reflect (we don't use image-based lighting), which is
- * why AI-generated armour looks pitch dark. Drop the metalness and roughen it so our direct +
- * ambient lights shade it like the rest of the (non-PBR, stylized) world.
- */
-export function neutralizePbr(meshes: AbstractMesh[]): void {
-  const seen = new Set<Material>();
-  const fix = (m: Material | null): void => {
-    if (!m || seen.has(m)) return;
-    seen.add(m);
-    if (m instanceof MultiMaterial) {
-      m.subMaterials.forEach(fix);
-      return;
-    }
-    if (m instanceof PBRMaterial) {
-      m.metallic = 0.1;
-      m.roughness = Math.max(m.roughness ?? 0.6, 0.7);
-    }
-  };
-  for (const mesh of meshes) fix(mesh.material);
 }
 
 /** All GLB base names currently available in src/assets/models/. */
