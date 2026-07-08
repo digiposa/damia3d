@@ -10,7 +10,7 @@ import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
 import { Atmosphere } from "../world/atmosphere";
 import { LIGHTING_PRESETS } from "../world/lighting";
-import { loadEnvironment, type PropPlacement } from "../world/props";
+import { loadEnvironment, importModel, type PropPlacement } from "../world/props";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -312,6 +312,7 @@ export class TrainingMode extends GameMode {
     this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.trainingArena);
     this.refreshShadowCasters();
     void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
+    void this.warmUpModels(); // preload the enemy GLB pipeline so the first spawn swaps instantly
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
     // Tapping a row takes control of that member.
@@ -520,6 +521,21 @@ export class TrainingMode extends GameMode {
     this.runner.attach(this.controlled.gauge);
     this.runner.setFillTime(this.player.atbFillTime);
     this.refreshShadowCasters();
+  }
+
+  /**
+   * Warm the GLB pipeline up front: the first enemy spawn otherwise shows the placeholder
+   * capsule for a beat while the glTF loader module, the meshopt decoder and the model file all
+   * download. Preload the knight once and discard it — the loader/decoder stay resident and the
+   * file is HTTP-cached, so real spawns swap in immediately.
+   */
+  private async warmUpModels(): Promise<void> {
+    const res = await importModel(this.scene, "knight").catch(() => undefined);
+    if (!res) return;
+    for (const g of res.animationGroups) g.dispose();
+    for (const s of res.skeletons) s.dispose();
+    for (const m of res.meshes) m.dispose();
+    for (const t of res.transformNodes) t.dispose();
   }
 
   /** Load the optional GLB decor layout and register it as static shadow casters. No-op while
