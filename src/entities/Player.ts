@@ -20,9 +20,9 @@ import { importModel, flattenCellShaded } from "../world/props";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 
 const SPEED = 6; // world units per second
-/** Yaw applied to a loaded bearer model so its native forward faces the rig's +Z. AI/AccuRIG
- *  exports of our characters face +X, so turn them −90°. Flip the sign if a model faces backwards. */
-const MODEL_YAW = -Math.PI / 2;
+/** Yaw applied to a loaded bearer model so its native forward faces the rig's +Z (Meru's AccuRIG
+ *  export already faces +Z, so 0). Adjust here if a future model is authored facing another axis. */
+const MODEL_YAW = 0;
 /** Target on-screen height (world units) any imported bearer model is auto-fit to. */
 const MODEL_TARGET_H = 1.8;
 const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 100 at D'Lv5)
