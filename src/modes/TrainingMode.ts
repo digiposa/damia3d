@@ -1348,12 +1348,22 @@ export class TrainingMode extends GameMode {
     // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…), then Rose/Blossom Storm.
     let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
     if (this.player.damageHalved) dmg = Math.floor(dmg * 0.5);
-    this.player.hp = Math.max(0, this.player.hp - dmg);
-    this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, TEXT.damage);
 
-    if (this.player.hp === 0) {
-      this.player.revert(); // HP 0 forces de-transformation (canon)
-      this.player.hp = this.player.maxHp; // sandbox: revive instead of game-over
+    const applyHit = (): void => {
+      this.player.hp = Math.max(0, this.player.hp - dmg);
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, TEXT.damage);
+      if (this.player.hp === 0) {
+        this.player.revert(); // HP 0 forces de-transformation (canon)
+        this.player.hp = this.player.maxHp; // sandbox: revive instead of game-over
+      }
+    };
+
+    // Thrown attacks (Throw Dagger/Knife) fly as a projectile and land on arrival; melee/magic hit now.
+    if (action.kind === "physical" && action.ranged) {
+      const to = this.player.position.add(new Vector3(0, 1.0, 0));
+      this.arrows.push(new Arrow(this.scene, enemy.handPosition, to, ARROW_SPEED, applyHit, 0.25));
+    } else {
+      applyHit();
     }
   }
 

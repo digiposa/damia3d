@@ -17,6 +17,8 @@ import { importModel, tuneImportedMetal, flattenCellShaded, tuneWeapon } from ".
 const SPEED = 3.2;
 /** Distance within which the enemy stops to attack. */
 const ATTACK_RANGE = 1.7;
+/** Max distance a ranged attacker throws a dagger/knife (beyond melee, it closes in between throws). */
+const THROW_RANGE = 10;
 /** Seconds between the enemy's attacks. */
 const ATTACK_INTERVAL = 1.4;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
@@ -24,9 +26,10 @@ const WEAPON_SCALE = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
 const WEAPON_GRIP_Y = 0.87;
 
-/** A resolved enemy action for the mode to apply against the player (or itself). */
+/** A resolved enemy action for the mode to apply against the player (or itself). `ranged` marks a
+ *  thrown attack (dagger/knife) the mode should deliver as a flying projectile from a distance. */
 export type EnemyAction =
-  | { kind: "physical"; name: string; multiplier: number }
+  | { kind: "physical"; name: string; multiplier: number; ranged?: boolean }
   | { kind: "magical"; name: string; multiplier: number; element?: Element }
   | { kind: "heal"; name: string; amount: number };
 
@@ -57,7 +60,7 @@ export class Enemy {
   readonly ready: Promise<void>;
   /** Placeholder meshes (capsule/helm/crown), hidden when a rigged model loads. */
   private placeholder: AbstractMesh[] = [];
-  private anims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup; death?: AnimationGroup } = {};
+  private anims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup; throw?: AnimationGroup; death?: AnimationGroup } = {};
   private currentAnim?: AnimationGroup;
   private attacking = false;
   private dead = false;
@@ -202,6 +205,7 @@ export class Enemy {
     this.anims.attack = groups.find((a) => has(a, "slash", "attack"));
     this.anims.walk = groups.find((a) => has(a, "walk")) ?? groups.find((a) => has(a, "run") && !has(a, "attack", "slash"));
     this.anims.idle = groups.find((a) => has(a, "idle")) ?? groups[0];
+    this.anims.throw = groups.find((a) => has(a, "throw", "dagger", "knife"));
     this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
     this.play(this.anims.idle);
@@ -273,6 +277,19 @@ export class Enemy {
     });
   }
 
+  /** Play the dagger-throw animation once, then fall back to idle/walk on the next frame. */
+  private playThrow(): void {
+    const a = this.anims.throw;
+    if (!a) return;
+    this.attacking = true;
+    this.currentAnim?.stop();
+    this.currentAnim = a;
+    a.start(false, 1.0, a.from, a.to);
+    a.onAnimationGroupEndObservable.addOnce(() => {
+      this.attacking = false;
+    });
+  }
+
   /** True once the death sequence has begun — the enemy is out of play (no AI, not targetable). */
   get dying(): boolean {
     return this.dead;
@@ -310,6 +327,11 @@ export class Enemy {
   /** World position above the enemy's head (for HUD / floating text). */
   get headPosition(): Vector3 {
     return this.position.add(new Vector3(0, 2.4 * this.scale, 0));
+  }
+
+  /** Approx. throwing-hand height (projectile origin for thrown daggers). */
+  get handPosition(): Vector3 {
+    return this.position.add(new Vector3(0, 1.3 * this.scale, 0));
   }
 
   get alive(): boolean {
@@ -384,6 +406,14 @@ export class Enemy {
     if (dist > 1e-3) this.root.rotation.y = Math.atan2(to.x, to.z);
 
     if (dist > ATTACK_RANGE * this.scale) {
+      // Out of melee range: throw a dagger if the enemy can, then keep closing in between throws.
+      const ranged = this.rangedAttack();
+      if (ranged && this.anims.throw && dist <= THROW_RANGE * this.scale && this.attackCooldown <= 0) {
+        this.attackCooldown = ATTACK_INTERVAL;
+        this.setMoving(false);
+        this.playThrow();
+        return { kind: "physical", name: ranged.name, multiplier: ranged.multiplier, ranged: true };
+      }
       this.root.position.addInPlace(to.normalize().scale(Math.min(SPEED * dt, dist)));
       this.setMoving(true);
       return null;
@@ -395,9 +425,15 @@ export class Enemy {
     return this.chooseAction(ctx);
   }
 
+  /** The enemy's thrown (ranged) attack, if it has one — its name contains "Throw". */
+  private rangedAttack() {
+    return this.def.attacks.find((a) => /throw/i.test(a.name));
+  }
+
   private chooseAction(ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction(ctx);
-    const a = this.def.attacks[0];
+    // Melee: the first non-thrown attack (a thrown one is reserved for range).
+    const a = this.def.attacks.find((x) => !/throw/i.test(x.name)) ?? this.def.attacks[0];
     return { kind: a.kind, name: a.name, multiplier: a.multiplier };
   }
 
