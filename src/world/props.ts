@@ -56,6 +56,32 @@ export function tuneImportedMetal(meshes: AbstractMesh[], metalCap = 0.7, roughC
   for (const mesh of meshes) fix(mesh.material);
 }
 
+/**
+ * Flatten imported PBR materials to a diffuse "cell-shaded" look: force metallic 0 and roughness 1
+ * so the model reads as its painted base-colour texture, lit only softly by ambient + sun (no metal
+ * reflection, no env dependence). Use for AI-generated models whose shading is baked into the
+ * texture (Tripo/Meshy cartoon exports) — the opposite treatment to {@link tuneImportedMetal},
+ * which is for genuinely metallic PBR assets. Without this, a glTF material with no metallicFactor
+ * defaults to metallic 1.0 and renders near-black in our dim scene.
+ */
+export function flattenCellShaded(meshes: AbstractMesh[]): void {
+  const seen = new Set<Material>();
+  const fix = (m: Material | null): void => {
+    if (!m || seen.has(m)) return;
+    seen.add(m);
+    if (m instanceof MultiMaterial) {
+      m.subMaterials.forEach(fix);
+      return;
+    }
+    if (m instanceof PBRMaterial) {
+      m.metallic = 0;
+      m.roughness = 1;
+      m.environmentIntensity = 0; // painted shading, not reflected env
+    }
+  };
+  for (const mesh of meshes) fix(mesh.material);
+}
+
 /** All GLB base names currently available in src/assets/models/. */
 export function availableModels(): string[] {
   return Object.keys(MODEL_URLS).map((k) => k.replace(/^.*\/(.+)\.glb$/, "$1"));

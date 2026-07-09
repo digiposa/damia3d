@@ -48,6 +48,12 @@ export interface EnemyDef {
    * capsule, with animations (idle / walk / attack). Falls back to the capsule if absent.
    */
   model?: string;
+  /**
+   * The model's shading is painted into its texture (AI cartoon/cell-shaded exports). Render it
+   * flat-diffuse (metallic 0, roughness 1, no env) so the painted look shows, instead of the
+   * metallic PBR tuning used for genuinely metal assets.
+   */
+  cellShaded?: boolean;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -96,6 +102,7 @@ export const KNIGHT_OF_SANDORA_SELES: EnemyDef = {
   expReward: 2,
   goldReward: 3,
   model: "knight_sandora",
+  cellShaded: true,
 };
 
 /**
@@ -118,6 +125,7 @@ export const KNIGHT_OF_SANDORA_BLACK_CASTLE: EnemyDef = {
   expReward: 24,
   goldReward: 15,
   model: "knight_sandora",
+  cellShaded: true,
 };
 
 /** Default Knight of Sandora used in the sandbox (the first-encountered Seles squad member). */
