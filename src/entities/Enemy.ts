@@ -6,6 +6,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
 import type { EnemyDef } from "../data/enemies";
 import type { Element } from "../combat/element";
@@ -184,12 +185,58 @@ export class Enemy {
       modelRoot.position.y = -lo * factor; // feet on the ground
     }
     modelRoot.parent = this.root;
-    const clip = (suffix: string) => res.animationGroups.find((a) => a.name.endsWith(suffix));
-    this.anims.idle = clip("|Idle") ?? res.animationGroups[0];
-    this.anims.walk = clip("|Walking") ?? clip("|Run");
-    this.anims.attack = clip("|Run_swordAttack") ?? clip("|swordAttackJump");
-    for (const g of res.animationGroups) g.stop(); // ImportMesh auto-plays the first — stop all
+
+    // Give the model its sword (our AI knight is rigged weaponless — attach a procedural blade to
+    // the right-hand bone so it moves with every animation, no baked-in bending).
+    if (this.def.cellShaded) this.attachSword(scene, res.skeletons[0]);
+
+    // Match clips by keyword so both our Mixamo names (Idle/Walking/Slash) and the Quaternius
+    // convention (…|Idle, …|Run, …|Run_swordAttack) resolve without per-pack special-casing.
+    const groups = res.animationGroups;
+    const has = (a: AnimationGroup, ...keys: string[]) => keys.some((k) => a.name.toLowerCase().includes(k));
+    this.anims.attack = groups.find((a) => has(a, "slash", "attack"));
+    this.anims.walk = groups.find((a) => has(a, "walk")) ?? groups.find((a) => has(a, "run") && !has(a, "attack", "slash"));
+    this.anims.idle = groups.find((a) => has(a, "idle")) ?? groups[0];
+    for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
     this.play(this.anims.idle);
+  }
+
+  /** Build a low-poly sword and parent it to the right-hand bone so it follows the animation.
+   *  Geometry is in the model's native units (the auto-fit scaling above carries it with the body);
+   *  the blade runs along the hand's local +Y (finger direction). */
+  private attachSword(scene: Scene, skeleton?: Skeleton): void {
+    const hand = skeleton?.bones.find((b) => b.name === "mixamorig:RightHand")?.getTransformNode();
+    if (!hand) return;
+
+    const steel = new StandardMaterial("swordSteel", scene);
+    steel.diffuseColor = new Color3(0.72, 0.76, 0.85);
+    steel.specularColor = new Color3(0.9, 0.93, 1);
+    steel.emissiveColor = new Color3(0.16, 0.18, 0.24);
+    steel.backFaceCulling = false; // the hand bone inherits a mirrored (-Y) world scale
+    const gripMat = new StandardMaterial("swordGrip", scene);
+    gripMat.diffuseColor = new Color3(0.16, 0.11, 0.07);
+    gripMat.emissiveColor = new Color3(0.03, 0.02, 0.01);
+    gripMat.backFaceCulling = false;
+
+    const sword = new TransformNode(`sword:${this.def.id}`, scene);
+    const blade = MeshBuilder.CreateBox("swordBlade", { width: 0.05, depth: 0.014, height: 0.5 }, scene);
+    blade.position.y = 0.3; // spans grip → tip along +Y
+    blade.material = steel;
+    const guard = MeshBuilder.CreateBox("swordGuard", { width: 0.16, depth: 0.032, height: 0.03 }, scene);
+    guard.position.y = 0.05;
+    guard.material = steel;
+    const grip = MeshBuilder.CreateCylinder("swordHilt", { diameter: 0.028, height: 0.11 }, scene);
+    grip.position.y = -0.01;
+    grip.material = gripMat;
+    const pommel = MeshBuilder.CreateSphere("swordPommel", { diameter: 0.042, segments: 6 }, scene);
+    pommel.position.y = -0.07;
+    pommel.material = steel;
+    for (const part of [blade, guard, grip, pommel]) {
+      part.parent = sword;
+      part.isPickable = false;
+    }
+    sword.position = new Vector3(0, 0.02, 0); // seat the grip in the palm
+    sword.parent = hand;
   }
 
   /** Loop a locomotion/idle animation, replacing whatever is playing (no-op if already it). */
