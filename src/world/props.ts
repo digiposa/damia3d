@@ -1,5 +1,6 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { MultiMaterial } from "@babylonjs/core/Materials/multiMaterial";
 import type { Material } from "@babylonjs/core/Materials/material";
@@ -77,6 +78,32 @@ export function flattenCellShaded(meshes: AbstractMesh[]): void {
       m.metallic = 0;
       m.roughness = 1;
       m.environmentIntensity = 0; // painted shading, not reflected env
+    }
+  };
+  for (const mesh of meshes) fix(mesh.material);
+}
+
+/**
+ * Tune an imported weapon so it reads in the dim scene instead of vanishing as a dark toothpick:
+ * a light metallic glint (steel catches highlights) plus a modest self-illumination driven by its
+ * own base texture, so the blade/guard stay visible even in shadow — without the GlowLayer turning
+ * it into a neon blade. Use for hand-held weapon models.
+ */
+export function tuneWeapon(meshes: AbstractMesh[]): void {
+  const seen = new Set<Material>();
+  const fix = (m: Material | null): void => {
+    if (!m || seen.has(m)) return;
+    seen.add(m);
+    if (m instanceof MultiMaterial) {
+      m.subMaterials.forEach(fix);
+      return;
+    }
+    if (m instanceof PBRMaterial) {
+      m.metallic = 0.25;
+      m.roughness = 0.4;
+      m.environmentIntensity = 0.8;
+      if (m.albedoTexture) m.emissiveTexture = m.albedoTexture; // self-lit from its own colours
+      m.emissiveColor = new Color3(0.3, 0.3, 0.3);
     }
   };
   for (const mesh of meshes) fix(mesh.material);

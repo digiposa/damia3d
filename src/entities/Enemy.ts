@@ -11,7 +11,7 @@ import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 import type { EnemyDef } from "../data/enemies";
 import type { Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
-import { importModel, tuneImportedMetal, flattenCellShaded } from "../world/props";
+import { importModel, tuneImportedMetal, flattenCellShaded, tuneWeapon } from "../world/props";
 
 /** Movement speed (world units / second) while chasing. */
 const SPEED = 3.2;
@@ -20,7 +20,7 @@ const ATTACK_RANGE = 1.7;
 /** Seconds between the enemy's attacks. */
 const ATTACK_INTERVAL = 1.4;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
-const WEAPON_SCALE = 0.95;
+const WEAPON_SCALE = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
 const WEAPON_GRIP_Y = 0.87;
 
@@ -220,7 +220,7 @@ export class Enemy {
       if (res) for (const m of res.meshes) m.dispose();
       return;
     }
-    flattenCellShaded(res.meshes); // match the cell-shaded body (no dark metallic PBR)
+    tuneWeapon(res.meshes); // glint + self-illumination so the blade reads in the dim scene
 
     hand.computeWorldMatrix(true);
     const s = hand.absoluteScaling;
