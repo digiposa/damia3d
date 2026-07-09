@@ -53,9 +53,10 @@ export class Enemy {
   readonly ready: Promise<void>;
   /** Placeholder meshes (capsule/helm/crown), hidden when a rigged model loads. */
   private placeholder: AbstractMesh[] = [];
-  private anims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup } = {};
+  private anims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup; death?: AnimationGroup } = {};
   private currentAnim?: AnimationGroup;
   private attacking = false;
+  private dead = false;
 
   private bar: HTMLDivElement;
   private barFill: HTMLDivElement;
@@ -197,6 +198,7 @@ export class Enemy {
     this.anims.attack = groups.find((a) => has(a, "slash", "attack"));
     this.anims.walk = groups.find((a) => has(a, "walk")) ?? groups.find((a) => has(a, "run") && !has(a, "attack", "slash"));
     this.anims.idle = groups.find((a) => has(a, "idle")) ?? groups[0];
+    this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
     this.play(this.anims.idle);
   }
@@ -273,6 +275,36 @@ export class Enemy {
     });
   }
 
+  /** True once the death sequence has begun — the enemy is out of play (no AI, not targetable). */
+  get dying(): boolean {
+    return this.dead;
+  }
+
+  /**
+   * Play the death animation once, then invoke {@link done} so the mode can despawn the body. Hides
+   * the health bar and freezes on the final (fallen) frame. Falls back to an immediate despawn when
+   * there's no death clip (placeholder enemies), so callers can always defer removal through here.
+   */
+  playDeath(done: () => void): void {
+    if (this.dead) return;
+    this.dead = true;
+    this.attacking = false;
+    this.bar.style.display = "none";
+    if (this.nameTag) this.nameTag.style.display = "none";
+
+    const a = this.anims.death;
+    if (!a) {
+      done();
+      return;
+    }
+    this.currentAnim?.stop();
+    this.currentAnim = a;
+    a.start(false, 1.0, a.from, a.to); // once; holds the last frame when it ends
+    a.onAnimationGroupEndObservable.addOnce(() => {
+      window.setTimeout(done, 700); // linger a beat on the ground before despawning
+    });
+  }
+
   get position(): Vector3 {
     return this.root.position;
   }
@@ -336,6 +368,8 @@ export class Enemy {
    * perform this turn (or null when just moving / waiting).
    */
   aiUpdate(dt: number, targetPos: Vector3, ctx: EnemyContext): EnemyAction | null {
+    // Dying: playing out the death animation — no chase, no attacks.
+    if (this.dead) return null;
     // The training dummy just stands there: no chasing, no attacks.
     if (this.def.behavior === "dummy") return null;
     // Stunned: frozen — no chase, no attack (cooldown still thaws).
@@ -401,6 +435,7 @@ export class Enemy {
 
   /** Position and fill the floating health bar (and name plate) each frame. */
   syncHud(scene: Scene): void {
+    if (this.dead) return; // bar/name already hidden by playDeath; keep them hidden while dying
     const p = projectToScreen(scene, this.headPosition);
     if (!p.visible) {
       this.bar.style.display = "none";

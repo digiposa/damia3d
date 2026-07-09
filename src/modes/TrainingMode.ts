@@ -1300,6 +1300,7 @@ export class TrainingMode extends GameMode {
 
   /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
   private rewardKill(target: Enemy): void {
+    if (target.dying) return; // death sequence already running — don't double-award or re-trigger
     this.player.gainExp(target.def.expReward);
     this.player.gold += target.def.goldReward;
     this.popText(target.headPosition, `+${target.def.expReward} EXP`, TEXT.exp);
@@ -1309,11 +1310,12 @@ export class TrainingMode extends GameMode {
       this.runner.cancel();
       this.comboTarget = undefined;
     }
-    this.removeEnemy(target);
+    if (this.attackTarget === target) this.clearNav(); // stop chasing the corpse
+    target.playDeath(() => this.removeEnemy(target)); // play the death animation, then despawn
   }
 
   private updateEnemies(cdt: number): void {
-    const knightsAlive = this.enemies.filter((e) => e.def.id.startsWith("knight_of_sandora")).length;
+    const knightsAlive = this.enemies.filter((e) => e.alive && e.def.id.startsWith("knight_of_sandora")).length;
     const ctx = { knightsAlive };
     for (const enemy of this.enemies) {
       enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
@@ -1395,7 +1397,7 @@ export class TrainingMode extends GameMode {
       hasItem: this.hasHealItem(),
       canCastMagic: member.avatar.canCastMagic,
     };
-    const decision = member.brain.decide(view, { enemies: this.enemies });
+    const decision = member.brain.decide(view, { enemies: this.enemies.filter((e) => e.alive) });
     if (decision.kind === "approach") {
       const to = decision.target.position.subtract(member.position);
       to.y = 0;
@@ -1523,6 +1525,7 @@ export class TrainingMode extends GameMode {
     let best: Enemy | undefined;
     let bestDist = maxDist;
     for (const e of this.enemies) {
+      if (!e.alive) continue; // skip corpses still lingering through their death animation
       const d = Vector3.Distance(this.player.position, e.position);
       if (d <= bestDist) {
         best = e;
@@ -1536,6 +1539,7 @@ export class TrainingMode extends GameMode {
     let best: Enemy | undefined;
     let bestDist = this.reach;
     for (const e of this.enemies) {
+      if (!e.alive) continue; // skip corpses still lingering through their death animation
       const d = Vector3.Distance(this.player.position, e.position);
       if (d <= bestDist) {
         best = e;
@@ -1547,7 +1551,8 @@ export class TrainingMode extends GameMode {
 
   private removeEnemy(enemy: Enemy): void {
     const i = this.enemies.indexOf(enemy);
-    if (i >= 0) this.enemies.splice(i, 1);
+    if (i < 0) return; // already gone (e.g. the mode was torn down before the death linger fired)
+    this.enemies.splice(i, 1);
     if (this.attackTarget === enemy) this.clearNav();
     enemy.dispose();
     this.refreshShadowCasters();
