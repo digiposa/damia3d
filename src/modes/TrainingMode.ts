@@ -476,8 +476,10 @@ export class TrainingMode extends GameMode {
   /** Default party: the starting bearer plus two distinct implemented front-liners. */
   private defaultParty(): Bearer[] {
     const roster = selectableBearers();
-    const prefs = ["lavitz", "albert", "rose", "shana", "meru"];
-    const team: Bearer[] = [DEFAULT_BEARER];
+    const prefs = ["lavitz", "albert", "rose", "shana"];
+    // Meru leads the default party (she has a rigged 3D model); fall back to Dart if unavailable.
+    const lead = roster.find((x) => x.id === "meru") ?? DEFAULT_BEARER;
+    const team: Bearer[] = [lead];
     for (const id of prefs) {
       if (team.length >= 3) break;
       const b = roster.find((x) => x.id === id);

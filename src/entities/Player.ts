@@ -16,8 +16,15 @@ import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 import { DragoonForm } from "./DragoonForm";
+import { importModel, flattenCellShaded } from "../world/props";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 
 const SPEED = 6; // world units per second
+/** Yaw applied to a loaded bearer model so its native forward faces the rig's +Z. AI/AccuRIG
+ *  exports of our characters face +X, so turn them −90°. Flip the sign if a model faces backwards. */
+const MODEL_YAW = -Math.PI / 2;
+/** Target on-screen height (world units) any imported bearer model is auto-fit to. */
+const MODEL_TARGET_H = 1.8;
 const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 100 at D'Lv5)
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
@@ -94,6 +101,11 @@ export class Player {
   private humanoid: Humanoid;
   /** Procedural Dragoon-form model, shown while transformed (currently Dart's Red-Eye only). */
   private dragoonForm?: DragoonForm;
+  /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
+  private modelRoot?: TransformNode;
+  private modelAnims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup } = {};
+  private modelCurrent?: AnimationGroup;
+  private modelAttacking = false;
 
   constructor(scene: Scene, bearer: Bearer, spawn = new Vector3(0, 0, 0), level = 1) {
     const cls = dragoonClass(bearer.classId);
@@ -478,7 +490,7 @@ export class Player {
     this.sp = this.dragoonTurns * 100;
     if (this.dragoonForm) {
       // Swap the human figure for the Dragoon model (it carries its own glow — no aura).
-      this.humanoid.setEnabled(false);
+      this.setFigureEnabled(false);
       this.dragoonForm.setEnabled(true);
     } else {
       this.dragoonAura.isVisible = true;
@@ -508,8 +520,14 @@ export class Player {
     this.dragoonAura.isVisible = false;
     if (this.dragoonForm) {
       this.dragoonForm.setEnabled(false);
-      this.humanoid.setEnabled(true);
+      this.setFigureEnabled(true);
     }
+  }
+
+  /** Show/hide the active human figure — the loaded model if there is one, else the placeholder. */
+  private setFigureEnabled(on: boolean): void {
+    if (this.modelRoot) this.modelRoot.setEnabled(on);
+    else this.humanoid.setEnabled(on);
   }
 
   // --- Magic / healing ------------------------------------------------------
@@ -576,39 +594,96 @@ export class Player {
 
   /** Advance the active figure's walk/idle animation (visual only). */
   animate(dt: number, moving: boolean): void {
-    if (this.dragoonActive && this.dragoonForm) this.dragoonForm.update(dt, moving);
-    else this.humanoid.update(dt, moving);
+    if (this.dragoonActive && this.dragoonForm) {
+      this.dragoonForm.update(dt, moving);
+      return;
+    }
+    if (this.modelRoot) {
+      if (!this.modelAttacking) {
+        this.playModel(moving ? this.modelAnims.walk ?? this.modelAnims.idle : this.modelAnims.idle, true);
+      }
+      return;
+    }
+    this.humanoid.update(dt, moving);
   }
 
   /** Play a one-shot strike animation (call when a blow lands). */
   strike(): void {
-    if (this.dragoonActive && this.dragoonForm) this.dragoonForm.strike();
-    else this.humanoid.strike();
+    if (this.dragoonActive && this.dragoonForm) {
+      this.dragoonForm.strike();
+      return;
+    }
+    if (this.modelRoot) {
+      const a = this.modelAnims.attack;
+      if (!a) return; // no attack clip yet — stay in the current loop
+      this.modelAttacking = true;
+      this.modelCurrent?.stop();
+      this.modelCurrent = a;
+      a.start(false, 1.2, a.from, a.to);
+      a.onAnimationGroupEndObservable.addOnce(() => {
+        this.modelAttacking = false;
+      });
+      return;
+    }
+    this.humanoid.strike();
+  }
+
+  /** Loop/replace the model's current animation group (no-op if already playing it). */
+  private playModel(group: AnimationGroup | undefined, loop: boolean): void {
+    if (!group || group === this.modelCurrent) return;
+    this.modelCurrent?.stop();
+    this.modelCurrent = group;
+    group.start(loop, 1, group.from, group.to);
   }
 
   /**
-   * Load a rigged glTF/GLB model for the bearer and swap out the procedural
-   * placeholder. Best-effort: any failure keeps the placeholder. The glTF loader
-   * is imported lazily so it only weighs in when a model is actually used.
+   * Load a rigged glTF/GLB model (base filename in src/assets/models/) for the bearer and swap out
+   * the procedural placeholder: auto-fit to {@link MODEL_TARGET_H}, orient to face forward, flatten
+   * its painted materials, and map idle/walk/attack clips driven by {@link animate}/{@link strike}.
+   * Best-effort — any failure keeps the placeholder.
    */
-  private async loadModel(url: string, scene: Scene): Promise<void> {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
-      const i = url.lastIndexOf("/") + 1;
-      const res = await SceneLoader.ImportMeshAsync("", url.slice(0, i), url.slice(i), scene);
-      if (this.root.isDisposed()) {
-        for (const m of res.meshes) m.dispose();
-        return;
-      }
-      const modelRoot = res.meshes[0];
-      if (modelRoot) {
-        modelRoot.parent = this.root;
-        this.humanoid.setEnabled(false); // hide the placeholder
-      }
-    } catch (e) {
-      console.warn(`Player model failed to load (${url}); keeping placeholder.`, e);
+  private async loadModel(name: string, scene: Scene): Promise<void> {
+    const res = await importModel(scene, name).catch(() => undefined);
+    if (!res) return;
+    if (this.root.isDisposed()) {
+      for (const m of res.meshes) m.dispose();
+      return;
     }
+
+    const modelRoot = new TransformNode(`playerModel:${this.bearer.id}`, scene);
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = modelRoot;
+      mesh.isPickable = false;
+    }
+    flattenCellShaded(res.meshes); // painted textures read flat-diffuse in the dim scene
+
+    // Auto-fit to a fixed height with feet at y=0 (AI/AccuRIG exports arrive at arbitrary scale).
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const mesh of res.meshes) {
+      if (mesh.getTotalVertices() === 0) continue;
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      lo = Math.min(lo, bb.minimumWorld.y);
+      hi = Math.max(hi, bb.maximumWorld.y);
+    }
+    if (hi > lo) {
+      const f = MODEL_TARGET_H / (hi - lo);
+      modelRoot.scaling.setAll(f);
+      modelRoot.position.y = -lo * f;
+    }
+    modelRoot.rotation.y = MODEL_YAW;
+    modelRoot.parent = this.root;
+    this.modelRoot = modelRoot;
+    this.humanoid.setEnabled(false); // the model replaces the placeholder
+
+    const g = res.animationGroups;
+    const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
+    this.modelAnims.attack = g.find((a) => has(a, "slash", "attack", "swing"));
+    this.modelAnims.walk = g.find((a) => has(a, "walk")) ?? g.find((a) => has(a, "run") && !has(a, "attack", "slash"));
+    this.modelAnims.idle = g.find((a) => has(a, "idle")) ?? g[0];
+    for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
+    this.playModel(this.modelAnims.idle, true);
   }
 
   /** Every Addition in this Dragoon class's repertoire (locked or not). */
