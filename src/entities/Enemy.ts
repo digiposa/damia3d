@@ -201,42 +201,49 @@ export class Enemy {
     this.play(this.anims.idle);
   }
 
-  /** Build a low-poly sword and parent it to the right-hand bone so it follows the animation.
-   *  Geometry is in the model's native units (the auto-fit scaling above carries it with the body);
-   *  the blade runs along the hand's local +Y (finger direction). */
+  /** Build a low-poly sword and parent it to the model's right-hand bone so it follows every
+   *  animation. fbx2gltf leaves the skeleton bones ~200× the mesh scale (and the glTF import adds a
+   *  mirror), so a socket node cancels the hand's world scale — the sword is then authored directly
+   *  in world units, scales with the character (def.scale), and its blade points out of the fist. */
   private attachSword(scene: Scene, skeleton?: Skeleton): void {
     const hand = skeleton?.bones.find((b) => b.name === "mixamorig:RightHand")?.getTransformNode();
     if (!hand) return;
+    hand.computeWorldMatrix(true);
+    const s = hand.absoluteScaling;
 
     const steel = new StandardMaterial("swordSteel", scene);
-    steel.diffuseColor = new Color3(0.72, 0.76, 0.85);
-    steel.specularColor = new Color3(0.9, 0.93, 1);
-    steel.emissiveColor = new Color3(0.16, 0.18, 0.24);
-    steel.backFaceCulling = false; // the hand bone inherits a mirrored (-Y) world scale
+    steel.diffuseColor = new Color3(0.74, 0.78, 0.86);
+    steel.specularColor = new Color3(0.8, 0.85, 0.95);
+    steel.emissiveColor = new Color3(0.04, 0.05, 0.07); // low: keep the GlowLayer from neon-blading it
+    steel.backFaceCulling = false;
     const gripMat = new StandardMaterial("swordGrip", scene);
     gripMat.diffuseColor = new Color3(0.16, 0.11, 0.07);
-    gripMat.emissiveColor = new Color3(0.03, 0.02, 0.01);
+    gripMat.emissiveColor = new Color3(0.02, 0.015, 0.01);
     gripMat.backFaceCulling = false;
 
+    // Cancel the hand bone's (huge, mirrored) world scale → a clean rigid frame in world units.
+    const socket = new TransformNode(`swordSocket:${this.def.id}`, scene);
+    socket.parent = hand;
+    socket.scaling = new Vector3(this.scale / s.x, this.scale / s.y, this.scale / s.z);
+
     const sword = new TransformNode(`sword:${this.def.id}`, scene);
-    const blade = MeshBuilder.CreateBox("swordBlade", { width: 0.05, depth: 0.014, height: 0.5 }, scene);
-    blade.position.y = 0.3; // spans grip → tip along +Y
+    const blade = MeshBuilder.CreateBox("swordBlade", { width: 0.06, depth: 0.018, height: 0.72 }, scene);
+    blade.position.y = 0.44;
     blade.material = steel;
-    const guard = MeshBuilder.CreateBox("swordGuard", { width: 0.16, depth: 0.032, height: 0.03 }, scene);
-    guard.position.y = 0.05;
+    const guard = MeshBuilder.CreateBox("swordGuard", { width: 0.2, depth: 0.04, height: 0.035 }, scene);
+    guard.position.y = 0.08;
     guard.material = steel;
-    const grip = MeshBuilder.CreateCylinder("swordHilt", { diameter: 0.028, height: 0.11 }, scene);
-    grip.position.y = -0.01;
+    const grip = MeshBuilder.CreateCylinder("swordHilt", { diameter: 0.035, height: 0.13 }, scene);
     grip.material = gripMat;
-    const pommel = MeshBuilder.CreateSphere("swordPommel", { diameter: 0.042, segments: 6 }, scene);
-    pommel.position.y = -0.07;
+    const pommel = MeshBuilder.CreateSphere("swordPommel", { diameter: 0.05, segments: 6 }, scene);
+    pommel.position.y = -0.08;
     pommel.material = steel;
     for (const part of [blade, guard, grip, pommel]) {
       part.parent = sword;
       part.isPickable = false;
     }
-    sword.position = new Vector3(0, 0.02, 0); // seat the grip in the palm
-    sword.parent = hand;
+    sword.parent = socket;
+    sword.rotation.z = Math.PI / 2; // blade out of the fist: tip up at rest, leads the slash
   }
 
   /** Loop a locomotion/idle animation, replacing whatever is playing (no-op if already it). */
