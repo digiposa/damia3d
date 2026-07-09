@@ -16,8 +16,9 @@ import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 import { DragoonForm } from "./DragoonForm";
-import { importModel, flattenCellShaded } from "../world/props";
+import { importModel, flattenCellShaded, tuneWeapon } from "../world/props";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
 const SPEED = 6; // world units per second
 /** Yaw applied to a loaded bearer model so its native forward faces the rig's +Z (Meru's AccuRIG
@@ -25,6 +26,12 @@ const SPEED = 6; // world units per second
 const MODEL_YAW = 0;
 /** Target on-screen height (world units) any imported bearer model is auto-fit to. */
 const MODEL_TARGET_H = 1.8;
+/** Right-hand bone name in the AccuRIG/Character-Creator skeleton (weapon attach point). */
+const HAND_BONE = "CC_Base_R_Hand";
+/** Uniform world scale of a hand-attached weapon model. */
+const WEAPON_SCALE = 0.9;
+/** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
+const WEAPON_GRIP_Y = 0.6;
 const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 100 at D'Lv5)
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
@@ -684,6 +691,43 @@ export class Player {
     this.modelAnims.idle = g.find((a) => has(a, "idle")) ?? g[0];
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
+
+    if (this.bearer.weaponModel) await this.attachWeapon(this.bearer.weaponModel, scene, res.skeletons[0]);
+  }
+
+  /** Attach a weapon GLB to the model's right-hand bone so it follows every animation. The bone's
+   *  (large, mirrored) world scale is cancelled by a socket, then the weapon is sized in world units;
+   *  the mesh is flipped and grip-aligned so the haft seats in the fist and the head points up. */
+  private async attachWeapon(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
+    const hand = skeleton?.bones.find((b) => b.name === HAND_BONE)?.getTransformNode();
+    if (!hand) return;
+    const res = await importModel(scene, name).catch(() => undefined);
+    if (!res || this.root.isDisposed()) {
+      if (res) for (const m of res.meshes) m.dispose();
+      return;
+    }
+    tuneWeapon(res.meshes); // glint + self-illumination so it reads in the dim scene
+
+    hand.computeWorldMatrix(true);
+    const s = hand.absoluteScaling;
+    const scale = this.bearer.scale ?? 1;
+    const socket = new TransformNode(`weaponSocket:${this.bearer.id}`, scene);
+    socket.parent = hand;
+    socket.scaling = new Vector3(scale / s.x, scale / s.y, scale / s.z);
+
+    const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
+    weapon.parent = socket;
+    weapon.rotation.z = -Math.PI / 2; // haft axis out of the fist
+    weapon.scaling.setAll(WEAPON_SCALE);
+
+    const align = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
+    align.parent = weapon;
+    align.rotation.x = Math.PI; // flip so the head points up
+    align.position.y = WEAPON_GRIP_Y; // seat the grip on the socket origin (the fist)
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = align;
+      mesh.isPickable = false;
+    }
   }
 
   /** Every Addition in this Dragoon class's repertoire (locked or not). */

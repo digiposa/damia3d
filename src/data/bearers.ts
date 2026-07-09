@@ -83,6 +83,9 @@ export interface Bearer {
   /** Optional rigged glTF/GLB model (base filename in src/assets/models/); falls back to the
    *  procedural placeholder when absent. Auto-fit, oriented and animated by {@link Player.loadModel}. */
   model?: string;
+  /** Optional weapon GLB (base filename in src/assets/models/) attached to the loaded model's
+   *  right-hand bone. Only used alongside {@link model}. */
+  weaponModel?: string;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -137,7 +140,7 @@ export const BEARERS: Bearer[] = [
   // Blue-Sea (Water) — hammer
   { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
   { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
-  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, model: "meru", weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
+  { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, model: "meru", weaponModel: "meru_hammer", weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
   // Golden (Earth) — axe
   { id: "belzac", name: "Belzac", classId: "golden", portrait: belzacPortrait, weapon: "axe", hair: "wrap", outfit: "brawler", color: C_EARTH, scale: 1.2, storyPlayable: false },
   { id: "kongol", name: "Kongol", classId: "golden", portrait: kongolPortrait, weapon: "axe", hair: "topknot", outfit: "gigantos", color: C_EARTH, skinTone: [0.66, 0.5, 0.34], scale: 1.4, storyPlayable: true },
