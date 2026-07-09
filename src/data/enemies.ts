@@ -54,6 +54,10 @@ export interface EnemyDef {
    * metallic PBR tuning used for genuinely metal assets.
    */
   cellShaded?: boolean;
+  /** Optional weapon GLB (base filename in src/assets/models/) attached to the model's right-hand
+   *  bone (mixamorig:RightHand). The blade is authored along the mesh's own axis; the engine seats
+   *  the grip in the fist and points it out. */
+  weaponModel?: string;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -103,6 +107,7 @@ export const KNIGHT_OF_SANDORA_SELES: EnemyDef = {
   goldReward: 3,
   model: "knight_sandora",
   cellShaded: true,
+  weaponModel: "kos_sword",
 };
 
 /**
@@ -126,6 +131,7 @@ export const KNIGHT_OF_SANDORA_BLACK_CASTLE: EnemyDef = {
   goldReward: 15,
   model: "knight_sandora",
   cellShaded: true,
+  weaponModel: "kos_sword",
 };
 
 /** Default Knight of Sandora used in the sandbox (the first-encountered Seles squad member). */

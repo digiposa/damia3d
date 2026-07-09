@@ -19,6 +19,10 @@ const SPEED = 3.2;
 const ATTACK_RANGE = 1.7;
 /** Seconds between the enemy's attacks. */
 const ATTACK_INTERVAL = 1.4;
+/** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
+const WEAPON_SCALE = 0.95;
+/** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
+const WEAPON_GRIP_Y = 0.87;
 
 /** A resolved enemy action for the mode to apply against the player (or itself). */
 export type EnemyAction =
@@ -187,9 +191,9 @@ export class Enemy {
     }
     modelRoot.parent = this.root;
 
-    // Give the model its sword (our AI knight is rigged weaponless — attach a procedural blade to
-    // the right-hand bone so it moves with every animation, no baked-in bending).
-    if (this.def.cellShaded) this.attachSword(scene, res.skeletons[0]);
+    // Attach the enemy's weapon model to the right-hand bone (our AI models are rigged weaponless),
+    // so it follows every animation with no baked-in bending.
+    if (this.def.weaponModel) await this.attachWeapon(this.def.weaponModel, scene, res.skeletons[0]);
 
     // Match clips by keyword so both our Mixamo names (Idle/Walking/Slash) and the Quaternius
     // convention (…|Idle, …|Run, …|Run_swordAttack) resolve without per-pack special-casing.
@@ -203,49 +207,43 @@ export class Enemy {
     this.play(this.anims.idle);
   }
 
-  /** Build a low-poly sword and parent it to the model's right-hand bone so it follows every
-   *  animation. fbx2gltf leaves the skeleton bones ~200× the mesh scale (and the glTF import adds a
-   *  mirror), so a socket node cancels the hand's world scale — the sword is then authored directly
-   *  in world units, scales with the character (def.scale), and its blade points out of the fist. */
-  private attachSword(scene: Scene, skeleton?: Skeleton): void {
+  /** Load a weapon GLB and parent it to the model's right-hand bone so it follows every animation.
+   *  fbx2gltf leaves the skeleton bones ~200× the mesh scale (and the glTF import adds a mirror), so
+   *  a socket node cancels the hand's world scale — the weapon is then sized in world units and
+   *  scales with the character (def.scale). The mesh's grip is seated in the fist and the blade
+   *  pointed out of it (tip up at rest, overhead in the slash). */
+  private async attachWeapon(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
     const hand = skeleton?.bones.find((b) => b.name === "mixamorig:RightHand")?.getTransformNode();
     if (!hand) return;
+    const res = await importModel(scene, name).catch(() => undefined);
+    if (!res || this.root.isDisposed()) {
+      if (res) for (const m of res.meshes) m.dispose();
+      return;
+    }
+    flattenCellShaded(res.meshes); // match the cell-shaded body (no dark metallic PBR)
+
     hand.computeWorldMatrix(true);
     const s = hand.absoluteScaling;
-
-    const steel = new StandardMaterial("swordSteel", scene);
-    steel.diffuseColor = new Color3(0.74, 0.78, 0.86);
-    steel.specularColor = new Color3(0.8, 0.85, 0.95);
-    steel.emissiveColor = new Color3(0.04, 0.05, 0.07); // low: keep the GlowLayer from neon-blading it
-    steel.backFaceCulling = false;
-    const gripMat = new StandardMaterial("swordGrip", scene);
-    gripMat.diffuseColor = new Color3(0.16, 0.11, 0.07);
-    gripMat.emissiveColor = new Color3(0.02, 0.015, 0.01);
-    gripMat.backFaceCulling = false;
-
     // Cancel the hand bone's (huge, mirrored) world scale → a clean rigid frame in world units.
-    const socket = new TransformNode(`swordSocket:${this.def.id}`, scene);
+    const socket = new TransformNode(`weaponSocket:${this.def.id}`, scene);
     socket.parent = hand;
     socket.scaling = new Vector3(this.scale / s.x, this.scale / s.y, this.scale / s.z);
 
-    const sword = new TransformNode(`sword:${this.def.id}`, scene);
-    const blade = MeshBuilder.CreateBox("swordBlade", { width: 0.06, depth: 0.018, height: 0.72 }, scene);
-    blade.position.y = 0.44;
-    blade.material = steel;
-    const guard = MeshBuilder.CreateBox("swordGuard", { width: 0.2, depth: 0.04, height: 0.035 }, scene);
-    guard.position.y = 0.08;
-    guard.material = steel;
-    const grip = MeshBuilder.CreateCylinder("swordHilt", { diameter: 0.035, height: 0.13 }, scene);
-    grip.material = gripMat;
-    const pommel = MeshBuilder.CreateSphere("swordPommel", { diameter: 0.05, segments: 6 }, scene);
-    pommel.position.y = -0.08;
-    pommel.material = steel;
-    for (const part of [blade, guard, grip, pommel]) {
-      part.parent = sword;
-      part.isPickable = false;
-    }
+    const sword = new TransformNode(`weapon:${this.def.id}`, scene);
     sword.parent = socket;
-    sword.rotation.z = -Math.PI / 2; // blade out of the fist: tip up at rest, overhead in the slash
+    sword.rotation.z = -Math.PI / 2; // orient the grip-to-blade axis out of the fist
+    sword.scaling.setAll(WEAPON_SCALE);
+
+    // The KoS sword mesh runs tip(y=0)→grip(y≈GRIP_Y)→pommel(y=1); flip so the blade points +Y and
+    // slide the grip onto the socket origin (the fist).
+    const align = new TransformNode(`weaponAlign:${this.def.id}`, scene);
+    align.parent = sword;
+    align.rotation.x = Math.PI;
+    align.position.y = WEAPON_GRIP_Y;
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = align;
+      mesh.isPickable = false;
+    }
   }
 
   /** Loop a locomotion/idle animation, replacing whatever is playing (no-op if already it). */
