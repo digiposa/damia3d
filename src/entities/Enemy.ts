@@ -243,7 +243,7 @@ export class Enemy {
       part.isPickable = false;
     }
     sword.parent = socket;
-    sword.rotation.z = Math.PI / 2; // blade out of the fist: tip up at rest, leads the slash
+    sword.rotation.z = -Math.PI / 2; // blade out of the fist: tip up at rest, overhead in the slash
   }
 
   /** Loop a locomotion/idle animation, replacing whatever is playing (no-op if already it). */
