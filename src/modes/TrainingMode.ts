@@ -107,6 +107,8 @@ const ACQUIRE_RANGE = 20;
 
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
+/** Joystick magnitude (0–1) at/above which movement is a run rather than a walk. */
+const RUN_THRESHOLD = 0.65;
 /** A living enemy within this distance of the controlled character puts the party in combat stance. */
 const COMBAT_RANGE = 12;
 /** Seconds the combat stance lingers after the last enemy leaves range / dies (anti-flicker). */
@@ -658,20 +660,24 @@ export class TrainingMode extends GameMode {
     // reposition while you can't attack).
     const rooted = this.player.guardActive || this.runner.active || this.rangedCooldownT > 0;
     const before = this.player.position.clone();
+    // Walk vs run: gauged by joystick magnitude on touch (past RUN_THRESHOLD = run); desktop
+    // click-to-move has no analog input, so it defaults to a run.
+    let running = true;
     if (!rooted) {
       const axis = this.input.axis();
       if (axis.x !== 0 || axis.y !== 0) {
+        running = Math.hypot(axis.x, axis.y) >= RUN_THRESHOLD;
         const dir = this.camera.groundForward.scale(axis.y).add(this.camera.groundRight.scale(axis.x));
-        this.player.move(dir, dt);
+        this.player.move(dir, dt, running);
         this.clearNav();
       } else {
-        this.navigate(dt);
+        this.navigate(dt); // click-to-move runs (Player.move defaults to running)
       }
       clampToArena(this.player.position); // the wall is a hard boundary
     }
     this.camera.follow(this.player.position);
-    // Procedural walk/idle animation (visual only, uses real time).
-    this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6);
+    // Procedural walk/run/idle animation (visual only, uses real time).
+    this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6, running);
     this.updateCombatState(dt); // toggle the party's combat vs exploration stance
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
@@ -1424,7 +1430,7 @@ export class TrainingMode extends GameMode {
     if (decision.kind === "approach") {
       const to = decision.target.position.subtract(member.position);
       to.y = 0;
-      member.avatar.move(to, dt);
+      member.avatar.move(to, dt, false); // AI allies keep a walk pace (matches enemy speed)
     } else if (decision.kind === "idle") {
       if (decision.target) member.avatar.face(decision.target.position.subtract(member.position));
     } else {

@@ -20,7 +20,8 @@ import { importModel, flattenCellShaded, tuneWeapon } from "../world/props";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
-const SPEED = 6; // world units per second
+const WALK_SPEED = 3.2; // world units per second (gentle joystick / combat pace)
+const RUN_SPEED = 6.5; // world units per second (full joystick / desktop click-to-move)
 /** Yaw applied to a loaded bearer model so its native forward faces the rig's +Z (Meru's AccuRIG
  *  export already faces +Z, so 0). Adjust here if a future model is authored facing another axis. */
 const MODEL_YAW = 0;
@@ -114,9 +115,11 @@ export class Player {
   private modelAnims: {
     idle?: AnimationGroup;
     walk?: AnimationGroup;
+    run?: AnimationGroup;
     attack?: AnimationGroup;
     idleCombat?: AnimationGroup;
     walkCombat?: AnimationGroup;
+    runCombat?: AnimationGroup;
   } = {};
   private modelCurrent?: AnimationGroup;
   private modelAttacking = false;
@@ -595,9 +598,9 @@ export class Player {
    * @param dir non-normalized desired direction on the XZ plane
    * @param dt  seconds since last frame
    */
-  move(dir: Vector3, dt: number): void {
+  move(dir: Vector3, dt: number, running = true): void {
     if (dir.lengthSquared() < 1e-4) return;
-    const step = dir.normalize().scale(SPEED * dt);
+    const step = dir.normalize().scale((running ? RUN_SPEED : WALK_SPEED) * dt);
     this.root.position.addInPlace(step);
     // Face the direction of travel.
     this.root.rotation.y = Math.atan2(step.x, step.z);
@@ -609,8 +612,9 @@ export class Player {
     this.root.rotation.y = Math.atan2(dir.x, dir.z);
   }
 
-  /** Advance the active figure's walk/idle animation (visual only). */
-  animate(dt: number, moving: boolean): void {
+  /** Advance the active figure's idle/walk/run animation (visual only). `running` selects the run
+   *  clip over the walk clip while moving (gauged by joystick magnitude / desktop click-to-move). */
+  animate(dt: number, moving: boolean, running = false): void {
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.update(dt, moving);
       return;
@@ -619,7 +623,10 @@ export class Player {
       if (!this.modelAttacking) {
         const idle = (this.combat && this.modelAnims.idleCombat) || this.modelAnims.idle;
         const walk = (this.combat && this.modelAnims.walkCombat) || this.modelAnims.walk;
-        this.playModel(moving ? walk ?? idle : idle, true);
+        const run = (this.combat && this.modelAnims.runCombat) || this.modelAnims.run;
+        // Run clip if running (fall back to walk when a character has no run clip yet).
+        const locomotion = (running ? run ?? walk : walk) ?? idle;
+        this.playModel(moving ? locomotion : idle, true);
       }
       return;
     }
@@ -706,12 +713,13 @@ export class Player {
     const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
     const combatOf = (a: AnimationGroup) => has(a, "combat", "fight", "battle");
     this.modelAnims.attack = g.find((a) => has(a, "slash", "attack", "swing", "punch", "kick"));
-    // Peaceful (exploration) vs combat idle/walk sets — combat clips are tagged in the name.
+    // Peaceful (exploration) vs combat sets for idle / walk / run — combat clips are tagged in the name.
     this.modelAnims.idleCombat = g.find((a) => has(a, "idle") && combatOf(a));
-    this.modelAnims.walkCombat = g.find((a) => (has(a, "walk") || has(a, "run")) && combatOf(a));
+    this.modelAnims.walkCombat = g.find((a) => has(a, "walk") && combatOf(a));
+    this.modelAnims.runCombat = g.find((a) => has(a, "run") && combatOf(a));
     this.modelAnims.idle = g.find((a) => has(a, "idle") && !combatOf(a)) ?? g.find((a) => has(a, "idle")) ?? g[0];
-    this.modelAnims.walk =
-      g.find((a) => has(a, "walk") && !combatOf(a)) ?? g.find((a) => has(a, "run") && !combatOf(a)) ?? g.find((a) => has(a, "walk"));
+    this.modelAnims.walk = g.find((a) => has(a, "walk") && !combatOf(a)) ?? g.find((a) => has(a, "walk"));
+    this.modelAnims.run = g.find((a) => has(a, "run") && !combatOf(a)) ?? g.find((a) => has(a, "run"));
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 
