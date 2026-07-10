@@ -33,10 +33,12 @@ const MODEL_TARGET_H = 1.8;
 const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
 /** Upper-back / spine bone the weapon is holstered on while sheathed (out of combat), by rig. */
 const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "mixamorig:Spine", "CC_Base_Spine01"];
-/** Sheathed pose on the back (tuned from screenshots): extra rotation (rad) and position offset
- *  applied in the back-bone frame so the weapon lies diagonally across the back, grip up. */
-const BACK_ROT = new Vector3(0, 0, Math.PI * 0.78);
-const BACK_POS = new Vector3(-0.12, 0.02, -0.16);
+/** Sheathed pose (tuned from screenshots), in the scale-cancelled spine-bone frame:
+ *  BACK_ROT orients the weapon along the back, BACK_POS drops it down and hugs it to the body,
+ *  BACK_GRIP centres the weapon on its mount (a low value keeps it close instead of pushed out). */
+const BACK_ROT = new Vector3(0, 0, Math.PI);
+const BACK_POS = new Vector3(0, 0.5, -0.17); // +Y = down the spine, -Z = behind the back
+const BACK_GRIP = 0.5;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
@@ -842,7 +844,7 @@ export class Player {
       const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
       backMount.parent = backWeapon;
       backMount.rotation.x = Math.PI;
-      backMount.position.y = grip;
+      backMount.position.y = BACK_GRIP; // back seat is independent of the hand grip
       this.weaponBackMount = backMount;
     }
 
