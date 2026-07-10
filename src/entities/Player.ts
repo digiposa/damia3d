@@ -4,6 +4,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { statsForLevel, levelForExp, nextLevelExp, type CharacterLevel } from "../data/dart";
@@ -30,6 +31,12 @@ const MODEL_TARGET_H = 1.8;
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
 const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
+/** Upper-back / spine bone the weapon is holstered on while sheathed (out of combat), by rig. */
+const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "mixamorig:Spine", "CC_Base_Spine01"];
+/** Sheathed pose on the back (tuned from screenshots): extra rotation (rad) and position offset
+ *  applied in the back-bone frame so the weapon lies diagonally across the back, grip up. */
+const BACK_ROT = new Vector3(0, 0, Math.PI * 0.78);
+const BACK_POS = new Vector3(-0.12, 0.02, -0.16);
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
@@ -120,9 +127,19 @@ export class Player {
     idleCombat?: AnimationGroup;
     walkCombat?: AnimationGroup;
     runCombat?: AnimationGroup;
+    draw?: AnimationGroup;
+    sheathe?: AnimationGroup;
   } = {};
   private modelCurrent?: AnimationGroup;
   private modelAttacking = false;
+  /** Weapon holstering: the top-level weapon meshes and the two mount points they swap between —
+   *  the hand (drawn, in combat) and the back (sheathed, out of combat). */
+  private weaponMeshes: AbstractMesh[] = [];
+  private weaponHandMount?: TransformNode;
+  private weaponBackMount?: TransformNode;
+  /** Current mount state (true = on back) and the in-progress draw/sheathe transition, if any. */
+  private weaponSheathed?: boolean;
+  private weaponTransition?: "draw" | "sheathe";
   /** Combat stance: swaps to the combat idle/walk clips when the party is engaged (falls back to
    *  the peaceful clips when a character has no combat variant yet). Set by the mode each frame. */
   private combat = false;
@@ -620,7 +637,9 @@ export class Player {
       return;
     }
     if (this.modelRoot) {
-      if (!this.modelAttacking) {
+      this.updateWeaponHolster(); // draw / sheathe on a combat-stance change
+      // The draw/sheathe clip (like the attack) owns the body until it ends — don't override it.
+      if (!this.modelAttacking && !this.weaponTransition) {
         const idle = (this.combat && this.modelAnims.idleCombat) || this.modelAnims.idle;
         const walk = (this.combat && this.modelAnims.walkCombat) || this.modelAnims.walk;
         const run = (this.combat && this.modelAnims.runCombat) || this.modelAnims.run;
@@ -634,9 +653,45 @@ export class Player {
   }
 
   /** Enter/leave the combat stance (the mode sets this from enemy proximity). Swaps to the combat
-   *  idle/walk clips when available; a no-op figure-wise for placeholder/procedural bearers. */
+   *  idle/walk clips when available; a no-op figure-wise for placeholder/procedural bearers. The
+   *  weapon then draws to the hand / sheathes to the back (see {@link updateWeaponHolster}). */
   setCombat(on: boolean): void {
     this.combat = on;
+  }
+
+  /** Reconcile the weapon's mount with the combat stance: drawn (hand) in combat, sheathed (back)
+   *  out of it. Plays the draw/sheathe clip and reparents the weapon partway through; falls back to
+   *  an instant snap if the character has no such clip. Called each frame from {@link animate}. */
+  private updateWeaponHolster(): void {
+    if (this.weaponTransition || !this.weaponMeshes.length) return; // one transition at a time
+    const wantSheathed = !this.combat;
+    if (wantSheathed === this.weaponSheathed) return;
+    const clip = wantSheathed ? this.modelAnims.sheathe : this.modelAnims.draw;
+    if (!clip || !this.weaponBackMount) {
+      this.applyWeaponSheath(wantSheathed); // no clip / no back mount → snap
+      return;
+    }
+    this.weaponTransition = wantSheathed ? "sheathe" : "draw";
+    this.modelCurrent?.stop();
+    this.modelCurrent = clip;
+    clip.start(false, 1, clip.from, clip.to);
+    // Reparent when the hand meets the weapon — mid-clip (drawing) / near the end (sheathing).
+    const durMs = ((clip.to - clip.from) / 60) * 1000;
+    const frac = wantSheathed ? 0.6 : 0.45;
+    window.setTimeout(() => this.applyWeaponSheath(wantSheathed), durMs * frac);
+    clip.onAnimationGroupEndObservable.addOnce(() => {
+      this.applyWeaponSheath(wantSheathed); // ensure final state even if the timer was skipped
+      this.weaponTransition = undefined;
+    });
+  }
+
+  /** Move the weapon between its back (sheathed) and hand (drawn) mounts. Idempotent. */
+  private applyWeaponSheath(sheathed: boolean): void {
+    if (sheathed === this.weaponSheathed) return;
+    const mount = sheathed ? this.weaponBackMount ?? this.weaponHandMount : this.weaponHandMount;
+    if (!mount || !this.weaponMeshes.length) return;
+    for (const m of this.weaponMeshes) m.parent = mount;
+    this.weaponSheathed = sheathed;
   }
 
   /** Play a one-shot strike animation (call when a blow lands). */
@@ -720,6 +775,8 @@ export class Player {
     this.modelAnims.idle = g.find((a) => has(a, "idle") && !combatOf(a)) ?? g.find((a) => has(a, "idle")) ?? g[0];
     this.modelAnims.walk = g.find((a) => has(a, "walk") && !combatOf(a)) ?? g.find((a) => has(a, "walk"));
     this.modelAnims.run = g.find((a) => has(a, "run") && !combatOf(a)) ?? g.find((a) => has(a, "run"));
+    this.modelAnims.draw = g.find((a) => has(a, "draw", "unsheath"));
+    this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 
@@ -741,26 +798,57 @@ export class Player {
     }
     tuneWeapon(res.meshes); // glint + self-illumination so it reads in the dim scene
 
-    hand.computeWorldMatrix(true);
-    const s = hand.absoluteScaling;
     const scale = this.bearer.scale ?? 1;
+
+    // Drawn (in-hand) mount: cancel the hand bone's (large, mirrored) world scale, point the haft
+    // out of the fist, then flip + grip-align the mesh so the head points up.
+    hand.computeWorldMatrix(true);
+    const hs = hand.absoluteScaling;
     const socket = new TransformNode(`weaponSocket:${this.bearer.id}`, scene);
     socket.parent = hand;
-    socket.scaling = new Vector3(scale / s.x, scale / s.y, scale / s.z);
-
+    socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
     const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
     weapon.parent = socket;
-    weapon.rotation.z = -Math.PI / 2; // haft axis out of the fist
+    weapon.rotation.z = -Math.PI / 2;
     weapon.scaling.setAll(WEAPON_SCALE);
+    const handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
+    handMount.parent = weapon;
+    handMount.rotation.x = Math.PI;
+    handMount.position.y = WEAPON_GRIP_Y;
+    this.weaponHandMount = handMount;
 
-    const align = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
-    align.parent = weapon;
-    align.rotation.x = Math.PI; // flip so the head points up
-    align.position.y = WEAPON_GRIP_Y; // seat the grip on the socket origin (the fist)
+    // Sheathed (on-back) mount: same grip-aligned frame, but hung on a spine bone and laid across
+    // the back. Built only if the rig has a back bone; otherwise the weapon just stays in hand.
+    const back = BACK_BONES.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
+      (n): n is NonNullable<typeof n> => !!n,
+    );
+    if (back) {
+      back.computeWorldMatrix(true);
+      const bs = back.absoluteScaling;
+      const backSocket = new TransformNode(`weaponBackSocket:${this.bearer.id}`, scene);
+      backSocket.parent = back;
+      backSocket.scaling = new Vector3(scale / bs.x, scale / bs.y, scale / bs.z);
+      backSocket.rotation = BACK_ROT.clone();
+      backSocket.position = BACK_POS.clone();
+      const backWeapon = new TransformNode(`weaponBack:${this.bearer.id}`, scene);
+      backWeapon.parent = backSocket;
+      backWeapon.scaling.setAll(WEAPON_SCALE);
+      const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
+      backMount.parent = backWeapon;
+      backMount.rotation.x = Math.PI;
+      backMount.position.y = WEAPON_GRIP_Y;
+      this.weaponBackMount = backMount;
+    }
+
     for (const mesh of res.meshes) {
-      if (!mesh.parent) mesh.parent = align;
+      if (!mesh.parent) {
+        mesh.parent = handMount;
+        this.weaponMeshes.push(mesh); // top-level weapon meshes swap between hand/back
+      }
       mesh.isPickable = false;
     }
+    // Start sheathed on the back when out of combat (weaponSheathed is undefined → forces apply).
+    this.applyWeaponSheath(!this.combat);
   }
 
   /** Every Addition in this Dragoon class's repertoire (locked or not). */
