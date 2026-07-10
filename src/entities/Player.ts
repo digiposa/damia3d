@@ -26,8 +26,9 @@ const SPEED = 6; // world units per second
 const MODEL_YAW = 0;
 /** Target on-screen height (world units) any imported bearer model is auto-fit to. */
 const MODEL_TARGET_H = 1.8;
-/** Right-hand bone name in the AccuRIG/Character-Creator skeleton (weapon attach point). */
-const HAND_BONE = "CC_Base_R_Hand";
+/** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
+ *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
+const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
@@ -721,7 +722,9 @@ export class Player {
    *  (large, mirrored) world scale is cancelled by a socket, then the weapon is sized in world units;
    *  the mesh is flipped and grip-aligned so the haft seats in the fist and the head points up. */
   private async attachWeapon(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
-    const hand = skeleton?.bones.find((b) => b.name === HAND_BONE)?.getTransformNode();
+    const hand = HAND_BONES.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
+      (n): n is NonNullable<typeof n> => !!n,
+    );
     if (!hand) return;
     const res = await importModel(scene, name).catch(() => undefined);
     if (!res || this.root.isDisposed()) {
