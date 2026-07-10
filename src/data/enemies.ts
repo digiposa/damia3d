@@ -163,7 +163,9 @@ export const COMMANDER_SELES: EnemyDef = {
   isBoss: true,
   scale: 1.6,
   bodyColor: [0.28, 0.18, 0.42],
-  model: "knight",
+  model: "commander",
+  cellShaded: true,
+  weaponModel: "kos_sword",
 };
 
 /**
@@ -189,5 +191,7 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
   goldReward: 9,
   scale: 1.3,
   bodyColor: [0.3, 0.2, 0.4],
-  model: "knight",
+  model: "commander",
+  cellShaded: true,
+  weaponModel: "kos_sword",
 };

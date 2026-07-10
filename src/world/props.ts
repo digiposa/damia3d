@@ -81,9 +81,24 @@ export function flattenCellShaded(meshes: AbstractMesh[]): void {
       // emissive gets picked up by the GlowLayer and haloes the model into a "ghost".
       m.environmentIntensity = 1.0;
       m.emissiveColor = new Color3(0.04, 0.04, 0.04); // tiny floor so deep shadow isn't pitch black
+      // Force fully opaque at EVERY level. The AI exports are authored OPAQUE with no texture
+      // alpha, yet users reported "translucent/ghost" characters — a symptom of a mobile GL path
+      // treating the PBR material as alpha-blended. Pin every transparency knob so the body can
+      // never render see-through regardless of the device: no blend mode, full alpha, ignore any
+      // stray texture alpha, and write depth so nothing shows through.
+      m.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+      m.alpha = 1;
+      m.useAlphaFromAlbedoTexture = false;
+      if (m.albedoTexture) m.albedoTexture.hasAlpha = false;
+      m.forceDepthWrite = true;
+      m.needDepthPrePass = false;
+      m.backFaceCulling = true;
     }
   };
   for (const mesh of meshes) fix(mesh.material);
+  // Belt-and-suspenders: reset per-mesh visibility (the arena fades near-side *decor* via
+  // mesh.visibility; guarantee a character is never inadvertently dimmed to translucency).
+  for (const mesh of meshes) mesh.visibility = 1;
 }
 
 /**

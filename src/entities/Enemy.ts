@@ -60,7 +60,15 @@ export class Enemy {
   readonly ready: Promise<void>;
   /** Placeholder meshes (capsule/helm/crown), hidden when a rigged model loads. */
   private placeholder: AbstractMesh[] = [];
-  private anims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup; throw?: AnimationGroup; death?: AnimationGroup } = {};
+  private anims: {
+    idle?: AnimationGroup;
+    walk?: AnimationGroup;
+    attack?: AnimationGroup;
+    slashTwice?: AnimationGroup;
+    powerUp?: AnimationGroup;
+    throw?: AnimationGroup;
+    death?: AnimationGroup;
+  } = {};
   private currentAnim?: AnimationGroup;
   private attacking = false;
   private dead = false;
@@ -205,6 +213,8 @@ export class Enemy {
     this.anims.attack = groups.find((a) => has(a, "slash", "attack"));
     this.anims.walk = groups.find((a) => has(a, "walk")) ?? groups.find((a) => has(a, "run") && !has(a, "attack", "slash"));
     this.anims.idle = groups.find((a) => has(a, "idle")) ?? groups[0];
+    this.anims.slashTwice = groups.find((a) => has(a, "twice", "double", "multi"));
+    this.anims.powerUp = groups.find((a) => has(a, "power"));
     this.anims.throw = groups.find((a) => has(a, "throw", "dagger", "knife"));
     this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
@@ -264,30 +274,28 @@ export class Enemy {
     this.play(moving ? this.anims.walk ?? this.anims.idle : this.anims.idle);
   }
 
-  /** Play the attack swing once, then fall back to idle/walk on the next frame. */
-  private playAttack(): void {
-    const a = this.anims.attack;
-    if (!a) return;
+  /** Play a one-shot animation (attack/throw/power-up), flagging `attacking` until it ends so the
+   *  enemy holds position and doesn't cut the motion with idle/walk. */
+  private playOneShot(group?: AnimationGroup, speed = 1.2): void {
+    if (!group) return;
     this.attacking = true;
     this.currentAnim?.stop();
-    this.currentAnim = a;
-    a.start(false, 1.2, a.from, a.to);
-    a.onAnimationGroupEndObservable.addOnce(() => {
+    this.currentAnim = group;
+    group.start(false, speed, group.from, group.to);
+    group.onAnimationGroupEndObservable.addOnce(() => {
       this.attacking = false;
     });
   }
 
-  /** Play the dagger-throw animation once, then fall back to idle/walk on the next frame. */
+  /** Play the melee swing for the chosen action (Slash Twice uses its own clip when present). */
+  private playAttack(name = ""): void {
+    const twice = /twice|multi/i.test(name);
+    this.playOneShot((twice && this.anims.slashTwice) || this.anims.attack);
+  }
+
+  /** Play the dagger-throw animation once. */
   private playThrow(): void {
-    const a = this.anims.throw;
-    if (!a) return;
-    this.attacking = true;
-    this.currentAnim?.stop();
-    this.currentAnim = a;
-    a.start(false, 1.0, a.from, a.to);
-    a.onAnimationGroupEndObservable.addOnce(() => {
-      this.attacking = false;
-    });
+    this.playOneShot(this.anims.throw, 1.0);
   }
 
   /** True once the death sequence has begun — the enemy is out of play (no AI, not targetable). */
@@ -429,8 +437,13 @@ export class Enemy {
     this.setMoving(false);
     if (this.attackCooldown > 0) return null;
     this.attackCooldown = ATTACK_INTERVAL;
-    this.playAttack();
-    return this.chooseAction(ctx);
+    // Decide the action first (it may flip the Commander into its powered-up stance), then match the
+    // animation to it: the Power-Up instant plays its own clip; Slash Twice / Multi pick theirs.
+    const wasPowered = this.poweredUp;
+    const action = this.chooseAction(ctx);
+    if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
+    else this.playAttack(action.name);
+    return action;
   }
 
   /** The enemy's thrown (ranged) attack, if it has one — its name contains "Throw". */
