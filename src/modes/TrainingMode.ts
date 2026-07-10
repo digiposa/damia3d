@@ -109,6 +109,9 @@ const ACQUIRE_RANGE = 20;
 const ARROW_SPEED = 26;
 /** Joystick magnitude (0–1) at/above which movement is a run rather than a walk. */
 const RUN_THRESHOLD = 0.65;
+/** Desktop mouse-wheel zoom bounds for the orthographic iso view (higher = closer). */
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3.5;
 /** A living enemy within this distance of the controlled character puts the party in combat stance. */
 const COMBAT_RANGE = 12;
 /** Seconds the combat stance lingers after the last enemy leaves range / dies (anti-flicker). */
@@ -428,6 +431,7 @@ export class TrainingMode extends GameMode {
     this.canvas?.addEventListener("pointerdown", this.onPointerDown);
     this.canvas?.addEventListener("pointermove", this.onPointerMove);
     this.canvas?.addEventListener("pointerleave", this.onPointerLeave);
+    this.canvas?.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("keydown", this.onKeyDown);
 
     // Start with an empty arena so the party begins in the exploration stance; spawn an enemy
@@ -1097,6 +1101,15 @@ export class TrainingMode extends GameMode {
 
   private onPointerLeave = (): void => {
     if (this.canvas) this.canvas.style.cursor = "";
+  };
+
+  /** Desktop mouse-wheel zoom: scroll up to zoom in, down to zoom out. Adjusts the orthographic
+   *  iso view (settings.cameraZoom, read live by IsoCamera). preventDefault stops the page from
+   *  scrolling under the canvas. */
+  private onWheel = (e: WheelEvent): void => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    settings.cameraZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, settings.cameraZoom * factor));
   };
 
   /** Walk toward the move target or attack target; strike when in reach. */
@@ -1876,6 +1889,7 @@ export class TrainingMode extends GameMode {
     this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
     this.canvas?.removeEventListener("pointermove", this.onPointerMove);
     this.canvas?.removeEventListener("pointerleave", this.onPointerLeave);
+    this.canvas?.removeEventListener("wheel", this.onWheel);
     window.removeEventListener("keydown", this.onKeyDown);
     for (const a of this.arrows) a.dispose();
     this.arrows = [];
