@@ -136,7 +136,7 @@ export const BEARERS: Bearer[] = [
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
   { id: "doel", name: "Doel", classId: "thunder", portrait: doelPortrait, weapon: "dualsword", hair: "imperial", outfit: "warlord", color: C_THUNDER, bodyColor: [0.16, 0.14, 0.2], storyPlayable: false },
-  { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
+  { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, model: "haschel", weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
   { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
   { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
