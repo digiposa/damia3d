@@ -87,6 +87,11 @@ export interface Bearer {
   /** Optional weapon GLB (base filename in src/assets/models/) attached to the loaded model's
    *  right-hand bone. Only used alongside {@link model}. */
   weaponModel?: string;
+  /** Where the fist grips along the weapon mesh (0–1 up its length). Higher = the hand holds
+   *  further up toward the head, so the weapon hangs lower. Per-weapon; default tuned for Meru. */
+  weaponGrip?: number;
+  /** Uniform world scale of the hand-held weapon. Per-weapon; default tuned for Meru. */
+  weaponScale?: number;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -139,7 +144,7 @@ export const BEARERS: Bearer[] = [
   { id: "doel", name: "Doel", classId: "thunder", portrait: doelPortrait, weapon: "dualsword", hair: "imperial", outfit: "warlord", color: C_THUNDER, bodyColor: [0.16, 0.14, 0.2], storyPlayable: false },
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, model: "haschel", weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
-  { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, model: "damia", weaponModel: "damia_weapon", weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
+  { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, model: "damia", weaponModel: "damia_weapon", weaponGrip: 0.85, weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
   { id: "lenus", name: "Lenus", classId: "blueSea", portrait: lenusPortrait, weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
   { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, model: "meru", weaponModel: "meru_hammer", weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
   // Golden (Earth) — axe

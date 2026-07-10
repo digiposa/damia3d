@@ -799,6 +799,8 @@ export class Player {
     tuneWeapon(res.meshes); // glint + self-illumination so it reads in the dim scene
 
     const scale = this.bearer.scale ?? 1;
+    const grip = this.bearer.weaponGrip ?? WEAPON_GRIP_Y; // per-weapon grip point up the mesh
+    const wScale = this.bearer.weaponScale ?? WEAPON_SCALE;
 
     // Drawn (in-hand) mount: cancel the hand bone's (large, mirrored) world scale, point the haft
     // out of the fist, then flip + grip-align the mesh so the head points up.
@@ -810,11 +812,11 @@ export class Player {
     const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
     weapon.parent = socket;
     weapon.rotation.z = -Math.PI / 2;
-    weapon.scaling.setAll(WEAPON_SCALE);
+    weapon.scaling.setAll(wScale);
     const handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
     handMount.parent = weapon;
     handMount.rotation.x = Math.PI;
-    handMount.position.y = WEAPON_GRIP_Y;
+    handMount.position.y = grip;
     this.weaponHandMount = handMount;
 
     // Sheathed (on-back) mount: same grip-aligned frame, but hung on a spine bone and laid across
@@ -836,11 +838,11 @@ export class Player {
       backWeapon.parent = backSocket;
       backWeapon.rotation = BACK_ROT.clone();
       backWeapon.position = BACK_POS.clone();
-      backWeapon.scaling.setAll(WEAPON_SCALE);
+      backWeapon.scaling.setAll(wScale);
       const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
       backMount.parent = backWeapon;
       backMount.rotation.x = Math.PI;
-      backMount.position.y = WEAPON_GRIP_Y;
+      backMount.position.y = grip;
       this.weaponBackMount = backMount;
     }
 
