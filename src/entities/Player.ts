@@ -533,10 +533,10 @@ export class Player {
     this.dragoonTurns = Math.floor(this.sp / 100);
     this.sp = this.dragoonTurns * 100;
     if (this.dragoonModelRoot) {
-      // Swap the human figure (and its holstered weapon) for the GLB Dragoon model.
+      // Swap the human figure (and its holstered weapon) for the GLB Dragoon model — the winged
+      // model is its own cue, so no glow ball.
       this.setFigureEnabled(false);
       this.dragoonModelRoot.setEnabled(true);
-      this.dragoonAura.isVisible = true; // keep the aura as a glow cue until the model is animated
     } else if (this.dragoonForm) {
       // Swap the human figure for the procedural Dragoon model (it carries its own glow — no aura).
       this.setFigureEnabled(false);
@@ -770,7 +770,9 @@ export class Player {
       dragoonRoot.scaling.setAll(f);
       dragoonRoot.position.y = -lo * f;
     }
-    dragoonRoot.rotation.y = MODEL_YAW;
+    // This dragoon GLB is authored facing +X (not +Z like the base model), so it turned 90° off
+    // the movement direction — add a quarter-turn to align its forward with the rig's +Z.
+    dragoonRoot.rotation.y = MODEL_YAW + Math.PI / 2;
     dragoonRoot.parent = this.root;
     for (const g of res.animationGroups) g.stop();
     dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
