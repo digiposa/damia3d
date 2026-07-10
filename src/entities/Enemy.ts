@@ -400,6 +400,14 @@ export class Enemy {
 
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
 
+    // Mid-attack (sword swing or dagger throw): stay planted and let the one-shot animation play out,
+    // still turning to face the target — no sliding toward the player during the wind-up/throw.
+    if (this.attacking) {
+      const face = targetPos.subtract(this.position);
+      if (face.x * face.x + face.z * face.z > 1e-6) this.root.rotation.y = Math.atan2(face.x, face.z);
+      return null;
+    }
+
     const to = targetPos.subtract(this.position);
     to.y = 0;
     const dist = to.length();
