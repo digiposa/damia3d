@@ -77,7 +77,15 @@ export function flattenCellShaded(meshes: AbstractMesh[]): void {
     if (m instanceof PBRMaterial) {
       m.metallic = 0;
       m.roughness = 1;
-      m.environmentIntensity = 0; // painted shading, not reflected env
+      m.environmentIntensity = 0.4; // a little ambient bounce so it isn't flat-dark
+      // Self-illuminate from the model's own texture so characters read in the dim scene instead of
+      // going murky (PBR diffuse is dimmer than the Standard-material ground under the same lights).
+      if (m.albedoTexture) {
+        m.emissiveTexture = m.albedoTexture;
+        m.emissiveColor = new Color3(0.35, 0.35, 0.35);
+      } else {
+        m.emissiveColor = new Color3(0.12, 0.12, 0.12);
+      }
     }
   };
   for (const mesh of meshes) fix(mesh.material);
