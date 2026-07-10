@@ -426,7 +426,8 @@ export class TrainingMode extends GameMode {
     this.canvas?.addEventListener("pointerleave", this.onPointerLeave);
     window.addEventListener("keydown", this.onKeyDown);
 
-    this.spawnDummy();
+    // Start with an empty arena so the party begins in the exploration stance; spawn an enemy
+    // from the 🛠 menu to enter combat (lets the combat vs exploration animation swap be tested).
   }
 
   /** Build one secondary-action button in the right-hand arc above the attack button. */
