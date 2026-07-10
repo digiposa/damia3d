@@ -36,8 +36,8 @@ const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "
 /** Sheathed pose (tuned from screenshots), in the scale-cancelled spine-bone frame:
  *  BACK_ROT orients the weapon along the back, BACK_POS drops it down and hugs it to the body,
  *  BACK_GRIP centres the weapon on its mount (a low value keeps it close instead of pushed out). */
-const BACK_ROT = new Vector3(0, 0, Math.PI);
-const BACK_POS = new Vector3(0, 0.5, -0.17); // +Y = down the spine, -Z = behind the back
+const BACK_ROT = new Vector3(0, 0, 2.4); // tilt so it hangs diagonally across the back
+const BACK_POS = new Vector3(0, 1.0, -0.06); // +Y = down the spine, -Z = behind the back
 const BACK_GRIP = 0.5;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
@@ -843,7 +843,7 @@ export class Player {
       backWeapon.scaling.setAll(wScale);
       const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
       backMount.parent = backWeapon;
-      backMount.rotation.x = Math.PI;
+      backMount.rotation.x = 0; // no flip → head/mass hangs DOWN, handle up (unlike the hand's PI)
       backMount.position.y = BACK_GRIP; // back seat is independent of the hand grip
       this.weaponBackMount = backMount;
     }
