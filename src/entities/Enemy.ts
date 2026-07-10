@@ -115,6 +115,7 @@ export class Enemy {
       crown.material = crownMat;
       crown.parent = this.root;
       crown.metadata = this;
+      this.placeholder.push(crown); // hidden with the rest of the placeholder once a rigged model loads
     }
 
     // Floating health bar (positioned each frame via syncHud).

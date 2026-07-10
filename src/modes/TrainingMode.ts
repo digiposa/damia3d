@@ -206,25 +206,11 @@ export class TrainingMode extends GameMode {
   private atmosphere?: Atmosphere;
   private hud!: PartyPanel;
   /**
-   * GLB decor layout — Quaternius Fantasy Props dressing the medieval colosseum, placed ringside
-   * (radius ~11-13) so it frames the arena without blocking the fight. Props sit at y:0 (models
-   * are base-pivoted); scale 1 ≈ real size vs our ~1.8-unit characters. Tune from screenshots.
+   * GLB decor layout (Quaternius Fantasy Props). Empty for now — the ringside crates/barrels/racks
+   * were removed at the user's request; the procedural arena stands on its own. Re-add
+   * {@link PropPlacement} entries here to dress the ring.
    */
-  private decor: PropPlacement[] = [
-    // Ringside supply cluster (back-left).
-    { model: "fp_crate", position: [-11.5, 0, 4] },
-    { model: "fp_crate_metal", position: [-12.3, 0, 5], rotationY: 0.6 },
-    { model: "fp_barrel", position: [-10.8, 0, 4.8] },
-    { model: "fp_barrel", position: [-11.7, 0, 5.9] },
-    // Weapon racks (right side).
-    { model: "fp_weaponstand", position: [11.8, 0, 2.5], rotationY: -2.2 },
-    { model: "fp_weaponstand", position: [12.2, 0, 4], rotationY: -2.4 },
-    // Caged beast + chains near the back.
-    { model: "fp_cage", position: [-3, 0, 12] },
-    { model: "fp_chain", position: [-4.2, 0, 11.3] },
-    // A decorative vase.
-    { model: "fp_vase", position: [5.5, 0, 12] },
-  ];
+  private decor: PropPlacement[] = [];
   private sight!: TimingSight;
   private debugBtn!: Button;
   private debugMenu!: TrainingMenu;
