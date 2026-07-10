@@ -265,6 +265,8 @@ export class TrainingMode extends GameMode {
   private arrows: Arrow[] = [];
   /** Countdown keeping the party in combat stance briefly after enemies leave range (anti-flicker). */
   private combatLinger = 0;
+  /** Current combat-stance state, for detecting the enter/leave edge (float-text tag). */
+  private inCombat = false;
   /** Ranged fire cooldown (real seconds) so bow bearers don't spray arrows. */
   private rangedCooldownT = 0;
   private runner = new AdditionRunner();
@@ -1324,6 +1326,15 @@ export class TrainingMode extends GameMode {
     );
     this.combatLinger = near ? COMBAT_LINGER : Math.max(0, this.combatLinger - dt);
     const inCombat = near || this.combatLinger > 0;
+    // On the enter/leave edge, pop a floating tag over the controlled character.
+    if (inCombat !== this.inCombat) {
+      this.inCombat = inCombat;
+      this.popText(
+        this.player.position.add(new Vector3(0, 3.0, 0)),
+        inCombat ? t("combat.enter") : t("combat.exit"),
+        inCombat ? TEXT.miss : TEXT.hp,
+      );
+    }
     for (const m of this.party) m.avatar.setCombat(inCombat);
   }
 

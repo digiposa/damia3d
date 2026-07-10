@@ -148,6 +148,8 @@ const en: Dict = {
   "combat.press": "▸ PRESS!",
   "combat.perfect": "PERFECT",
   "combat.miss": "MISS",
+  "combat.enter": "⚔ COMBAT",
+  "combat.exit": "✔ SAFE",
   "tech.mode": "{mode} · {n} enemies · {speed}× combat",
 
   // Logs
@@ -287,6 +289,8 @@ const fr: Dict = {
   "combat.press": "▸ APPUIE !",
   "combat.perfect": "PARFAIT",
   "combat.miss": "RATÉ",
+  "combat.enter": "⚔ COMBAT",
+  "combat.exit": "✔ HORS COMBAT",
   "tech.mode": "{mode} · {n} ennemi(s) · {speed}× combat",
 
   "log.knightSpawned": "Knight of Sandora apparu ({n} en jeu)",
