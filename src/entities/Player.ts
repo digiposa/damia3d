@@ -825,13 +825,17 @@ export class Player {
     if (back) {
       back.computeWorldMatrix(true);
       const bs = back.absoluteScaling;
+      // Socket cancels the bone's (huge, mirrored) world scale — ONLY scale here, so everything
+      // below is in a clean ~world-unit frame (a position on the socket itself would be multiplied
+      // by the bone scale and fling the weapon metres away).
       const backSocket = new TransformNode(`weaponBackSocket:${this.bearer.id}`, scene);
       backSocket.parent = back;
       backSocket.scaling = new Vector3(scale / bs.x, scale / bs.y, scale / bs.z);
-      backSocket.rotation = BACK_ROT.clone();
-      backSocket.position = BACK_POS.clone();
+      // Sheathed placement, in the cancelled frame (world units): lay the weapon across the back.
       const backWeapon = new TransformNode(`weaponBack:${this.bearer.id}`, scene);
       backWeapon.parent = backSocket;
+      backWeapon.rotation = BACK_ROT.clone();
+      backWeapon.position = BACK_POS.clone();
       backWeapon.scaling.setAll(WEAPON_SCALE);
       const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
       backMount.parent = backWeapon;
