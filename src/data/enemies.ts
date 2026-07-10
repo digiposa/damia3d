@@ -161,7 +161,7 @@ export const COMMANDER_SELES: EnemyDef = {
   goldReward: 20,
   behavior: "commander",
   isBoss: true,
-  scale: 1.6,
+  scale: 1.3,
   bodyColor: [0.28, 0.18, 0.42],
   model: "commander",
   cellShaded: true,
