@@ -15,6 +15,7 @@ import damiaDragoonPortrait from "../assets/portraits/damia-dragoon.png";
 import belzacPortrait from "../assets/portraits/belzac.png";
 import kanzasPortrait from "../assets/portraits/kanzas.png";
 import doelPortrait from "../assets/portraits/doel.png";
+import lenusPortrait from "../assets/portraits/lenus.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -139,7 +140,7 @@ export const BEARERS: Bearer[] = [
   { id: "haschel", name: "Haschel", classId: "thunder", portrait: haschelPortrait, model: "haschel", weapon: "fist", hair: "elder", outfit: "martialist", color: C_THUNDER, storyPlayable: true },
   // Blue-Sea (Water) — hammer
   { id: "damia", name: "Damia", classId: "blueSea", portrait: damiaPortrait, dragoonPortrait: damiaDragoonPortrait, weapon: "hammer", hair: "siren", outfit: "siren", color: C_WATER, skinTone: [0.56, 0.76, 0.86], storyPlayable: false },
-  { id: "lenus", name: "Lenus", classId: "blueSea", weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
+  { id: "lenus", name: "Lenus", classId: "blueSea", portrait: lenusPortrait, weapon: "hammer", hair: "long", color: C_WATER, storyPlayable: false },
   { id: "meru", name: "Meru", classId: "blueSea", portrait: meruPortrait, model: "meru", weaponModel: "meru_hammer", weapon: "hammer", hair: "ponytail", outfit: "dancer", color: C_WATER, storyPlayable: true },
   // Golden (Earth) — axe
   { id: "belzac", name: "Belzac", classId: "golden", portrait: belzacPortrait, weapon: "axe", hair: "wrap", outfit: "brawler", color: C_EARTH, scale: 1.2, storyPlayable: false },
