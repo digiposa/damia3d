@@ -36,8 +36,8 @@ const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "
 /** Sheathed pose (tuned from screenshots), in the scale-cancelled spine-bone frame:
  *  BACK_ROT orients the weapon along the back, BACK_POS drops it down and hugs it to the body,
  *  BACK_GRIP centres the weapon on its mount (a low value keeps it close instead of pushed out). */
-const BACK_ROT = new Vector3(0, 0, 2.4); // tilt so it hangs diagonally across the back
-const BACK_POS = new Vector3(0.28, 1.0, -0.06); // +X = across to centre on the spine, +Y = down, -Z = behind
+const BACK_ROT = new Vector3(0, 0, 2.9); // near-vertical with a slight incline across the back
+const BACK_POS = new Vector3(0.05, 0.6, -0.14); // centred on the spine, dropped to mid-back, hugging behind
 const BACK_GRIP = 0.5;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
@@ -119,6 +119,8 @@ export class Player {
   private humanoid: Humanoid;
   /** Procedural Dragoon-form model, shown while transformed (currently Dart's Red-Eye only). */
   private dragoonForm?: DragoonForm;
+  /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
+  private dragoonModelRoot?: TransformNode;
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -185,10 +187,13 @@ export class Player {
     this.humanoid.rig.parent = this.root;
     if (bearer.model) void this.loadModel(bearer.model, scene);
 
-    // Dragoon-form model, shown while transformed (the human figure is hidden). Classes with
-    // a built form select its variant; the rest still use the glow aura until theirs exist.
+    // Dragoon-form figure, shown while transformed (the human figure is hidden). A supplied GLB
+    // (bearer.dragoonModel) takes precedence over the procedural DragoonForm; classes with a built
+    // procedural form select its variant; the rest still use the glow aura until theirs exist.
     const formVariant = cls.id === "redEye" ? "redEye" : cls.id === "blueSea" ? "blueSea" : undefined;
-    if (formVariant) {
+    if (bearer.dragoonModel) {
+      void this.loadDragoonModel(bearer.dragoonModel, scene);
+    } else if (formVariant) {
       this.dragoonForm = new DragoonForm(scene, { variant: formVariant, scale: bearer.scale });
       this.dragoonForm.rig.parent = this.root;
       this.dragoonForm.setEnabled(false);
@@ -527,8 +532,13 @@ export class Player {
     this.dragoonActive = true;
     this.dragoonTurns = Math.floor(this.sp / 100);
     this.sp = this.dragoonTurns * 100;
-    if (this.dragoonForm) {
-      // Swap the human figure for the Dragoon model (it carries its own glow — no aura).
+    if (this.dragoonModelRoot) {
+      // Swap the human figure (and its holstered weapon) for the GLB Dragoon model.
+      this.setFigureEnabled(false);
+      this.dragoonModelRoot.setEnabled(true);
+      this.dragoonAura.isVisible = true; // keep the aura as a glow cue until the model is animated
+    } else if (this.dragoonForm) {
+      // Swap the human figure for the procedural Dragoon model (it carries its own glow — no aura).
       this.setFigureEnabled(false);
       this.dragoonForm.setEnabled(true);
     } else {
@@ -557,7 +567,10 @@ export class Player {
     this.dragoonTurns = 0;
     this.sp = 0;
     this.dragoonAura.isVisible = false;
-    if (this.dragoonForm) {
+    if (this.dragoonModelRoot) {
+      this.dragoonModelRoot.setEnabled(false);
+      this.setFigureEnabled(true);
+    } else if (this.dragoonForm) {
       this.dragoonForm.setEnabled(false);
       this.setFigureEnabled(true);
     }
@@ -634,6 +647,7 @@ export class Player {
   /** Advance the active figure's idle/walk/run animation (visual only). `running` selects the run
    *  clip over the walk clip while moving (gauged by joystick magnitude / desktop click-to-move). */
   animate(dt: number, moving: boolean, running = false): void {
+    if (this.dragoonActive && this.dragoonModelRoot) return; // static GLB dragoon model (no clips yet)
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.update(dt, moving);
       return;
@@ -723,6 +737,44 @@ export class Player {
     this.modelCurrent?.stop();
     this.modelCurrent = group;
     group.start(loop, 1, group.from, group.to);
+  }
+
+  /**
+   * Load the Dragoon-form GLB (base filename in src/assets/models/): auto-fit, orient forward,
+   * flatten its painted materials, and keep it hidden until {@link transform} shows it. Static for
+   * now (no clips) — animation is grafted in later, like the base model. Best-effort.
+   */
+  private async loadDragoonModel(name: string, scene: Scene): Promise<void> {
+    const res = await importModel(scene, name).catch(() => undefined);
+    if (!res || this.root.isDisposed()) {
+      if (res) for (const m of res.meshes) m.dispose();
+      return;
+    }
+    const dragoonRoot = new TransformNode(`dragoonModel:${this.bearer.id}`, scene);
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = dragoonRoot;
+      mesh.isPickable = false;
+    }
+    flattenCellShaded(res.meshes);
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const mesh of res.meshes) {
+      if (mesh.getTotalVertices() === 0) continue;
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+      lo = Math.min(lo, bb.minimumWorld.y);
+      hi = Math.max(hi, bb.maximumWorld.y);
+    }
+    if (hi > lo) {
+      const f = MODEL_TARGET_H / (hi - lo);
+      dragoonRoot.scaling.setAll(f);
+      dragoonRoot.position.y = -lo * f;
+    }
+    dragoonRoot.rotation.y = MODEL_YAW;
+    dragoonRoot.parent = this.root;
+    for (const g of res.animationGroups) g.stop();
+    dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
+    this.dragoonModelRoot = dragoonRoot;
   }
 
   /**
