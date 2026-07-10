@@ -645,9 +645,10 @@ export class TrainingMode extends GameMode {
     this.refreshHud();
   }
 
-  /** Stop Tab from moving DOM focus — it's the control-switch key in Training. */
+  /** Stop Tab from moving DOM focus (control-switch key) and Alt from stealing focus to the
+   *  browser menu bar (Alt is the hold-to-walk key on desktop). */
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (e.code === "Tab") e.preventDefault();
+    if (e.code === "Tab" || e.code === "AltLeft" || e.code === "AltRight") e.preventDefault();
   };
 
   update(dt: number): void {
@@ -663,17 +664,19 @@ export class TrainingMode extends GameMode {
     const rooted = this.player.guardActive || this.runner.active || this.rangedCooldownT > 0;
     const before = this.player.position.clone();
     // Walk vs run: gauged by joystick magnitude on touch (past RUN_THRESHOLD = run); desktop
-    // click-to-move has no analog input, so it defaults to a run.
-    let running = true;
+    // click-to-move has no analog input, so it defaults to a run. Holding Alt forces a walk
+    // (desktop: the only way to walk without an analog stick).
+    const forceWalk = this.input.isDown("AltLeft") || this.input.isDown("AltRight");
+    let running = !forceWalk;
     if (!rooted) {
       const axis = this.input.axis();
       if (axis.x !== 0 || axis.y !== 0) {
-        running = Math.hypot(axis.x, axis.y) >= RUN_THRESHOLD;
+        running = !forceWalk && Math.hypot(axis.x, axis.y) >= RUN_THRESHOLD;
         const dir = this.camera.groundForward.scale(axis.y).add(this.camera.groundRight.scale(axis.x));
         this.player.move(dir, dt, running);
         this.clearNav();
       } else {
-        this.navigate(dt); // click-to-move runs (Player.move defaults to running)
+        this.navigate(dt, running); // click-to-move: run unless Alt (walk) is held
       }
       clampToArena(this.player.position); // the wall is a hard boundary
     }
@@ -1097,14 +1100,14 @@ export class TrainingMode extends GameMode {
   };
 
   /** Walk toward the move target or attack target; strike when in reach. */
-  private navigate(dt: number): void {
+  private navigate(dt: number, running = true): void {
     if (this.attackTarget && !this.attackTarget.alive) this.clearNav();
 
     if (this.attackTarget) {
       const to = this.attackTarget.position.subtract(this.player.position);
       to.y = 0;
       if (to.length() > this.reach) {
-        this.player.move(to, dt);
+        this.player.move(to, dt, running);
       } else {
         this.player.face(to);
         // Multi-hit Additions advance via clicks / timing presses. A basic
@@ -1122,7 +1125,7 @@ export class TrainingMode extends GameMode {
     if (this.moveTarget) {
       const to = this.moveTarget.subtract(this.player.position);
       to.y = 0;
-      if (to.length() > 0.15) this.player.move(to, dt);
+      if (to.length() > 0.15) this.player.move(to, dt, running);
       else this.moveTarget = undefined;
     }
   }
