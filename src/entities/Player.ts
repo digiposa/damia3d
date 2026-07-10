@@ -110,9 +110,18 @@ export class Player {
   private dragoonForm?: DragoonForm;
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
-  private modelAnims: { idle?: AnimationGroup; walk?: AnimationGroup; attack?: AnimationGroup } = {};
+  private modelAnims: {
+    idle?: AnimationGroup;
+    walk?: AnimationGroup;
+    attack?: AnimationGroup;
+    idleCombat?: AnimationGroup;
+    walkCombat?: AnimationGroup;
+  } = {};
   private modelCurrent?: AnimationGroup;
   private modelAttacking = false;
+  /** Combat stance: swaps to the combat idle/walk clips when the party is engaged (falls back to
+   *  the peaceful clips when a character has no combat variant yet). Set by the mode each frame. */
+  private combat = false;
 
   constructor(scene: Scene, bearer: Bearer, spawn = new Vector3(0, 0, 0), level = 1) {
     const cls = dragoonClass(bearer.classId);
@@ -607,11 +616,19 @@ export class Player {
     }
     if (this.modelRoot) {
       if (!this.modelAttacking) {
-        this.playModel(moving ? this.modelAnims.walk ?? this.modelAnims.idle : this.modelAnims.idle, true);
+        const idle = (this.combat && this.modelAnims.idleCombat) || this.modelAnims.idle;
+        const walk = (this.combat && this.modelAnims.walkCombat) || this.modelAnims.walk;
+        this.playModel(moving ? walk ?? idle : idle, true);
       }
       return;
     }
     this.humanoid.update(dt, moving);
+  }
+
+  /** Enter/leave the combat stance (the mode sets this from enemy proximity). Swaps to the combat
+   *  idle/walk clips when available; a no-op figure-wise for placeholder/procedural bearers. */
+  setCombat(on: boolean): void {
+    this.combat = on;
   }
 
   /** Play a one-shot strike animation (call when a blow lands). */
@@ -686,9 +703,14 @@ export class Player {
 
     const g = res.animationGroups;
     const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
-    this.modelAnims.attack = g.find((a) => has(a, "slash", "attack", "swing"));
-    this.modelAnims.walk = g.find((a) => has(a, "walk")) ?? g.find((a) => has(a, "run") && !has(a, "attack", "slash"));
-    this.modelAnims.idle = g.find((a) => has(a, "idle")) ?? g[0];
+    const combatOf = (a: AnimationGroup) => has(a, "combat", "fight", "battle");
+    this.modelAnims.attack = g.find((a) => has(a, "slash", "attack", "swing", "punch", "kick"));
+    // Peaceful (exploration) vs combat idle/walk sets — combat clips are tagged in the name.
+    this.modelAnims.idleCombat = g.find((a) => has(a, "idle") && combatOf(a));
+    this.modelAnims.walkCombat = g.find((a) => (has(a, "walk") || has(a, "run")) && combatOf(a));
+    this.modelAnims.idle = g.find((a) => has(a, "idle") && !combatOf(a)) ?? g.find((a) => has(a, "idle")) ?? g[0];
+    this.modelAnims.walk =
+      g.find((a) => has(a, "walk") && !combatOf(a)) ?? g.find((a) => has(a, "run") && !combatOf(a)) ?? g.find((a) => has(a, "walk"));
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 

@@ -107,6 +107,10 @@ const ACQUIRE_RANGE = 20;
 
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
+/** A living enemy within this distance of the controlled character puts the party in combat stance. */
+const COMBAT_RANGE = 12;
+/** Seconds the combat stance lingers after the last enemy leaves range / dies (anti-flicker). */
+const COMBAT_LINGER = 2.5;
 
 /** Reference enemy defence used by the Training balance/DPS readout. */
 const BALANCE_REF_DF = 20;
@@ -271,6 +275,8 @@ export class TrainingMode extends GameMode {
 
   private enemies: Enemy[] = [];
   private arrows: Arrow[] = [];
+  /** Countdown keeping the party in combat stance briefly after enemies leave range (anti-flicker). */
+  private combatLinger = 0;
   /** Ranged fire cooldown (real seconds) so bow bearers don't spray arrows. */
   private rangedCooldownT = 0;
   private runner = new AdditionRunner();
@@ -679,6 +685,7 @@ export class TrainingMode extends GameMode {
     this.camera.follow(this.player.position);
     // Procedural walk/idle animation (visual only, uses real time).
     this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6);
+    this.updateCombatState(dt); // toggle the party's combat vs exploration stance
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
@@ -1314,6 +1321,17 @@ export class TrainingMode extends GameMode {
     }
     if (this.attackTarget === target) this.clearNav(); // stop chasing the corpse
     target.playDeath(() => this.removeEnemy(target)); // play the death animation, then despawn
+  }
+
+  /** Put the party in combat stance while a living enemy is within {@link COMBAT_RANGE}, holding it
+   *  for {@link COMBAT_LINGER}s after the last one leaves/dies so it doesn't flicker between fights. */
+  private updateCombatState(dt: number): void {
+    const near = this.enemies.some(
+      (e) => e.alive && Vector3.Distance(e.position, this.player.position) <= COMBAT_RANGE,
+    );
+    this.combatLinger = near ? COMBAT_LINGER : Math.max(0, this.combatLinger - dt);
+    const inCombat = near || this.combatLinger > 0;
+    for (const m of this.party) m.avatar.setCombat(inCombat);
   }
 
   private updateEnemies(cdt: number): void {
