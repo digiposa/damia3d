@@ -77,10 +77,15 @@ export function flattenCellShaded(meshes: AbstractMesh[]): void {
     if (m instanceof PBRMaterial) {
       m.metallic = 0;
       m.roughness = 1;
-      // Brighten via the scene's ambient IBL (soft, physically-based — no bloom), not emissive:
-      // emissive gets picked up by the GlowLayer and haloes the model into a "ghost".
-      m.environmentIntensity = 1.0;
-      m.emissiveColor = new Color3(0.04, 0.04, 0.04); // tiny floor so deep shadow isn't pitch black
+      // Brightness comes ONLY from the scene's ambient IBL (soft, physically-based), NEVER from
+      // emissive. The GlowLayer (intensity 0.6, 32px blur) turns ANY non-zero emissive into a
+      // blurred full-body halo — the "luminescent / translucent ghost" look reported since the
+      // self-illumination was first added. Emissive is pinned to pure black so a character feeds
+      // the glow buffer nothing at all; readability is bought back purely by lifting the IBL.
+      m.environmentIntensity = 1.35;
+      m.emissiveColor = Color3.Black();
+      m.emissiveTexture = null; // never let an export's own emissive map re-introduce the glow
+      m.emissiveIntensity = 0;
       // Force fully opaque at EVERY level. The AI exports are authored OPAQUE with no texture
       // alpha, yet users reported "translucent/ghost" characters — a symptom of a mobile GL path
       // treating the PBR material as alpha-blended. Pin every transparency knob so the body can
