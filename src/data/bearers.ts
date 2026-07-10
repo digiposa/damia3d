@@ -4,7 +4,7 @@ import lavitzPortrait from "../assets/portraits/lavitz.png";
 import grehamPortrait from "../assets/portraits/greham.png";
 import syuveilPortrait from "../assets/portraits/syuveil.png";
 import shanaPortrait from "../assets/portraits/shana.png";
-import meruPortrait from "../assets/portraits/meru.jpg";
+import meruPortrait from "../assets/portraits/meru.png";
 import rosePortrait from "../assets/portraits/rose.png";
 import haschelPortrait from "../assets/portraits/haschel.png";
 import kongolPortrait from "../assets/portraits/kongol.png";

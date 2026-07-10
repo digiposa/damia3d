@@ -165,7 +165,7 @@ export const COMMANDER_SELES: EnemyDef = {
   bodyColor: [0.28, 0.18, 0.42],
   model: "commander",
   cellShaded: true,
-  weaponModel: "kos_sword",
+  weaponModel: "commander_sword",
 };
 
 /**
@@ -193,5 +193,5 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
   bodyColor: [0.3, 0.2, 0.4],
   model: "commander",
   cellShaded: true,
-  weaponModel: "kos_sword",
+  weaponModel: "commander_sword",
 };
