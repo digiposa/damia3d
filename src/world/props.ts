@@ -79,8 +79,8 @@ export function flattenCellShaded(meshes: AbstractMesh[]): void {
       m.roughness = 1;
       // Brighten via the scene's ambient IBL (soft, physically-based — no bloom), not emissive:
       // emissive gets picked up by the GlowLayer and haloes the model into a "ghost".
-      m.environmentIntensity = 1.3;
-      m.emissiveColor = new Color3(0.05, 0.05, 0.05); // tiny floor so deep shadow isn't pitch black
+      m.environmentIntensity = 1.0;
+      m.emissiveColor = new Color3(0.04, 0.04, 0.04); // tiny floor so deep shadow isn't pitch black
     }
   };
   for (const mesh of meshes) fix(mesh.material);
