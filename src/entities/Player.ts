@@ -37,7 +37,7 @@ const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "
  *  BACK_ROT orients the weapon along the back, BACK_POS drops it down and hugs it to the body,
  *  BACK_GRIP centres the weapon on its mount (a low value keeps it close instead of pushed out). */
 const BACK_ROT = new Vector3(0, 0, 2.4); // tilt so it hangs diagonally across the back
-const BACK_POS = new Vector3(0, 1.0, -0.06); // +Y = down the spine, -Z = behind the back
+const BACK_POS = new Vector3(0.28, 1.0, -0.06); // +X = across to centre on the spine, +Y = down, -Z = behind
 const BACK_GRIP = 0.5;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
