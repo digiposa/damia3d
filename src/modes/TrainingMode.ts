@@ -1364,9 +1364,10 @@ export class TrainingMode extends GameMode {
       fwd.y = 0;
       if (fwd.lengthSquared() > 1e-4) fwd.normalize();
       const from = enemy.handPosition.add(fwd.scale(0.45)); // hand extended forward at the release
-      const to = this.player.position.add(new Vector3(0, 1.0, 0));
-      // Release the dagger in sync with the throw animation (arm fully forward ≈ mid-clip).
-      this.arrows.push(new Arrow(this.scene, from, to, ARROW_SPEED, applyHit, enemy.throwReleaseDelay));
+      const torso = (): Vector3 => this.player.position.add(new Vector3(0, 1.0, 0));
+      // Release in sync with the throw (arm fully forward ≈ mid-clip); home on the player so the
+      // dagger reaches them even if they move — the hit always connects (turn-based, no live dodge).
+      this.arrows.push(new Arrow(this.scene, from, torso(), ARROW_SPEED, applyHit, enemy.throwReleaseDelay, torso));
     } else {
       applyHit();
     }

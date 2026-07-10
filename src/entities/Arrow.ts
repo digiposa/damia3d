@@ -12,8 +12,7 @@ import type { Scene } from "@babylonjs/core/scene";
  */
 export class Arrow {
   private readonly root: TransformNode;
-  private readonly dir: Vector3;
-  private remaining: number;
+  private readonly target: Vector3;
   private done = false;
 
   constructor(
@@ -23,6 +22,9 @@ export class Arrow {
     private speed: number,
     private onHit: () => void,
     private delay = 0,
+    /** Optional live target: when set, the projectile re-aims at it each frame (homing) so it
+     *  reaches a moving target — the hit always connects (turn-based combat, no live dodging). */
+    private follow?: () => Vector3,
   ) {
     this.root = new TransformNode("arrow", scene);
     this.root.position = from.clone();
@@ -56,13 +58,12 @@ export class Arrow {
       fletch.parent = this.root;
     }
 
-    const delta = to.subtract(from);
-    this.remaining = delta.length();
-    this.dir = this.remaining > 1e-4 ? delta.scale(1 / this.remaining) : new Vector3(0, 0, 1);
+    this.target = to.clone();
     this.root.lookAt(to);
   }
 
-  /** Advance the arrow; returns false once it has landed (and disposed). */
+  /** Advance the arrow; returns false once it has landed (and disposed). Re-aims at a live target
+   *  each frame when {@link follow} is set, so a homing projectile always reaches a moving target. */
   update(dt: number): boolean {
     if (this.done) return false;
     if (this.delay > 0) {
@@ -70,15 +71,18 @@ export class Arrow {
       if (this.delay > 0) return true; // still drawing — hold at the hand, hidden
       this.root.setEnabled(true); // released: appear and fly
     }
+    const target = this.follow ? this.follow() : this.target;
+    const delta = target.subtract(this.root.position);
+    const dist = delta.length();
     const step = this.speed * dt;
-    if (step >= this.remaining) {
+    if (step >= dist) {
       this.done = true;
       this.onHit();
       this.root.dispose();
       return false;
     }
-    this.remaining -= step;
-    this.root.position.addInPlace(this.dir.scale(step));
+    this.root.position.addInPlace(delta.scaleInPlace(step / dist));
+    this.root.lookAt(target);
     return true;
   }
 
