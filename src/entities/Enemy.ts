@@ -438,6 +438,13 @@ export class Enemy {
     return this.def.attacks.find((a) => /throw/i.test(a.name));
   }
 
+  /** Seconds into the throw animation when the dagger leaves the hand (arm fully forward ≈ 50%),
+   *  so the mode can release the projectile in sync. Falls back to a sensible default. */
+  get throwReleaseDelay(): number {
+    const a = this.anims.throw;
+    return a ? ((a.to - a.from) / 60) * 0.5 : 0.4; // clip plays at speed 1.0, Babylon 60 fps
+  }
+
   private chooseAction(ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction(ctx);
     // Melee: the first non-thrown attack (a thrown one is reserved for range).

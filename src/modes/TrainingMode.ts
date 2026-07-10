@@ -1360,8 +1360,13 @@ export class TrainingMode extends GameMode {
 
     // Thrown attacks (Throw Dagger/Knife) fly as a projectile and land on arrival; melee/magic hit now.
     if (action.kind === "physical" && action.ranged) {
+      const fwd = this.player.position.subtract(enemy.position);
+      fwd.y = 0;
+      if (fwd.lengthSquared() > 1e-4) fwd.normalize();
+      const from = enemy.handPosition.add(fwd.scale(0.45)); // hand extended forward at the release
       const to = this.player.position.add(new Vector3(0, 1.0, 0));
-      this.arrows.push(new Arrow(this.scene, enemy.handPosition, to, ARROW_SPEED, applyHit, 0.25));
+      // Release the dagger in sync with the throw animation (arm fully forward ≈ mid-clip).
+      this.arrows.push(new Arrow(this.scene, from, to, ARROW_SPEED, applyHit, enemy.throwReleaseDelay));
     } else {
       applyHit();
     }
