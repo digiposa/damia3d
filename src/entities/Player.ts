@@ -144,6 +144,11 @@ export class Player {
   /** Current mount state (true = on back) and the in-progress draw/sheathe transition, if any. */
   private weaponSheathed?: boolean;
   private weaponTransition?: "draw" | "sheathe";
+  /** Pending draw/sheathe reparent timer id, cleared on dispose so it can't fire on dead nodes. */
+  private weaponTimer?: number;
+  /** Scene-level objects from imported GLBs (animation groups, skeletons) — NOT children of root,
+   *  so they must be disposed explicitly, else they (and their observers) leak on each respawn. */
+  private modelDisposables: { dispose(): void }[] = [];
   /** Combat stance: swaps to the combat idle/walk clips when the party is engaged (falls back to
    *  the peaceful clips when a character has no combat variant yet). Set by the mode each frame. */
   private combat = false;
@@ -245,6 +250,8 @@ export class Player {
 
   /** Remove the avatar's meshes (e.g. when switching bearer). */
   dispose(): void {
+    if (this.weaponTimer !== undefined) window.clearTimeout(this.weaponTimer);
+    for (const d of this.modelDisposables) d.dispose();
     this.root.dispose();
   }
 
@@ -694,7 +701,7 @@ export class Player {
     // Reparent when the hand meets the weapon — mid-clip (drawing) / near the end (sheathing).
     const durMs = ((clip.to - clip.from) / 60) * 1000;
     const frac = wantSheathed ? 0.6 : 0.45;
-    window.setTimeout(() => this.applyWeaponSheath(wantSheathed), durMs * frac);
+    this.weaponTimer = window.setTimeout(() => this.applyWeaponSheath(wantSheathed), durMs * frac);
     clip.onAnimationGroupEndObservable.addOnce(() => {
       this.applyWeaponSheath(wantSheathed); // ensure final state even if the timer was skipped
       this.weaponTransition = undefined;
@@ -750,6 +757,7 @@ export class Player {
       if (res) for (const m of res.meshes) m.dispose();
       return;
     }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
     const dragoonRoot = new TransformNode(`dragoonModel:${this.bearer.id}`, scene);
     for (const mesh of res.meshes) {
       if (!mesh.parent) mesh.parent = dragoonRoot;
@@ -792,6 +800,7 @@ export class Player {
       for (const m of res.meshes) m.dispose();
       return;
     }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
 
     const modelRoot = new TransformNode(`playerModel:${this.bearer.id}`, scene);
     for (const mesh of res.meshes) {
@@ -852,6 +861,7 @@ export class Player {
       if (res) for (const m of res.meshes) m.dispose();
       return;
     }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
     tuneWeapon(res.meshes); // glint + self-illumination so it reads in the dim scene
 
     const scale = this.bearer.scale ?? 1;

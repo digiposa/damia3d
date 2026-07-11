@@ -72,6 +72,11 @@ export class Enemy {
   private currentAnim?: AnimationGroup;
   private attacking = false;
   private dead = false;
+  /** Scene-level objects from imported GLBs (animation groups, skeletons) — not children of root,
+   *  so dispose() must clean them up or they (and their observers) leak on every despawn. */
+  private modelDisposables: { dispose(): void }[] = [];
+  /** Pending death-despawn timer id, cleared on dispose. */
+  private deathTimer?: number;
 
   private bar: HTMLDivElement;
   private barFill: HTMLDivElement;
@@ -170,6 +175,11 @@ export class Enemy {
   private async loadModel(scene: Scene, name: string): Promise<void> {
     const res = await importModel(scene, name).catch(() => undefined);
     if (!res) return;
+    if (this.root.isDisposed()) {
+      for (const m of res.meshes) m.dispose();
+      return;
+    }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
     for (const mesh of this.placeholder) mesh.setEnabled(false); // hide the capsule/helm
 
     // Gather the model under one container so we can normalize its size: source packs come in
@@ -235,6 +245,7 @@ export class Enemy {
       if (res) for (const m of res.meshes) m.dispose();
       return;
     }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
     tuneWeapon(res.meshes); // glint + self-illumination so the blade reads in the dim scene
 
     hand.computeWorldMatrix(true);
@@ -325,7 +336,7 @@ export class Enemy {
     this.currentAnim = a;
     a.start(false, 1.0, a.from, a.to); // once; holds the last frame when it ends
     a.onAnimationGroupEndObservable.addOnce(() => {
-      window.setTimeout(done, 700); // linger a beat on the ground before despawning
+      this.deathTimer = window.setTimeout(done, 700); // linger a beat on the ground before despawning
     });
   }
 
@@ -518,6 +529,8 @@ export class Enemy {
   }
 
   dispose(): void {
+    if (this.deathTimer !== undefined) window.clearTimeout(this.deathTimer);
+    for (const d of this.modelDisposables) d.dispose();
     this.bar.remove();
     this.nameTag?.remove();
     this.root.dispose();
