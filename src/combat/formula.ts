@@ -1,5 +1,4 @@
 import { modifiers, type Modifiers } from "./modifiers";
-import { oppositeOf, type Element } from "./element";
 
 /**
  * Faithful re-implementation of *The Legend of Dragoon*'s damage formulas.
@@ -239,21 +238,6 @@ export function drakeWire(
   return d;
 }
 
-/**
- * Magical attack-item damage. Unlike spells, attack items deal a FIXED power independent of the
- * user's stats (anyone can use them). The user's element is irrelevant; only the ITEM's element vs
- * the target's matters, and — per the items doc — the elemental swing is stronger than for spells:
- * ×2 versus the opposing element, ×0.5 versus the same element, ×1 otherwise (Non-Elemental never
- * scales). Clamped to ≥1.
- */
-export function itemAttackDamage(power: number, itemElement: Element, targetElement: Element): number {
-  let mult = 1;
-  if (itemElement !== "Non-Elemental" && targetElement !== "Non-Elemental") {
-    if (itemElement === targetElement) mult = 0.5;
-    else if (oppositeOf(itemElement) === targetElement) mult = 2;
-  }
-  return Math.max(1, f(power * mult));
-}
 
 // ---------------------------------------------------------------------------
 // Status damage (no modifiers except where noted)

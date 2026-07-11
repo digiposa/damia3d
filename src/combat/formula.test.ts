@@ -13,7 +13,6 @@ import {
   rareMonsterBasic,
   additionCounter,
   poisonDamage,
-  itemAttackDamage,
 } from "./formula";
 import {
   DART_ADDITIONS,
@@ -151,22 +150,13 @@ describe("addition data integrity", () => {
   });
 });
 
-describe("itemAttackDamage", () => {
-  it("deals its fixed power with no elemental match", () => {
-    expect(itemAttackDamage(45, "Fire", "Thunder")).toBe(45);
+describe("item magic (via magicAttack, dragoonMatPct=100, multiplier=BID)", () => {
+  it("Burn Out (BID 150) MAT 20 LV 10 vs MDF 10 → floor(floor(20*15*5/10)*150/100)=225", () => {
+    // a=20, b=floor(20*15*5/10)=150, c=floor(150*150/100)=225
+    expect(magicAttack(20, 10, 100, 150, 10)).toBe(225);
   });
-  it("doubles against the opposing element", () => {
-    expect(itemAttackDamage(45, "Fire", "Water")).toBe(90); // Fire ↔ Water opposites
-    expect(itemAttackDamage(35, "Wind", "Earth")).toBe(70);
-  });
-  it("halves against the same element", () => {
-    expect(itemAttackDamage(80, "Water", "Water")).toBe(40);
-  });
-  it("ignores element when either side is Non-Elemental", () => {
-    expect(itemAttackDamage(100, "Non-Elemental", "Fire")).toBe(100);
-    expect(itemAttackDamage(60, "Light", "Non-Elemental")).toBe(60);
-  });
-  it("never drops below 1", () => {
-    expect(itemAttackDamage(1, "Light", "Light")).toBe(1); // 1*0.5 floored → clamp to 1
+  it("applies the element modifier (×1.5 opposite / ×0.5 same)", () => {
+    expect(magicAttack(20, 10, 100, 150, 10, { element: 1.5 })).toBe(337); // floor(225*1.5)
+    expect(magicAttack(20, 10, 100, 150, 10, { element: 0.5 })).toBe(112); // floor(225*0.5)
   });
 });

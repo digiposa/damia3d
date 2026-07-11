@@ -34,7 +34,6 @@ import {
   magicAttack,
   enemyPhysicalAttack,
   enemyMagicalAttack,
-  itemAttackDamage,
 } from "../combat/formula";
 import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
 import { ItemMenu, type ItemEntry } from "../ui/ItemMenu";
@@ -841,7 +840,7 @@ export class TrainingMode extends GameMode {
         // Attack items need a living target; heal/SP items are usable any time there's stock.
         enabled: s.count > 0 && (!atk || enemyPresent),
         detail: atk
-          ? `${atk.element} · ${atk.power}${atk.target === "allEnemies" ? " · all" : ""}`
+          ? `${atk.element}${atk.target === "allEnemies" ? " · all" : ""}`
           : s.def.spRestore
             ? `+${s.def.spRestore} ${t("stat.sp")}`
             : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
@@ -882,7 +881,14 @@ export class TrainingMode extends GameMode {
     if (targets.length === 0) return false;
     m.avatar.strike(); // throw motion
     this.popText(m.position.add(new Vector3(0, 2.6, 0)), t(stock.def.nameKey), ELEMENT_COLOR[atk.element]);
-    for (const foe of targets) this.landDamage(foe, itemAttackDamage(atk.power, atk.element, foe.def.element));
+    // Item magic (LoD): floor{floor[(LV+5)·MAT·5/MDF]·BID/100} + element/field mods. This is exactly
+    // magicAttack with dragoonMatPct=100 (plain MAT, no Dragoon scaling) and multiplier=BID.
+    const field = fieldMultiplier(this.dragoonSpace, atk.element);
+    for (const foe of targets) {
+      const element = elementMultiplier(atk.element, foe.def.element);
+      const dmg = magicAttack(m.avatar.baseMat, foe.def.stats.mdf, 100, atk.bid, m.avatar.level, { element, field });
+      this.landDamage(foe, Math.max(1, dmg));
+    }
     stock.count -= 1;
     return true;
   }

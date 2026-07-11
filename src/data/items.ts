@@ -13,12 +13,13 @@ export interface ItemDef {
   /** Flat SP restored to the Dragoon gauge (0 = not a spirit item). */
   spRestore?: number;
   /**
-   * Offensive item: fixed magic damage of `element` dealt to one enemy (`"enemy"`) or all
-   * (`"allEnemies"`). `power` is a flat value INDEPENDENT of the user's stats (canon: anyone can
-   * throw a Burn Out for the same effect); the element scales ×2 vs the opposing element / ×0.5 vs
-   * the same. Placeholder powers below — tune from the 2D project's formula doc.
+   * Offensive ("magic") item: elemental magic damage to one enemy (`"enemy"`) or all
+   * (`"allEnemies"`). Per the LoD formula doc, item magic uses the USER's MAT + level and the
+   * target's MDF, scaled by the item's `bid` (Base Item Damage): floor{floor[(LV+5)·MAT·5/MDF]·
+   * BID/100}, then the standard element modifier (×1.5 vs opposite, ×0.5 vs same). See
+   * combat/formula.magicAttack, which is exactly this formula with dragoonMatPct=100, multiplier=bid.
    */
-  attack?: { element: Element; power: number; target: "enemy" | "allEnemies" };
+  attack?: { element: Element; bid: number; target: "enemy" | "allEnemies" };
 }
 
 export const HEALING_POTION: ItemDef = {
@@ -35,43 +36,43 @@ export const SPIRIT_POTION: ItemDef = {
 };
 
 // --- Attack items (Legend of Dragoon magic items) --------------------------
-// Canon layout: 8 elements × 3 tiers — Single-target, All-target, All-target "Powerful" — plus
-// Non-Elemental variants. Powers are PLACEHOLDERS keyed by tier (single hits one, so it hits
-// harder per target than the all-target tiers); replace with the exact values from the formula doc.
-const TIER_SINGLE = 45; // single-target
-const TIER_ALL = 35; // all-target
-const TIER_POWERFUL = 80; // all-target, powerful (chest/drop tier)
+// Canon layout: 8 elements × 3 tiers — Single-target, All-target, All-target "Powerful" — plus the
+// Non-Elemental set. `bid` (Base Item Damage) values are from the formula doc's BID chart.
+const BID_SINGLE = 150; // Single Target Multi
+const BID_ALL = 100; // All Target Multi
+const BID_POWERFUL = 300; // All Target Powerful
 
-function attackItem(id: string, element: Element, power: number, target: "enemy" | "allEnemies"): ItemDef {
-  return { id, nameKey: `item.${id}`, healFraction: 0, attack: { element, power, target } };
+function attackItem(id: string, element: Element, bid: number, target: "enemy" | "allEnemies"): ItemDef {
+  return { id, nameKey: `item.${id}`, healFraction: 0, attack: { element, bid, target } };
 }
 
 /** Every attack item, grouped by element (single / all / powerful), then the Non-Elemental set. */
 export const ATTACK_ITEMS: ItemDef[] = [
-  attackItem("burnOut", "Fire", TIER_SINGLE, "enemy"),
-  attackItem("gushingMagma", "Fire", TIER_ALL, "allEnemies"),
-  attackItem("burningWave", "Fire", TIER_POWERFUL, "allEnemies"),
-  attackItem("pellet", "Earth", TIER_SINGLE, "enemy"),
-  attackItem("meteorFall", "Earth", TIER_ALL, "allEnemies"),
-  attackItem("gravityGrabber", "Earth", TIER_POWERFUL, "allEnemies"),
-  attackItem("sparkNet", "Thunder", TIER_SINGLE, "enemy"),
-  attackItem("thunderbolt", "Thunder", TIER_ALL, "allEnemies"),
-  attackItem("flashHall", "Thunder", TIER_POWERFUL, "allEnemies"),
-  attackItem("spinningGale", "Wind", TIER_SINGLE, "enemy"),
-  attackItem("raveTwister", "Wind", TIER_ALL, "allEnemies"),
-  attackItem("downBurst", "Wind", TIER_POWERFUL, "allEnemies"),
-  attackItem("spearFrost", "Water", TIER_SINGLE, "enemy"),
-  attackItem("fatalBlizzard", "Water", TIER_ALL, "allEnemies"),
-  attackItem("frozenJet", "Water", TIER_POWERFUL, "allEnemies"),
-  attackItem("darkMist", "Darkness", TIER_SINGLE, "enemy"),
-  attackItem("blackRain", "Darkness", TIER_ALL, "allEnemies"),
-  attackItem("nightRaid", "Darkness", TIER_POWERFUL, "allEnemies"),
-  attackItem("transLight", "Light", TIER_SINGLE, "enemy"),
-  attackItem("dancingRay", "Light", TIER_ALL, "allEnemies"),
-  attackItem("spectralFlash", "Light", TIER_POWERFUL, "allEnemies"),
-  // Non-Elemental (fixed damage from the doc where known): Detonate Rock 100, Psyche Bomb X 400.
+  attackItem("burnOut", "Fire", BID_SINGLE, "enemy"),
+  attackItem("gushingMagma", "Fire", BID_ALL, "allEnemies"),
+  attackItem("burningWave", "Fire", BID_POWERFUL, "allEnemies"),
+  attackItem("pellet", "Earth", BID_SINGLE, "enemy"),
+  attackItem("meteorFall", "Earth", BID_ALL, "allEnemies"),
+  attackItem("gravityGrabber", "Earth", BID_POWERFUL, "allEnemies"),
+  attackItem("sparkNet", "Thunder", BID_SINGLE, "enemy"),
+  attackItem("thunderbolt", "Thunder", BID_ALL, "allEnemies"),
+  attackItem("flashHall", "Thunder", BID_POWERFUL, "allEnemies"),
+  attackItem("spinningGale", "Wind", BID_SINGLE, "enemy"),
+  attackItem("raveTwister", "Wind", BID_ALL, "allEnemies"),
+  attackItem("downBurst", "Wind", BID_POWERFUL, "allEnemies"),
+  attackItem("spearFrost", "Water", BID_SINGLE, "enemy"),
+  attackItem("fatalBlizzard", "Water", BID_ALL, "allEnemies"),
+  attackItem("frozenJet", "Water", BID_POWERFUL, "allEnemies"),
+  attackItem("darkMist", "Darkness", BID_SINGLE, "enemy"),
+  attackItem("blackRain", "Darkness", BID_ALL, "allEnemies"),
+  attackItem("nightRaid", "Darkness", BID_POWERFUL, "allEnemies"),
+  attackItem("transLight", "Light", BID_SINGLE, "enemy"),
+  attackItem("dancingRay", "Light", BID_ALL, "allEnemies"),
+  attackItem("spectralFlash", "Light", BID_POWERFUL, "allEnemies"),
+  // Non-Elemental — BID chart: Detonate Rock 100, Psyche Bomb X 400. Psyche Bomb (non-X) isn't in
+  // the chart; slotted at the Powerful tier (300) pending its exact BID.
   attackItem("detonateRock", "Non-Elemental", 100, "enemy"),
-  attackItem("psychedelicBomb", "Non-Elemental", 200, "allEnemies"),
+  attackItem("psychedelicBomb", "Non-Elemental", BID_POWERFUL, "allEnemies"),
   attackItem("psychedelicBombX", "Non-Elemental", 400, "allEnemies"),
 ];
 
