@@ -13,6 +13,7 @@ import {
   rareMonsterBasic,
   additionCounter,
   poisonDamage,
+  itemAttackDamage,
 } from "./formula";
 import {
   DART_ADDITIONS,
@@ -147,5 +148,25 @@ describe("addition data integrity", () => {
     for (const key of Object.keys(perfect) as (keyof typeof DART_ADDITIONS)[]) {
       expect(additionHitsPercent(DART_ADDITIONS[key])).toBe(perfect[key]);
     }
+  });
+});
+
+describe("itemAttackDamage", () => {
+  it("deals its fixed power with no elemental match", () => {
+    expect(itemAttackDamage(45, "Fire", "Thunder")).toBe(45);
+  });
+  it("doubles against the opposing element", () => {
+    expect(itemAttackDamage(45, "Fire", "Water")).toBe(90); // Fire ↔ Water opposites
+    expect(itemAttackDamage(35, "Wind", "Earth")).toBe(70);
+  });
+  it("halves against the same element", () => {
+    expect(itemAttackDamage(80, "Water", "Water")).toBe(40);
+  });
+  it("ignores element when either side is Non-Elemental", () => {
+    expect(itemAttackDamage(100, "Non-Elemental", "Fire")).toBe(100);
+    expect(itemAttackDamage(60, "Light", "Non-Elemental")).toBe(60);
+  });
+  it("never drops below 1", () => {
+    expect(itemAttackDamage(1, "Light", "Light")).toBe(1); // 1*0.5 floored → clamp to 1
   });
 });

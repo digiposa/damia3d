@@ -34,6 +34,7 @@ import {
   magicAttack,
   enemyPhysicalAttack,
   enemyMagicalAttack,
+  itemAttackDamage,
 } from "../combat/formula";
 import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
 import { ItemMenu, type ItemEntry } from "../ui/ItemMenu";
@@ -830,16 +831,23 @@ export class TrainingMode extends GameMode {
   }
 
   private openItemMenu(): void {
-    const entries: ItemEntry[] = this.items.map((s) => ({
-      id: s.def.id,
-      name: t(s.def.nameKey),
-      count: s.count,
-      enabled: s.count > 0, // any item in stock is usable, even if it would waste its effect
-      detail: s.def.spRestore
-        ? `+${s.def.spRestore} ${t("stat.sp")}`
-        : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
-      color: s.def.spRestore ? TEXT.sp : TEXT.hp,
-    }));
+    const enemyPresent = this.enemies.some((e) => e.alive);
+    const entries: ItemEntry[] = this.items.map((s) => {
+      const atk = s.def.attack;
+      return {
+        id: s.def.id,
+        name: t(s.def.nameKey),
+        count: s.count,
+        // Attack items need a living target; heal/SP items are usable any time there's stock.
+        enabled: s.count > 0 && (!atk || enemyPresent),
+        detail: atk
+          ? `${atk.element} · ${atk.power}${atk.target === "allEnemies" ? " · all" : ""}`
+          : s.def.spRestore
+            ? `+${s.def.spRestore} ${t("stat.sp")}`
+            : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
+        color: atk ? ELEMENT_COLOR[atk.element] : s.def.spRestore ? TEXT.sp : TEXT.hp,
+      };
+    });
     this.paused = true;
     this.itemMenu.show(entries);
   }
@@ -853,10 +861,30 @@ export class TrainingMode extends GameMode {
     this.paused = false;
     const stock = this.items.find((s) => s.def.id === id);
     if (!stock || stock.count <= 0 || !this.runner.gauge.isReady) return;
-    this.useItem(this.controlled, stock);
+    // Attack items need a valid target; if none, don't consume the item or the turn.
+    if (stock.def.attack && !this.useAttackItem(this.controlled, stock)) return;
+    else if (!stock.def.attack) this.useItem(this.controlled, stock);
     this.runner.gauge.spend(); // using an item is the member's ATB action
     this.finishAction();
     this.refreshHud();
+  }
+
+  /** Throw an attack item: fixed elemental magic damage (independent of stats) to one enemy or all.
+   *  Returns false (leaving the turn/stock intact) if there's no living target. */
+  private useAttackItem(m: PartyMember, stock: { def: ItemDef; count: number }): boolean {
+    const atk = stock.def.attack!;
+    const targets =
+      atk.target === "allEnemies"
+        ? this.enemies.filter((e) => e.alive)
+        : [
+            this.attackTarget && this.attackTarget.alive ? this.attackTarget : this.nearestEnemy(ACQUIRE_RANGE),
+          ].filter((e): e is Enemy => !!e);
+    if (targets.length === 0) return false;
+    m.avatar.strike(); // throw motion
+    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t(stock.def.nameKey), ELEMENT_COLOR[atk.element]);
+    for (const foe of targets) this.landDamage(foe, itemAttackDamage(atk.power, atk.element, foe.def.element));
+    stock.count -= 1;
+    return true;
   }
 
   /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
