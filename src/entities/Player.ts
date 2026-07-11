@@ -17,7 +17,7 @@ import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 import { DragoonForm } from "./DragoonForm";
-import { importModel, flattenCellShaded, tuneWeapon } from "../world/props";
+import { importModel, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
@@ -764,20 +764,7 @@ export class Player {
       mesh.isPickable = false;
     }
     flattenCellShaded(res.meshes);
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const mesh of res.meshes) {
-      if (mesh.getTotalVertices() === 0) continue;
-      mesh.computeWorldMatrix(true);
-      const bb = mesh.getBoundingInfo().boundingBox;
-      lo = Math.min(lo, bb.minimumWorld.y);
-      hi = Math.max(hi, bb.maximumWorld.y);
-    }
-    if (hi > lo) {
-      const f = MODEL_TARGET_H / (hi - lo);
-      dragoonRoot.scaling.setAll(f);
-      dragoonRoot.position.y = -lo * f;
-    }
+    fitHeight(res.meshes, dragoonRoot, MODEL_TARGET_H);
     // This dragoon GLB is authored facing +X (not +Z like the base model), so it turned 90° off
     // the movement direction — add a quarter-turn to align its forward with the rig's +Z.
     dragoonRoot.rotation.y = MODEL_YAW + Math.PI / 2;
@@ -808,22 +795,7 @@ export class Player {
       mesh.isPickable = false;
     }
     flattenCellShaded(res.meshes); // painted textures read flat-diffuse in the dim scene
-
-    // Auto-fit to a fixed height with feet at y=0 (AI/AccuRIG exports arrive at arbitrary scale).
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const mesh of res.meshes) {
-      if (mesh.getTotalVertices() === 0) continue;
-      mesh.computeWorldMatrix(true);
-      const bb = mesh.getBoundingInfo().boundingBox;
-      lo = Math.min(lo, bb.minimumWorld.y);
-      hi = Math.max(hi, bb.maximumWorld.y);
-    }
-    if (hi > lo) {
-      const f = MODEL_TARGET_H / (hi - lo);
-      modelRoot.scaling.setAll(f);
-      modelRoot.position.y = -lo * f;
-    }
+    fitHeight(res.meshes, modelRoot, MODEL_TARGET_H); // AI/AccuRIG exports arrive at arbitrary scale
     modelRoot.rotation.y = MODEL_YAW;
     modelRoot.parent = this.root;
     this.modelRoot = modelRoot;

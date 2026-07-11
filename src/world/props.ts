@@ -40,21 +40,49 @@ export interface PropPlacement {
  * shade it, and cap roughness so highlights stay sharp (a polished-metal glint) rather than a
  * dull matte wash. Balances "visible" and "looks like shiny metal".
  */
-export function tuneImportedMetal(meshes: AbstractMesh[], metalCap = 0.7, roughCap = 0.4): void {
+/**
+ * Visit every unique {@link PBRMaterial} on `meshes`, descending into MultiMaterials and
+ * de-duplicating shared materials. The three tuning passes below differ only in the body they
+ * apply per material, so they share this walker.
+ */
+function forEachPBRMaterial(meshes: AbstractMesh[], apply: (m: PBRMaterial) => void): void {
   const seen = new Set<Material>();
-  const fix = (m: Material | null): void => {
+  const visit = (m: Material | null): void => {
     if (!m || seen.has(m)) return;
     seen.add(m);
-    if (m instanceof MultiMaterial) {
-      m.subMaterials.forEach(fix);
-      return;
-    }
-    if (m instanceof PBRMaterial) {
-      if (m.metallic !== null && m.metallic > metalCap) m.metallic = metalCap;
-      if (m.roughness !== null && m.roughness > roughCap) m.roughness = roughCap;
-    }
+    if (m instanceof MultiMaterial) m.subMaterials.forEach(visit);
+    else if (m instanceof PBRMaterial) apply(m);
   };
-  for (const mesh of meshes) fix(mesh.material);
+  for (const mesh of meshes) visit(mesh.material);
+}
+
+/**
+ * Auto-fit a loaded model to a target height with its feet at y=0: scan the meshes' world-space
+ * Y bounds and scale/position `root` so it stands the right size regardless of the source's units
+ * (AI/Mixamo/AccuRIG exports arrive at wildly different scales). Rotation is set by the caller.
+ */
+export function fitHeight(meshes: AbstractMesh[], root: TransformNode, targetH: number): void {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const mesh of meshes) {
+    if (mesh.getTotalVertices() === 0) continue; // skip the empty glTF __root__
+    mesh.computeWorldMatrix(true);
+    const bb = mesh.getBoundingInfo().boundingBox;
+    lo = Math.min(lo, bb.minimumWorld.y);
+    hi = Math.max(hi, bb.maximumWorld.y);
+  }
+  if (hi > lo) {
+    const f = targetH / (hi - lo);
+    root.scaling.setAll(f);
+    root.position.y = -lo * f; // feet on the ground
+  }
+}
+
+export function tuneImportedMetal(meshes: AbstractMesh[], metalCap = 0.7, roughCap = 0.4): void {
+  forEachPBRMaterial(meshes, (m) => {
+    if (m.metallic !== null && m.metallic > metalCap) m.metallic = metalCap;
+    if (m.roughness !== null && m.roughness > roughCap) m.roughness = roughCap;
+  });
 }
 
 /**
@@ -66,41 +94,31 @@ export function tuneImportedMetal(meshes: AbstractMesh[], metalCap = 0.7, roughC
  * defaults to metallic 1.0 and renders near-black in our dim scene.
  */
 export function flattenCellShaded(meshes: AbstractMesh[]): void {
-  const seen = new Set<Material>();
-  const fix = (m: Material | null): void => {
-    if (!m || seen.has(m)) return;
-    seen.add(m);
-    if (m instanceof MultiMaterial) {
-      m.subMaterials.forEach(fix);
-      return;
-    }
-    if (m instanceof PBRMaterial) {
-      m.metallic = 0;
-      m.roughness = 1;
-      // Brightness comes ONLY from the scene's ambient IBL (soft, physically-based), NEVER from
-      // emissive. The GlowLayer (intensity 0.6, 32px blur) turns ANY non-zero emissive into a
-      // blurred full-body halo — the "luminescent / translucent ghost" look reported since the
-      // self-illumination was first added. Emissive is pinned to pure black so a character feeds
-      // the glow buffer nothing at all; readability is bought back purely by lifting the IBL.
-      m.environmentIntensity = 1.35;
-      m.emissiveColor = Color3.Black();
-      m.emissiveTexture = null; // never let an export's own emissive map re-introduce the glow
-      m.emissiveIntensity = 0;
-      // Force fully opaque at EVERY level. The AI exports are authored OPAQUE with no texture
-      // alpha, yet users reported "translucent/ghost" characters — a symptom of a mobile GL path
-      // treating the PBR material as alpha-blended. Pin every transparency knob so the body can
-      // never render see-through regardless of the device: no blend mode, full alpha, ignore any
-      // stray texture alpha, and write depth so nothing shows through.
-      m.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
-      m.alpha = 1;
-      m.useAlphaFromAlbedoTexture = false;
-      if (m.albedoTexture) m.albedoTexture.hasAlpha = false;
-      m.forceDepthWrite = true;
-      m.needDepthPrePass = false;
-      m.backFaceCulling = true;
-    }
-  };
-  for (const mesh of meshes) fix(mesh.material);
+  forEachPBRMaterial(meshes, (m) => {
+    m.metallic = 0;
+    m.roughness = 1;
+    // Brightness comes ONLY from the scene's ambient IBL (soft, physically-based), NEVER from
+    // emissive. The GlowLayer (intensity 0.6, 32px blur) turns ANY non-zero emissive into a
+    // blurred full-body halo — the "luminescent / translucent ghost" look reported since the
+    // self-illumination was first added. Emissive is pinned to pure black so a character feeds
+    // the glow buffer nothing at all; readability is bought back purely by lifting the IBL.
+    m.environmentIntensity = 1.35;
+    m.emissiveColor = Color3.Black();
+    m.emissiveTexture = null; // never let an export's own emissive map re-introduce the glow
+    m.emissiveIntensity = 0;
+    // Force fully opaque at EVERY level. The AI exports are authored OPAQUE with no texture
+    // alpha, yet users reported "translucent/ghost" characters — a symptom of a mobile GL path
+    // treating the PBR material as alpha-blended. Pin every transparency knob so the body can
+    // never render see-through regardless of the device: no blend mode, full alpha, ignore any
+    // stray texture alpha, and write depth so nothing shows through.
+    m.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+    m.alpha = 1;
+    m.useAlphaFromAlbedoTexture = false;
+    if (m.albedoTexture) m.albedoTexture.hasAlpha = false;
+    m.forceDepthWrite = true;
+    m.needDepthPrePass = false;
+    m.backFaceCulling = true;
+  });
   // Belt-and-suspenders: reset per-mesh visibility (the arena fades near-side *decor* via
   // mesh.visibility; guarantee a character is never inadvertently dimmed to translucency).
   for (const mesh of meshes) mesh.visibility = 1;
@@ -113,23 +131,13 @@ export function flattenCellShaded(meshes: AbstractMesh[]): void {
  * it into a neon blade. Use for hand-held weapon models.
  */
 export function tuneWeapon(meshes: AbstractMesh[]): void {
-  const seen = new Set<Material>();
-  const fix = (m: Material | null): void => {
-    if (!m || seen.has(m)) return;
-    seen.add(m);
-    if (m instanceof MultiMaterial) {
-      m.subMaterials.forEach(fix);
-      return;
-    }
-    if (m instanceof PBRMaterial) {
-      m.metallic = 0.25;
-      m.roughness = 0.4;
-      m.environmentIntensity = 0.8;
-      if (m.albedoTexture) m.emissiveTexture = m.albedoTexture; // self-lit from its own colours
-      m.emissiveColor = new Color3(0.3, 0.3, 0.3);
-    }
-  };
-  for (const mesh of meshes) fix(mesh.material);
+  forEachPBRMaterial(meshes, (m) => {
+    m.metallic = 0.25;
+    m.roughness = 0.4;
+    m.environmentIntensity = 0.8;
+    if (m.albedoTexture) m.emissiveTexture = m.albedoTexture; // self-lit from its own colours
+    m.emissiveColor = new Color3(0.3, 0.3, 0.3);
+  });
 }
 
 /** All GLB base names currently available in src/assets/models/. */

@@ -278,59 +278,20 @@ export const KONGOL_ADDITIONS = {
   },
 } satisfies Record<string, AdditionDef>;
 
+// Each list is simply its Addition object's values (object key order = acquisition order), so the
+// roster lives in one place — adding/renaming an Addition can't desync a hand-maintained list.
 /** Dart's Additions in acquisition order. */
-export const DART_ADDITION_LIST: AdditionDef[] = [
-  DART_ADDITIONS.doubleSlash,
-  DART_ADDITIONS.volcano,
-  DART_ADDITIONS.burningRush,
-  DART_ADDITIONS.crushDance,
-  DART_ADDITIONS.madnessHero,
-  DART_ADDITIONS.moonStrike,
-  DART_ADDITIONS.blazingDynamo,
-];
-
+export const DART_ADDITION_LIST: AdditionDef[] = Object.values(DART_ADDITIONS);
 /** Lavitz / Albert Additions in acquisition order. */
-export const LAVITZ_ADDITION_LIST: AdditionDef[] = [
-  LAVITZ_ADDITIONS.harpoon,
-  LAVITZ_ADDITIONS.spinningCane,
-  LAVITZ_ADDITIONS.rodTyphoon,
-  LAVITZ_ADDITIONS.gustOfWindDance,
-  LAVITZ_ADDITIONS.flowerStorm,
-];
-
+export const LAVITZ_ADDITION_LIST: AdditionDef[] = Object.values(LAVITZ_ADDITIONS);
 /** Rose Additions in acquisition order. */
-export const ROSE_ADDITION_LIST: AdditionDef[] = [
-  ROSE_ADDITIONS.whipSmack,
-  ROSE_ADDITIONS.moreAndMore,
-  ROSE_ADDITIONS.hardBlade,
-  ROSE_ADDITIONS.demonsDance,
-];
-
+export const ROSE_ADDITION_LIST: AdditionDef[] = Object.values(ROSE_ADDITIONS);
 /** Haschel Additions in acquisition order. */
-export const HASCHEL_ADDITION_LIST: AdditionDef[] = [
-  HASCHEL_ADDITIONS.doublePunch,
-  HASCHEL_ADDITIONS.flurryOfStyx,
-  HASCHEL_ADDITIONS.summon4Gods,
-  HASCHEL_ADDITIONS.fiveRingShattering,
-  HASCHEL_ADDITIONS.hexHammer,
-  HASCHEL_ADDITIONS.omniSweep,
-];
-
+export const HASCHEL_ADDITION_LIST: AdditionDef[] = Object.values(HASCHEL_ADDITIONS);
 /** Meru Additions in acquisition order. */
-export const MERU_ADDITION_LIST: AdditionDef[] = [
-  MERU_ADDITIONS.doubleSmack,
-  MERU_ADDITIONS.hammerSpin,
-  MERU_ADDITIONS.coolBoogie,
-  MERU_ADDITIONS.catsCradle,
-  MERU_ADDITIONS.perkyStep,
-];
-
+export const MERU_ADDITION_LIST: AdditionDef[] = Object.values(MERU_ADDITIONS);
 /** Kongol Additions in acquisition order. */
-export const KONGOL_ADDITION_LIST: AdditionDef[] = [
-  KONGOL_ADDITIONS.pursuit,
-  KONGOL_ADDITIONS.inferno,
-  KONGOL_ADDITIONS.boneCrush,
-];
+export const KONGOL_ADDITION_LIST: AdditionDef[] = Object.values(KONGOL_ADDITIONS);
 
 /** Every character's Addition list, keyed for lookup/iteration. */
 export const ADDITION_LISTS = {

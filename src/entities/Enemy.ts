@@ -11,7 +11,7 @@ import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 import type { EnemyDef } from "../data/enemies";
 import type { Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
-import { importModel, tuneImportedMetal, flattenCellShaded, tuneWeapon } from "../world/props";
+import { importModel, tuneImportedMetal, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 
 /** Movement speed (world units / second) while chasing. */
 const SPEED = 3.2;
@@ -202,22 +202,7 @@ export class Enemy {
     if (this.def.cellShaded) flattenCellShaded(res.meshes);
     else tuneImportedMetal(res.meshes);
 
-
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const mesh of res.meshes) {
-      if (mesh.getTotalVertices() === 0) continue; // skip the empty __root__
-      mesh.computeWorldMatrix(true);
-      const bb = mesh.getBoundingInfo().boundingBox;
-      lo = Math.min(lo, bb.minimumWorld.y);
-      hi = Math.max(hi, bb.maximumWorld.y);
-    }
-    const TARGET_H = 1.8; // ≈ our characters' height
-    if (hi > lo) {
-      const factor = TARGET_H / (hi - lo);
-      modelRoot.scaling.setAll(factor);
-      modelRoot.position.y = -lo * factor; // feet on the ground
-    }
+    fitHeight(res.meshes, modelRoot, 1.8); // ≈ our characters' height; exports arrive at any scale
     modelRoot.parent = this.root;
 
     // Attach the enemy's weapon model to the right-hand bone (our AI models are rigged weaponless),

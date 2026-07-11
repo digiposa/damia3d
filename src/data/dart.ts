@@ -101,24 +101,17 @@ export function nextLevelExp(levels: CharacterLevel[], level: number): number {
   return levels[level].exp;
 }
 
-/** Stats for a given level, clamped to the valid 1–60 range. */
+// Dart-specific wrappers = the generic table helpers pre-bound to DART_LEVELS (kept for the
+// existing tests / call sites; the logic lives once in statsForLevel / levelForExp / nextLevelExp).
+/** Stats for a given Dart level, clamped to the valid 1–60 range. */
 export function dartStatsForLevel(level: number): DartLevel {
-  const clamped = Math.min(Math.max(Math.floor(level), 1), DART_MAX_LEVEL);
-  return DART_LEVELS[clamped - 1];
+  return statsForLevel(DART_LEVELS, level) as DartLevel;
 }
-
-/** Highest level whose cumulative EXP requirement is met by `exp`. */
+/** Highest Dart level whose cumulative EXP requirement is met by `exp`. */
 export function dartLevelForExp(exp: number): number {
-  let level = 1;
-  for (const row of DART_LEVELS) {
-    if (exp >= row.exp) level = row.level;
-    else break;
-  }
-  return level;
+  return levelForExp(DART_LEVELS, exp);
 }
-
-/** Cumulative EXP needed to reach the next level (capped at the max level). */
+/** Cumulative EXP needed to reach Dart's next level (capped at the max level). */
 export function dartNextLevelExp(level: number): number {
-  if (level >= DART_MAX_LEVEL) return DART_LEVELS[DART_MAX_LEVEL - 1].exp;
-  return DART_LEVELS[level].exp; // row index `level` is the (level+1)th entry
+  return nextLevelExp(DART_LEVELS, level);
 }
