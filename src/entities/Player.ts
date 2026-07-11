@@ -116,7 +116,7 @@ export class Player {
   /** Remaining actions of the active Dragoon transformation (0 = human form). */
   private dragoonTurns = 0;
   private dragoonAura!: Mesh;
-  private humanoid: Humanoid;
+  private humanoid?: Humanoid;
   /** Procedural Dragoon-form model, shown while transformed (currently Dart's Red-Eye only). */
   private dragoonForm?: DragoonForm;
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
@@ -177,20 +177,12 @@ export class Player {
     this.root = new TransformNode("player", scene);
     this.root.position = spawn.clone();
 
-    // Low-poly humanoid placeholder, tinted to the bearer. Replaced by a glTF
-    // model if the bearer supplies one (loaded asynchronously below).
-    this.humanoid = new Humanoid(scene, {
-      color: bearer.color,
-      bodyColor: bearer.bodyColor,
-      weapon: bearer.weapon,
-      weaponVariant: bearer.weaponVariant,
-      hair: bearer.hair,
-      outfit: bearer.outfit,
-      scale: bearer.scale,
-      skinTone: bearer.skinTone,
-    });
-    this.humanoid.rig.parent = this.root;
+    // Low-poly humanoid placeholder, tinted to the bearer. Built ONLY when the bearer has no
+    // rigged GLB — no point constructing (and retaining) dozens of procedural meshes just to hide
+    // them behind a model. A modeled bearer loads its GLB instead; if that fails, loadModel builds
+    // the placeholder as a fallback.
     if (bearer.model) void this.loadModel(bearer.model, scene);
+    else this.buildHumanoid(scene);
 
     // Dragoon-form figure, shown while transformed (the human figure is hidden). A supplied GLB
     // (bearer.dragoonModel) takes precedence over the procedural DragoonForm; classes with a built
@@ -586,7 +578,7 @@ export class Player {
   /** Show/hide the active human figure — the loaded model if there is one, else the placeholder. */
   private setFigureEnabled(on: boolean): void {
     if (this.modelRoot) this.modelRoot.setEnabled(on);
-    else this.humanoid.setEnabled(on);
+    else this.humanoid?.setEnabled(on);
   }
 
   // --- Magic / healing ------------------------------------------------------
@@ -672,7 +664,7 @@ export class Player {
       }
       return;
     }
-    this.humanoid.update(dt, moving);
+    this.humanoid?.update(dt, moving);
   }
 
   /** Enter/leave the combat stance (the mode sets this from enemy proximity). Swaps to the combat
@@ -735,7 +727,7 @@ export class Player {
       });
       return;
     }
-    this.humanoid.strike();
+    this.humanoid?.strike();
   }
 
   /** Loop/replace the model's current animation group (no-op if already playing it). */
@@ -780,9 +772,29 @@ export class Player {
    * its painted materials, and map idle/walk/attack clips driven by {@link animate}/{@link strike}.
    * Best-effort — any failure keeps the placeholder.
    */
+  /** Build the procedural placeholder figure — for a bearer with no GLB model, or as a fallback
+   *  when its model fails to load. No-op if one already exists. */
+  private buildHumanoid(scene: Scene): void {
+    if (this.humanoid) return;
+    this.humanoid = new Humanoid(scene, {
+      color: this.bearer.color,
+      bodyColor: this.bearer.bodyColor,
+      weapon: this.bearer.weapon,
+      weaponVariant: this.bearer.weaponVariant,
+      hair: this.bearer.hair,
+      outfit: this.bearer.outfit,
+      scale: this.bearer.scale,
+      skinTone: this.bearer.skinTone,
+    });
+    this.humanoid.rig.parent = this.root;
+  }
+
   private async loadModel(name: string, scene: Scene): Promise<void> {
     const res = await importModel(scene, name).catch(() => undefined);
-    if (!res) return;
+    if (!res) {
+      if (!this.root.isDisposed()) this.buildHumanoid(scene); // model missing → procedural fallback
+      return;
+    }
     if (this.root.isDisposed()) {
       for (const m of res.meshes) m.dispose();
       return;
@@ -799,7 +811,10 @@ export class Player {
     modelRoot.rotation.y = MODEL_YAW;
     modelRoot.parent = this.root;
     this.modelRoot = modelRoot;
-    this.humanoid.setEnabled(false); // the model replaces the placeholder
+    // Free the procedural placeholder if one was built (e.g. a rebuild race) — the model owns
+    // the figure now; usually there is none, since a modeled bearer skips building it.
+    this.humanoid?.dispose();
+    this.humanoid = undefined;
 
     const g = res.animationGroups;
     const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
