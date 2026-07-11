@@ -34,6 +34,10 @@ export class ActionButton {
   private frameIndex = 0;
   /** Whether the icon is currently cycling (ATB ready). */
   private animating = false;
+  /** Last-written HUD state, so the per-frame setters skip redundant style writes. */
+  private _available?: boolean;
+  private _visible?: boolean;
+  private _ready?: boolean;
 
   constructor(
     label: string,
@@ -111,18 +115,24 @@ export class ActionButton {
 
   /** Enable/disable the button: dims and blocks taps when unavailable. */
   setAvailable(enabled: boolean): void {
+    if (this._available === enabled) return; // called every HUD frame — skip if unchanged
+    this._available = enabled;
     this.el.style.opacity = enabled ? "1" : "0.35";
     this.el.style.pointerEvents = enabled ? "auto" : "none";
   }
 
   /** Show or hide the button entirely (e.g. actions only valid in one form). */
   setVisible(visible: boolean): void {
+    if (this._visible === visible) return;
+    this._visible = visible;
     this.el.style.display = visible ? "flex" : "none";
   }
 
   /** Highlight the button with a gold "ready to act" glow (ATB full), and — for a
    *  multi-frame sprite icon — cycle the frames while ready, freezing on the rest pose. */
   setReady(ready: boolean): void {
+    if (this._ready === ready) return;
+    this._ready = ready;
     this.el.style.boxShadow = ready ? READY_SHADOW : BASE_SHADOW;
     if (this.frames.length > 1) {
       if (ready) this.startAnim();

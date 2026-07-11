@@ -724,9 +724,11 @@ export class TrainingMode extends GameMode {
     // Slowed (or frozen, at scale 0) while the player combos.
     if (worldScale > 0) {
       this.updateEnemies(worldDt);
-      // AI party members (everyone except the controlled one) run their Brain.
+      // AI party members (everyone except the controlled one) run their Brain. Compute the
+      // living-enemy list once and share it (was re-filtered per member each frame).
+      const aliveEnemies = this.enemies.filter((e) => e.alive);
       for (const m of this.party) {
-        if (m !== this.controlled) this.updateAiMember(m, dt * worldScale, worldDt);
+        if (m !== this.controlled) this.updateAiMember(m, dt * worldScale, worldDt, aliveEnemies);
       }
     }
     this.updateSight();
@@ -1087,11 +1089,14 @@ export class TrainingMode extends GameMode {
    *  the normal cursor. Only enemies are pickable, so this is a cheap per-move pick. */
   private onPointerMove = (e: PointerEvent): void => {
     if (!this.canvas || e.pointerType === "touch") return;
-    const picked = this.scene.pick(e.offsetX, e.offsetY)?.pickedMesh?.metadata;
+    // Restrict the ray test to enemy meshes (skip the large floor + decor) — this fires on every
+    // mouse move, so a predicate keeps it cheap.
+    const picked = this.scene.pick(e.offsetX, e.offsetY, (m) => m.metadata instanceof Enemy)?.pickedMesh?.metadata;
     const overEnemy = picked instanceof Enemy && picked.alive && this.enemies.includes(picked);
     // Sword hotspot near the blade tip; match the form's blade colour (blue human / red Dragoon).
     const frame = this.player.transformed ? ATTACK_DRAGOON_FRAMES[0] : ATTACK_ICON_FRAMES[0];
-    this.canvas.style.cursor = overEnemy ? `url(${frame}) 8 4, crosshair` : "";
+    const cursor = overEnemy ? `url(${frame}) 8 4, crosshair` : "";
+    if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
   };
 
   private onPointerLeave = (): void => {
@@ -1350,7 +1355,8 @@ export class TrainingMode extends GameMode {
   }
 
   private updateEnemies(cdt: number): void {
-    const knightsAlive = this.enemies.filter((e) => e.alive && e.def.id.startsWith("knight_of_sandora")).length;
+    let knightsAlive = 0; // count in a loop — no throwaway filtered array each frame
+    for (const e of this.enemies) if (e.alive && e.def.id.startsWith("knight_of_sandora")) knightsAlive++;
     const ctx = { knightsAlive };
     for (const enemy of this.enemies) {
       enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
@@ -1426,7 +1432,7 @@ export class TrainingMode extends GameMode {
    * decision point a future gambit system will replace) and execute the result —
    * approach, strike (auto-resolving the full Addition), or hold while charging.
    */
-  private updateAiMember(member: PartyMember, dt: number, cdt: number): void {
+  private updateAiMember(member: PartyMember, dt: number, cdt: number, aliveEnemies: Enemy[]): void {
     member.tickGauge(cdt);
     member.avatar.tickGuard(cdt);
 
@@ -1437,7 +1443,8 @@ export class TrainingMode extends GameMode {
       return;
     }
 
-    const before = member.position.clone();
+    const bx = member.position.x; // capture pre-move position without allocating a Vector3
+    const bz = member.position.z;
     const view = {
       position: member.position,
       reach: this.reachFor(member.avatar),
@@ -1448,7 +1455,7 @@ export class TrainingMode extends GameMode {
       hasItem: this.hasHealItem(),
       canCastMagic: member.avatar.canCastMagic,
     };
-    const decision = member.brain.decide(view, { enemies: this.enemies.filter((e) => e.alive) });
+    const decision = member.brain.decide(view, { enemies: aliveEnemies });
     if (decision.kind === "approach") {
       const to = decision.target.position.subtract(member.position);
       to.y = 0;
@@ -1470,7 +1477,9 @@ export class TrainingMode extends GameMode {
       }
     }
     clampToArena(member.position);
-    member.avatar.animate(dt, Vector3.DistanceSquared(before, member.position) > 1e-6);
+    const dx = member.position.x - bx;
+    const dz = member.position.z - bz;
+    member.avatar.animate(dt, dx * dx + dz * dz > 1e-6);
     member.syncHud(this.scene);
   }
 

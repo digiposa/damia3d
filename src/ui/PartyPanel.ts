@@ -33,6 +33,11 @@ interface Gauge {
   track: HTMLDivElement;
   fill: HTMLDivElement;
   text: HTMLDivElement;
+  /** Persistent label (left) and value (right) spans — updated in place, never re-parsed. */
+  labelEl: HTMLSpanElement;
+  valueEl: HTMLSpanElement;
+  /** Last-written values, so per-frame refreshes skip DOM writes when nothing changed. */
+  cache: { ratio?: number; label?: string; value?: string; ready?: boolean };
 }
 
 interface Row {
@@ -45,6 +50,8 @@ interface Row {
   extras: HTMLDivElement;
   sp: Gauge;
   mp: Gauge;
+  /** Last-written row state, so per-frame set() skips unchanged style writes. */
+  cache: { shown?: boolean; controlled?: boolean; level?: number; portrait?: string; extras?: boolean };
 }
 
 /**
@@ -161,32 +168,38 @@ export class PartyPanel {
     col.append(hp.track, atb.track, extras);
     root.append(portrait, col);
 
-    return { root, portrait, portraitInitial, lvBadge, hp, atb, extras, sp, mp };
+    return { root, portrait, portraitInitial, lvBadge, hp, atb, extras, sp, mp, cache: {} };
   }
 
   set(views: PartyRowView[]): void {
     for (let i = 0; i < MAX_ROWS; i++) {
       const row = this.rows[i];
+      const c = row.cache;
       const v = views[i];
       if (!v) {
-        row.root.style.display = "none";
+        if (c.shown !== false) { c.shown = false; row.root.style.display = "none"; }
         continue;
       }
-      row.root.style.display = "flex";
-      row.root.style.border = v.controlled ? "1px solid #ffe08a" : "1px solid rgba(120,150,200,0.22)";
-      row.root.style.background = v.controlled ? "rgba(26,22,8,0.78)" : "rgba(8,11,17,0.72)";
-
-      row.lvBadge.textContent = `${v.level}`;
+      if (c.shown !== true) { c.shown = true; row.root.style.display = "flex"; }
+      if (c.controlled !== v.controlled) {
+        c.controlled = v.controlled;
+        row.root.style.border = v.controlled ? "1px solid #ffe08a" : "1px solid rgba(120,150,200,0.22)";
+        row.root.style.background = v.controlled ? "rgba(26,22,8,0.78)" : "rgba(8,11,17,0.72)";
+      }
+      if (c.level !== v.level) { c.level = v.level; row.lvBadge.textContent = `${v.level}`; }
       // In Dragoon form the HUD swaps to the Dragoon portrait if the bearer has one
       // (menus keep the human portrait); otherwise the normal portrait is used.
-      const portrait = (v.transformed && v.dragoonPortrait) || v.portrait;
-      if (portrait) {
-        row.portrait.style.backgroundImage = `url(${portrait})`;
-        row.portraitInitial.style.display = "none";
-      } else {
-        row.portrait.style.backgroundImage = "none";
-        row.portraitInitial.textContent = v.name.charAt(0);
-        row.portraitInitial.style.display = "flex";
+      const portrait = ((v.transformed && v.dragoonPortrait) || v.portrait) ?? "";
+      if (c.portrait !== portrait) {
+        c.portrait = portrait;
+        if (portrait) {
+          row.portrait.style.backgroundImage = `url(${portrait})`;
+          row.portraitInitial.style.display = "none";
+        } else {
+          row.portrait.style.backgroundImage = "none";
+          row.portraitInitial.textContent = v.name.charAt(0);
+          row.portraitInitial.style.display = "flex";
+        }
       }
 
       // The member's name is overlaid in the HP gauge to save a whole line.
@@ -194,15 +207,17 @@ export class PartyPanel {
       fillAtb(row.atb, v.atb);
 
       // SP/MP gauges only for the controlled member, and only once the Dragoon is unlocked.
-      if (v.controlled && v.dragoonUnlocked) {
-        row.extras.style.display = "flex";
+      const showExtras = !!(v.controlled && v.dragoonUnlocked);
+      if (c.extras !== showExtras) {
+        c.extras = showExtras;
+        row.extras.style.display = showExtras ? "flex" : "none";
+        row.mp.track.style.display = showExtras ? "block" : "none";
+      }
+      if (showExtras) {
         // SP gauge: segmented into 100-SP blocks (each = one Dragoon turn); label carries D'Lv.
         fillSpGauge(row.sp, v.sp ?? 0, v.maxSp ?? 0, `D'${v.dragoonLevel ?? 1} · ${t("stat.sp")}`);
         // MP shown alongside SP once the Dragoon is unlocked (it powers Dragoon magic).
-        row.mp.track.style.display = "block";
         fillGauge(row.mp, v.mp ?? 0, v.maxMp ?? 0, t("stat.mp"));
-      } else {
-        row.extras.style.display = "none";
       }
     }
   }
@@ -246,15 +261,36 @@ function gauge(dark: string, light: string, height: number): Gauge {
     textShadow: "0 1px 2px rgba(0,0,0,0.95)",
   } satisfies Partial<CSSStyleDeclaration>);
 
+  // Label (left) + value (right) as persistent spans — set via textContent, never innerHTML.
+  const labelEl = document.createElement("span");
+  Object.assign(labelEl.style, { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+  const valueEl = document.createElement("span");
+  text.append(labelEl, valueEl);
+
   track.append(fill, text);
-  return { track, fill, text };
+  return { track, fill, text, labelEl, valueEl, cache: {} };
 }
 
-/** Fill a gauge and label it "<label>   <value>/<max>" (label left, value right). */
+/** Set the fill width only when the (rounded) ratio changed — avoids a style write every frame. */
+function setRatio(g: Gauge, ratio: number): void {
+  const r = Math.round(Math.max(0, Math.min(1, ratio)) * 1000) / 1000;
+  if (g.cache.ratio === r) return;
+  g.cache.ratio = r;
+  g.fill.style.transform = `scaleX(${r})`;
+}
+
+/** Fill a gauge and label it "<label>   <value>/<max>" (label left, value right). In-place, cached. */
 function fillGauge(g: Gauge, value: number, max: number, label: string): void {
-  const ratio = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
-  g.fill.style.transform = `scaleX(${ratio})`;
-  g.text.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span><span>${value}/${max}</span>`;
+  setRatio(g, max > 0 ? value / max : 0);
+  if (g.cache.label !== label) {
+    g.cache.label = label;
+    g.labelEl.textContent = label;
+  }
+  const v = `${value}/${max}`;
+  if (g.cache.value !== v) {
+    g.cache.value = v;
+    g.valueEl.textContent = v;
+  }
 }
 
 /**
@@ -265,10 +301,13 @@ function fillGauge(g: Gauge, value: number, max: number, label: string): void {
 function fillSpGauge(g: Gauge, value: number, max: number, label: string): void {
   fillGauge(g, value, max, label);
   const ready = value >= 100;
-  g.fill.style.background = ready
-    ? "linear-gradient(90deg, #6a4bb0, #ffd86b)"
-    : "linear-gradient(90deg, #3a2f73, #6f7fd0)";
-  g.track.style.boxShadow = ready ? "0 0 5px rgba(255,216,107,0.55)" : "none";
+  if (g.cache.ready !== ready) {
+    g.cache.ready = ready;
+    g.fill.style.background = ready
+      ? "linear-gradient(90deg, #6a4bb0, #ffd86b)"
+      : "linear-gradient(90deg, #3a2f73, #6f7fd0)";
+    g.track.style.boxShadow = ready ? "0 0 5px rgba(255,216,107,0.55)" : "none";
+  }
 
   const segments = Math.max(1, Math.round(max / 100));
   if (g.track.dataset.segs !== String(segments)) {
@@ -292,14 +331,16 @@ function fillSpGauge(g: Gauge, value: number, max: number, label: string): void 
   }
 }
 
-/** The ATB gauge: cyan while charging, gold + glow when full (ready to act). */
+/** The ATB gauge: cyan while charging, gold + glow when full (ready to act). In-place, cached. */
 function fillAtb(g: Gauge, atb: number): void {
-  const ratio = Math.max(0, Math.min(1, atb));
-  g.fill.style.transform = `scaleX(${ratio})`;
-  const ready = ratio >= 1;
+  setRatio(g, atb);
+  const ready = atb >= 1;
+  if (g.cache.ready === ready) return;
+  g.cache.ready = ready;
   g.fill.style.background = ready
     ? "linear-gradient(90deg, #d8a32a, #ffe08a)"
     : "linear-gradient(90deg, #2f6dd0, #56b6ff)";
   g.track.style.boxShadow = ready ? "0 0 6px rgba(255,216,107,0.8)" : "none";
-  g.text.innerHTML = `<span>ATB</span><span>${ready ? "●" : ""}</span>`;
+  if (g.cache.label !== "ATB") { g.cache.label = "ATB"; g.labelEl.textContent = "ATB"; }
+  g.valueEl.textContent = ready ? "●" : "";
 }

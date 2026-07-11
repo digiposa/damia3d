@@ -27,9 +27,16 @@ export class IsoCamera {
     scene.onBeforeRenderObservable.add(() => this.applyOrtho(scene));
   }
 
-  /** Recompute orthographic bounds from the current aspect ratio. */
+  private lastAspect = -1;
+  private lastZoom = -1;
+
+  /** Recompute orthographic bounds from the current aspect ratio — only when the aspect ratio or
+   *  zoom actually changed (runs every frame via onBeforeRender, but the bounds rarely move). */
   private applyOrtho(scene: Scene): void {
     const aspect = scene.getEngine().getAspectRatio(this.camera);
+    if (aspect === this.lastAspect && settings.cameraZoom === this.lastZoom) return;
+    this.lastAspect = aspect;
+    this.lastZoom = settings.cameraZoom;
     const half = VIEW_HEIGHT / settings.cameraZoom / 2;
     this.camera.orthoTop = half;
     this.camera.orthoBottom = -half;
@@ -42,16 +49,27 @@ export class IsoCamera {
     Vector3.LerpToRef(this.camera.target, position, lerp, this.camera.target);
   }
 
+  // The iso angle is fixed, so the ground basis never changes — compute it once and hand back
+  // shared read-only vectors (movement reads these every frame; don't allocate).
+  private _groundForward?: Vector3;
+  private _groundRight?: Vector3;
+
   /** Forward direction (into the screen) projected onto the ground plane. */
   get groundForward(): Vector3 {
-    const fwd = this.camera.target.subtract(this.camera.position);
-    fwd.y = 0;
-    return fwd.normalize();
+    if (!this._groundForward) {
+      const fwd = this.camera.target.subtract(this.camera.position);
+      fwd.y = 0;
+      this._groundForward = fwd.normalize();
+    }
+    return this._groundForward;
   }
 
   /** Right direction relative to the screen, on the ground plane. */
   get groundRight(): Vector3 {
-    const f = this.groundForward;
-    return new Vector3(f.z, 0, -f.x);
+    if (!this._groundRight) {
+      const f = this.groundForward;
+      this._groundRight = new Vector3(f.z, 0, -f.x);
+    }
+    return this._groundRight;
   }
 }

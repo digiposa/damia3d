@@ -26,6 +26,11 @@ const WEAPON_SCALE = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
 const WEAPON_GRIP_Y = 0.87;
 
+// Shared status-glow colours (hoisted so tickStatus allocates nothing per frame).
+const STATUS_STUN = new Color3(0.5, 0.42, 0.06); // amber = stunned
+const STATUS_FEAR = new Color3(0.34, 0.1, 0.46); // violet = feared
+const STATUS_NONE = Color3.Black();
+
 /** A resolved enemy action for the mode to apply against the player (or itself). `ranged` marks a
  *  thrown attack (dagger/knife) the mode should deliver as a flying projectile from a distance. */
 export type EnemyAction =
@@ -72,6 +77,8 @@ export class Enemy {
   private currentAnim?: AnimationGroup;
   private attacking = false;
   private dead = false;
+  /** Currently-applied status glow, so tickStatus only writes the material on a transition. */
+  private statusColor?: Color3;
   /** Scene-level objects from imported GLBs (animation groups, skeletons) — not children of root,
    *  so dispose() must clean them up or they (and their observers) leak on every despawn. */
   private modelDisposables: { dispose(): void }[] = [];
@@ -396,11 +403,12 @@ export class Enemy {
   tickStatus(dt: number): void {
     if (this.fearTimer > 0) this.fearTimer = Math.max(0, this.fearTimer - dt);
     if (this.stunTimer > 0) this.stunTimer = Math.max(0, this.stunTimer - dt);
-    this.bodyMat.emissiveColor = this.stunned
-      ? new Color3(0.5, 0.42, 0.06) // amber = stunned
-      : this.feared
-        ? new Color3(0.34, 0.1, 0.46) // violet = feared
-        : Color3.Black();
+    // Shared constant colours (no per-frame allocation); only reassign when the state changes.
+    const c = this.stunned ? STATUS_STUN : this.feared ? STATUS_FEAR : STATUS_NONE;
+    if (this.statusColor !== c) {
+      this.statusColor = c;
+      this.bodyMat.emissiveColor = c;
+    }
   }
 
   /**
