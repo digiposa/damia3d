@@ -18,14 +18,11 @@ const READY_SHADOW = "0 0 16px 2px rgba(255,216,107,0.95)," + BASE_SHADOW;
 /**
  * Round on-screen action button, anchored bottom-right by default (clear of the
  * build tag). Primarily for touch, but also clickable with a mouse. Fires
- * `onPress` on pointer-up. {@link setCooldown} shows a depleting radial overlay
- * and a seconds countdown so cooldowns (e.g. Defense) are readable.
+ * `onPress` on pointer-up.
  */
 export class ActionButton {
   private el: HTMLButtonElement;
   private label: HTMLSpanElement;
-  private overlay: HTMLDivElement;
-  private count: HTMLSpanElement;
   /** Desktop-only keyboard-shortcut pill (created lazily by setShortcut). */
   private shortcutEl?: HTMLSpanElement;
 
@@ -103,56 +100,13 @@ export class ActionButton {
       this.label.textContent = label;
     }
 
-    // Depleting radial overlay (a dark wedge that shrinks as the cooldown ends).
-    this.overlay = document.createElement("div");
-    Object.assign(this.overlay.style, {
-      position: "absolute",
-      inset: "0",
-      borderRadius: "50%",
-      display: "none",
-      pointerEvents: "none",
-    } satisfies Partial<CSSStyleDeclaration>);
-
-    this.count = document.createElement("span");
-    Object.assign(this.count.style, {
-      position: "absolute",
-      inset: "0",
-      display: "none",
-      alignItems: "center",
-      justifyContent: "center",
-      font: "800 26px/1 system-ui, sans-serif",
-      color: "#fff",
-      textShadow: "0 1px 3px rgba(0,0,0,0.9)",
-      zIndex: "2",
-      pointerEvents: "none",
-    } satisfies Partial<CSSStyleDeclaration>);
-
-    this.el.append(this.overlay, this.label, this.count);
+    this.el.append(this.label);
     this.el.addEventListener("pointerup", (e) => {
       e.preventDefault();
       onPress();
     });
     scaleHud(this.el); // desktop: enlarge the phone-tuned HUD (scales size + corner offset)
     document.body.appendChild(this.el);
-  }
-
-  /**
-   * Show the cooldown state: `remaining` seconds and `fraction` of the cooldown
-   * still to go (1 → 0). Pass fraction ≤ 0 when ready.
-   */
-  setCooldown(remaining: number, fraction: number): void {
-    if (fraction <= 0) {
-      this.overlay.style.display = "none";
-      this.count.style.display = "none";
-      this.el.style.opacity = "1";
-      return;
-    }
-    const deg = Math.max(0, Math.min(1, fraction)) * 360;
-    this.overlay.style.display = "block";
-    this.overlay.style.background = `conic-gradient(rgba(0,0,0,0.55) ${deg}deg, rgba(0,0,0,0) 0deg)`;
-    this.count.style.display = "flex";
-    this.count.textContent = String(Math.ceil(remaining));
-    this.el.style.opacity = "0.85";
   }
 
   /** Enable/disable the button: dims and blocks taps when unavailable. */

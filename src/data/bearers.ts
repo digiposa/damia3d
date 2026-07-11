@@ -158,8 +158,9 @@ export const BEARERS: Bearer[] = [
 /** Default playable bearer (Dart). */
 export const DEFAULT_BEARER: Bearer = BEARERS.find((b) => b.id === "dart")!;
 
+const BEARER_BY_ID = new Map(BEARERS.map((b) => [b.id, b]));
 export function bearerById(id: string): Bearer | undefined {
-  return BEARERS.find((b) => b.id === id);
+  return BEARER_BY_ID.get(id);
 }
 
 /** Bearers whose Dragoon class is implemented (selectable in Survival/Training). */

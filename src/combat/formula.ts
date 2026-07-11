@@ -17,9 +17,11 @@ import { modifiers, type Modifiers } from "./modifiers";
 
 const f = Math.floor;
 
-/** LoD's rounded integer division: floor((numerator + divisor/2) / divisor). */
+/** LoD's rounded integer division: floor((numerator + divisor/2) / divisor). The divisor (always
+ *  a target's DF/MDF here) is clamped to ≥1 so a 0-defence target can't yield Infinity/NaN damage. */
 export function lodRound(numerator: number, divisor: number): number {
-  return f((numerator + divisor / 2) / divisor);
+  const d = Math.max(1, divisor);
+  return f((numerator + d / 2) / d);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +129,7 @@ export function magicAttack(
 ): number {
   const m = modifiers(mods);
   const a = f((casterMat * dragoonMatPct) / 100);
-  const b = f((a * (lv + 5) * 5) / targetMdf);
+  const b = f((a * (lv + 5) * 5) / Math.max(1, targetMdf));
   const c = f((b * multiplier) / 100);
   let d = f(c * m.targetFear * m.power);
   d = f(d * m.field);
@@ -154,7 +156,7 @@ export function enemyPhysicalAttack(
   mods: Partial<Modifiers> = {},
 ): number {
   const m = modifiers(mods);
-  const base = f((attackerAt * attackerAt * 5) / targetDf);
+  const base = f((attackerAt * attackerAt * 5) / Math.max(1, targetDf));
   let d = f(base * attackMultiplier * m.targetFear * m.attackerFear);
   d = f(d * m.power);
   d = f(d * m.guard);
@@ -174,7 +176,7 @@ export function enemyMagicalAttack(
   mods: Partial<Modifiers> = {},
 ): number {
   const m = modifiers(mods);
-  const base = f((attackerMat * attackerMat * 5) / targetMdf);
+  const base = f((attackerMat * attackerMat * 5) / Math.max(1, targetMdf));
   let d = f(base * attackMultiplier * m.targetFear * m.attackerFear);
   d = f(d * m.power);
   d = f(d * m.field);
@@ -218,7 +220,7 @@ export function additionCounter(
   mods: Partial<Modifiers> = {},
 ): number {
   const m = modifiers(mods);
-  const base = f(f((attackerAt * attackerAt * 250) / targetDf) / 100);
+  const base = f(f((attackerAt * attackerAt * 250) / Math.max(1, targetDf)) / 100);
   let d = f(base * m.targetFear * m.attackerFear);
   d = f(d * m.power);
   return d;
@@ -230,7 +232,7 @@ export function drakeWire(
   mods: Partial<Modifiers> = {},
 ): number {
   const m = modifiers(mods);
-  let d = f(1000 / targetDf);
+  let d = f(1000 / Math.max(1, targetDf));
   d = f(d * m.targetFear);
   d = f(d * m.power);
   return d;

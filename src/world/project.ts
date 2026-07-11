@@ -22,7 +22,7 @@ export function projectToScreen(scene: Scene, world: Vector3): ScreenPoint {
 
   const p = Vector3.Project(
     world,
-    Matrix.Identity(),
+    Matrix.IdentityReadOnly, // shared identity — avoids allocating a matrix per call (per floating label/frame)
     scene.getTransformMatrix(),
     cam.viewport.toGlobal(rect.width, rect.height),
   );

@@ -358,15 +358,6 @@ export function additionHitsPercent(def: AdditionDef, hitsLanded = def.hits.leng
   return sum;
 }
 
-/**
- * An Addition's role. "sp" Additions have a flat multiplier at every level — they
- * trade damage for SP (the Dragoon gauge); "damage" Additions grow their multiplier
- * and so deal more (and, with the adaptive combo timing, out-DPS lower-rank ones).
- */
-export function additionFocus(def: AdditionDef): "damage" | "sp" {
-  return def.multiplier.every((m) => m === def.multiplier[0]) ? "sp" : "damage";
-}
-
 /** Multiplier for an Addition at the given level (1–5), clamped. */
 export function additionMultiplier(def: AdditionDef, level: number): number {
   const i = Math.min(Math.max(Math.floor(level), 1), 5) - 1;
