@@ -49,6 +49,10 @@ const BID_SINGLE = 150; // Single Target Multi
 const BID_ALL = 100; // All Target Multi
 const BID_POWERFUL = 300; // All Target Powerful
 
+/** Mashing QTE bounds for "Multi" items: no mash = 100%, full mash caps at 268% (wiki Items page). */
+export const ITEM_MULTIPLIER_MIN = 100;
+export const ITEM_MULTIPLIER_MAX = 268;
+
 function attackItem(
   id: string,
   element: Element,
@@ -74,11 +78,12 @@ export const ATTACK_ITEMS: ItemDef[] = [
   single("spearFrost", "Water"), all("fatalBlizzard", "Water"), powerful("frozenJet", "Water"),
   single("darkMist", "Darkness"), all("blackRain", "Darkness"), powerful("nightRaid", "Darkness"),
   single("transLight", "Light"), all("dancingRay", "Light"), powerful("spectralFlash", "Light"),
-  // Non-Elemental — no QTE. BID chart: Detonate Rock 100, Psyche Bomb X 400. Psyche Bomb (non-X)
-  // isn't in the chart; slotted at the Powerful tier (300) pending its exact BID.
-  attackItem("detonateRock", "Non-Elemental", 100, "enemy", false),
-  attackItem("psychedelicBomb", "Non-Elemental", BID_POWERFUL, "allEnemies", false),
-  attackItem("psychedelicBombX", "Non-Elemental", 400, "allEnemies", false),
+  // Non-Elemental (per the wiki Items page): Detonate Rock hits ALL, no mashing (BID 100). Both
+  // Psyche Bombs hit ALL, DO have the mashing QTE, and share the highest BID (400) — so at max mash
+  // they out-damage every other item.
+  attackItem("detonateRock", "Non-Elemental", 100, "allEnemies", false),
+  attackItem("psychedelicBomb", "Non-Elemental", 400, "allEnemies", true),
+  attackItem("psychedelicBombX", "Non-Elemental", 400, "allEnemies", true),
 ];
 
 /** Attack items keyed by id (for spawn menus / inventory lookup). */

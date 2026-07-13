@@ -164,6 +164,7 @@ Wrapperless: floor[ floor{ floor[(LV+5) * MAT * 5 / MDF] * BID / 100 } ]   (× M
 Wrapper:     floor[floor{floor[floor{floor[floor{floor[(LV+5)*MAT*5/MDF] * BID/100} * AF} * Power] * Field} * Element] * Multiplier%/100] * Target Fear
 ```
 `Multiplier%` is applied after Element and **before** the outermost Target Fear — its order matters.
+No mash = **100%**; a full mash caps at **268%** (`ITEM_MULTIPLIER_MIN`/`MAX` in `items.ts`).
 
 **Powerful Items and Detonate Rock** (no QTE, no `Multiplier%`):
 ```
@@ -180,7 +181,7 @@ Not applicable (either kind): Guard, Destroyer Mace.
 | All Target Multi | 100 | yes |
 | All Target Powerful | 300 | no |
 | Detonate Rock | 100 | no |
-| Psyche Bomb X | 400 | no |
+| Psyche Bomb / Psyche Bomb X | 400 | yes |
 
 > The 21 elemental attack items are 7 elements × 3 tiers (Single Multi / All Multi / All Powerful).
 > Item list + gold/tiers: [`../items/items.md`](../items/items.md).
@@ -286,8 +287,8 @@ doc). Modifiers are passed via the `Modifiers` object (default ×1).
 |---|---|---|
 | Archer Attack | `physicalAttack` | |
 | Additions | `additionAttack` | hit/mult data in `src/data/additions.ts` |
-| Item Magic — Multi | `multiItemAttack` | `Multiplier%` = mashing QTE (currently defaults to 100 until the mini-game exists) |
-| Item Magic — Powerful | `powerfulItemAttack` | Detonate Rock, Psyche Bomb X, All-Powerful |
+| Item Magic — Multi | `multiItemAttack` | `Multiplier%` = mashing QTE (defaults to 100, caps at 268; mini-game not built yet). Both Psyche Bombs (BID 400). |
+| Item Magic — Powerful | `powerfulItemAttack` | All-Powerful items and Detonate Rock (no QTE) |
 | Dragoon Archer / D'Attack | `dragoonAttack` | `archer` flag; `DRAGOON_OUTPUT` = the input table |
 | Dragoon Magic | `magicAttack` | spell multipliers in `src/data/dragoonSpells.ts` |
 | Enemy Physical | `enemyPhysicalAttack` | |
