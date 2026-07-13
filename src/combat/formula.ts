@@ -137,6 +137,55 @@ export function magicAttack(
   return d;
 }
 
+/**
+ * Item Magic — "Multi" items (Single-target / All-target Multi). These carry the mashing QTE, whose
+ * result is `multiplierPct` (100 = no mash bonus). Doc wrapper (note Target Fear is OUTERMOST and
+ * comes AFTER the Multiplier%, and there is NO Guard/Destroyer Mace):
+ *   floor[floor{floor[floor{floor[floor{floor[(LV+5)·MAT·5/MDF]·BID/100}·AF}·Power]·Field}·Element]·Mult%/100]·TF
+ * `bid` is the item's Base Item Damage; damage scales with the USER's MAT/level and the target MDF.
+ */
+export function multiItemAttack(
+  casterMat: number,
+  targetMdf: number,
+  lv: number,
+  bid: number,
+  multiplierPct: number,
+  mods: Partial<Modifiers> = {},
+): number {
+  const m = modifiers(mods);
+  const base = f(((lv + 5) * casterMat * 5) / Math.max(1, targetMdf));
+  let d = f((base * bid) / 100);
+  d = f(d * m.attackerFear);
+  d = f(d * m.power);
+  d = f(d * m.field);
+  d = f(d * m.element);
+  d = f((d * multiplierPct) / 100); // the mashing QTE result
+  d = f(d * m.targetFear); // outermost
+  return d;
+}
+
+/**
+ * Item Magic — "Powerful" items, Detonate Rock and Psyche Bomb X. NO mashing QTE (no Multiplier%).
+ * Doc wrapper:
+ *   floor{floor[floor{floor[floor{floor[(LV+5)·MAT·5/MDF]·BID/100}·TF·AF]·Power}·Field]·Element}
+ */
+export function powerfulItemAttack(
+  casterMat: number,
+  targetMdf: number,
+  lv: number,
+  bid: number,
+  mods: Partial<Modifiers> = {},
+): number {
+  const m = modifiers(mods);
+  const base = f(((lv + 5) * casterMat * 5) / Math.max(1, targetMdf));
+  let d = f((base * bid) / 100);
+  d = f(d * m.targetFear * m.attackerFear);
+  d = f(d * m.power);
+  d = f(d * m.field);
+  d = f(d * m.element);
+  return d;
+}
+
 // ---------------------------------------------------------------------------
 // Enemy formulas
 // ---------------------------------------------------------------------------

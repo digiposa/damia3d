@@ -13,6 +13,8 @@ import {
   rareMonsterBasic,
   additionCounter,
   poisonDamage,
+  multiItemAttack,
+  powerfulItemAttack,
 } from "./formula";
 import {
   DART_ADDITIONS,
@@ -150,13 +152,20 @@ describe("addition data integrity", () => {
   });
 });
 
-describe("item magic (via magicAttack, dragoonMatPct=100, multiplier=BID)", () => {
-  it("Burn Out (BID 150) MAT 20 LV 10 vs MDF 10 → floor(floor(20*15*5/10)*150/100)=225", () => {
-    // a=20, b=floor(20*15*5/10)=150, c=floor(150*150/100)=225
-    expect(magicAttack(20, 10, 100, 150, 10)).toBe(225);
+describe("item magic (Multi & Powerful)", () => {
+  it("Multi item: base = floor(floor((LV+5)·MAT·5/MDF)·BID/100), no mash → ×100%", () => {
+    // base=floor(15*20*5/10)=150, ·BID150/100=225, ·mult%100 → 225
+    expect(multiItemAttack(20, 10, 10, 150, 100)).toBe(225);
   });
-  it("applies the element modifier (×1.5 opposite / ×0.5 same)", () => {
-    expect(magicAttack(20, 10, 100, 150, 10, { element: 1.5 })).toBe(337); // floor(225*1.5)
-    expect(magicAttack(20, 10, 100, 150, 10, { element: 0.5 })).toBe(112); // floor(225*0.5)
+  it("Multi item: the mashing Multiplier% scales the result", () => {
+    expect(multiItemAttack(20, 10, 10, 150, 200)).toBe(450); // 225 × 200%
+    expect(multiItemAttack(20, 10, 10, 150, 150)).toBe(337); // floor(225 × 1.5)
+  });
+  it("Multi item: element modifier (×1.5 opposite) applies before the Multiplier%", () => {
+    expect(multiItemAttack(20, 10, 10, 150, 100, { element: 1.5 })).toBe(337); // floor(225·1.5)·100%
+  });
+  it("Powerful item: no Multiplier% term (BID 300)", () => {
+    // base=150, ·300/100 = 450
+    expect(powerfulItemAttack(20, 10, 10, 300)).toBe(450);
   });
 });

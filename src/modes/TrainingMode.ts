@@ -32,6 +32,8 @@ import {
   dragoonAttack,
   DRAGOON_OUTPUT,
   magicAttack,
+  multiItemAttack,
+  powerfulItemAttack,
   enemyPhysicalAttack,
   enemyMagicalAttack,
 } from "../combat/formula";
@@ -881,12 +883,18 @@ export class TrainingMode extends GameMode {
     if (targets.length === 0) return false;
     m.avatar.strike(); // throw motion
     this.popText(m.position.add(new Vector3(0, 2.6, 0)), t(stock.def.nameKey), ELEMENT_COLOR[atk.element]);
-    // Item magic (LoD): floor{floor[(LV+5)·MAT·5/MDF]·BID/100} + element/field mods. This is exactly
-    // magicAttack with dragoonMatPct=100 (plain MAT, no Dragoon scaling) and multiplier=BID.
+    // Item magic (LoD): damage scales with the user's MAT/level, the target's MDF and the item's
+    // BID. "Multi" items also carry a mashing QTE (Multiplier%); until that mini-game exists it
+    // defaults to 100 (the un-mashed floor). "Powerful" items have no QTE.
     const field = fieldMultiplier(this.dragoonSpace, atk.element);
+    const mat = m.avatar.baseMat;
+    const lv = m.avatar.level;
+    const multiplierPct = 100; // TODO: raise via the spam-X QTE once the mash→% curve is known
     for (const foe of targets) {
       const element = elementMultiplier(atk.element, foe.def.element);
-      const dmg = magicAttack(m.avatar.baseMat, foe.def.stats.mdf, 100, atk.bid, m.avatar.level, { element, field });
+      const dmg = atk.multi
+        ? multiItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, multiplierPct, { element, field })
+        : powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
       this.landDamage(foe, Math.max(1, dmg));
     }
     stock.count -= 1;

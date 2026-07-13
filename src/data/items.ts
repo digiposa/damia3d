@@ -19,7 +19,14 @@ export interface ItemDef {
    * BID/100}, then the standard element modifier (×1.5 vs opposite, ×0.5 vs same). See
    * combat/formula.magicAttack, which is exactly this formula with dragoonMatPct=100, multiplier=bid.
    */
-  attack?: { element: Element; bid: number; target: "enemy" | "allEnemies" };
+  attack?: {
+    element: Element;
+    bid: number;
+    target: "enemy" | "allEnemies";
+    /** "Multi" items carry the mashing QTE (spam to raise a Multiplier%); "Powerful" items,
+     *  Detonate Rock and Psyche Bomb X do NOT — different formula (see combat/formula). */
+    multi: boolean;
+  };
 }
 
 export const HEALING_POTION: ItemDef = {
@@ -42,38 +49,36 @@ const BID_SINGLE = 150; // Single Target Multi
 const BID_ALL = 100; // All Target Multi
 const BID_POWERFUL = 300; // All Target Powerful
 
-function attackItem(id: string, element: Element, bid: number, target: "enemy" | "allEnemies"): ItemDef {
-  return { id, nameKey: `item.${id}`, healFraction: 0, attack: { element, bid, target } };
+function attackItem(
+  id: string,
+  element: Element,
+  bid: number,
+  target: "enemy" | "allEnemies",
+  multi: boolean,
+): ItemDef {
+  return { id, nameKey: `item.${id}`, healFraction: 0, attack: { element, bid, target, multi } };
 }
+/** Single-target Multi item (BID 150, has the mashing QTE). */
+const single = (id: string, el: Element) => attackItem(id, el, BID_SINGLE, "enemy", true);
+/** All-target Multi item (BID 100, has the mashing QTE). */
+const all = (id: string, el: Element) => attackItem(id, el, BID_ALL, "allEnemies", true);
+/** All-target Powerful item (BID 300, NO QTE). */
+const powerful = (id: string, el: Element) => attackItem(id, el, BID_POWERFUL, "allEnemies", false);
 
 /** Every attack item, grouped by element (single / all / powerful), then the Non-Elemental set. */
 export const ATTACK_ITEMS: ItemDef[] = [
-  attackItem("burnOut", "Fire", BID_SINGLE, "enemy"),
-  attackItem("gushingMagma", "Fire", BID_ALL, "allEnemies"),
-  attackItem("burningWave", "Fire", BID_POWERFUL, "allEnemies"),
-  attackItem("pellet", "Earth", BID_SINGLE, "enemy"),
-  attackItem("meteorFall", "Earth", BID_ALL, "allEnemies"),
-  attackItem("gravityGrabber", "Earth", BID_POWERFUL, "allEnemies"),
-  attackItem("sparkNet", "Thunder", BID_SINGLE, "enemy"),
-  attackItem("thunderbolt", "Thunder", BID_ALL, "allEnemies"),
-  attackItem("flashHall", "Thunder", BID_POWERFUL, "allEnemies"),
-  attackItem("spinningGale", "Wind", BID_SINGLE, "enemy"),
-  attackItem("raveTwister", "Wind", BID_ALL, "allEnemies"),
-  attackItem("downBurst", "Wind", BID_POWERFUL, "allEnemies"),
-  attackItem("spearFrost", "Water", BID_SINGLE, "enemy"),
-  attackItem("fatalBlizzard", "Water", BID_ALL, "allEnemies"),
-  attackItem("frozenJet", "Water", BID_POWERFUL, "allEnemies"),
-  attackItem("darkMist", "Darkness", BID_SINGLE, "enemy"),
-  attackItem("blackRain", "Darkness", BID_ALL, "allEnemies"),
-  attackItem("nightRaid", "Darkness", BID_POWERFUL, "allEnemies"),
-  attackItem("transLight", "Light", BID_SINGLE, "enemy"),
-  attackItem("dancingRay", "Light", BID_ALL, "allEnemies"),
-  attackItem("spectralFlash", "Light", BID_POWERFUL, "allEnemies"),
-  // Non-Elemental — BID chart: Detonate Rock 100, Psyche Bomb X 400. Psyche Bomb (non-X) isn't in
-  // the chart; slotted at the Powerful tier (300) pending its exact BID.
-  attackItem("detonateRock", "Non-Elemental", 100, "enemy"),
-  attackItem("psychedelicBomb", "Non-Elemental", BID_POWERFUL, "allEnemies"),
-  attackItem("psychedelicBombX", "Non-Elemental", 400, "allEnemies"),
+  single("burnOut", "Fire"), all("gushingMagma", "Fire"), powerful("burningWave", "Fire"),
+  single("pellet", "Earth"), all("meteorFall", "Earth"), powerful("gravityGrabber", "Earth"),
+  single("sparkNet", "Thunder"), all("thunderbolt", "Thunder"), powerful("flashHall", "Thunder"),
+  single("spinningGale", "Wind"), all("raveTwister", "Wind"), powerful("downBurst", "Wind"),
+  single("spearFrost", "Water"), all("fatalBlizzard", "Water"), powerful("frozenJet", "Water"),
+  single("darkMist", "Darkness"), all("blackRain", "Darkness"), powerful("nightRaid", "Darkness"),
+  single("transLight", "Light"), all("dancingRay", "Light"), powerful("spectralFlash", "Light"),
+  // Non-Elemental — no QTE. BID chart: Detonate Rock 100, Psyche Bomb X 400. Psyche Bomb (non-X)
+  // isn't in the chart; slotted at the Powerful tier (300) pending its exact BID.
+  attackItem("detonateRock", "Non-Elemental", 100, "enemy", false),
+  attackItem("psychedelicBomb", "Non-Elemental", BID_POWERFUL, "allEnemies", false),
+  attackItem("psychedelicBombX", "Non-Elemental", 400, "allEnemies", false),
 ];
 
 /** Attack items keyed by id (for spawn menus / inventory lookup). */
