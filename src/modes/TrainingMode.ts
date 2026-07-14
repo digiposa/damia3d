@@ -1,5 +1,4 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Color4 } from "@babylonjs/core/Maths/math.color";
 import "@babylonjs/core/Meshes/meshBuilder";
 // Side-effect import: scene.pick / createPickingRay need Ray registered, else
 // every click throws "Ray needs to be imported before" and click-to-move dies.
@@ -10,6 +9,7 @@ import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
 import { Atmosphere } from "../world/atmosphere";
+import { SpellFx } from "../world/SpellFx";
 import { LIGHTING_PRESETS } from "../world/lighting";
 import { loadEnvironment, importModel, type PropPlacement } from "../world/props";
 import { projectToScreen } from "../world/project";
@@ -177,15 +177,6 @@ const ELEMENT_COLOR: Record<Element, string> = {
   "Non-Elemental": "#bdbdc8",
 };
 
-/** Elemental magic-burst colours (bright core + outer/dying tint), derived from {@link ELEMENT_RGB}:
- *  the core is a whitened, punchier version of the element hue so the burst reads hot at its centre. */
-function elementBurstColors(element: Element): [Color4, Color4] {
-  const [r, g, b] = ELEMENT_RGB[element];
-  const hot = new Color4(Math.min(1, r * 1.3 + 0.3), Math.min(1, g * 1.3 + 0.3), Math.min(1, b * 1.3 + 0.25), 1);
-  const cool = new Color4(r, g, b, 1);
-  return [hot, cool];
-}
-
 /** Floating combat-text palette — one colour per feedback type (tweak here only). */
 const TEXT = {
   damage: "#ffcf5c", // OR — all damage (dealt to enemies or taken by the player)
@@ -247,6 +238,7 @@ export class TrainingMode extends GameMode {
 
   private camera!: IsoCamera;
   private atmosphere?: Atmosphere;
+  private spellFx?: SpellFx;
   private hud!: PartyPanel;
   /**
    * GLB decor layout (Quaternius Fantasy Props). Empty for now — the ringside crates/barrels/racks
@@ -350,6 +342,7 @@ export class TrainingMode extends GameMode {
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
     this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.trainingArena);
+    this.spellFx = new SpellFx(this.scene);
     this.refreshShadowCasters();
     void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
     void this.warmUpModels(); // preload the enemy GLB pipeline so the first spawn swaps instantly
@@ -937,9 +930,8 @@ export class TrainingMode extends GameMode {
       this.startMash(m, targets, atk.element, atk.bid, mat, lv, field, t(stock.def.nameKey));
     } else {
       // "Powerful" / Detonate Rock: no QTE, resolve immediately (with a strong burst on each target).
-      const [hot, cool] = elementBurstColors(atk.element);
       for (const foe of targets) {
-        this.atmosphere?.magicBurst(foe.position, hot, cool, 1.5);
+        this.spellFx?.burst(atk.element, foe.position, 1.5);
         const element = elementMultiplier(atk.element, foe.def.element);
         const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
         this.landDamage(foe, Math.max(1, dmg));
@@ -981,9 +973,8 @@ export class TrainingMode extends GameMode {
     this.mash.pct = Math.min(ITEM_MULTIPLIER_MAX, this.mash.pct + MASH_TAP_GAIN);
     this.mashMeter.setPct(this.mash.pct);
     // Each tap spits a small elemental flare ON each target — energy building on the enemy.
-    const [hot, cool] = elementBurstColors(this.mash.element);
     for (const foe of this.mash.targets) {
-      if (foe.alive) this.atmosphere?.magicBurst(foe.position, hot, cool, 0.3);
+      if (foe.alive) this.spellFx?.burst(this.mash.element, foe.position, 0.3);
     }
     if (this.mash.pct >= ITEM_MULTIPLIER_MAX) this.resolveMash();
   }
@@ -1002,11 +993,10 @@ export class TrainingMode extends GameMode {
     this.mash = undefined;
     this.mashMeter.close();
     // Eruption on each target, its size scaled by how hard the QTE was mashed (100→268%).
-    const [hot, cool] = elementBurstColors(s.element);
     const power = 0.9 + ((s.pct - ITEM_MULTIPLIER_MIN) / (ITEM_MULTIPLIER_MAX - ITEM_MULTIPLIER_MIN)) * 1.0;
     for (const foe of s.targets) {
       if (!foe.alive) continue;
-      this.atmosphere?.magicBurst(foe.position, hot, cool, power);
+      this.spellFx?.burst(s.element, foe.position, power);
       const element = elementMultiplier(s.element, foe.def.element);
       const dmg = multiItemAttack(s.mat, foe.def.stats.mdf, s.lv, s.bid, s.pct, { element, field: s.field });
       this.landDamage(foe, Math.max(1, dmg));
@@ -2090,6 +2080,7 @@ export class TrainingMode extends GameMode {
     this.spellMenu.dispose();
     this.itemMenu.dispose();
     this.mashMeter.dispose();
+    this.spellFx?.dispose();
     this.spaceOverlay.remove();
   }
 }

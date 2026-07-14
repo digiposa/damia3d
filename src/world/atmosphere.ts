@@ -55,7 +55,6 @@ export class Atmosphere {
   private readonly sun: DirectionalLight;
   private readonly pipeline: DefaultRenderingPipeline;
   private readonly sparks: ParticleSystem;
-  private readonly magic: ParticleSystem;
   private current: LightingPreset;
   private transitionObs?: Observer<Scene>;
   /** Static (decor) shadow casters, kept so the dynamic rebuild in setCasters never drops them. */
@@ -112,7 +111,6 @@ export class Atmosphere {
 
     this.dot = softDotTexture(scene);
     this.sparks = this.buildSparks(scene);
-    this.magic = this.buildMagicBurst(scene);
     this.spawnDust(scene);
 
     this.current = preset;
@@ -216,46 +214,6 @@ export class Atmosphere {
   spark(position: Vector3): void {
     this.sparks.emitter = position.clone();
     this.sparks.manualEmitCount = 26; // emitted once on the next frame, then auto-resets to 0
-  }
-
-  /**
-   * One persistent elemental-magic burst system, recoloured per call (fire / water / thunder / …).
-   * Rising additive plume — reads as an eruption of the element. Reused like {@link spark}: nothing
-   * emits until {@link magicBurst} sets colours + a manual count. Colour is set per burst, so a fire
-   * burst and a frost burst can fire back-to-back from the same system.
-   */
-  private buildMagicBurst(scene: Scene): ParticleSystem {
-    const ps = new ParticleSystem("magicBurst", 700, scene);
-    ps.particleTexture = this.dot;
-    ps.createConeEmitter(0.5, Math.PI / 3); // upward cone — an eruption from the ground up
-    ps.minSize = 0.14;
-    ps.maxSize = 0.62;
-    ps.minLifeTime = 0.25;
-    ps.maxLifeTime = 0.65;
-    ps.blendMode = ParticleSystem.BLENDMODE_ADD; // glowy magic (feeds the GlowLayer/bloom)
-    ps.gravity = new Vector3(0, 5, 0); // flames/energy rise
-    ps.minEmitPower = 2.5;
-    ps.maxEmitPower = 6.5;
-    ps.updateSpeed = 0.02;
-    ps.emitRate = 0; // bursts only
-    ps.start();
-    return ps;
-  }
-
-  /**
-   * Fire a one-shot elemental burst at a world position. `hot` is the bright core colour, `cool`
-   * the outer/dying colour; `power` (≈0.2 small flare … 1 full eruption … up to ~2) scales the
-   * particle count and reach. Used for attack-item spells (see TrainingMode) and future magic.
-   */
-  magicBurst(position: Vector3, hot: Color4, cool: Color4, power = 1): void {
-    const p = Math.max(0.1, power);
-    this.magic.emitter = position.clone();
-    this.magic.color1 = hot;
-    this.magic.color2 = cool;
-    this.magic.colorDead = new Color4(cool.r, cool.g, cool.b, 0);
-    this.magic.minEmitPower = 2.5 * p;
-    this.magic.maxEmitPower = 6.5 * p;
-    this.magic.manualEmitCount = Math.round(70 * p);
   }
 
   /**

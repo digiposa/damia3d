@@ -134,6 +134,11 @@ once (chest, mostly). Each targets an ally/enemy; effect expires after the targe
   slow-mo (`COMBO_TIME_SCALE`, like an Addition) and a ~2 s window counts down while each **X** press
   (desktop) or **tap** (mobile) raises the `Multiplier%` from 100 toward the 268 cap. Damage lands on
   window end (or at 268). Powerful/Detonate items skip the QTE and resolve instantly.
+- **Spell VFX — implemented.** `src/world/SpellFx.ts` gives each element its own procedural particle
+  effect (no assets): fire rises & flickers with embers/smoke, water = stretched ice shards, thunder
+  cracks down in violet bolts + a flash, wind is a green vortex, earth throws tumbling debris, light
+  a gold bloom, darkness a violet haze, Non-Elemental a white shockwave. Bursts land on the target,
+  scaled by the mashed %.
 - **Recovery — partial.** Healing Potion (50%) + Spirit Potion (100 SP) exist; the rest (Fog/Breeze/
   Rain, Sun Rhapsody/Moon Serenade, revive, status cures) are not yet added.
 - **Not built:** Random / Repeat / Miscellaneous categories, the Sachet fixed-10 special, the Psyche
