@@ -595,6 +595,13 @@ export class Player {
     return this.hp - before;
   }
 
+  /** Restore MP (Dragoon-magic pool), clamped to maxMp. Returns the amount actually restored. */
+  restoreMp(amount: number): number {
+    const before = this.mp;
+    this.mp = Math.min(this.maxMp, this.mp + Math.max(0, amount));
+    return this.mp - before;
+  }
+
   /** Jump straight to a level (debug/training): set stats & EXP and fully heal. */
   setLevel(level: number): void {
     const clamped = Math.min(Math.max(Math.floor(level), 1), this.cls.levels.length);

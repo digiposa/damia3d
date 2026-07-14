@@ -12,6 +12,8 @@ export interface ItemDef {
   healFraction: number;
   /** Flat SP restored to the Dragoon gauge (0 = not a spirit item). */
   spRestore?: number;
+  /** Flat MP restored to the Dragoon-magic pool, clamped to Max MP (a big value = full restore). */
+  mpRestore?: number;
   /**
    * Offensive ("magic") item: elemental magic damage to one enemy (`"enemy"`) or all
    * (`"allEnemies"`). Per the LoD formula doc, item magic uses the USER's MAT + level and the
@@ -40,6 +42,14 @@ export const SPIRIT_POTION: ItemDef = {
   nameKey: "item.spiritPotion",
   healFraction: 0,
   spRestore: 100,
+};
+
+/** Sun Rhapsody (LoD): fully restore one character's MP. 999 is clamped to Max MP by restoreMp. */
+export const SUN_RHAPSODY: ItemDef = {
+  id: "sunRhapsody",
+  nameKey: "item.sunRhapsody",
+  healFraction: 0,
+  mpRestore: 999,
 };
 
 // --- Attack items (Legend of Dragoon magic items) --------------------------
@@ -89,14 +99,25 @@ export const ATTACK_ITEMS: ItemDef[] = [
 /** Attack items keyed by id (for spawn menus / inventory lookup). */
 export const ATTACK_ITEM_BY_ID = new Map(ATTACK_ITEMS.map((i) => [i.id, i]));
 
-/** The Training sandbox's starting item pool (shared by the party). A sampler of attack items is
- *  included so the offensive-item flow is testable out of the box. */
+/** The Training sandbox's starting item pool (shared by the party). One attack item of EVERY magic
+ *  type is stocked so all the elemental spell VFX are testable out of the box (single-target Multi
+ *  items — they carry the mashing QTE), plus the Non-Elemental set and HP/SP/MP restores. */
 export function startingItems(): { def: ItemDef; count: number }[] {
+  const attack = (id: string, count = 5) => ({ def: ATTACK_ITEM_BY_ID.get(id)!, count });
   return [
     { def: HEALING_POTION, count: 5 },
     { def: SPIRIT_POTION, count: 3 },
-    { def: ATTACK_ITEM_BY_ID.get("burnOut")!, count: 5 },
-    { def: ATTACK_ITEM_BY_ID.get("spinningGale")!, count: 3 },
-    { def: ATTACK_ITEM_BY_ID.get("frozenJet")!, count: 2 },
+    { def: SUN_RHAPSODY, count: 3 },
+    // One Single-target Multi per element (each has the QTE + its own VFX).
+    attack("burnOut"), // Fire
+    attack("pellet"), // Earth
+    attack("sparkNet"), // Thunder
+    attack("spinningGale"), // Wind
+    attack("spearFrost"), // Water (ice)
+    attack("darkMist"), // Darkness
+    attack("transLight"), // Light
+    // Non-Elemental: the mashing Psyche Bomb + the no-QTE Detonate Rock.
+    attack("psychedelicBomb"),
+    attack("detonateRock"),
   ];
 }

@@ -881,8 +881,16 @@ export class TrainingMode extends GameMode {
           ? `${atk.element}${atk.target === "allEnemies" ? " · all" : ""}`
           : s.def.spRestore
             ? `+${s.def.spRestore} ${t("stat.sp")}`
-            : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
-        color: atk ? ELEMENT_COLOR[atk.element] : s.def.spRestore ? TEXT.sp : TEXT.hp,
+            : s.def.mpRestore
+              ? `+${t("stat.mp")}`
+              : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
+        color: atk
+          ? ELEMENT_COLOR[atk.element]
+          : s.def.spRestore
+            ? TEXT.sp
+            : s.def.mpRestore
+              ? TEXT.mp
+              : TEXT.hp,
       };
     });
     this.paused = true;
@@ -1034,6 +1042,10 @@ export class TrainingMode extends GameMode {
     if (stock.def.spRestore) {
       a.gainSp(stock.def.spRestore);
       this.popText(m.position.add(new Vector3(0, 2.6, 0)), `+${stock.def.spRestore} ${t("stat.sp")}`, TEXT.sp);
+    }
+    if (stock.def.mpRestore) {
+      const gained = a.restoreMp(stock.def.mpRestore);
+      if (gained > 0) this.popText(m.position.add(new Vector3(0, 2.8, 0)), `+${gained} ${t("stat.mp")}`, TEXT.mp);
     }
     stock.count -= 1;
   }
