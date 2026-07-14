@@ -18,7 +18,12 @@ import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
 import { GambitBrain, resolveGambit, nextGambitId, DEFAULT_GAMBIT_IDS } from "../combat/Gambit";
 import type { ActionId } from "../combat/Action";
-import { startingItems, type ItemDef } from "../data/items";
+import {
+  startingItems,
+  type ItemDef,
+  ITEM_MULTIPLIER_MIN,
+  ITEM_MULTIPLIER_MAX,
+} from "../data/items";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
 import {
   additionHitsPercent,
@@ -39,6 +44,7 @@ import {
 } from "../combat/formula";
 import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
 import { ItemMenu, type ItemEntry } from "../ui/ItemMenu";
+import { MashMeter } from "../ui/MashMeter";
 import type { DragoonSpell } from "../data/dragoonSpells";
 import { estimateDps } from "../combat/balance";
 import { elementMultiplier, fieldMultiplier, type Element } from "../combat/element";
@@ -135,6 +141,12 @@ const ACTION_RECOVERY = 0.5;
  *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
 const COMBO_TIME_SCALE = 0.2;
 
+/** Attack-item mashing QTE (Multi items). The window is REAL seconds (unaffected by combat speed);
+ *  each X press / tap adds MASH_TAP_GAIN% toward the {@link ITEM_MULTIPLIER_MAX} cap. ~15 fast taps
+ *  reach 268%. The world runs at COMBO_TIME_SCALE (slow-mo) while the meter is up, like an Addition. */
+const MASH_SECONDS = 2.0;
+const MASH_TAP_GAIN = 11;
+
 // Dragoon-Magic status / buff durations (seconds of combat time).
 const FEAR_SECONDS = 12;
 const STUN_SECONDS = 5;
@@ -198,6 +210,20 @@ function lowestHp(allies: Player[]): Player | undefined {
   return allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
 }
 
+/** In-flight state for the attack-item mashing QTE (see {@link MashMeter}). Captured when a Multi
+ *  item is thrown; the meter charges `pct` (100→268) until the window elapses, then damage lands. */
+interface MashState {
+  member: PartyMember;
+  targets: Enemy[];
+  element: Element;
+  bid: number;
+  mat: number;
+  lv: number;
+  field: number;
+  pct: number;
+  tRemaining: number;
+}
+
 /**
  * Training arena: a Diablo-style real-time hack-and-slash sandbox with
  * LoD-faithful attacks. Desktop uses click-to-move (click an enemy to approach
@@ -230,6 +256,9 @@ export class TrainingMode extends GameMode {
   private specialBtn?: ActionButton;
   private spellMenu!: SpellMenu;
   private itemMenu!: ItemMenu;
+  private mashMeter!: MashMeter;
+  /** Active attack-item mashing QTE (Multi items); undefined when no throw is being charged. */
+  private mash?: MashState;
   /** Party members whose ATB gauge was full last frame, for "start of turn" SP (Spirit Ring). */
   private turnReady = new WeakSet<PartyMember>();
 
@@ -362,6 +391,7 @@ export class TrainingMode extends GameMode {
       (id) => this.onItemPicked(id),
       () => this.closeItemMenu(),
     );
+    this.mashMeter = new MashMeter(() => this.mashTap());
     this.attackBtn = new ActionButton(
       "⚔",
       () => this.input.pressVirtual("Space"),
@@ -662,6 +692,9 @@ export class TrainingMode extends GameMode {
     // Game's render loop still calls input.endFrame() after this returns.
     if (this.paused) return;
 
+    // Attack-item mashing QTE: player input is captured by the meter; the world runs in slow-mo.
+    if (this.mash) return this.updateMash(dt);
+
     // Movement (unaffected by combat speed): joystick on touch, click-to-move
     // otherwise. Attacking roots the player: you can't move while a melee Addition is
     // running or while a ranged shot is in progress/cooling down (no move-spam/kiting),
@@ -870,8 +903,9 @@ export class TrainingMode extends GameMode {
     this.refreshHud();
   }
 
-  /** Throw an attack item: fixed elemental magic damage (independent of stats) to one enemy or all.
-   *  Returns false (leaving the turn/stock intact) if there's no living target. */
+  /** Throw an attack item. "Multi" items open the mashing QTE (damage lands when it resolves);
+   *  "Powerful"/Detonate items resolve immediately. Returns false (turn/stock intact) if there's
+   *  no living target. */
   private useAttackItem(m: PartyMember, stock: { def: ItemDef; count: number }): boolean {
     const atk = stock.def.attack!;
     const targets =
@@ -883,22 +917,99 @@ export class TrainingMode extends GameMode {
     if (targets.length === 0) return false;
     m.avatar.strike(); // throw motion
     this.popText(m.position.add(new Vector3(0, 2.6, 0)), t(stock.def.nameKey), ELEMENT_COLOR[atk.element]);
-    // Item magic (LoD): damage scales with the user's MAT/level, the target's MDF and the item's
-    // BID. "Multi" items also carry a mashing QTE (Multiplier%); until that mini-game exists it
-    // defaults to 100 (the un-mashed floor). "Powerful" items have no QTE.
+    // Item magic (LoD): damage scales with the user's MAT/level, the target's MDF and the item's BID.
     const field = fieldMultiplier(this.dragoonSpace, atk.element);
     const mat = m.avatar.baseMat;
     const lv = m.avatar.level;
-    const multiplierPct = 100; // TODO: raise via the spam-X QTE once the mash→% curve is known
-    for (const foe of targets) {
-      const element = elementMultiplier(atk.element, foe.def.element);
-      const dmg = atk.multi
-        ? multiItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, multiplierPct, { element, field })
-        : powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
+    stock.count -= 1; // committed once thrown
+    if (atk.multi) {
+      // "Multi" items carry the mashing QTE — start it; damage resolves in resolveMash().
+      this.startMash(m, targets, atk.element, atk.bid, mat, lv, field, t(stock.def.nameKey));
+    } else {
+      // "Powerful" / Detonate Rock: no QTE, resolve immediately.
+      for (const foe of targets) {
+        const element = elementMultiplier(atk.element, foe.def.element);
+        const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
+        this.landDamage(foe, Math.max(1, dmg));
+      }
+    }
+    return true;
+  }
+
+  /** Open the mashing QTE for a thrown Multi item: slow the world, show the meter, start the timer. */
+  private startMash(
+    member: PartyMember,
+    targets: Enemy[],
+    element: Element,
+    bid: number,
+    mat: number,
+    lv: number,
+    field: number,
+    itemName: string,
+  ): void {
+    this.mash = {
+      member,
+      targets,
+      element,
+      bid,
+      mat,
+      lv,
+      field,
+      pct: ITEM_MULTIPLIER_MIN,
+      tRemaining: MASH_SECONDS,
+    };
+    const isTouch = matchMedia("(pointer: coarse)").matches;
+    this.mashMeter.show(itemName, ELEMENT_COLOR[element], isTouch);
+  }
+
+  /** One X press / screen tap during the QTE: bump the multiplier (capped), end early once maxed. */
+  private mashTap(): void {
+    if (!this.mash) return;
+    this.mash.pct = Math.min(ITEM_MULTIPLIER_MAX, this.mash.pct + MASH_TAP_GAIN);
+    this.mashMeter.setPct(this.mash.pct);
+    if (this.mash.pct >= ITEM_MULTIPLIER_MAX) this.resolveMash();
+  }
+
+  /** Advance the QTE window (real seconds); resolve when it lapses. Called each frame while active. */
+  private tickMash(dt: number): void {
+    if (!this.mash) return;
+    this.mash.tRemaining -= dt;
+    if (this.mash.tRemaining <= 0) this.resolveMash();
+  }
+
+  /** Land the mashed item's damage on every (still-living) target and close the meter. */
+  private resolveMash(): void {
+    const s = this.mash;
+    if (!s) return;
+    this.mash = undefined;
+    this.mashMeter.close();
+    for (const foe of s.targets) {
+      if (!foe.alive) continue;
+      const element = elementMultiplier(s.element, foe.def.element);
+      const dmg = multiItemAttack(s.mat, foe.def.stats.mdf, s.lv, s.bid, s.pct, { element, field: s.field });
       this.landDamage(foe, Math.max(1, dmg));
     }
-    stock.count -= 1;
-    return true;
+    this.refreshHud();
+  }
+
+  /** Per-frame while the mashing QTE is up: read X presses, count the real-time window down, and
+   *  keep the world ticking in slow-mo behind the meter (mirrors an Addition combo). */
+  private updateMash(dt: number): void {
+    // Desktop mashes X (KeyX / the Special virtual code); mobile taps go straight to mashTap().
+    if (this.input.wasPressed("KeyX") || this.input.wasPressed("Special")) this.mashTap();
+    if (this.mash) this.tickMash(dt); // window is REAL seconds (combat-speed independent)
+    if (this.mash) {
+      const worldDt = dt * settings.combatSpeed * COMBO_TIME_SCALE;
+      this.player.tickGuard(dt * settings.combatSpeed);
+      this.updateEnemies(worldDt);
+      const aliveEnemies = this.enemies.filter((e) => e.alive);
+      for (const m of this.party) {
+        if (m !== this.controlled) this.updateAiMember(m, dt * COMBO_TIME_SCALE, worldDt, aliveEnemies);
+      }
+      this.player.animate(dt, false, false);
+      this.camera.follow(this.player.position);
+    }
+    this.refreshHud();
   }
 
   /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
@@ -1956,6 +2067,7 @@ export class TrainingMode extends GameMode {
     this.specialBtn?.dispose();
     this.spellMenu.dispose();
     this.itemMenu.dispose();
+    this.mashMeter.dispose();
     this.spaceOverlay.remove();
   }
 }

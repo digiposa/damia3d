@@ -287,7 +287,7 @@ doc). Modifiers are passed via the `Modifiers` object (default ×1).
 |---|---|---|
 | Archer Attack | `physicalAttack` | |
 | Additions | `additionAttack` | hit/mult data in `src/data/additions.ts` |
-| Item Magic — Multi | `multiItemAttack` | `Multiplier%` = mashing QTE (defaults to 100, caps at 268; mini-game not built yet). Both Psyche Bombs (BID 400). |
+| Item Magic — Multi | `multiItemAttack` | `Multiplier%` = mashing QTE (`src/ui/MashMeter.ts`, 100→268). Both Psyche Bombs (BID 400). |
 | Item Magic — Powerful | `powerfulItemAttack` | All-Powerful items and Detonate Rock (no QTE) |
 | Dragoon Archer / D'Attack | `dragoonAttack` | `archer` flag; `DRAGOON_OUTPUT` = the input table |
 | Dragoon Magic | `magicAttack` | spell multipliers in `src/data/dragoonSpells.ts` |
@@ -303,8 +303,6 @@ doc). Modifiers are passed via the `Modifiers` object (default ×1).
 ### Not yet implemented
 - **Feyrbrand's Attacking Power Up** modifier (needs the boss + a use-counter).
 - **Rare Monster damage mitigation** (needs a Rare Monster enemy type).
-- The **mashing QTE** that produces `Multiplier%` for Multi items — the formula slot is wired; the
-  mini-game (and its mash→% curve) is still to be built.
 
 ## Credits
 Written by **Wulves**, base formula info & insights from Drew, tfz, Zychronix, Monoxide; extensive

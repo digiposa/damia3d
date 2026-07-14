@@ -130,8 +130,11 @@ once (chest, mostly). Each targets an ally/enemy; effect expires after the targe
   target, multi}`); thrown via `TrainingMode`; damage via `multiItemAttack` / `powerfulItemAttack`.
   BID values, targets and Multi flags match the wiki (Detonate Rock = All/no-Multi; both Psyche
   Bombs = BID 400 / Multi). `ITEM_MULTIPLIER_MIN/MAX = 100 / 268`.
+- **Mashing QTE — implemented.** Throwing a Multi item opens `src/ui/MashMeter.ts`: time drops to
+  slow-mo (`COMBO_TIME_SCALE`, like an Addition) and a ~2 s window counts down while each **X** press
+  (desktop) or **tap** (mobile) raises the `Multiplier%` from 100 toward the 268 cap. Damage lands on
+  window end (or at 268). Powerful/Detonate items skip the QTE and resolve instantly.
 - **Recovery — partial.** Healing Potion (50%) + Spirit Potion (100 SP) exist; the rest (Fog/Breeze/
   Rain, Sun Rhapsody/Moon Serenade, revive, status cures) are not yet added.
-- **Not built:** the mashing **QTE** (`Multiplier%` defaults to 100; cap 268 is ready), Random /
-  Repeat / Miscellaneous categories, the Sachet fixed-10 special, the Psyche Bomb ×2-vs-elemental
-  exception, and the 32-slot inventory / 3-category inventory screen.
+- **Not built:** Random / Repeat / Miscellaneous categories, the Sachet fixed-10 special, the Psyche
+  Bomb ×2-vs-elemental exception, and the 32-slot inventory / 3-category inventory screen.
