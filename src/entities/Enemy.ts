@@ -359,6 +359,35 @@ export class Enemy {
     this.hp = Math.min(this.def.stats.maxHp, this.hp + amount);
   }
 
+  // --- Hit reaction (knockback) ---------------------------------------------
+
+  /** Remaining knockback velocity (world units/sec); decays to zero over a fraction of a second. */
+  private knock = new Vector3(0, 0, 0);
+
+  /** Shove the enemy along `dir` (horizontal component) at `strength` units/sec — a hit recoil. */
+  applyKnockback(dir: Vector3, strength: number): void {
+    const x = dir.x;
+    const z = dir.z;
+    const len = Math.hypot(x, z);
+    if (len < 1e-4 || strength <= 0) return;
+    this.knock.x += (x / len) * strength;
+    this.knock.z += (z / len) * strength;
+  }
+
+  /** Advance the knockback recoil; call once per frame (after the AI move). */
+  tickKnockback(dt: number): void {
+    if (this.knock.x === 0 && this.knock.z === 0) return;
+    this.root.position.x += this.knock.x * dt;
+    this.root.position.z += this.knock.z * dt;
+    const decay = Math.max(0, 1 - dt * 10); // ~0.1s to settle
+    this.knock.x *= decay;
+    this.knock.z *= decay;
+    if (Math.hypot(this.knock.x, this.knock.z) < 0.02) {
+      this.knock.x = 0;
+      this.knock.z = 0;
+    }
+  }
+
   // --- Status ailments (Dragoon Magic) --------------------------------------
 
   private fearTimer = 0;

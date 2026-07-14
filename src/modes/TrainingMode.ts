@@ -261,6 +261,8 @@ export class TrainingMode extends GameMode {
   private mashMeter!: MashMeter;
   /** Active attack-item mashing QTE (Multi items); undefined when no throw is being charged. */
   private mash?: MashState;
+  /** Hit-stop: seconds of real time the whole scene freezes on a heavy hit (juice). */
+  private hitStopT = 0;
   /** Party members whose ATB gauge was full last frame, for "start of turn" SP (Spirit Ring). */
   private turnReady = new WeakSet<PartyMember>();
 
@@ -694,6 +696,12 @@ export class TrainingMode extends GameMode {
     // Spawn menu open: gameplay is paused (the HUD keeps its last state).
     // Game's render loop still calls input.endFrame() after this returns.
     if (this.paused) return;
+
+    // Hit-stop: a heavy hit freezes the whole scene for a few frames — a punchy "impact" beat.
+    if (this.hitStopT > 0) {
+      this.hitStopT = Math.max(0, this.hitStopT - dt);
+      return;
+    }
 
     // Attack-item mashing QTE: player input is captured by the meter; the world runs in slow-mo.
     if (this.mash) return this.updateMash(dt);
@@ -1500,8 +1508,18 @@ export class TrainingMode extends GameMode {
     const frac = dmg / Math.max(1, target.def.stats.maxHp);
     const big = frac >= 0.18 || dmg >= 120;
     this.popText(target.headPosition, `${dmg}`, TEXT.damage, big);
-    if (fromControlled) this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
+    // Camera shake, hit recoil and (on heavy hits) a freeze-frame — only for YOUR hits.
+    if (fromControlled) {
+      this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
+      target.applyKnockback(target.position.subtract(this.player.position), Math.min(6, 2 + frac * 10));
+      if (big) this.hitStop(0.05);
+    }
     if (!target.alive) this.rewardKill(target);
+  }
+
+  /** Freeze the whole scene for `seconds` (capped) — the impact "beat" on heavy hits. */
+  private hitStop(seconds: number): void {
+    this.hitStopT = Math.max(this.hitStopT, Math.min(seconds, 0.08));
   }
 
   /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
@@ -1547,6 +1565,7 @@ export class TrainingMode extends GameMode {
     for (const enemy of this.enemies) {
       enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
       const action = enemy.aiUpdate(cdt, this.player.position, ctx);
+      enemy.tickKnockback(cdt); // hit recoil, applied on top of the AI move
       clampToArena(enemy.position);
       enemy.syncHud(this.scene);
       if (action) this.resolveEnemyAction(enemy, action);
