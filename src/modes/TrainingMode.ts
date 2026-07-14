@@ -943,7 +943,7 @@ export class TrainingMode extends GameMode {
         this.spellFx?.burst(atk.element, foe.position, 1.5);
         const element = elementMultiplier(atk.element, foe.def.element);
         const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
-        this.landDamage(foe, Math.max(1, dmg));
+        this.landDamage(foe, Math.max(1, dmg), m === this.controlled);
       }
     }
     return true;
@@ -1008,7 +1008,7 @@ export class TrainingMode extends GameMode {
       this.spellFx?.burst(s.element, foe.position, power);
       const element = elementMultiplier(s.element, foe.def.element);
       const dmg = multiItemAttack(s.mat, foe.def.stats.mdf, s.lv, s.bid, s.pct, { element, field: s.field });
-      this.landDamage(foe, Math.max(1, dmg));
+      this.landDamage(foe, Math.max(1, dmg), s.member === this.controlled);
     }
     this.refreshHud();
   }
@@ -1165,7 +1165,7 @@ export class TrainingMode extends GameMode {
           }),
         );
         totalDamage += dmg;
-        this.landDamage(foe, dmg);
+        this.landDamage(foe, dmg, caster === this.player);
       }
     }
 
@@ -1455,7 +1455,7 @@ export class TrainingMode extends GameMode {
           to,
           ARROW_SPEED,
           () => {
-            if (target.alive) this.landDamage(target, dmg);
+            if (target.alive) this.landDamage(target, dmg, true);
           },
           0.22,
         ),
@@ -1463,7 +1463,7 @@ export class TrainingMode extends GameMode {
       return;
     }
 
-    this.landDamage(target, dmg);
+    this.landDamage(target, dmg, true); // applyHit is the controlled player's Addition/D'Attack
   }
 
   /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
@@ -1490,15 +1490,17 @@ export class TrainingMode extends GameMode {
   }
 
   /** Apply a computed hit to the target: damage, floating text, and death handling. */
-  private landDamage(target: Enemy, dmg: number): void {
+  /** Apply damage to an enemy with hit feedback. `fromControlled` = the hit came from the member the
+   *  player is steering, so the screen shakes (an ally's hits pop numbers but don't shake the view). */
+  private landDamage(target: Enemy, dmg: number, fromControlled = false): void {
     target.takeDamage(dmg);
     this.atmosphere?.spark(target.headPosition); // hit-spark burst at the point of impact
     // Juice: the bigger the hit (relative to the target's health), the harder the number pops and
-    // the more the screen kicks.
+    // the more the screen kicks — but only the controlled member's hits shake the camera.
     const frac = dmg / Math.max(1, target.def.stats.maxHp);
     const big = frac >= 0.18 || dmg >= 120;
     this.popText(target.headPosition, `${dmg}`, TEXT.damage, big);
-    this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
+    if (fromControlled) this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
     if (!target.alive) this.rewardKill(target);
   }
 
@@ -1729,12 +1731,12 @@ export class TrainingMode extends GameMode {
       const to = target.position.add(new Vector3(0, 1.2, 0));
       this.arrows.push(
         new Arrow(this.scene, from, to, ARROW_SPEED, () => {
-          if (target.alive) this.landDamage(target, dmg);
+          if (target.alive) this.landDamage(target, dmg, attacker === this.player);
         }, 0.22),
       );
       return;
     }
-    this.landDamage(target, dmg);
+    this.landDamage(target, dmg, attacker === this.player);
   }
 
   /** Per-Addition DPS readout for the Training balance tab (full vs. spam-hit-1). */
