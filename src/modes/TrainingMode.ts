@@ -363,6 +363,30 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Training revives a downed member instantly (sandbox); Survival lets them stay down (KO). */
   protected reviveOnZero = true;
 
+  /** Grant each built member their Dragoon Spirit up front (Training). Survival unlocks it as a
+   *  rare in-run reward, so it starts off. */
+  protected unlockDragoonOnBuild = true;
+
+  /** Append one live party member (up to 3) WITHOUT rebuilding the party — existing members keep
+   *  their HP/SP. Used by Survival's rare "recruit" reward. Returns the new member, or undefined if
+   *  the party is already full. */
+  protected addPartyMember(bearer: Bearer): PartyMember | undefined {
+    if (this.party.length >= 3) return undefined;
+    const i = this.party.length;
+    this.partyBearers.push(bearer);
+    this.gambitIds.push([...DEFAULT_GAMBIT_IDS]);
+    const spawn = this.player.position.clone().add(this.formationOffset(i));
+    const brain = new GambitBrain(resolveGambit(this.gambitIds[i]));
+    const m = new PartyMember(this.scene, bearer, spawn, brain, this.partyLevel);
+    if (this.unlockDragoonOnBuild) m.avatar.unlockDragoon();
+    if (this.startFullSp) m.avatar.sp = m.avatar.maxSp;
+    this.applyConfig(m.avatar, bearer);
+    m.setControlled(false);
+    this.party.push(m);
+    this.refreshShadowCasters();
+    return m;
+  }
+
   /** Take control of the first living member (skips the downed). Returns false if none live. */
   protected takeControlOfLiving(): boolean {
     if (this.controlled?.avatar.hp > 0) return true;
@@ -593,7 +617,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.party = this.partyBearers.map((b, i) => {
       const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
       const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
-      m.avatar.unlockDragoon(); // everyone has their Dragoon Spirit (SP/MP/transform)
+      if (this.unlockDragoonOnBuild) m.avatar.unlockDragoon(); // Dragoon Spirit (SP/MP/transform)
       if (this.startFullSp) m.avatar.sp = m.avatar.maxSp; // Training: transform right away
 
       this.applyConfig(m.avatar, b); // restore this character's stored gear / Addition

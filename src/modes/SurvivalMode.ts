@@ -13,6 +13,8 @@ import { t } from "../core/i18n";
 const BEST_KEY = "damia3d.survival.best";
 /** A "mini-boss" (Commander) reinforces the wave every this-many waves. */
 const BOSS_EVERY = 5;
+/** Per-kill chance to drop a rare reward (recruit an ally, or unlock a Dragoon Spirit). */
+const REWARD_CHANCE = 0.06;
 
 /**
  * Survival mode — endless escalating waves in the training arena, built on {@link ArenaCombatMode}.
@@ -26,6 +28,7 @@ export class SurvivalMode extends ArenaCombatMode {
   protected showDebugTools = false; // no Training spawn/level tools
   protected startFullSp = false; // earn SP (and the transform) over the waves
   protected reviveOnZero = false; // members that fall stay down until the run ends
+  protected unlockDragoonOnBuild = false; // the Dragoon Spirit is a rare in-run reward, not a given
 
   private wave = 0;
   private kills = 0;
@@ -42,8 +45,8 @@ export class SurvivalMode extends ArenaCombatMode {
   override enter(): void {
     super.enter(); // arena, camera, atmosphere/VFX, a bootstrap party, combat UI (no debug button)
     this.buildBanner();
-    // Straight into party selection; gameplay is paused behind it.
-    this.select = new PartySelect(selectableBearers(), (party) => this.beginRun(party));
+    // Straight into character selection (solo — allies are recruited as rare rewards).
+    this.select = new PartySelect(selectableBearers(), (party) => this.beginRun(party), 1);
     this.paused = true;
     this.select.show();
   }
@@ -91,7 +94,45 @@ export class SurvivalMode extends ArenaCombatMode {
   }
 
   protected override onEnemyKilled(): void {
-    if (this.runActive) this.kills++;
+    if (!this.runActive) return;
+    this.kills++;
+    if (Math.random() < REWARD_CHANCE) this.grantRareReward();
+  }
+
+  /** Roll a rare reward: recruit a new ally, or grant a Dragoon Spirit to a member who lacks one. */
+  private grantRareReward(): void {
+    const canRecruit = this.party.length < 3 && this.recruitPool().length > 0;
+    const locked = this.party.filter((m) => m.avatar.hp > 0 && !m.avatar.dragoonUnlocked);
+    const options: ("recruit" | "dragoon")[] = [];
+    if (canRecruit) options.push("recruit");
+    if (locked.length) options.push("dragoon");
+    if (!options.length) return;
+    const pick = options[Math.floor(Math.random() * options.length)];
+    if (pick === "recruit") this.recruitAlly();
+    else this.grantDragoon(locked[Math.floor(Math.random() * locked.length)]);
+  }
+
+  /** Selectable bearers not already in the party (recruit candidates). */
+  private recruitPool(): Bearer[] {
+    const have = new Set(this.party.map((m) => m.avatar.bearer.id));
+    return selectableBearers().filter((b) => !have.has(b.id));
+  }
+
+  private recruitAlly(): void {
+    const pool = this.recruitPool();
+    if (!pool.length) return;
+    const bearer = pool[Math.floor(Math.random() * pool.length)];
+    const member = this.addPartyMember(bearer);
+    if (member) {
+      this.showBanner(t("survival.recruited", { name: bearer.name }), "#8fe3a0");
+      this.popText(member.position.add(new Vector3(0, 2.8, 0)), "★", "#8fe3a0");
+    }
+  }
+
+  private grantDragoon(member: PartyMember): void {
+    member.avatar.unlockDragoon();
+    this.showBanner(t("survival.dragoonReward", { name: member.avatar.bearer.name }), "#ffe27a");
+    this.popText(member.position.add(new Vector3(0, 2.8, 0)), "✦", "#ffe27a");
   }
 
   protected override onMemberDowned(member: PartyMember): void {

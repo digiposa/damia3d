@@ -1,17 +1,16 @@
 import { t } from "../core/i18n";
 import type { Bearer } from "../data/bearers";
 
-const MAX_PARTY = 3;
-
 /** rgba() string from a bearer's 0–1 colour triplet. */
 function rgba(c: [number, number, number], a = 1): string {
   return `rgba(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)}, ${a})`;
 }
 
 /**
- * Full-screen party picker shown before a Survival run: tap up to {@link MAX_PARTY} characters
- * (first tapped = the leader you control), then Start. Purely presentational — `onStart` gets the
- * chosen bearers in selection order. Reuses each bearer's portrait + accent colour.
+ * Full-screen party picker: tap up to `maxParty` characters (first tapped = the leader you control),
+ * then Start. With `maxParty === 1` it behaves as a radio (tapping another replaces the pick) — used
+ * by Survival, where you start solo and recruit the rest as rare in-run rewards. Purely
+ * presentational — `onStart` gets the chosen bearers in selection order.
  */
 export class PartySelect {
   private backdrop: HTMLDivElement;
@@ -24,6 +23,7 @@ export class PartySelect {
   constructor(
     private roster: Bearer[],
     private onStart: (party: Bearer[]) => void,
+    private maxParty = 3,
   ) {
     this.backdrop = document.createElement("div");
     Object.assign(this.backdrop.style, {
@@ -47,7 +47,7 @@ export class PartySelect {
     Object.assign(title.style, { font: "800 20px/1.2 system-ui, sans-serif", textAlign: "center" });
 
     const hint = document.createElement("div");
-    hint.textContent = t("survival.selectHint");
+    hint.textContent = this.maxParty === 1 ? t("survival.selectSoloHint") : t("survival.selectHint");
     Object.assign(hint.style, { opacity: "0.7", font: "600 13px/1.3 system-ui, sans-serif", textAlign: "center" });
 
     this.grid = document.createElement("div");
@@ -159,7 +159,8 @@ export class PartySelect {
   private toggle(b: Bearer): void {
     const i = this.chosen.findIndex((x) => x.id === b.id);
     if (i >= 0) this.chosen.splice(i, 1);
-    else if (this.chosen.length < MAX_PARTY) this.chosen.push(b);
+    else if (this.chosen.length < this.maxParty) this.chosen.push(b);
+    else if (this.maxParty === 1) this.chosen = [b]; // radio: replace the single pick
     this.refresh();
   }
 
