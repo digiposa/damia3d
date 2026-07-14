@@ -293,8 +293,9 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Post-action breather (combat seconds) — blocks the next action start while counting down. */
   private actionRecoveryT = 0;
 
-  /** Shared consumable pool (Training sandbox). */
-  private items = startingItems();
+  /** Shared consumable pool. Populated from {@link initialItems} on enter (Training gets the full
+   *  sampler; Survival a lean survival kit). */
+  protected items: { def: ItemDef; count: number }[] = [];
 
   /** The party (up to 3): one member is player-controlled, the rest run their Brain. */
   protected party: PartyMember[] = [];
@@ -396,7 +397,14 @@ export abstract class ArenaCombatMode extends GameMode {
     return true;
   }
 
+  /** The consumable pool a run starts with. Training: the full attack/heal sampler. Override in
+   *  subclasses (Survival gives a lean kit). */
+  protected initialItems(): { def: ItemDef; count: number }[] {
+    return startingItems();
+  }
+
   enter(): void {
+    this.items = this.initialItems();
     createArena(this.scene);
     // The sand floor catches the characters' cast shadows.
     const floor = this.scene.getMeshByName("arenaFloor");
@@ -1608,16 +1616,26 @@ export abstract class ArenaCombatMode extends GameMode {
     this.hitStopT = Math.max(this.hitStopT, Math.min(seconds, 0.08));
   }
 
-  /** Hook: an enemy was just felled (before its death animation). Survival scores kills. */
+  /** Hook: an enemy was just felled (after XP/gold are awarded, so subclasses see the new level). */
   protected onEnemyKilled(_target: Enemy): void {}
+
+  /** EXP multiplier per kill (Survival boosts it so leveling happens over a run). */
+  protected xpMultiplier = 1;
+  /** Split EXP across every living member (Survival) vs. only the controlled one (Training). */
+  protected shareXpWithParty = false;
 
   /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
   private rewardKill(target: Enemy): void {
     if (target.dying) return; // death sequence already running — don't double-award or re-trigger
-    this.onEnemyKilled(target);
-    this.player.gainExp(target.def.expReward);
+    const xp = Math.round(target.def.expReward * this.xpMultiplier);
+    if (this.shareXpWithParty) {
+      for (const m of this.party) if (m.avatar.hp > 0) m.avatar.gainExp(xp);
+    } else {
+      this.player.gainExp(xp);
+    }
     this.player.gold += target.def.goldReward;
-    this.popText(target.headPosition, `+${target.def.expReward} EXP`, TEXT.exp);
+    this.popText(target.headPosition, `+${xp} EXP`, TEXT.exp);
+    this.onEnemyKilled(target); // after XP: Survival checks for a level-up to offer reward cards
     // Only cancel the player's combo if it's the one that just died (an ally kill
     // must not abort the player's in-progress Addition).
     if (this.comboTarget === target) {

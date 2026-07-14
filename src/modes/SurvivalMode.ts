@@ -2,40 +2,59 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 import { ArenaCombatMode } from "./TrainingMode";
 import { PartySelect } from "../ui/PartySelect";
+import { RewardCards, type RewardCard } from "../ui/RewardCards";
 import { selectableBearers, type Bearer } from "../data/bearers";
 import { DEFAULT_GAMBIT_IDS } from "../combat/Gambit";
 import { Enemy } from "../entities/Enemy";
 import type { PartyMember } from "../entities/PartyMember";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES } from "../data/enemies";
+import { HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
 import { t } from "../core/i18n";
 
 /** Local-storage key for the best (waves survived) score. */
 const BEST_KEY = "damia3d.survival.best";
 /** A "mini-boss" (Commander) reinforces the wave every this-many waves. */
 const BOSS_EVERY = 5;
-/** Per-kill chance to drop a rare reward (recruit an ally, or unlock a Dragoon Spirit). */
-const REWARD_CHANCE = 0.06;
+/** EXP boost so kills level the party fast enough to feel the roguelite card loop. */
+const XP_MULT = 4;
+/** How many reward cards to offer on a level-up. */
+const CARDS_PER_LEVEL = 3;
 
 /**
  * Survival mode — endless escalating waves in the training arena, built on {@link ArenaCombatMode}.
- * The player first picks a party (1–3), then fights waves that grow in size; every {@link BOSS_EVERY}
- * waves a Commander mini-boss reinforces them. There is NO recovery between waves — HP/MP/SP persist,
- * so attrition is the challenge. A full party wipe ends the run with a Game Over showing the score
- * (waves survived + kills) and the local best. Retry re-picks a party; nothing else persists.
+ * You start with ONE character (no Dragoon); kills grant shared EXP, and every level-up opens a
+ * roguelite reward screen (Magic Survival style) to pick a card — recruit an ally, unlock a Dragoon
+ * Spirit, heal, or restock. Waves grow in size; every {@link BOSS_EVERY} waves a Commander mini-boss
+ * reinforces them. NO recovery between waves — HP/MP/SP persist, so attrition is the challenge. A
+ * full party wipe ends the run with a Game Over (waves survived + kills + local best).
  */
 export class SurvivalMode extends ArenaCombatMode {
   readonly name = "Survival";
   protected showDebugTools = false; // no Training spawn/level tools
   protected startFullSp = false; // earn SP (and the transform) over the waves
   protected reviveOnZero = false; // members that fall stay down until the run ends
-  protected unlockDragoonOnBuild = false; // the Dragoon Spirit is a rare in-run reward, not a given
+  protected unlockDragoonOnBuild = false; // the Dragoon Spirit is a card reward, not a given
+  protected shareXpWithParty = true; // the whole living party levels together
+  protected xpMultiplier = XP_MULT;
 
   private wave = 0;
   private kills = 0;
   private runActive = false;
+  private lastLevel = 1;
   private select?: PartySelect;
+  private cards?: RewardCards;
   private banner?: HTMLDivElement;
   private gameOver?: HTMLDivElement;
+
+  /** Survival starts with a lean kit (attrition!) — a few Healing Potions and two attack items,
+   *  NOT the Training sampler. */
+  protected initialItems(): { def: ItemDef; count: number }[] {
+    return [
+      { def: HEALING_POTION, count: 3 },
+      { def: ATTACK_ITEM_BY_ID.get("burnOut")!, count: 2 },
+      { def: ATTACK_ITEM_BY_ID.get("spinningGale")!, count: 1 },
+    ];
+  }
 
   /** Bootstrap the party until the player picks one (super.enter builds a party immediately). */
   protected pickParty(): Bearer[] {
@@ -45,6 +64,9 @@ export class SurvivalMode extends ArenaCombatMode {
   override enter(): void {
     super.enter(); // arena, camera, atmosphere/VFX, a bootstrap party, combat UI (no debug button)
     this.buildBanner();
+    this.cards = new RewardCards(() => {
+      this.paused = false; // resume once a card is chosen
+    });
     // Straight into character selection (solo — allies are recruited as rare rewards).
     this.select = new PartySelect(selectableBearers(), (party) => this.beginRun(party), 1);
     this.paused = true;
@@ -65,6 +87,7 @@ export class SurvivalMode extends ArenaCombatMode {
     this.enemies = [];
     this.wave = 0;
     this.kills = 0;
+    this.lastLevel = this.partyLevelReached();
     this.partyWiped = false;
     this.runActive = true;
     this.paused = false;
@@ -96,20 +119,79 @@ export class SurvivalMode extends ArenaCombatMode {
   protected override onEnemyKilled(): void {
     if (!this.runActive) return;
     this.kills++;
-    if (Math.random() < REWARD_CHANCE) this.grantRareReward();
+    // Kills grant shared EXP (in the base). When the party's level ticks up, open the reward screen.
+    const lv = this.partyLevelReached();
+    if (lv > this.lastLevel) {
+      this.lastLevel = lv;
+      this.offerCards(lv);
+    }
   }
 
-  /** Roll a rare reward: recruit a new ally, or grant a Dragoon Spirit to a member who lacks one. */
-  private grantRareReward(): void {
-    const canRecruit = this.party.length < 3 && this.recruitPool().length > 0;
-    const locked = this.party.filter((m) => m.avatar.hp > 0 && !m.avatar.dragoonUnlocked);
-    const options: ("recruit" | "dragoon")[] = [];
-    if (canRecruit) options.push("recruit");
-    if (locked.length) options.push("dragoon");
-    if (!options.length) return;
-    const pick = options[Math.floor(Math.random() * options.length)];
-    if (pick === "recruit") this.recruitAlly();
-    else this.grantDragoon(locked[Math.floor(Math.random() * locked.length)]);
+  /** The highest level any party member has reached (drives the level-up card trigger). */
+  private partyLevelReached(): number {
+    return this.party.reduce((max, m) => Math.max(max, m.avatar.level), 1);
+  }
+
+  /** Pause and offer {@link CARDS_PER_LEVEL} reward cards for the player to pick from. */
+  private offerCards(level: number): void {
+    const pool = this.buildRewardPool();
+    if (!pool.length) return;
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1)); // Fisher–Yates shuffle
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    this.paused = true;
+    this.cards?.show(t("survival.levelUp", { n: level }), pool.slice(0, CARDS_PER_LEVEL));
+  }
+
+  /** Every reward card that currently applies (situational recruit/Dragoon + always-available kit). */
+  private buildRewardPool(): RewardCard[] {
+    const pool: RewardCard[] = [];
+
+    // Recruit: one card per available ally candidate (capped so the screen isn't flooded).
+    if (this.party.length < 3) {
+      for (const b of this.recruitPool().slice(0, 3)) {
+        pool.push({
+          id: `recruit:${b.id}`,
+          title: t("reward.recruit", { name: b.name }),
+          desc: t("reward.recruitDesc", { name: b.name }),
+          icon: "🧑‍🤝‍🧑",
+          color: "#8fe3a0",
+          apply: () => this.recruit(b),
+        });
+      }
+    }
+
+    // Dragoon Spirit: one card per living member who lacks the transform.
+    for (const m of this.party.filter((x) => x.avatar.hp > 0 && !x.avatar.dragoonUnlocked)) {
+      pool.push({
+        id: `dragoon:${m.avatar.bearer.id}`,
+        title: t("reward.dragoon"),
+        desc: t("reward.dragoonDesc", { name: m.avatar.bearer.name }),
+        icon: "✦",
+        color: "#ffe27a",
+        apply: () => this.grantDragoon(m),
+      });
+    }
+
+    // Always available: a full heal (precious given no between-wave recovery) and a supply cache.
+    pool.push({
+      id: "heal",
+      title: t("reward.heal"),
+      desc: t("reward.healDesc"),
+      icon: "❤️",
+      color: "#7ec8ff",
+      apply: () => this.healParty(),
+    });
+    pool.push({
+      id: "potions",
+      title: t("reward.potions"),
+      desc: t("reward.potionsDesc"),
+      icon: "🧪",
+      color: "#8fe3a0",
+      apply: () => this.stock(HEALING_POTION, 3),
+    });
+    return pool;
   }
 
   /** Selectable bearers not already in the party (recruit candidates). */
@@ -118,21 +200,26 @@ export class SurvivalMode extends ArenaCombatMode {
     return selectableBearers().filter((b) => !have.has(b.id));
   }
 
-  private recruitAlly(): void {
-    const pool = this.recruitPool();
-    if (!pool.length) return;
-    const bearer = pool[Math.floor(Math.random() * pool.length)];
+  private recruit(bearer: Bearer): void {
     const member = this.addPartyMember(bearer);
-    if (member) {
-      this.showBanner(t("survival.recruited", { name: bearer.name }), "#8fe3a0");
-      this.popText(member.position.add(new Vector3(0, 2.8, 0)), "★", "#8fe3a0");
-    }
+    if (member) this.popText(member.position.add(new Vector3(0, 2.8, 0)), "★", "#8fe3a0");
   }
 
   private grantDragoon(member: PartyMember): void {
     member.avatar.unlockDragoon();
-    this.showBanner(t("survival.dragoonReward", { name: member.avatar.bearer.name }), "#ffe27a");
     this.popText(member.position.add(new Vector3(0, 2.8, 0)), "✦", "#ffe27a");
+  }
+
+  private healParty(): void {
+    for (const m of this.party) {
+      if (m.avatar.hp > 0) m.avatar.heal(m.avatar.maxHp);
+    }
+  }
+
+  private stock(def: ItemDef, count: number): void {
+    const slot = this.items.find((s) => s.def.id === def.id);
+    if (slot) slot.count += count;
+    else this.items.push({ def, count });
   }
 
   protected override onMemberDowned(member: PartyMember): void {
@@ -274,6 +361,7 @@ export class SurvivalMode extends ArenaCombatMode {
 
   override dispose(): void {
     this.select?.dispose();
+    this.cards?.dispose();
     this.banner?.remove();
     this.gameOver?.remove();
     super.dispose();
