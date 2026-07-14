@@ -324,8 +324,9 @@ export abstract class ArenaCombatMode extends GameMode {
 
   /** True while an overlay (debug/selection/game-over) is open — pauses gameplay. */
   protected paused = false;
-  /** Latches once the whole party is down, so {@link onPartyWiped} fires exactly once. */
-  private partyWiped = false;
+  /** Latches once the whole party is down, so {@link onPartyWiped} fires exactly once. Subclasses
+   *  reset it when restarting (e.g. Survival on Retry). */
+  protected partyWiped = false;
 
   // Click-to-move intent (desktop).
   private moveTarget?: Vector3;
@@ -354,6 +355,22 @@ export abstract class ArenaCombatMode extends GameMode {
 
   /** Hook: every party member is down. Survival ends the run (Game Over). */
   protected onPartyWiped(): void {}
+
+  /** Hook: a party member just hit 0 HP (only when {@link reviveOnZero} is off). Survival hands
+   *  control to a living member. */
+  protected onMemberDowned(_member: PartyMember): void {}
+
+  /** Training revives a downed member instantly (sandbox); Survival lets them stay down (KO). */
+  protected reviveOnZero = true;
+
+  /** Take control of the first living member (skips the downed). Returns false if none live. */
+  protected takeControlOfLiving(): boolean {
+    if (this.controlled?.avatar.hp > 0) return true;
+    const idx = this.party.findIndex((m) => m.avatar.hp > 0);
+    if (idx < 0) return false;
+    this.controlMember(idx);
+    return true;
+  }
 
   enter(): void {
     createArena(this.scene);
@@ -622,10 +639,16 @@ export abstract class ArenaCombatMode extends GameMode {
     this.atmosphere.setCasters(roots);
   }
 
-  /** Cycle player control to the next party member (Tab / the ⇄ button). */
+  /** Cycle player control to the next living party member (Tab / the ⇄ button). */
   private cycleControl(): void {
     if (this.party.length < 2) return;
-    this.controlMember((this.controlledIndex + 1) % this.party.length);
+    for (let step = 1; step < this.party.length; step++) {
+      const idx = (this.controlledIndex + step) % this.party.length;
+      if (this.party[idx].avatar.hp > 0) {
+        this.controlMember(idx);
+        return;
+      }
+    }
   }
 
   /** Take control of a specific party member (e.g. tapping its HUD row). */
@@ -1561,9 +1584,13 @@ export abstract class ArenaCombatMode extends GameMode {
     this.hitStopT = Math.max(this.hitStopT, Math.min(seconds, 0.08));
   }
 
+  /** Hook: an enemy was just felled (before its death animation). Survival scores kills. */
+  protected onEnemyKilled(_target: Enemy): void {}
+
   /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
   private rewardKill(target: Enemy): void {
     if (target.dying) return; // death sequence already running — don't double-award or re-trigger
+    this.onEnemyKilled(target);
     this.player.gainExp(target.def.expReward);
     this.player.gold += target.def.goldReward;
     this.popText(target.headPosition, `+${target.def.expReward} EXP`, TEXT.exp);
@@ -1636,8 +1663,13 @@ export abstract class ArenaCombatMode extends GameMode {
       this.player.hp = Math.max(0, this.player.hp - dmg);
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, TEXT.damage);
       if (this.player.hp === 0) {
+        const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)
-        this.player.hp = this.player.maxHp; // sandbox: revive instead of game-over
+        if (this.reviveOnZero) {
+          this.player.hp = this.player.maxHp; // Training sandbox: revive instead of game-over
+        } else {
+          this.onMemberDowned(downed); // Survival: real KO — hand control to a living member
+        }
       }
     };
 
@@ -1677,6 +1709,12 @@ export abstract class ArenaCombatMode extends GameMode {
    * approach, strike (auto-resolving the full Addition), or hold while charging.
    */
   private updateAiMember(member: PartyMember, dt: number, cdt: number, aliveEnemies: Enemy[]): void {
+    // A downed member (KO in Survival) neither charges nor acts — it just holds its pose.
+    if (member.avatar.hp <= 0) {
+      member.avatar.animate(dt, false);
+      member.syncHud(this.scene);
+      return;
+    }
     member.tickGauge(cdt);
     member.avatar.tickGuard(cdt);
 
