@@ -1,4 +1,5 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color4 } from "@babylonjs/core/Maths/math.color";
 import "@babylonjs/core/Meshes/meshBuilder";
 // Side-effect import: scene.pick / createPickingRay need Ray registered, else
 // every click throws "Ray needs to be imported before" and click-to-move dies.
@@ -175,6 +176,15 @@ const ELEMENT_COLOR: Record<Element, string> = {
   Thunder: "#8f6bff",
   "Non-Elemental": "#bdbdc8",
 };
+
+/** Elemental magic-burst colours (bright core + outer/dying tint), derived from {@link ELEMENT_RGB}:
+ *  the core is a whitened, punchier version of the element hue so the burst reads hot at its centre. */
+function elementBurstColors(element: Element): [Color4, Color4] {
+  const [r, g, b] = ELEMENT_RGB[element];
+  const hot = new Color4(Math.min(1, r * 1.3 + 0.3), Math.min(1, g * 1.3 + 0.3), Math.min(1, b * 1.3 + 0.25), 1);
+  const cool = new Color4(r, g, b, 1);
+  return [hot, cool];
+}
 
 /** Floating combat-text palette — one colour per feedback type (tweak here only). */
 const TEXT = {
@@ -926,8 +936,10 @@ export class TrainingMode extends GameMode {
       // "Multi" items carry the mashing QTE — start it; damage resolves in resolveMash().
       this.startMash(m, targets, atk.element, atk.bid, mat, lv, field, t(stock.def.nameKey));
     } else {
-      // "Powerful" / Detonate Rock: no QTE, resolve immediately.
+      // "Powerful" / Detonate Rock: no QTE, resolve immediately (with a strong burst on each target).
+      const [hot, cool] = elementBurstColors(atk.element);
       for (const foe of targets) {
+        this.atmosphere?.magicBurst(foe.position, hot, cool, 1.5);
         const element = elementMultiplier(atk.element, foe.def.element);
         const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
         this.landDamage(foe, Math.max(1, dmg));
@@ -962,11 +974,15 @@ export class TrainingMode extends GameMode {
     this.mashMeter.show(itemName, ELEMENT_COLOR[element], isTouch);
   }
 
-  /** One X press / screen tap during the QTE: bump the multiplier (capped), end early once maxed. */
+  /** One X press / screen tap during the QTE: bump the multiplier (capped), flare the element at
+   *  the caster (the "charging" feedback), and end early once maxed. */
   private mashTap(): void {
     if (!this.mash) return;
     this.mash.pct = Math.min(ITEM_MULTIPLIER_MAX, this.mash.pct + MASH_TAP_GAIN);
     this.mashMeter.setPct(this.mash.pct);
+    // Each tap spits a small elemental flare from the caster — energy building toward the throw.
+    const [hot, cool] = elementBurstColors(this.mash.element);
+    this.atmosphere?.magicBurst(this.mash.member.position.add(new Vector3(0, 1.5, 0)), hot, cool, 0.3);
     if (this.mash.pct >= ITEM_MULTIPLIER_MAX) this.resolveMash();
   }
 
@@ -983,8 +999,12 @@ export class TrainingMode extends GameMode {
     if (!s) return;
     this.mash = undefined;
     this.mashMeter.close();
+    // Eruption on each target, its size scaled by how hard the QTE was mashed (100→268%).
+    const [hot, cool] = elementBurstColors(s.element);
+    const power = 0.9 + ((s.pct - ITEM_MULTIPLIER_MIN) / (ITEM_MULTIPLIER_MAX - ITEM_MULTIPLIER_MIN)) * 1.0;
     for (const foe of s.targets) {
       if (!foe.alive) continue;
+      this.atmosphere?.magicBurst(foe.position, hot, cool, power);
       const element = elementMultiplier(s.element, foe.def.element);
       const dmg = multiItemAttack(s.mat, foe.def.stats.mdf, s.lv, s.bid, s.pct, { element, field: s.field });
       this.landDamage(foe, Math.max(1, dmg));
