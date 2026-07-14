@@ -1,8 +1,10 @@
 import { Scene } from "@babylonjs/core/scene";
-import { Color4 } from "@babylonjs/core/Maths/math.color";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import type { Observer } from "@babylonjs/core/Misc/observable";
 import { softDotTexture } from "./atmosphere";
 import type { Element } from "../combat/element";
 
@@ -29,6 +31,12 @@ export class SpellFx {
   private readonly shard: DynamicTexture;
   private readonly systems: Record<FxKind, Burst[]>;
   private readonly disposables: { dispose(): void }[] = [];
+  // A single reused point light that flashes on each burst so the eruption lights the scene.
+  private readonly flashLight: PointLight;
+  private flashObs?: Observer<Scene>;
+  private flashPeak = 0;
+  private flashT = 0;
+  private flashDur = 0.14;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -46,20 +54,41 @@ export class SpellFx {
       dark: [this.buildDark()],
       neutral: [this.buildNeutral()],
     };
+
+    this.flashLight = new PointLight("fxFlash", new Vector3(0, 2, 0), scene);
+    this.flashLight.range = 16;
+    this.flashLight.intensity = 0;
+    this.flashObs = scene.onBeforeRenderObservable.add(() => {
+      if (this.flashT <= 0) return;
+      this.flashT = Math.max(0, this.flashT - scene.getEngine().getDeltaTime() / 1000);
+      this.flashLight.intensity = this.flashPeak * (this.flashT / this.flashDur);
+    });
   }
 
   /** Fire the element's effect at a world position (feet of the target). */
   burst(element: Element, position: Vector3, power = 1): void {
     const p = Math.max(0.15, power);
-    for (const b of this.systems[ELEMENT_KIND[element]]) {
+    const systems = this.systems[ELEMENT_KIND[element]];
+    for (const b of systems) {
       b.ps.emitter = position.add(new Vector3(0, b.yOffset, 0));
       b.ps.manualEmitCount = Math.round(b.count * p);
+    }
+    // Flash the scene in the element's colour on impactful bursts only — NOT the little per-tap
+    // charge flares (p≈0.3), which would strobe the light while mashing.
+    if (p >= 0.55) {
+      const tint = systems[0].ps.color1;
+      this.flashLight.diffuse = new Color3(tint.r, tint.g, tint.b);
+      this.flashLight.position = position.add(new Vector3(0, 1, 0));
+      this.flashPeak = 2.4 * p;
+      this.flashT = this.flashDur;
     }
   }
 
   dispose(): void {
     for (const list of Object.values(this.systems)) for (const b of list) b.ps.dispose();
     for (const d of this.disposables) d.dispose();
+    if (this.flashObs) this.scene.onBeforeRenderObservable.remove(this.flashObs);
+    this.flashLight.dispose();
   }
 
   // --- per-element builders -------------------------------------------------

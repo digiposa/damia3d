@@ -723,6 +723,7 @@ export class TrainingMode extends GameMode {
       clampToArena(this.player.position); // the wall is a hard boundary
     }
     this.camera.follow(this.player.position);
+    this.camera.tickShake(dt);
     // Procedural walk/run/idle animation (visual only, uses real time).
     this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6, running);
     this.updateCombatState(dt); // toggle the party's combat vs exploration stance
@@ -1029,6 +1030,7 @@ export class TrainingMode extends GameMode {
       this.player.animate(dt, false, false);
       this.camera.follow(this.player.position);
     }
+    this.camera.tickShake(dt);
     this.refreshHud();
   }
 
@@ -1491,7 +1493,12 @@ export class TrainingMode extends GameMode {
   private landDamage(target: Enemy, dmg: number): void {
     target.takeDamage(dmg);
     this.atmosphere?.spark(target.headPosition); // hit-spark burst at the point of impact
-    this.popText(target.headPosition, `${dmg}`, TEXT.damage);
+    // Juice: the bigger the hit (relative to the target's health), the harder the number pops and
+    // the more the screen kicks.
+    const frac = dmg / Math.max(1, target.def.stats.maxHp);
+    const big = frac >= 0.18 || dmg >= 120;
+    this.popText(target.headPosition, `${dmg}`, TEXT.damage, big);
+    this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
     if (!target.alive) this.rewardKill(target);
   }
 
@@ -1983,9 +1990,9 @@ export class TrainingMode extends GameMode {
     return p;
   }
 
-  private popText(world: Vector3, text: string, color: string): void {
+  private popText(world: Vector3, text: string, color: string, big = false): void {
     const p = projectToScreen(this.scene, world);
-    if (p.visible) floatingText(p.x, p.y, text, color);
+    if (p.visible) floatingText(p.x, p.y, text, color, big);
   }
 
   private refreshHud(): void {

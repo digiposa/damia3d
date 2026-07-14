@@ -44,9 +44,48 @@ export class IsoCamera {
     this.camera.orthoRight = half * aspect;
   }
 
+  // The camera target we're actually following (the "clean" point); the live camera.target is this
+  // plus a transient shake offset, so shake never accumulates into the followed position.
+  private base?: Vector3;
+  private shakeT = 0;
+  private shakeDur = 0;
+  private shakeMag = 0;
+
   /** Smoothly follow a world position on the ground. */
   follow(position: Vector3, lerp = 0.15): void {
-    Vector3.LerpToRef(this.camera.target, position, lerp, this.camera.target);
+    if (!this.base) this.base = this.camera.target.clone();
+    Vector3.LerpToRef(this.base, position, lerp, this.base);
+    this.applyTarget();
+  }
+
+  /**
+   * Kick a screen shake: `magnitude` in world units (~0.1 light … ~0.5 heavy), decaying over
+   * `duration` seconds. A stronger shake overrides a weaker ongoing one (they don't stack).
+   */
+  shake(magnitude: number, duration = 0.28): void {
+    if (magnitude <= 0) return;
+    if (magnitude >= this.shakeMag) this.shakeMag = magnitude;
+    this.shakeDur = duration;
+    this.shakeT = duration;
+  }
+
+  /** Advance the shake decay; call once per frame. */
+  tickShake(dt: number): void {
+    if (this.shakeT <= 0) return;
+    this.shakeT = Math.max(0, this.shakeT - dt);
+    if (this.shakeT === 0) this.shakeMag = 0;
+    this.applyTarget();
+  }
+
+  /** Set the live camera target = followed base + current (decaying, random) shake offset. */
+  private applyTarget(): void {
+    if (!this.base) return;
+    this.camera.target.copyFrom(this.base);
+    if (this.shakeT > 0 && this.shakeDur > 0) {
+      const k = this.shakeMag * (this.shakeT / this.shakeDur); // linear decay to 0
+      this.camera.target.x += (Math.random() * 2 - 1) * k;
+      this.camera.target.z += (Math.random() * 2 - 1) * k;
+    }
   }
 
   // The iso angle is fixed, so the ground basis never changes — compute it once and hand back
