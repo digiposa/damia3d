@@ -290,8 +290,19 @@ export class Player {
     return atbFillTime(this.speed);
   }
 
+  /** Flat, run-scoped stat bonuses on top of the canon level table + equipment (e.g. Survival
+   *  reward cards). Not canon stats — a mode layer; zero in Story. */
+  private runBonus = { at: 0, df: 0, mat: 0, mdf: 0, hp: 0 };
+
+  /** Grant a permanent (for this entity's life) flat stat bonus. `hp` also raises current HP so a
+   *  Max-HP boost heals by the same amount, like a level-up. */
+  addRunBonus(key: "at" | "df" | "mat" | "mdf" | "hp", amount: number): void {
+    this.runBonus[key] += amount;
+    if (key === "hp" && amount > 0) this.hp = Math.min(this.maxHp, this.hp + amount);
+  }
+
   get maxHp(): number {
-    return Math.floor(this.stats.maxHp * (1 + this.bonusPct("hpPct")));
+    return Math.floor(this.stats.maxHp * (1 + this.bonusPct("hpPct"))) + this.runBonus.hp;
   }
   /** Max MP = Dragoon Level × 20 (canon), 0 until the Dragoon is unlocked. Some gear doubles
    *  it via mpPct (mpPct 1 → ×2). */
@@ -301,16 +312,16 @@ export class Player {
     return Math.floor(base * (1 + this.bonusPct("mpPct")));
   }
   get atk(): number {
-    return this.withDragoon(this.stats.at + this.bonus("at"), "at");
+    return this.withDragoon(this.stats.at + this.bonus("at") + this.runBonus.at, "at");
   }
   get def(): number {
-    return this.withDragoon(this.stats.df + this.bonus("df"), "df");
+    return this.withDragoon(this.stats.df + this.bonus("df") + this.runBonus.df, "df");
   }
   get matk(): number {
-    return this.withDragoon(this.stats.mat + this.bonus("mat"), "mat");
+    return this.withDragoon(this.stats.mat + this.bonus("mat") + this.runBonus.mat, "mat");
   }
   get mdef(): number {
-    return this.withDragoon(this.stats.mdf + this.bonus("mdf"), "mdf");
+    return this.withDragoon(this.stats.mdf + this.bonus("mdf") + this.runBonus.mdf, "mdf");
   }
 
   /** Apply the Dragoon-form stat multiplier (% by D'Level) when transformed, else identity. */

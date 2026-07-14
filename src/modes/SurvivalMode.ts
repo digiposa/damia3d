@@ -15,8 +15,6 @@ import { t } from "../core/i18n";
 const BEST_KEY = "damia3d.survival.best";
 /** A "mini-boss" (Commander) reinforces the wave every this-many waves. */
 const BOSS_EVERY = 5;
-/** EXP boost so kills level the party fast enough to feel the roguelite card loop. */
-const XP_MULT = 4;
 /** How many reward cards to offer on a level-up. */
 const CARDS_PER_LEVEL = 3;
 
@@ -34,8 +32,7 @@ export class SurvivalMode extends ArenaCombatMode {
   protected startFullSp = false; // earn SP (and the transform) over the waves
   protected reviveOnZero = false; // members that fall stay down until the run ends
   protected unlockDragoonOnBuild = false; // the Dragoon Spirit is a card reward, not a given
-  protected shareXpWithParty = true; // the whole living party levels together
-  protected xpMultiplier = XP_MULT;
+  protected shareXpWithParty = true; // canon: each living member earns the full kill EXP
 
   private wave = 0;
   private kills = 0;
@@ -174,6 +171,12 @@ export class SurvivalMode extends ArenaCombatMode {
       });
     }
 
+    // Stat upgrades for your leader (bonuses ON TOP of the canon level stats — not canon values).
+    pool.push(this.statCard("at", 2, "reward.atk", "reward.atkDesc", "🗡️", "#ff8a5c"));
+    pool.push(this.statCard("df", 2, "reward.def", "reward.defDesc", "🛡️", "#9ad0ff"));
+    pool.push(this.statCard("mat", 2, "reward.mat", "reward.matDesc", "🔮", "#c9a2ff"));
+    pool.push(this.statCard("hp", 25, "reward.hp", "reward.hpDesc", "🫀", "#ff6a8a"));
+
     // Always available: a full heal (precious given no between-wave recovery) and a supply cache.
     pool.push({
       id: "heal",
@@ -192,6 +195,29 @@ export class SurvivalMode extends ArenaCombatMode {
       apply: () => this.stock(HEALING_POTION, 3),
     });
     return pool;
+  }
+
+  /** A flat stat-bonus card applied to your leader (the controlled member). */
+  private statCard(
+    key: "at" | "df" | "mat" | "mdf" | "hp",
+    amount: number,
+    titleKey: string,
+    descKey: string,
+    icon: string,
+    color: string,
+  ): RewardCard {
+    return {
+      id: `stat:${key}`,
+      title: t(titleKey, { n: amount }),
+      desc: t(descKey, { n: amount }),
+      icon,
+      color,
+      apply: () => {
+        const a = this.controlled.avatar;
+        a.addRunBonus(key, amount);
+        this.popText(this.controlled.position.add(new Vector3(0, 2.8, 0)), `+${amount}`, color);
+      },
+    };
   }
 
   /** Selectable bearers not already in the party (recruit candidates). */
