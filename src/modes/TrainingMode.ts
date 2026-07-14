@@ -233,12 +233,24 @@ interface MashState {
  * timed combo (see {@link AdditionRunner}); per-hit damage comes from the LoD
  * formula.
  */
-export class TrainingMode extends GameMode {
-  readonly name = "Training";
+/**
+ * Shared arena-combat core: party + ATB, iso camera, atmosphere/VFX, enemies + AI, Additions/combos,
+ * Dragoon magic, attack items + the mashing QTE, and all the hit juice. {@link TrainingMode} adds the
+ * debug spawn/balance tools; {@link import("./SurvivalMode").SurvivalMode} adds wave progression.
+ * Subclasses tune it via the protected hooks below (party source, mode UI, enemies-cleared,
+ * party-wiped) — the base stays mode-agnostic.
+ */
+export abstract class ArenaCombatMode extends GameMode {
+  abstract readonly name: string;
 
-  private camera!: IsoCamera;
-  private atmosphere?: Atmosphere;
-  private spellFx?: SpellFx;
+  /** Build the Training-only debug tools (level/spawn/DPS menu)? Survival turns this off. */
+  protected showDebugTools = true;
+  /** Fill each built party member's SP gauge (Training: transform right away). Survival earns it. */
+  protected startFullSp = true;
+
+  protected camera!: IsoCamera;
+  protected atmosphere?: Atmosphere;
+  protected spellFx?: SpellFx;
   private hud!: PartyPanel;
   /**
    * GLB decor layout (Quaternius Fantasy Props). Empty for now — the ringside crates/barrels/racks
@@ -247,8 +259,8 @@ export class TrainingMode extends GameMode {
    */
   private decor: PropPlacement[] = [];
   private sight!: TimingSight;
-  private debugBtn!: Button;
-  private debugMenu!: TrainingMenu;
+  private debugBtn?: Button;
+  private debugMenu?: TrainingMenu;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
   private transformBtn?: ActionButton;
@@ -285,21 +297,21 @@ export class TrainingMode extends GameMode {
   private items = startingItems();
 
   /** The party (up to 3): one member is player-controlled, the rest run their Brain. */
-  private party: PartyMember[] = [];
+  protected party: PartyMember[] = [];
   /** Index into {@link party} of the player-controlled member. */
-  private controlledIndex = 0;
+  protected controlledIndex = 0;
   /** The bearers assigned to each party slot (the roster the menu edits). */
-  private partyBearers: Bearer[] = [];
+  protected partyBearers: Bearer[] = [];
   /** The slot the Character menu is currently editing. */
   private activeSlot = 0;
   /** Shared training level applied to the whole party. */
-  private partyLevel = 1;
+  protected partyLevel = 1;
   /** Gambit rule ids per slot (3 rule slots each) — the AI rule lists the menu edits. */
-  private gambitIds: string[][] = [];
+  protected gambitIds: string[][] = [];
   /** Per-character gear/Addition config for the whole roster (persists across rebuilds). */
   private roster = new RosterStore();
 
-  private enemies: Enemy[] = [];
+  protected enemies: Enemy[] = [];
   private arrows: Arrow[] = [];
   /** Countdown keeping the party in combat stance briefly after enemies leave range (anti-flicker). */
   private combatLinger = 0;
@@ -310,8 +322,10 @@ export class TrainingMode extends GameMode {
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
 
-  /** True while the debug menu is open — pauses gameplay like the Options menu. */
-  private paused = false;
+  /** True while an overlay (debug/selection/game-over) is open — pauses gameplay. */
+  protected paused = false;
+  /** Latches once the whole party is down, so {@link onPartyWiped} fires exactly once. */
+  private partyWiped = false;
 
   // Click-to-move intent (desktop).
   private moveTarget?: Vector3;
@@ -321,14 +335,25 @@ export class TrainingMode extends GameMode {
   private canvas?: HTMLCanvasElement;
 
   /** The player-controlled party member. */
-  private get controlled(): PartyMember {
+  protected get controlled(): PartyMember {
     return this.party[this.controlledIndex];
   }
 
   /** The controlled member's avatar — the "player" for movement, camera, HUD and stats. */
-  private get player(): Player {
+  protected get player(): Player {
     return this.controlled.avatar;
   }
+
+  /** Which bearers form the party. Training uses its default; Survival overrides with the picker. */
+  protected pickParty(): Bearer[] {
+    return this.defaultParty();
+  }
+
+  /** Hook: the last enemy was cleared from the arena. Survival advances to the next wave. */
+  protected onEnemiesCleared(): void {}
+
+  /** Hook: every party member is down. Survival ends the run (Game Over). */
+  protected onPartyWiped(): void {}
 
   enter(): void {
     createArena(this.scene);
@@ -336,7 +361,7 @@ export class TrainingMode extends GameMode {
     const floor = this.scene.getMeshByName("arenaFloor");
     if (floor) floor.receiveShadows = true;
 
-    this.partyBearers = this.defaultParty();
+    this.partyBearers = this.pickParty();
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
@@ -356,33 +381,35 @@ export class TrainingMode extends GameMode {
 
     // Training debug menu (Training only): set level, spawn enemies, DPS balance.
     // (Party composition + gambits live in the normal System menu.) Opened from a
-    // button just below the gear (⚙); pauses gameplay.
-    this.debugMenu = new TrainingMenu({
-      state: () => ({
-        level: this.partyLevel,
-        maxLevel: this.player.maxLevel,
-        dragoonLevel: this.player.dragoonLevel,
-        maxDragoonLevel: MAX_DRAGOON_LEVEL,
-        refDf: BALANCE_REF_DF,
-        balance: this.balanceRows(),
-      }),
-      onSetLevel: (lv) => this.setLevel(lv),
-      onSetDragoonLevel: (dlv) => this.setDragoonLevel(dlv),
-      onSpawnDummy: () => this.spawnDummy(),
-      onSpawnKnight: () => this.spawnKnight(),
-      onSpawnCommander: () => this.spawnCommander(),
-      onResume: () => this.closeDebugMenu(),
-    });
-    this.debugBtn = new Button({
-      label: "🛠",
-      onClick: () => this.openDebugMenu(),
-      style: {
-        top: "calc(env(safe-area-inset-top, 0px) + 58px)",
-        right: "calc(env(safe-area-inset-right, 0px) + 10px)",
-        font: "600 18px/1 system-ui, sans-serif",
-        padding: "10px 14px",
-      },
-    });
+    // button just below the gear (⚙); pauses gameplay. Off in Survival.
+    if (this.showDebugTools) {
+      this.debugMenu = new TrainingMenu({
+        state: () => ({
+          level: this.partyLevel,
+          maxLevel: this.player.maxLevel,
+          dragoonLevel: this.player.dragoonLevel,
+          maxDragoonLevel: MAX_DRAGOON_LEVEL,
+          refDf: BALANCE_REF_DF,
+          balance: this.balanceRows(),
+        }),
+        onSetLevel: (lv) => this.setLevel(lv),
+        onSetDragoonLevel: (dlv) => this.setDragoonLevel(dlv),
+        onSpawnDummy: () => this.spawnDummy(),
+        onSpawnKnight: () => this.spawnKnight(),
+        onSpawnCommander: () => this.spawnCommander(),
+        onResume: () => this.closeDebugMenu(),
+      });
+      this.debugBtn = new Button({
+        label: "🛠",
+        onClick: () => this.openDebugMenu(),
+        style: {
+          top: "calc(env(safe-area-inset-top, 0px) + 58px)",
+          right: "calc(env(safe-area-inset-right, 0px) + 10px)",
+          font: "600 18px/1 system-ui, sans-serif",
+          padding: "10px 14px",
+        },
+      });
+    }
     // On-screen action cluster: a big ⚔ attack button bottom-right, with the secondary
     // actions in an arc above it that SWAP with the form (human: Guard/Item/Transform ·
     // Dragoon: Magic). Shown on every platform (clickable); desktop also has key shortcuts
@@ -512,7 +539,7 @@ export class TrainingMode extends GameMode {
   }
 
   /** Default party: the starting bearer plus two distinct implemented front-liners. */
-  private defaultParty(): Bearer[] {
+  protected defaultParty(): Bearer[] {
     const roster = selectableBearers();
     // Prefer the rigged 3D models (Damia lead, then Meru / Haschel) so they show up in Training.
     const prefs = ["meru", "haschel", "lavitz", "albert", "rose", "shana"];
@@ -542,15 +569,16 @@ export class TrainingMode extends GameMode {
    * spawn each in formation at {@link partyLevel}, mark the controlled one, and bind the
    * AdditionRunner to that member's ATB gauge. Resets transient combat state.
    */
-  private buildParty(): void {
+  protected buildParty(): void {
     const base = this.party.length ? this.player.position.clone() : new Vector3(0, 0, 0);
     for (const m of this.party) m.dispose();
     this.controlledIndex = Math.min(this.controlledIndex, this.partyBearers.length - 1);
     this.party = this.partyBearers.map((b, i) => {
       const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
       const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
-      m.avatar.unlockDragoon(); // Training: everyone has their Dragoon Spirit (SP/MP/transform)
-      m.avatar.sp = m.avatar.maxSp; // Training: start with a full SP gauge (transform right away)
+      m.avatar.unlockDragoon(); // everyone has their Dragoon Spirit (SP/MP/transform)
+      if (this.startFullSp) m.avatar.sp = m.avatar.maxSp; // Training: transform right away
+
       this.applyConfig(m.avatar, b); // restore this character's stored gear / Addition
       m.setControlled(i === this.controlledIndex);
       return m;
@@ -588,7 +616,7 @@ export class TrainingMode extends GameMode {
 
   /** Re-register every live entity as a shadow caster (party + enemies). Cheap; call after
    *  any spawn/despawn or party rebuild. No-op until the atmosphere exists. */
-  private refreshShadowCasters(): void {
+  protected refreshShadowCasters(): void {
     if (!this.atmosphere) return;
     const roots = [...this.party.map((m) => m.avatar.root), ...this.enemies.map((e) => e.root)];
     this.atmosphere.setCasters(roots);
@@ -614,25 +642,26 @@ export class TrainingMode extends GameMode {
   }
 
   private openDebugMenu(): void {
+    if (!this.debugMenu) return;
     this.paused = true;
-    this.debugBtn.setVisible(false);
+    this.debugBtn?.setVisible(false);
     this.debugMenu.show();
   }
 
   private closeDebugMenu(): void {
-    this.debugMenu.hide();
-    this.debugBtn.setVisible(true);
+    this.debugMenu?.hide();
+    this.debugBtn?.setVisible(true);
     this.paused = false;
   }
 
   /** GameMode: is one of this mode's overlays open? (mutually exclusive with the System menu) */
   hasOpenMenu(): boolean {
-    return this.debugMenu.isOpen || this.itemMenu.isOpen || this.spellMenu.isOpen;
+    return !!this.debugMenu?.isOpen || this.itemMenu.isOpen || this.spellMenu.isOpen;
   }
 
   /** GameMode: Escape closes the open overlay (debug/item/spell) instead of opening System. */
   closeTopMenu(): boolean {
-    if (this.debugMenu.isOpen) {
+    if (this.debugMenu?.isOpen) {
       this.closeDebugMenu();
       return true;
     }
@@ -781,8 +810,18 @@ export class TrainingMode extends GameMode {
     this.updateSight();
     this.updateDragoonSpace(); // end the Space once its initiator reverts
     this.grantTurnSp(); // Spirit Ring: +SP at the start of each member's turn
+    this.checkPartyWipe(); // mode hook when the whole party is down (Survival: Game Over)
 
     this.refreshHud();
+  }
+
+  /** Fire {@link onPartyWiped} once when every party member has fallen. */
+  private checkPartyWipe(): void {
+    if (this.partyWiped || this.party.length === 0) return;
+    if (this.party.every((m) => m.avatar.hp <= 0)) {
+      this.partyWiped = true;
+      this.onPartyWiped();
+    }
   }
 
   /** Spirit Ring & co.: grant per-turn SP when a member's ATB gauge becomes ready (edge). */
@@ -1821,6 +1860,7 @@ export class TrainingMode extends GameMode {
     if (this.attackTarget === enemy) this.clearNav();
     enemy.dispose();
     this.refreshShadowCasters();
+    if (this.enemies.length === 0) this.onEnemiesCleared(); // last foe down → mode hook (waves)
   }
 
   /** Data for the System menu's Characters / Party / Gambits tabs. */
@@ -1978,7 +2018,7 @@ export class TrainingMode extends GameMode {
 
   /** Register a spawned enemy and (re)register shadow casters — once now for the placeholder,
    *  and again when its rigged model finishes loading (its meshes appear then). */
-  private addEnemy(e: Enemy): void {
+  protected addEnemy(e: Enemy): void {
     this.enemies.push(e);
     this.refreshShadowCasters();
     void e.ready.then(() => this.refreshShadowCasters());
@@ -2003,7 +2043,7 @@ export class TrainingMode extends GameMode {
   }
 
   /** A random spawn position on a ring around the player, kept inside the arena. */
-  private ringPosition(radius = 6): Vector3 {
+  protected ringPosition(radius = 6): Vector3 {
     const angle = Math.random() * Math.PI * 2;
     const r = radius + Math.random() * 2;
     const p = this.player.position.add(new Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
@@ -2011,7 +2051,7 @@ export class TrainingMode extends GameMode {
     return p;
   }
 
-  private popText(world: Vector3, text: string, color: string, big = false): void {
+  protected popText(world: Vector3, text: string, color: string, big = false): void {
     const p = projectToScreen(this.scene, world);
     if (p.visible) floatingText(p.x, p.y, text, color, big);
   }
@@ -2108,8 +2148,8 @@ export class TrainingMode extends GameMode {
     this.party = [];
     this.hud.dispose();
     this.sight.dispose();
-    this.debugMenu.dispose();
-    this.debugBtn.dispose();
+    this.debugMenu?.dispose();
+    this.debugBtn?.dispose();
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
     this.transformBtn?.dispose();
@@ -2123,6 +2163,11 @@ export class TrainingMode extends GameMode {
     this.spellFx?.dispose();
     this.spaceOverlay.remove();
   }
+}
+
+/** The Training sandbox: the shared arena-combat core plus the debug spawn/level/DPS tools. */
+export class TrainingMode extends ArenaCombatMode {
+  readonly name = "Training";
 }
 
 /** Floating-damage colour: orange when boosted (weakness), blue-grey when resisted, else gold. */
