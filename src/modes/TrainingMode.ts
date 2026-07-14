@@ -974,15 +974,17 @@ export class TrainingMode extends GameMode {
     this.mashMeter.show(itemName, ELEMENT_COLOR[element], isTouch);
   }
 
-  /** One X press / screen tap during the QTE: bump the multiplier (capped), flare the element at
-   *  the caster (the "charging" feedback), and end early once maxed. */
+  /** One X press / screen tap during the QTE: bump the multiplier (capped), flare the element on
+   *  the target(s) — the fire builds up on the enemy, not the caster — and end early once maxed. */
   private mashTap(): void {
     if (!this.mash) return;
     this.mash.pct = Math.min(ITEM_MULTIPLIER_MAX, this.mash.pct + MASH_TAP_GAIN);
     this.mashMeter.setPct(this.mash.pct);
-    // Each tap spits a small elemental flare from the caster — energy building toward the throw.
+    // Each tap spits a small elemental flare ON each target — energy building on the enemy.
     const [hot, cool] = elementBurstColors(this.mash.element);
-    this.atmosphere?.magicBurst(this.mash.member.position.add(new Vector3(0, 1.5, 0)), hot, cool, 0.3);
+    for (const foe of this.mash.targets) {
+      if (foe.alive) this.atmosphere?.magicBurst(foe.position, hot, cool, 0.3);
+    }
     if (this.mash.pct >= ITEM_MULTIPLIER_MAX) this.resolveMash();
   }
 
