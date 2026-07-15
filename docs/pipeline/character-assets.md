@@ -28,8 +28,12 @@ If the sheet is good enough, ask for the **same character in a clean T-pose** (o
 image feeds Tripo, so it decides mesh + rig quality. Make it count:
 
 - **Front-facing, full body, plain/neutral background** (detoured is even better).
-- **Limbs clearly separated from the torso** — arms out ~45°+ , hands open, legs slightly apart.
-  This is what lets Mixamo's auto-rigger place the skeleton correctly later.
+- **ALL four limbs clearly separated** — arms out ~45°+ with hands open, AND **legs apart with a
+  visible gap between the thighs and between the ankles**. This is what lets Mixamo's auto-rigger
+  place the skeleton correctly. ⚠️ If limbs are too close, image-to-3D **webs the gap with
+  geometry** (a "palmure") that stays hidden in the static pose but stretches into an ugly sheet
+  once the rig spreads the limbs in animation. Legs-too-close is the most common offender — give
+  them a clear A-stance.
 - Symmetric pose, neutral expression, no props overlapping the body (weapons come separately).
 - **Non-humanoids** (creatures, quadrupeds): Mixamo can't auto-rig these. Plan for a manual Blender
   rig or in-engine procedural motion — flag it early.
