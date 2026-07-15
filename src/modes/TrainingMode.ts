@@ -1996,7 +1996,10 @@ export abstract class ArenaCombatMode extends GameMode {
     const cls = dragoonClass(bearer.classId)!;
     const cfg = this.roster.get(bearer);
     const live = this.party.find((m) => m.avatar.bearer.id === id)?.avatar;
-    const cs = computeCharacterStats(cfg, bearer.classId, this.partyLevel);
+    // Prefer the LIVE member's actual level (it climbs from earned EXP in Survival); fall back to
+    // the fixed training level for roster members not currently in the party.
+    const level = live ? live.level : this.partyLevel;
+    const cs = computeCharacterStats(cfg, bearer.classId, level);
 
     const gearExtras = (
       [
@@ -2013,11 +2016,11 @@ export abstract class ArenaCombatMode extends GameMode {
     const status: StatusView = {
       name: bearer.name,
       portrait: bearer.portrait,
-      level: this.partyLevel,
-      exp: cs.exp,
-      nextExp: cs.nextExp,
+      level,
+      exp: live ? live.exp : cs.exp,
+      nextExp: live ? live.nextExp : cs.nextExp,
       hp: live ? live.hp : cs.maxHp,
-      maxHp: cs.maxHp,
+      maxHp: live ? live.maxHp : cs.maxHp,
       sp: live ? live.sp : 0,
       maxSp: live ? live.maxSp : 100,
       mp: live ? live.mp : cs.maxMp,
@@ -2034,7 +2037,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     const additions: AdditionEntry[] = cls.additions.map((def) => ({
       def,
-      unlocked: def.acquireLevel <= this.partyLevel,
+      unlocked: def.acquireLevel <= level,
       level: live ? live.additionLevel(def) : 1,
       equipped: def.name === cfg.additionName,
     }));
