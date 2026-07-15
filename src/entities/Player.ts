@@ -826,7 +826,7 @@ export class Player {
     }
     flattenCellShaded(res.meshes); // painted textures read flat-diffuse in the dim scene
     fitHeight(res.meshes, modelRoot, MODEL_TARGET_H); // AI/AccuRIG exports arrive at arbitrary scale
-    modelRoot.rotation.y = MODEL_YAW;
+    modelRoot.rotation.y = MODEL_YAW + (this.bearer.modelYaw ?? 0);
     modelRoot.parent = this.root;
     this.modelRoot = modelRoot;
     // Free the procedural placeholder if one was built (e.g. a rebuild race) — the model owns

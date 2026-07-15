@@ -84,6 +84,10 @@ export interface Bearer {
   /** Optional rigged glTF/GLB model (base filename in src/assets/models/); falls back to the
    *  procedural placeholder when absent. Auto-fit, oriented and animated by {@link Player.loadModel}. */
   model?: string;
+  /** Extra yaw (radians) applied to the model to correct its authored facing to the game's forward
+   *  (+Z). 0 for Mixamo-rigged exports (their convention); set for raw Tripo meshes that face +X
+   *  until their rigged version replaces them. */
+  modelYaw?: number;
   /** Optional Dragoon-form GLB (base filename in src/assets/models/) shown while transformed,
    *  replacing the procedural {@link DragoonForm}. Static until animation clips are grafted in. */
   dragoonModel?: string;
@@ -132,7 +136,7 @@ export const BEARERS: Bearer[] = [
   { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "mane", outfit: "fullplate", color: C_FIRE, storyPlayable: false },
   { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
-  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
+  { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, model: "rose", modelYaw: -Math.PI / 2, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
   // Jade (Wind) — spears
   { id: "syuveil", name: "Syuveil", classId: "jade", portrait: syuveilPortrait, weapon: "spear", hair: "neat", outfit: "scholar", color: C_WIND, bodyColor: [0.88, 0.89, 0.92], storyPlayable: false },
   { id: "greham", name: "Greham", classId: "jade", portrait: grehamPortrait, weapon: "spear", hair: "banded", outfit: "darkknight", color: C_WIND, bodyColor: [0.26, 0.19, 0.13], storyPlayable: false },
@@ -140,7 +144,7 @@ export const BEARERS: Bearer[] = [
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", modelYaw: -Math.PI / 2, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
