@@ -33,6 +33,12 @@ export class SurvivalMode extends ArenaCombatMode {
   protected reviveOnZero = false; // members that fall stay down until the run ends
   protected unlockDragoonOnBuild = false; // the Dragoon Spirit is a card reward, not a given
   protected shareXpWithParty = true; // canon: each living member earns the full kill EXP
+  protected allowPartyEditing = false; // the party is fixed at the start; it only grows via cards
+
+  /** The menu only shows the members you actually have (started with + recruited), not the roster. */
+  protected menuRoster(): Bearer[] {
+    return this.partyBearers;
+  }
 
   private wave = 0;
   private kills = 0;

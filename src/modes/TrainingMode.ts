@@ -351,6 +351,16 @@ export abstract class ArenaCombatMode extends GameMode {
     return this.defaultParty();
   }
 
+  /** Bearers listed in the System menu's Characters tab. Training browses the whole implemented
+   *  roster; Survival narrows it to the members you actually have (started with + recruited). */
+  protected menuRoster(): Bearer[] {
+    return selectableBearers();
+  }
+
+  /** Whether the System menu's Party-composition tab is offered (swap members in/out). Training:
+   *  yes. Survival: no — the party is fixed at the start and only grows via reward cards. */
+  protected allowPartyEditing = true;
+
   /** Hook: the last enemy was cleared from the arena. Survival advances to the next wave. */
   protected onEnemiesCleared(): void {}
 
@@ -1943,13 +1953,14 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.enemies.length === 0) this.onEnemiesCleared(); // last foe down → mode hook (waves)
   }
 
-  /** Data for the System menu's Characters / Party / Gambits tabs. */
+  /** Data for the System menu's Characters / Party / Gambits tabs. The Characters roster and the
+   *  Party-composition tab are mode-scoped (see {@link menuRoster} / {@link allowPartyEditing}). */
   menuData(): ModeMenuData {
     return {
       gold: this.player.gold,
       characters: {
         controlledId: this.player.bearer.id,
-        list: selectableBearers().map((b) => ({
+        list: this.menuRoster().map((b) => ({
           id: b.id,
           name: b.name,
           portrait: b.portrait,
@@ -1960,21 +1971,25 @@ export abstract class ArenaCombatMode extends GameMode {
         })),
         sheet: (id) => this.characterSheet(id),
       },
-      party: {
-        slots: this.partyBearers.map((b, i) => ({
-          id: b.id,
-          name: b.name,
-          controlled: i === this.controlledIndex,
-        })),
-        activeSlot: this.activeSlot,
-        selectSlot: (s) => {
-          this.activeSlot = Math.min(Math.max(s, 0), this.partyBearers.length - 1);
-        },
-        assign: (id) => {
-          const b = bearerById(id);
-          if (b) this.assignToSlot(b);
-        },
-      },
+      // Party composition (swapping members) is Training-only; Survival's party is fixed + grows
+      // via reward cards, so the tab is omitted there (the menu handles an absent `party`).
+      party: this.allowPartyEditing
+        ? {
+            slots: this.partyBearers.map((b, i) => ({
+              id: b.id,
+              name: b.name,
+              controlled: i === this.controlledIndex,
+            })),
+            activeSlot: this.activeSlot,
+            selectSlot: (s) => {
+              this.activeSlot = Math.min(Math.max(s, 0), this.partyBearers.length - 1);
+            },
+            assign: (id) => {
+              const b = bearerById(id);
+              if (b) this.assignToSlot(b);
+            },
+          }
+        : undefined,
       gambits: {
         members: this.party.map((m, i) => ({
           name: m.avatar.bearer.name,
