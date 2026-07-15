@@ -982,30 +982,33 @@ export abstract class ArenaCombatMode extends GameMode {
 
   private openItemMenu(): void {
     const enemyPresent = this.enemies.some((e) => e.alive);
-    const entries: ItemEntry[] = this.items.map((s) => {
-      const atk = s.def.attack;
-      return {
-        id: s.def.id,
-        name: t(s.def.nameKey),
-        count: s.count,
-        // Attack items need a living target; heal/SP items are usable any time there's stock.
-        enabled: s.count > 0 && (!atk || enemyPresent),
-        detail: atk
-          ? `${atk.element}${atk.target === "allEnemies" ? " · all" : ""}`
-          : s.def.spRestore
-            ? `+${s.def.spRestore} ${t("stat.sp")}`
-            : s.def.mpRestore
-              ? `+${t("stat.mp")}`
-              : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
-        color: atk
-          ? ELEMENT_COLOR[atk.element]
-          : s.def.spRestore
-            ? TEXT.sp
-            : s.def.mpRestore
-              ? TEXT.mp
-              : TEXT.hp,
-      };
-    });
+    // A depleted item (count 0) drops out of the bag entirely rather than lingering greyed-out.
+    const entries: ItemEntry[] = this.items
+      .filter((s) => s.count > 0)
+      .map((s) => {
+        const atk = s.def.attack;
+        return {
+          id: s.def.id,
+          name: t(s.def.nameKey),
+          count: s.count,
+          // Attack items need a living target; heal/SP items are usable any time there's stock.
+          enabled: !atk || enemyPresent,
+          detail: atk
+            ? `${atk.element}${atk.target === "allEnemies" ? " · all" : ""}`
+            : s.def.spRestore
+              ? `+${s.def.spRestore} ${t("stat.sp")}`
+              : s.def.mpRestore
+                ? `+${t("stat.mp")}`
+                : `${t("stat.hp")} +${Math.round(s.def.healFraction * 100)}%`,
+          color: atk
+            ? ELEMENT_COLOR[atk.element]
+            : s.def.spRestore
+              ? TEXT.sp
+              : s.def.mpRestore
+                ? TEXT.mp
+                : TEXT.hp,
+        };
+      });
     this.paused = true;
     this.itemMenu.show(entries);
   }
