@@ -16,6 +16,7 @@ import belzacPortrait from "../assets/portraits/belzac.png";
 import kanzasPortrait from "../assets/portraits/kanzas.png";
 import doelPortrait from "../assets/portraits/doel.png";
 import lenusPortrait from "../assets/portraits/lenus.png";
+import mirandaPortrait from "../assets/portraits/miranda.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -145,7 +146,7 @@ export const BEARERS: Bearer[] = [
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
   { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", modelYaw: -Math.PI / 2, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
-  { id: "miranda", name: "Miranda", classId: "whiteSilver", weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
+  { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
   { id: "doel", name: "Doel", classId: "thunder", portrait: doelPortrait, weapon: "dualsword", hair: "imperial", outfit: "warlord", color: C_THUNDER, bodyColor: [0.16, 0.14, 0.2], storyPlayable: false },
