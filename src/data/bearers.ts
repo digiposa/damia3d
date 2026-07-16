@@ -145,7 +145,7 @@ export const BEARERS: Bearer[] = [
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", modelYaw: -Math.PI / 2, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
