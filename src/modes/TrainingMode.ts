@@ -600,8 +600,8 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Default party: the starting bearer plus two distinct implemented front-liners. */
   protected defaultParty(): Bearer[] {
     const roster = selectableBearers();
-    // Prefer the rigged 3D models (Damia lead, then Meru / Haschel) so they show up in Training.
-    const prefs = ["meru", "haschel", "lavitz", "albert", "rose", "shana"];
+    // Prefer the 3D-modeled bearers so they show up in Training (Damia lead, then Shana / Rose).
+    const prefs = ["shana", "rose", "meru", "haschel", "lavitz", "albert"];
     const lead = roster.find((x) => x.id === "damia") ?? DEFAULT_BEARER;
     const team: Bearer[] = [lead];
     for (const id of prefs) {
