@@ -34,6 +34,11 @@ image feeds Tripo, so it decides mesh + rig quality. Make it count:
   geometry** (a "palmure") that stays hidden in the static pose but stretches into an ugly sheet
   once the rig spreads the limbs in animation. Legs-too-close is the most common offender — give
   them a clear A-stance.
+- **Feet FLAT on the ground** — the character must read as *standing planted*, soles parallel to the
+  floor, NOT floating. ⚠️ Image-to-3D tends to generate a "floating" figure with **relaxed, pointed
+  toes** (plantarflexed). That pointed-foot pose bakes into the rig's rest pose, so **every**
+  animation then shows the character on tiptoe — the clips can't fix it. Show her on a visible
+  ground line, flat-footed, in the source sprite.
 - Symmetric pose, neutral expression, no props overlapping the body (weapons come separately).
 - **Non-humanoids** (creatures, quadrupeds): Mixamo can't auto-rig these. Plan for a manual Blender
   rig or in-engine procedural motion — flag it early.
