@@ -110,6 +110,24 @@ GLBs are binary and inflate the git repo + the Pages download. Keep meshes **low
 the WebP + meshopt optimization, and if the roster grows large, switch to lazy-loading / Git LFS so
 mobile page-load stays fast.
 
+## Known limitations & future "beauty pass"
+
+We currently rig on **Mixamo** (free, zero-setup) and accept its weaknesses for now:
+- **Crude shoulder/arm weights** — the deltoid flares into a "bell" when arms rest down; Mixamo gives
+  no control over bone placement or weight painting.
+- **Fixed humanoid skeleton only** — no bones for hair/ponytails, accessories, wings or props, so
+  characters like **Meru** can't be rigged fully.
+- **Limited animation library** — fine for locomotion/idle, thin for signature/combat moves.
+
+When we do a quality pass, the upgrade path (keep FBX/GLB export so the graft pipeline is unchanged):
+- **Rig quality + custom bones** → **Auto-Rig Pro** (Blender addon, paid) — clean shoulders, add
+  bones for hair/props, and *Remap* retargets any library onto the rig. Free lighter option:
+  **AccuRIG** (Reallusion) — better shoulders/fingers than Mixamo out of the box.
+- **Animation choice** → **ActorCore** (paid, quality) or **Truebones** (cheap, many `mixamorig`-
+  compatible packs that graft directly onto the current rig).
+- **Signature moves (Dragoon Additions, bow attack)** → AI mocap from video: **DeepMotion**,
+  **Plask**, **Rokoko Vision**, **Move.ai**; or hand-key with **Cascadeur**.
+
 ## Roster status
 
 | Character | Archetype | Model | Notes |
