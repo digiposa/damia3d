@@ -100,6 +100,13 @@ export interface Bearer {
   weaponGrip?: number;
   /** Uniform world scale of the hand-held weapon. Per-weapon; default tuned for Meru. */
   weaponScale?: number;
+  /** Flat-shade the weapon (painted/wooden look, no metal glint or glow) instead of the default
+   *  metallic tuning — for vertex-coloured props like Shana's bow, which otherwise blooms into a
+   *  glowing wire under the GlowLayer. */
+  weaponCellShaded?: boolean;
+  /** Keep the weapon in the hand at all times (never holster to the back) — for a bow, which reads
+   *  better held than slung, and avoids the sword-tuned back placement. */
+  weaponNoSheath?: boolean;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -145,7 +152,7 @@ export const BEARERS: Bearer[] = [
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weapon: "bow", weaponModel: "shana_bow", weaponScale: 2.0, weaponGrip: 0, hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weapon: "bow", weaponModel: "shana_bow", weaponScale: 2.0, weaponGrip: 0, weaponCellShaded: true, weaponNoSheath: true, hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },

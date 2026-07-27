@@ -875,7 +875,10 @@ export class Player {
       return;
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
-    tuneWeapon(res.meshes); // glint + self-illumination so it reads in the dim scene
+    // Painted/wooden weapons (Shana's bow) render flat like the characters — the metal glint +
+    // self-illumination path blooms their thin geometry into a glowing wire under the GlowLayer.
+    if (this.bearer.weaponCellShaded) flattenCellShaded(res.meshes);
+    else tuneWeapon(res.meshes); // glint + self-illumination so it reads in the dim scene
 
     const scale = this.bearer.scale ?? 1;
     const grip = this.bearer.weaponGrip ?? WEAPON_GRIP_Y; // per-weapon grip point up the mesh
@@ -899,10 +902,13 @@ export class Player {
     this.weaponHandMount = handMount;
 
     // Sheathed (on-back) mount: same grip-aligned frame, but hung on a spine bone and laid across
-    // the back. Built only if the rig has a back bone; otherwise the weapon just stays in hand.
-    const back = BACK_BONES.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
-      (n): n is NonNullable<typeof n> => !!n,
-    );
+    // the back. Built only if the rig has a back bone; otherwise (or for weaponNoSheath weapons like
+    // the bow) the weapon just stays in hand — applyWeaponSheath falls back to the hand mount.
+    const back = this.bearer.weaponNoSheath
+      ? undefined
+      : BACK_BONES.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
+          (n): n is NonNullable<typeof n> => !!n,
+        );
     if (back) {
       back.computeWorldMatrix(true);
       const bs = back.absoluteScaling;
