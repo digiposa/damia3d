@@ -10,7 +10,18 @@ import { Enemy } from "../entities/Enemy";
 import type { PartyMember } from "../entities/PartyMember";
 import { KNIGHT_OF_SANDORA, COMMANDER_SELES } from "../data/enemies";
 import { HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
+import { lootCandidates } from "../data/loot";
+import { equipSummary, type EquipDef, type EquipSlot } from "../data/equipment";
 import { t } from "../core/i18n";
+
+/** Emoji shown on a boss-loot card, by the slot it fills. */
+const LOOT_ICON: Record<EquipSlot, string> = {
+  weapon: "🗡️",
+  head: "🪖",
+  body: "🛡️",
+  feet: "👢",
+  accessory: "💍",
+};
 
 /** Local-storage key for the best (waves survived) score. */
 const BEST_KEY = "damia3d.survival.best";
@@ -50,6 +61,8 @@ export class SurvivalMode extends ArenaCombatMode {
   private cards?: RewardCards;
   private banner?: HTMLDivElement;
   private gameOver?: HTMLDivElement;
+  /** Reward screens waiting to be shown one at a time (a boss kill can trigger a level-up too). */
+  private pendingOffers: { heading: string; cards: RewardCard[] }[] = [];
 
   /** Survival starts with a lean kit (attrition!) — a few Healing Potions and two attack items,
    *  NOT the Training sampler. */
@@ -74,7 +87,7 @@ export class SurvivalMode extends ArenaCombatMode {
     super.enter(); // arena, camera, atmosphere/VFX, a bootstrap party, combat UI (no debug button)
     this.buildBanner();
     this.cards = new RewardCards(() => {
-      this.paused = false; // resume once a card is chosen
+      this.showNextOffer(); // chosen — show the next queued screen, or resume if none remain
     });
     // Straight into character selection (solo — allies are recruited as rare rewards).
     this.select = new PartySelect(selectableBearers(), (party) => this.beginRun(party), 1);
@@ -132,7 +145,7 @@ export class SurvivalMode extends ArenaCombatMode {
     if (this.runActive) this.spawnNextWave(); // wave cleared → next one (no breather heal)
   }
 
-  protected override onEnemyKilled(): void {
+  protected override onEnemyKilled(target: Enemy): void {
     if (!this.runActive) return;
     this.kills++;
     // Kills grant shared EXP (in the base). When the party's level ticks up, open the reward screen.
@@ -141,6 +154,8 @@ export class SurvivalMode extends ArenaCombatMode {
       this.lastLevel = lv;
       this.offerCards(lv);
     }
+    // Bosses drop gear: a 1-of-3 loot pick, queued after any level-up screen the same kill opened.
+    if (target.def.isBoss) this.offerLoot();
   }
 
   /** The highest level any party member has reached (drives the level-up card trigger). */
@@ -148,16 +163,59 @@ export class SurvivalMode extends ArenaCombatMode {
     return this.party.reduce((max, m) => Math.max(max, m.avatar.level), 1);
   }
 
-  /** Pause and offer {@link CARDS_PER_LEVEL} reward cards for the player to pick from. */
+  /** Offer {@link CARDS_PER_LEVEL} level-up reward cards for the player to pick from. */
   private offerCards(level: number): void {
-    const pool = this.buildRewardPool();
-    if (!pool.length) return;
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1)); // Fisher–Yates shuffle
-      [pool[i], pool[j]] = [pool[j], pool[i]];
+    const pool = this.shuffle(this.buildRewardPool());
+    this.enqueueOffer(t("survival.levelUp", { n: level }), pool.slice(0, CARDS_PER_LEVEL));
+  }
+
+  /** Offer a 1-of-{@link CARDS_PER_LEVEL} boss-loot pick: the next unowned gear up the party's
+   *  ladders. Manual — picking a card banks the item in the shared stash (equip it from the menu). */
+  private offerLoot(): void {
+    const pool = this.shuffle(lootCandidates(this.partyBearers, this.inventory).map((d) => this.lootCard(d)));
+    this.enqueueOffer(t("survival.bossLoot"), pool.slice(0, CARDS_PER_LEVEL));
+  }
+
+  /** A boss-loot card: banks one copy of the item in the shared stash and flashes a pickup banner. */
+  private lootCard(def: EquipDef): RewardCard {
+    return {
+      id: `loot:${def.id}`,
+      title: def.name,
+      desc: equipSummary(def),
+      icon: LOOT_ICON[def.slot],
+      color: "#ffd257",
+      apply: () => {
+        this.inventory.add(def.id);
+        this.showBanner(t("survival.looted", { name: def.name }), "#ffd257");
+      },
+    };
+  }
+
+  /** Queue a reward screen, showing it now if none is up. Skips empty pools. */
+  private enqueueOffer(heading: string, cards: RewardCard[]): void {
+    if (!cards.length) return;
+    this.pendingOffers.push({ heading, cards });
+    if (!this.cards?.isOpen) this.showNextOffer();
+  }
+
+  /** Show the next queued reward screen (pausing the run), or resume play once the queue is empty. */
+  private showNextOffer(): void {
+    const next = this.pendingOffers.shift();
+    if (!next) {
+      this.paused = false;
+      return;
     }
     this.paused = true;
-    this.cards?.show(t("survival.levelUp", { n: level }), pool.slice(0, CARDS_PER_LEVEL));
+    this.cards?.show(next.heading, next.cards);
+  }
+
+  /** Fisher–Yates shuffle (in place), returning the same array for chaining. */
+  private shuffle<T>(a: T[]): T[] {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
   }
 
   /** Every reward card that currently applies (situational recruit/Dragoon + always-available kit). */
