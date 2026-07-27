@@ -155,7 +155,10 @@ export const BEARERS: Bearer[] = [
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weapon: "bow", weaponModel: "shana_bow", weaponScale: 0.9, weaponGrip: 0, weaponRotation: [90, 90, 0], weaponCellShaded: true, weaponNoSheath: true, hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  // Bow weaponModel intentionally unwired: a static bow rigidly parented to a generic Mixamo hand
+  // reads wrong in poses not authored for holding one. A Tripo-made bow is planned; the weapon*
+  // fields above (rotation/scale/cellShaded/noSheath) are ready to wire it when it arrives.
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
