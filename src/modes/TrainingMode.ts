@@ -110,8 +110,14 @@ const PLAYER_REACH = 2.3;
 /** How close a ranged attacker (bow) must be to loose an arrow. */
 const RANGED_REACH = 9;
 
-/** Seconds between a ranged bearer's shots (their attack cadence). */
-const RANGED_COOLDOWN = 0.7;
+/** Seconds between a ranged bearer's shots — paced to Shana's draw→loose clip (~1.68s of clip at
+ *  the 1.2× strike playback ≈ 1.4s), so one shot is one full nock-draw-release. */
+const RANGED_COOLDOWN = 1.35;
+
+/** Delay (s) after the Attack press before the arrow actually leaves — synced to the "loose" frame
+ *  of the combined draw→shoot clip (the bow is fully drawn ~1.0s of clip in / ~0.85s real at 1.2×,
+ *  and the string releases just after). Before the draw animation existed this was a snappy 0.22s. */
+const ARROW_RELEASE_DELAY = 0.9;
 
 /** Pressing Attack with nobody in reach locks onto the nearest enemy within this radius and walks over. */
 const ACQUIRE_RANGE = 20;
@@ -1591,7 +1597,7 @@ export abstract class ArenaCombatMode extends GameMode {
       this.rangedCooldownT = RANGED_COOLDOWN; // pace shots to the draw animation
       const from = this.player.position.add(new Vector3(0, 1.3, 0));
       const to = target.position.add(new Vector3(0, 1.2, 0));
-      // Release the arrow ~0.22s in, syncing with the draw/loose animation.
+      // Hold the arrow until the "loose" frame of the draw→shoot clip (see ARROW_RELEASE_DELAY).
       this.arrows.push(
         new Arrow(
           this.scene,
@@ -1601,7 +1607,7 @@ export abstract class ArenaCombatMode extends GameMode {
           () => {
             if (target.alive) this.landDamage(target, dmg, true);
           },
-          0.22,
+          ARROW_RELEASE_DELAY,
         ),
       );
       return;
