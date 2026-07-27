@@ -14,6 +14,9 @@ import { lootCandidates } from "../data/loot";
 import { equipSummary, type EquipDef, type EquipSlot } from "../data/equipment";
 import { t } from "../core/i18n";
 
+/** Stat keys a run-wide reward card can raise (mirrors {@link Player.addRunBonus}). */
+type RunStatKey = "at" | "df" | "mat" | "mdf" | "hp";
+
 /** Emoji shown on a boss-loot card, by the slot it fills. */
 const LOOT_ICON: Record<EquipSlot, string> = {
   weapon: "🗡️",
@@ -63,6 +66,8 @@ export class SurvivalMode extends ArenaCombatMode {
   private gameOver?: HTMLDivElement;
   /** Reward screens waiting to be shown one at a time (a boss kill can trigger a level-up too). */
   private pendingOffers: { heading: string; cards: RewardCard[] }[] = [];
+  /** Run-wide stat bonuses earned from cards, applied to every member (present and future recruits). */
+  private runStatBonuses = new Map<RunStatKey, number>();
 
   /** Survival starts with a lean kit (attrition!) — a few Healing Potions and two attack items,
    *  NOT the Training sampler. */
@@ -103,6 +108,8 @@ export class SurvivalMode extends ArenaCombatMode {
     this.partyBearers = party;
     this.gambitIds = party.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.controlledIndex = 0;
+    this.runStatBonuses.clear(); // fresh run — drop last run's earned bonuses
+    this.pendingOffers = [];
     this.buildParty();
     // Clear any leftover enemies from a previous run.
     for (const e of this.enemies) e.dispose();
@@ -274,9 +281,10 @@ export class SurvivalMode extends ArenaCombatMode {
     return pool;
   }
 
-  /** A flat stat-bonus card applied to your leader (the controlled member). */
+  /** A flat stat-bonus card. The bonus is banked at the run level, so it applies to the WHOLE party
+   *  — every living member now, and any ally recruited later inherits it (see {@link applyRunBonuses}). */
   private statCard(
-    key: "at" | "df" | "mat" | "mdf" | "hp",
+    key: RunStatKey,
     amount: number,
     titleKey: string,
     descKey: string,
@@ -289,12 +297,24 @@ export class SurvivalMode extends ArenaCombatMode {
       desc: t(descKey, { n: amount }),
       icon,
       color,
-      apply: () => {
-        const a = this.controlled.avatar;
-        a.addRunBonus(key, amount);
-        this.popText(this.controlled.position.add(new Vector3(0, 2.8, 0)), `+${amount}`, color);
-      },
+      apply: () => this.grantRunBonus(key, amount, color),
     };
+  }
+
+  /** Bank a run-wide stat bonus: record it (so future recruits inherit it) and apply it to every
+   *  living member right now, popping the gain over each. */
+  private grantRunBonus(key: RunStatKey, amount: number, color: string): void {
+    this.runStatBonuses.set(key, (this.runStatBonuses.get(key) ?? 0) + amount);
+    for (const m of this.party) {
+      if (m.avatar.hp <= 0) continue; // downed members stay out for the run — no reviving via HP bonus
+      m.avatar.addRunBonus(key, amount);
+      this.popText(m.position.add(new Vector3(0, 2.8, 0)), `+${amount}`, color);
+    }
+  }
+
+  /** Apply every run-wide stat bonus banked so far to a freshly built member (a new recruit). */
+  private applyRunBonuses(member: PartyMember): void {
+    for (const [key, amount] of this.runStatBonuses) member.avatar.addRunBonus(key, amount);
   }
 
   /** Selectable bearers not already in the party (recruit candidates). */
@@ -305,7 +325,10 @@ export class SurvivalMode extends ArenaCombatMode {
 
   private recruit(bearer: Bearer): void {
     const member = this.addPartyMember(bearer);
-    if (member) this.popText(member.position.add(new Vector3(0, 2.8, 0)), "★", "#8fe3a0");
+    if (member) {
+      this.applyRunBonuses(member); // the new ally inherits every run bonus earned so far
+      this.popText(member.position.add(new Vector3(0, 2.8, 0)), "★", "#8fe3a0");
+    }
   }
 
   private grantDragoon(member: PartyMember): void {
