@@ -27,9 +27,12 @@ export interface TrainingCallbacks {
   state: () => TrainingState;
   onSetLevel: (level: number) => void;
   onSetDragoonLevel: (level: number) => void;
-  onSpawnDummy: () => void;
-  onSpawnKnight: () => void;
-  onSpawnCommander: () => void;
+  /** Spawns may resolve async (first-time model download) — the button shows a pending state. */
+  onSpawnDummy: () => void | Promise<void>;
+  onSpawnKnight: () => void | Promise<void>;
+  onSpawnCommander: () => void | Promise<void>;
+  /** Fired when the Spawn tab is shown — the mode prefetches the listed enemies' models. */
+  onSpawnTabShown?: () => void;
   onResume: () => void;
 }
 
@@ -224,11 +227,12 @@ export class TrainingMenu {
   }
 
   private renderSpawn(): HTMLElement {
+    this.cb.onSpawnTabShown?.(); // let the mode prefetch the listed enemies' models
     const box = section(t("debug.spawn"));
     box.append(
-      bigButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
-      bigButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
-      bigButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
+      spawnButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
+      spawnButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
+      spawnButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
     );
     return box;
   }
@@ -343,6 +347,24 @@ function label(text: string): HTMLDivElement {
     margin: "4px 0",
   } satisfies Partial<CSSStyleDeclaration>);
   return el;
+}
+
+/** A {@link bigButton} whose action may be async (first-time model download): while pending it
+ *  disables and shows an hourglass, then restores — so a cold spawn reads as "coming" not "broken". */
+function spawnButton(labelText: string, bg: string, onClick: () => void | Promise<void>): HTMLButtonElement {
+  const btn = bigButton(labelText, bg, () => {
+    const result = onClick();
+    if (!(result instanceof Promise)) return;
+    btn.disabled = true;
+    btn.textContent = `⏳ ${labelText}`;
+    btn.style.opacity = "0.6";
+    void result.finally(() => {
+      btn.disabled = false;
+      btn.textContent = labelText;
+      btn.style.opacity = "1";
+    });
+  });
+  return btn;
 }
 
 function bigButton(labelText: string, bg: string, onClick: () => void): HTMLButtonElement {

@@ -2,6 +2,8 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 
 import { Input } from "./Input";
 import { ModeManager } from "./ModeManager";
+import { prefetchModels } from "./AssetService";
+import { defaultPartyBearers, bearerModelNames } from "../data/bearers";
 import { hasTouch } from "./device";
 import type { GameHost, SystemSection } from "./menu";
 import { TrainingMode } from "../modes/TrainingMode";
@@ -88,6 +90,12 @@ export class Game implements GameHost {
     this.systemBtn.setVisible(true); // gear stays available on the title screen (Config only)
     this.joystick?.setVisible(false);
     this.menu.show();
+    // Warm the pipeline while the player reads the title screen: the default party's models plus
+    // the arena's stock enemies download in the background (each file at most once per page life),
+    // so a mode's loading gate is usually a sub-second flash instead of a multi-second wait.
+    const names = new Set<string>(["knight_sandora", "kos_sword"]);
+    for (const b of defaultPartyBearers()) for (const n of bearerModelNames(b)) names.add(n);
+    prefetchModels([...names]);
   }
 
   private startMode(mode: ModeId): void {

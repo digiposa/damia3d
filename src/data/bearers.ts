@@ -172,3 +172,31 @@ export function bearerById(id: string): Bearer | undefined {
 export function selectableBearers(): Bearer[] {
   return BEARERS.filter((b) => isClassImplemented(b.classId));
 }
+
+/**
+ * Default party: Damia leading, then the 3D-modeled bearers so they show up in Training.
+ * Shared by the arena modes (starting lineup) and the main menu's asset prefetch, so what the
+ * menu warms is exactly what a mode then loads.
+ */
+export function defaultPartyBearers(): Bearer[] {
+  const roster = selectableBearers();
+  const prefs = ["shana", "rose", "meru", "haschel", "lavitz", "albert"];
+  const lead = roster.find((x) => x.id === "damia") ?? DEFAULT_BEARER;
+  const team: Bearer[] = [lead];
+  for (const id of prefs) {
+    if (team.length >= 3) break;
+    const b = roster.find((x) => x.id === id);
+    if (b && !team.some((m) => m.id === b.id)) team.push(b);
+  }
+  // Top up from the implemented roster if the preferred picks weren't enough.
+  for (const b of roster) {
+    if (team.length >= 3) break;
+    if (!team.some((m) => m.id === b.id)) team.push(b);
+  }
+  return team;
+}
+
+/** Every GLB a bearer needs on screen (body, Dragoon form, weapon) — for prefetch/loading sets. */
+export function bearerModelNames(b: Bearer): string[] {
+  return [b.model, b.dragoonModel, b.weaponModel].filter((n): n is string => !!n);
+}

@@ -6,19 +6,15 @@ import { MultiMaterial } from "@babylonjs/core/Materials/multiMaterial";
 import type { Material } from "@babylonjs/core/Materials/material";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { ISceneLoaderAsyncResult } from "@babylonjs/core/Loading/sceneLoader";
+
+import { instantiateModel } from "../core/AssetService";
 
 /**
  * GLB prop pipeline. Drop `.glb` files into `src/assets/models/` and reference them by base
- * filename — no per-file import lines (Vite globs them as URLs). A scene's decor is then a
- * data list of placements ({@link PropPlacement}), so swapping procedural boxes for a real
+ * filename — no per-file import lines (the AssetService globs them as URLs). A scene's decor is
+ * then a data list of placements ({@link PropPlacement}), so swapping procedural boxes for a real
  * low-poly pack is a config change, not a rewrite. See `src/assets/models/README.md`.
  */
-const MODEL_URLS = import.meta.glob("../assets/models/*.glb", {
-  eager: true,
-  query: "?url",
-  import: "default",
-}) as Record<string, string>;
 
 /** One placed instance of a GLB model. */
 export interface PropPlacement {
@@ -140,38 +136,16 @@ export function tuneWeapon(meshes: AbstractMesh[]): void {
   });
 }
 
-/** All GLB base names currently available in src/assets/models/. */
-export function availableModels(): string[] {
-  return Object.keys(MODEL_URLS).map((k) => k.replace(/^.*\/(.+)\.glb$/, "$1"));
-}
-
 /**
- * Import a GLB by base filename (from src/assets/models/), returning the full loader result
- * (meshes + animationGroups + skeletons). The glTF loader is imported on demand and decodes
- * meshopt/WebP automatically. Returns undefined (logged) if the model file isn't present.
- * Shared by {@link loadProp} (static decor) and rigged entities (enemies/characters).
- */
-export async function importModel(scene: Scene, name: string): Promise<ISceneLoaderAsyncResult | undefined> {
-  const url = MODEL_URLS[`../assets/models/${name}.glb`];
-  if (!url) {
-    console.warn(`[props] no model "${name}.glb" in src/assets/models/`);
-    return undefined;
-  }
-  await import("@babylonjs/loaders/glTF"); // on demand → out of the initial bundle
-  const { SceneLoader } = await import("@babylonjs/core/Loading/sceneLoader");
-  const cut = url.lastIndexOf("/") + 1;
-  return SceneLoader.ImportMeshAsync("", url.slice(0, cut), url.slice(cut), scene);
-}
-
-/**
- * Load one GLB prop and place it. Returns the parent node and its meshes, or undefined if the
- * model file isn't present (logged, non-fatal — the scene keeps working without it).
+ * Load one GLB prop and place it (an instantiation from the AssetService's shared container —
+ * placing the same prop N times parses it once). Returns the parent node and its meshes, or
+ * undefined if the model file isn't present (logged, non-fatal — the scene keeps working).
  */
 export async function loadProp(
   scene: Scene,
   p: PropPlacement,
 ): Promise<{ root: TransformNode; meshes: AbstractMesh[] } | undefined> {
-  const res = await importModel(scene, p.model);
+  const res = await instantiateModel(scene, p.model);
   if (!res) return undefined;
 
   const root = new TransformNode(`prop:${p.model}`, scene);

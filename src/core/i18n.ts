@@ -25,6 +25,9 @@ const en: Dict = {
   "menu.hint.touch": "Tap a mode to start",
   "menu.hint.desktop": "Click a mode to start · ⚙ / Esc for the menu",
 
+  // Loading gate
+  "loading.assets": "Loading",
+
   // Common
   "common.resume": "Resume",
   "common.mainMenu": "Main menu",
@@ -241,6 +244,9 @@ const fr: Dict = {
   "mode.survival.blurb": "Vagues d'ennemis sans fin",
   "menu.hint.touch": "Touchez un mode pour commencer",
   "menu.hint.desktop": "Cliquez un mode pour commencer · ⚙ / Échap pour le menu",
+
+  // Loading gate
+  "loading.assets": "Chargement",
 
   "common.resume": "Reprendre",
   "common.mainMenu": "Menu principal",

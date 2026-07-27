@@ -17,7 +17,8 @@ import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
 import { Humanoid } from "./humanoid";
 import { DragoonForm } from "./DragoonForm";
-import { importModel, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
+import { flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
+import { instantiateModel } from "../core/AssetService";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
@@ -149,6 +150,9 @@ export class Player {
   /** Scene-level objects from imported GLBs (animation groups, skeletons) — NOT children of root,
    *  so they must be disposed explicitly, else they (and their observers) leak on each respawn. */
   private modelDisposables: { dispose(): void }[] = [];
+  /** Resolves once the bearer's GLB model (or the procedural fallback) is on screen — immediately
+   *  for bearers with no model. Loading gates await this so characters appear fully formed. */
+  readonly modelReady: Promise<void>;
   /** Combat stance: swaps to the combat idle/walk clips when the party is engaged (falls back to
    *  the peaceful clips when a character has no combat variant yet). Set by the mode each frame. */
   private combat = false;
@@ -181,8 +185,12 @@ export class Player {
     // rigged GLB — no point constructing (and retaining) dozens of procedural meshes just to hide
     // them behind a model. A modeled bearer loads its GLB instead; if that fails, loadModel builds
     // the placeholder as a fallback.
-    if (bearer.model) void this.loadModel(bearer.model, scene);
-    else this.buildHumanoid(scene);
+    if (bearer.model) {
+      this.modelReady = this.loadModel(bearer.model, scene).catch(() => undefined);
+    } else {
+      this.buildHumanoid(scene);
+      this.modelReady = Promise.resolve();
+    }
 
     // Dragoon-form figure, shown while transformed (the human figure is hidden). A supplied GLB
     // (bearer.dragoonModel) takes precedence over the procedural DragoonForm; classes with a built
@@ -762,9 +770,9 @@ export class Player {
    * now (no clips) — animation is grafted in later, like the base model. Best-effort.
    */
   private async loadDragoonModel(name: string, scene: Scene): Promise<void> {
-    const res = await importModel(scene, name).catch(() => undefined);
+    const res = await instantiateModel(scene, name).catch(() => undefined);
     if (!res || this.root.isDisposed()) {
-      if (res) for (const m of res.meshes) m.dispose();
+      res?.dispose();
       return;
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
@@ -808,13 +816,13 @@ export class Player {
   }
 
   private async loadModel(name: string, scene: Scene): Promise<void> {
-    const res = await importModel(scene, name).catch(() => undefined);
+    const res = await instantiateModel(scene, name).catch(() => undefined);
     if (!res) {
       if (!this.root.isDisposed()) this.buildHumanoid(scene); // model missing → procedural fallback
       return;
     }
     if (this.root.isDisposed()) {
-      for (const m of res.meshes) m.dispose();
+      res.dispose();
       return;
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
@@ -861,9 +869,9 @@ export class Player {
       (n): n is NonNullable<typeof n> => !!n,
     );
     if (!hand) return;
-    const res = await importModel(scene, name).catch(() => undefined);
+    const res = await instantiateModel(scene, name).catch(() => undefined);
     if (!res || this.root.isDisposed()) {
-      if (res) for (const m of res.meshes) m.dispose();
+      res?.dispose();
       return;
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);

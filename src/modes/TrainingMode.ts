@@ -11,7 +11,9 @@ import { createArena, clampToArena } from "../world/Arena";
 import { Atmosphere } from "../world/atmosphere";
 import { SpellFx } from "../world/SpellFx";
 import { LIGHTING_PRESETS } from "../world/lighting";
-import { loadEnvironment, importModel, type PropPlacement } from "../world/props";
+import { loadEnvironment, type PropPlacement } from "../world/props";
+import { loadModels, prefetchModels, hasContainer } from "../core/AssetService";
+import { LoadingOverlay } from "../ui/LoadingOverlay";
 import { projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
@@ -25,7 +27,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -58,7 +60,7 @@ import {
   equipmentForSlot,
   equipSummary,
 } from "../data/equipment";
-import { type Bearer, DEFAULT_BEARER, bearerById, selectableBearers } from "../data/bearers";
+import { type Bearer, bearerById, selectableBearers, defaultPartyBearers, bearerModelNames } from "../data/bearers";
 import { dragoonClass } from "../data/dragoonClasses";
 import { computeCharacterStats } from "../data/characterStats";
 import { ActionButton } from "../ui/ActionButton";
@@ -325,6 +327,8 @@ export abstract class ArenaCombatMode extends GameMode {
 
   /** True while an overlay (debug/selection/game-over) is open — pauses gameplay. */
   protected paused = false;
+  /** True while the asset loading gate's overlay is up (blocks Escape/System-menu interplay). */
+  private assetGateOpen = false;
   /** Latches once the whole party is down, so {@link onPartyWiped} fires exactly once. Subclasses
    *  reset it when restarting (e.g. Survival on Retry). */
   protected partyWiped = false;
@@ -431,7 +435,10 @@ export abstract class ArenaCombatMode extends GameMode {
     this.spellFx = new SpellFx(this.scene);
     this.refreshShadowCasters();
     void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
-    void this.warmUpModels(); // preload the enemy GLB pipeline so the first spawn swaps instantly
+    // Loading gate: pause behind a full-screen overlay until every required model (party bodies,
+    // weapons, Dragoon forms, the arena's stock enemies) is downloaded, parsed and instantiated —
+    // characters then appear fully formed and animated, never as placeholders.
+    void this.gateAssets().then(() => this.onAssetsReady());
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
     // Tapping a row takes control of that member.
@@ -456,6 +463,9 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnDummy: () => this.spawnDummy(),
         onSpawnKnight: () => this.spawnKnight(),
         onSpawnCommander: () => this.spawnCommander(),
+        // Opening the Spawn tab starts the Commander download in the background (the knight is
+        // preloaded by the entry gate), so by the time the player taps, it's usually instant.
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -597,24 +607,10 @@ export abstract class ArenaCombatMode extends GameMode {
     );
   }
 
-  /** Default party: the starting bearer plus two distinct implemented front-liners. */
+  /** Default party: the starting bearer plus two distinct implemented front-liners. Data lives in
+   *  bearers.ts so the main menu prefetches exactly this lineup's models. */
   protected defaultParty(): Bearer[] {
-    const roster = selectableBearers();
-    // Prefer the 3D-modeled bearers so they show up in Training (Damia lead, then Shana / Rose).
-    const prefs = ["shana", "rose", "meru", "haschel", "lavitz", "albert"];
-    const lead = roster.find((x) => x.id === "damia") ?? DEFAULT_BEARER;
-    const team: Bearer[] = [lead];
-    for (const id of prefs) {
-      if (team.length >= 3) break;
-      const b = roster.find((x) => x.id === id);
-      if (b && !team.some((m) => m.id === b.id)) team.push(b);
-    }
-    // Top up from the implemented roster if the preferred picks weren't enough.
-    for (const b of roster) {
-      if (team.length >= 3) break;
-      if (!team.some((m) => m.id === b.id)) team.push(b);
-    }
-    return team;
+    return defaultPartyBearers();
   }
 
   /** A small formation offset for party slot `i` around a base point. */
@@ -650,19 +646,51 @@ export abstract class ArenaCombatMode extends GameMode {
     this.refreshShadowCasters();
   }
 
+  /** Every model this mode needs before play starts: the party's bodies/weapons/Dragoon forms
+   *  plus the mode's stock enemies ({@link extraModels}). */
+  protected requiredModels(): string[] {
+    const names = new Set<string>(this.extraModels());
+    for (const b of this.partyBearers) for (const n of bearerModelNames(b)) names.add(n);
+    return [...names];
+  }
+
+  /** Mode-specific models to preload beyond the party (default: the arena's common spawns). */
+  protected extraModels(): string[] {
+    return ["knight_sandora", "kos_sword"];
+  }
+
   /**
-   * Warm the GLB pipeline up front: the first enemy spawn otherwise shows the placeholder
-   * capsule for a beat while the glTF loader module, the meshopt decoder and the model file all
-   * download. Preload the knight once and discard it — the loader/decoder stay resident and the
-   * file is HTTP-cached, so real spawns swap in immediately.
+   * Pause behind a loading overlay until {@link requiredModels} are downloaded + parsed and every
+   * live entity's instantiation has landed. Skips the overlay entirely when everything is already
+   * cached (e.g. a party rebuild from the same roster). Never rejects — a broken file logs and
+   * falls back to its procedural figure rather than soft-locking the mode. The caller decides
+   * what happens next (unpause, spawn a wave…).
    */
-  private async warmUpModels(): Promise<void> {
-    const res = await importModel(this.scene, "knight_sandora").catch(() => undefined);
-    if (!res) return;
-    for (const g of res.animationGroups) g.dispose();
-    for (const s of res.skeletons) s.dispose();
-    for (const m of res.meshes) m.dispose();
-    for (const t of res.transformNodes) t.dispose();
+  protected async gateAssets(): Promise<void> {
+    const names = this.requiredModels();
+    this.paused = true;
+    let overlay: LoadingOverlay | undefined;
+    if (!this.assetGateOpen && !names.every((n) => hasContainer(this.scene, n))) {
+      this.assetGateOpen = true;
+      overlay = new LoadingOverlay();
+    }
+    try {
+      await loadModels(this.scene, names, overlay ? (f) => overlay?.setProgress(f) : undefined);
+      await Promise.all(this.party.map((m) => m.avatar.modelReady));
+      await Promise.all(this.enemies.map((e) => e.ready));
+      this.refreshShadowCasters(); // the freshly-landed meshes must cast
+    } finally {
+      if (overlay) {
+        overlay.close();
+        this.assetGateOpen = false;
+      }
+    }
+  }
+
+  /** Called when the entry loading gate finishes. Training resumes play; Survival keeps its
+   *  party-select overlay in charge of the pause instead. */
+  protected onAssetsReady(): void {
+    this.paused = false;
   }
 
   /** Load the optional GLB decor layout and register it as static shadow casters. No-op while
@@ -721,11 +749,12 @@ export abstract class ArenaCombatMode extends GameMode {
 
   /** GameMode: is one of this mode's overlays open? (mutually exclusive with the System menu) */
   hasOpenMenu(): boolean {
-    return !!this.debugMenu?.isOpen || this.itemMenu.isOpen || this.spellMenu.isOpen;
+    return this.assetGateOpen || !!this.debugMenu?.isOpen || this.itemMenu.isOpen || this.spellMenu.isOpen;
   }
 
   /** GameMode: Escape closes the open overlay (debug/item/spell) instead of opening System. */
   closeTopMenu(): boolean {
+    if (this.assetGateOpen) return true; // the loading gate can't be dismissed — swallow Escape
     if (this.debugMenu?.isOpen) {
       this.closeDebugMenu();
       return true;
@@ -2130,7 +2159,19 @@ export abstract class ArenaCombatMode extends GameMode {
     this.addEnemy(new Enemy(this.scene, TRAINING_DUMMY, this.ringPosition(4)));
   }
 
-  private spawnKnight(): void {
+  /** Make sure an enemy's models are in this scene's container cache before constructing it, so
+   *  it pops fully formed (no capsule flash). Instant when cached; the spawn button shows its own
+   *  pending state during a first-time load. */
+  protected async ensureEnemyAssets(def: EnemyDef): Promise<void> {
+    const names = [def.model, def.weaponModel].filter((n): n is string => !!n);
+    if (names.length && !names.every((n) => hasContainer(this.scene, n))) {
+      await loadModels(this.scene, names);
+    }
+  }
+
+  private async spawnKnight(): Promise<void> {
+    await this.ensureEnemyAssets(KNIGHT_OF_SANDORA);
+    if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
   }
 
@@ -2139,7 +2180,9 @@ export abstract class ArenaCombatMode extends GameMode {
    * are present and then defeated — spawn some alongside to see the scripted
    * Seles behaviour.)
    */
-  private spawnCommander(): void {
+  private async spawnCommander(): Promise<void> {
+    await this.ensureEnemyAssets(COMMANDER_SELES);
+    if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
   }
 

@@ -11,7 +11,8 @@ import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 import type { EnemyDef } from "../data/enemies";
 import type { Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
-import { importModel, tuneImportedMetal, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
+import { tuneImportedMetal, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
+import { instantiateModel, hasContainer } from "../core/AssetService";
 
 /** Movement speed (world units / second) while chasing. */
 const SPEED = 3.2;
@@ -174,16 +175,25 @@ export class Enemy {
     }
 
     // Swap the placeholder for a rigged GLB model (with idle/walk/attack) when the def has one.
+    // When the model's container is already parsed (pre-gated spawn), hide the capsule up front
+    // so it never flashes for a frame; a cold spawn keeps it visible until the model lands.
+    if (def.model && hasContainer(scene, def.model)) {
+      for (const mesh of this.placeholder) mesh.setEnabled(false);
+    }
     this.ready = def.model ? this.loadModel(scene, def.model) : Promise.resolve();
   }
 
   /** Load the rigged model, hide the placeholder, and start the idle animation. Best-effort:
    *  a missing/failed model keeps the placeholder capsule. */
   private async loadModel(scene: Scene, name: string): Promise<void> {
-    const res = await importModel(scene, name).catch(() => undefined);
-    if (!res) return;
+    const res = await instantiateModel(scene, name).catch(() => undefined);
+    if (!res) {
+      // Failure → the capsule is the figure; re-enable it in case it was pre-hidden above.
+      if (!this.root.isDisposed()) for (const mesh of this.placeholder) mesh.setEnabled(true);
+      return;
+    }
     if (this.root.isDisposed()) {
-      for (const m of res.meshes) m.dispose();
+      res.dispose();
       return;
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
@@ -232,9 +242,9 @@ export class Enemy {
   private async attachWeapon(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
     const hand = skeleton?.bones.find((b) => b.name === "mixamorig:RightHand")?.getTransformNode();
     if (!hand) return;
-    const res = await importModel(scene, name).catch(() => undefined);
+    const res = await instantiateModel(scene, name).catch(() => undefined);
     if (!res || this.root.isDisposed()) {
-      if (res) for (const m of res.meshes) m.dispose();
+      res?.dispose();
       return;
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);

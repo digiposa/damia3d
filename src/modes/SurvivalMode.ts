@@ -1,6 +1,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 import { ArenaCombatMode } from "./TrainingMode";
+import { loadModels } from "../core/AssetService";
 import { PartySelect } from "../ui/PartySelect";
 import { RewardCards, type RewardCard } from "../ui/RewardCards";
 import { selectableBearers, type Bearer } from "../data/bearers";
@@ -64,6 +65,10 @@ export class SurvivalMode extends ArenaCombatMode {
     return this.defaultParty();
   }
 
+  /** The entry gate finishes while the party-select overlay is up — that overlay owns the pause,
+   *  so (unlike Training) don't unpause here; {@link beginRun} runs its own gate then unpauses. */
+  protected override onAssetsReady(): void {}
+
   override enter(): void {
     super.enter(); // arena, camera, atmosphere/VFX, a bootstrap party, combat UI (no debug button)
     this.buildBanner();
@@ -93,8 +98,15 @@ export class SurvivalMode extends ArenaCombatMode {
     this.lastLevel = this.partyLevelReached();
     this.partyWiped = false;
     this.runActive = true;
-    this.paused = false;
-    this.spawnNextWave();
+    // Gate wave 1 behind the loading screen until the chosen party's models (and the knights)
+    // are in — usually instant, since entering the mode already loaded the default set. Then
+    // warm the wave-5 Commander in the background so the first mini-boss pops fully formed.
+    void this.gateAssets().then(() => {
+      if (this.scene.isDisposed || !this.runActive) return;
+      this.paused = false;
+      this.spawnNextWave();
+      void loadModels(this.scene, ["commander", "commander_sword"]);
+    });
   }
 
   /** Spawn the next wave: escalating knights, plus a Commander every {@link BOSS_EVERY} waves. */
