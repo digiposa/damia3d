@@ -17,6 +17,26 @@ import { t } from "../core/i18n";
 /** Stat keys a run-wide reward card can raise (mirrors {@link Player.addRunBonus}). */
 type RunStatKey = "at" | "df" | "mat" | "mdf" | "hp";
 
+/** A reward card paired with its draw weight (higher = more likely to be offered). */
+interface WeightedCard {
+  card: RewardCard;
+  weight: number;
+}
+
+/** Draw weights per card kind. Situational-but-impactful cards (recruit, Dragoon) outweigh the
+ *  always-there filler so they surface when relevant instead of being drowned by stats/heal/potions. */
+const WEIGHT = {
+  dragoon: 6,
+  recruit: 5,
+  heal: 3,
+  stat: 2,
+  potions: 2,
+} as const;
+
+/** Soft penalty applied to a card that was offered in the immediately-previous draw, so the screen
+ *  rarely repeats back-to-back without ever hard-excluding a card (light anti-repetition). */
+const REPEAT_PENALTY = 0.2;
+
 /** Emoji shown on a boss-loot card, by the slot it fills. */
 const LOOT_ICON: Record<EquipSlot, string> = {
   weapon: "🗡️",
@@ -68,6 +88,8 @@ export class SurvivalMode extends ArenaCombatMode {
   private pendingOffers: { heading: string; cards: RewardCard[] }[] = [];
   /** Run-wide stat bonuses earned from cards, applied to every member (present and future recruits). */
   private runStatBonuses = new Map<RunStatKey, number>();
+  /** Card ids shown in the previous level-up draw — soft-penalised next time (anti-repetition). */
+  private lastOfferedIds = new Set<string>();
 
   /** Survival starts with a lean kit (attrition!) — a few Healing Potions and two attack items,
    *  NOT the Training sampler. */
@@ -109,6 +131,7 @@ export class SurvivalMode extends ArenaCombatMode {
     this.gambitIds = party.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.controlledIndex = 0;
     this.runStatBonuses.clear(); // fresh run — drop last run's earned bonuses
+    this.lastOfferedIds.clear();
     this.pendingOffers = [];
     this.buildParty();
     // Clear any leftover enemies from a previous run.
@@ -176,10 +199,31 @@ export class SurvivalMode extends ArenaCombatMode {
     return 1 + Math.floor((this.partyLevelReached() - 1) / 5);
   }
 
-  /** Offer {@link CARDS_PER_LEVEL} level-up reward cards for the player to pick from. */
+  /** Offer {@link CARDS_PER_LEVEL} level-up reward cards, drawn by weight (situational cards favoured)
+   *  and softly avoiding a repeat of the previous draw. */
   private offerCards(level: number): void {
-    const pool = this.shuffle(this.buildRewardPool());
-    this.enqueueOffer(t("survival.levelUp", { n: level }), pool.slice(0, CARDS_PER_LEVEL));
+    const cards = this.drawWeighted(this.buildRewardPool(), CARDS_PER_LEVEL);
+    this.lastOfferedIds = new Set(cards.map((c) => c.id));
+    this.enqueueOffer(t("survival.levelUp", { n: level }), cards);
+  }
+
+  /** Draw up to `n` cards from a weighted pool without replacement. A card offered last time gets a
+   *  {@link REPEAT_PENALTY} multiplier, so back-to-back repeats are rare but never impossible. */
+  private drawWeighted(pool: WeightedCard[], n: number): RewardCard[] {
+    const entries = pool.map((e) => ({
+      card: e.card,
+      weight: e.weight * (this.lastOfferedIds.has(e.card.id) ? REPEAT_PENALTY : 1),
+    }));
+    const picked: RewardCard[] = [];
+    while (picked.length < n && entries.length) {
+      const total = entries.reduce((s, e) => s + e.weight, 0);
+      let r = Math.random() * total;
+      let i = entries.findIndex((e) => (r -= e.weight) < 0);
+      if (i < 0) i = entries.length - 1; // rounding guard
+      picked.push(entries[i].card);
+      entries.splice(i, 1);
+    }
+    return picked;
   }
 
   /** Offer a 1-of-{@link CARDS_PER_LEVEL} boss-loot pick: the next unowned gear up the party's
@@ -231,20 +275,24 @@ export class SurvivalMode extends ArenaCombatMode {
     return a;
   }
 
-  /** Every reward card that currently applies (situational recruit/Dragoon + always-available kit). */
-  private buildRewardPool(): RewardCard[] {
-    const pool: RewardCard[] = [];
+  /** Every reward card that currently applies, each with its draw weight (situational recruit/Dragoon
+   *  + always-available kit). {@link drawWeighted} samples this. */
+  private buildRewardPool(): WeightedCard[] {
+    const pool: WeightedCard[] = [];
 
     // Recruit: one card per available ally candidate (capped so the screen isn't flooded).
     if (this.party.length < 3) {
       for (const b of this.recruitPool().slice(0, 3)) {
         pool.push({
-          id: `recruit:${b.id}`,
-          title: t("reward.recruit", { name: b.name }),
-          desc: t("reward.recruitDesc", { name: b.name }),
-          icon: "🧑‍🤝‍🧑",
-          color: "#8fe3a0",
-          apply: () => this.recruit(b),
+          weight: WEIGHT.recruit,
+          card: {
+            id: `recruit:${b.id}`,
+            title: t("reward.recruit", { name: b.name }),
+            desc: t("reward.recruitDesc", { name: b.name }),
+            icon: "🧑‍🤝‍🧑",
+            color: "#8fe3a0",
+            apply: () => this.recruit(b),
+          },
         });
       }
     }
@@ -252,39 +300,48 @@ export class SurvivalMode extends ArenaCombatMode {
     // Dragoon Spirit: one card per living member who lacks the transform.
     for (const m of this.party.filter((x) => x.avatar.hp > 0 && !x.avatar.dragoonUnlocked)) {
       pool.push({
-        id: `dragoon:${m.avatar.bearer.id}`,
-        title: t("reward.dragoon"),
-        desc: t("reward.dragoonDesc", { name: m.avatar.bearer.name }),
-        icon: "✦",
-        color: "#ffe27a",
-        apply: () => this.grantDragoon(m),
+        weight: WEIGHT.dragoon,
+        card: {
+          id: `dragoon:${m.avatar.bearer.id}`,
+          title: t("reward.dragoon"),
+          desc: t("reward.dragoonDesc", { name: m.avatar.bearer.name }),
+          icon: "✦",
+          color: "#ffe27a",
+          apply: () => this.grantDragoon(m),
+        },
       });
     }
 
     // Party-wide stat upgrades (bonuses ON TOP of the canon level stats — not canon values). The
     // amount scales with progression so a card stays worthwhile deep into a run (see rewardTier).
     const tier = this.rewardTier();
-    pool.push(this.statCard("at", 2 * tier, "reward.atk", "reward.atkDesc", "🗡️", "#ff8a5c"));
-    pool.push(this.statCard("df", 2 * tier, "reward.def", "reward.defDesc", "🛡️", "#9ad0ff"));
-    pool.push(this.statCard("mat", 2 * tier, "reward.mat", "reward.matDesc", "🔮", "#c9a2ff"));
-    pool.push(this.statCard("hp", 25 * tier, "reward.hp", "reward.hpDesc", "🫀", "#ff6a8a"));
+    pool.push({ weight: WEIGHT.stat, card: this.statCard("at", 2 * tier, "reward.atk", "reward.atkDesc", "🗡️", "#ff8a5c") });
+    pool.push({ weight: WEIGHT.stat, card: this.statCard("df", 2 * tier, "reward.def", "reward.defDesc", "🛡️", "#9ad0ff") });
+    pool.push({ weight: WEIGHT.stat, card: this.statCard("mat", 2 * tier, "reward.mat", "reward.matDesc", "🔮", "#c9a2ff") });
+    pool.push({ weight: WEIGHT.stat, card: this.statCard("hp", 25 * tier, "reward.hp", "reward.hpDesc", "🫀", "#ff6a8a") });
 
     // Always available: a full heal (precious given no between-wave recovery) and a supply cache.
     pool.push({
-      id: "heal",
-      title: t("reward.heal"),
-      desc: t("reward.healDesc"),
-      icon: "❤️",
-      color: "#7ec8ff",
-      apply: () => this.healParty(),
+      weight: WEIGHT.heal,
+      card: {
+        id: "heal",
+        title: t("reward.heal"),
+        desc: t("reward.healDesc"),
+        icon: "❤️",
+        color: "#7ec8ff",
+        apply: () => this.healParty(),
+      },
     });
     pool.push({
-      id: "potions",
-      title: t("reward.potions"),
-      desc: t("reward.potionsDesc"),
-      icon: "🧪",
-      color: "#8fe3a0",
-      apply: () => this.stock(HEALING_POTION, 3),
+      weight: WEIGHT.potions,
+      card: {
+        id: "potions",
+        title: t("reward.potions"),
+        desc: t("reward.potionsDesc"),
+        icon: "🧪",
+        color: "#8fe3a0",
+        apply: () => this.stock(HEALING_POTION, 3),
+      },
     });
     return pool;
   }
