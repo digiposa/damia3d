@@ -170,6 +170,12 @@ export class SurvivalMode extends ArenaCombatMode {
     return this.party.reduce((max, m) => Math.max(max, m.avatar.level), 1);
   }
 
+  /** Stat-card scaling tier: steps up every 5 party levels so a flat bonus keeps pace with the
+   *  run (×1 at levels 1–5 → +2 AT / +25 HP; ×8 past level 35 → +16 AT / +200 HP). */
+  private rewardTier(): number {
+    return 1 + Math.floor((this.partyLevelReached() - 1) / 5);
+  }
+
   /** Offer {@link CARDS_PER_LEVEL} level-up reward cards for the player to pick from. */
   private offerCards(level: number): void {
     const pool = this.shuffle(this.buildRewardPool());
@@ -255,11 +261,13 @@ export class SurvivalMode extends ArenaCombatMode {
       });
     }
 
-    // Stat upgrades for your leader (bonuses ON TOP of the canon level stats — not canon values).
-    pool.push(this.statCard("at", 2, "reward.atk", "reward.atkDesc", "🗡️", "#ff8a5c"));
-    pool.push(this.statCard("df", 2, "reward.def", "reward.defDesc", "🛡️", "#9ad0ff"));
-    pool.push(this.statCard("mat", 2, "reward.mat", "reward.matDesc", "🔮", "#c9a2ff"));
-    pool.push(this.statCard("hp", 25, "reward.hp", "reward.hpDesc", "🫀", "#ff6a8a"));
+    // Party-wide stat upgrades (bonuses ON TOP of the canon level stats — not canon values). The
+    // amount scales with progression so a card stays worthwhile deep into a run (see rewardTier).
+    const tier = this.rewardTier();
+    pool.push(this.statCard("at", 2 * tier, "reward.atk", "reward.atkDesc", "🗡️", "#ff8a5c"));
+    pool.push(this.statCard("df", 2 * tier, "reward.def", "reward.defDesc", "🛡️", "#9ad0ff"));
+    pool.push(this.statCard("mat", 2 * tier, "reward.mat", "reward.matDesc", "🔮", "#c9a2ff"));
+    pool.push(this.statCard("hp", 25 * tier, "reward.hp", "reward.hpDesc", "🫀", "#ff6a8a"));
 
     // Always available: a full heal (precious given no between-wave recovery) and a supply cache.
     pool.push({
