@@ -332,7 +332,7 @@ export class SystemMenu {
     );
     for (const opt of equip.options(slot)) {
       box.appendChild(
-        listRow(opt.name, opt.detail, opt.equipped, true, () => {
+        listRow(opt.name, opt.detail, opt.equipped, opt.enabled ?? true, () => {
           equip.equip(slot, opt.id);
           this.render();
         }),

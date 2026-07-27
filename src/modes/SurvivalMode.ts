@@ -35,6 +35,7 @@ export class SurvivalMode extends ArenaCombatMode {
   protected unlockDragoonOnBuild = false; // the Dragoon Spirit is a card reward, not a given
   protected shareXpWithParty = true; // canon: each living member earns the full kill EXP
   protected allowPartyEditing = false; // the party is fixed at the start; it only grows via cards
+  protected allowAllGear = false; // may only equip OWNED gear (starting kit + future loot), not the catalog
 
   /** The menu only shows the members you actually have (started with + recruited), not the roster. */
   protected menuRoster(): Bearer[] {

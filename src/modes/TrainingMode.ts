@@ -35,6 +35,7 @@ import {
   BASIC_ATTACK,
 } from "../data/additions";
 import { RosterStore, EQUIP_SLOTS } from "../data/roster";
+import { EquipInventory } from "../data/inventory";
 import {
   additionAttack,
   dragoonAttack,
@@ -373,6 +374,13 @@ export abstract class ArenaCombatMode extends GameMode {
    *  yes. Survival: no — the party is fixed at the start and only grows via reward cards. */
   protected allowPartyEditing = true;
 
+  /** Whether every catalog item is equippable (sandbox). Training: yes. Survival/Story: no — you
+   *  may only equip gear the party {@link inventory owns}. */
+  protected allowAllGear = true;
+  /** Owned-equipment stash (a shared inventory). Only consulted when {@link allowAllGear} is off;
+   *  seeded from each member's starting loadout, grown by loot/rewards/shops. */
+  protected inventory = new EquipInventory();
+
   /** Hook: the last enemy was cleared from the arena. Survival advances to the next wave. */
   protected onEnemiesCleared(): void {}
 
@@ -396,6 +404,7 @@ export abstract class ArenaCombatMode extends GameMode {
   protected addPartyMember(bearer: Bearer): PartyMember | undefined {
     if (this.party.length >= 3) return undefined;
     const i = this.party.length;
+    this.inventory.grantLoadout(bearer); // a recruit brings (owns) their starting kit
     this.partyBearers.push(bearer);
     this.gambitIds.push([...DEFAULT_GAMBIT_IDS]);
     const spawn = this.player.position.clone().add(this.formationOffset(i));
@@ -637,6 +646,7 @@ export abstract class ArenaCombatMode extends GameMode {
     for (const m of this.party) m.dispose();
     this.controlledIndex = Math.min(this.controlledIndex, this.partyBearers.length - 1);
     this.party = this.partyBearers.map((b, i) => {
+      this.inventory.grantLoadout(b); // each member owns their starting kit (once)
       const brain = new GambitBrain(resolveGambit(this.gambitIds[i] ?? DEFAULT_GAMBIT_IDS));
       const m = new PartyMember(this.scene, b, base.add(this.formationOffset(i)), brain, this.partyLevel);
       if (this.unlockDragoonOnBuild) m.avatar.unlockDragoon(); // Dragoon Spirit (SP/MP/transform)
@@ -2108,12 +2118,23 @@ export abstract class ArenaCombatMode extends GameMode {
         equippedName: cfg.equipment[slot] ? equipById(cfg.equipment[slot]!)?.name : undefined,
       })),
       options: (slot) =>
-        equipmentForSlot(slot, cls.equipmentUser).map((def) => ({
-          id: def.id,
-          name: def.name,
-          detail: equipSummary(def),
-          equipped: cfg.equipment[slot] === def.id,
-        })),
+        equipmentForSlot(slot, cls.equipmentUser).flatMap((def) => {
+          const here = cfg.equipment[slot] === def.id; // this character already wears it
+          // Training is a sandbox: the whole catalog is free. Elsewhere you may only equip gear the
+          // party OWNS, and each owned copy is a single instance — a copy worn by another member
+          // isn't available here (own one Bastard Sword → Dart OR Zieg; own two → both).
+          if (this.allowAllGear) {
+            return [{ id: def.id, name: def.name, detail: equipSummary(def), equipped: here, enabled: true }];
+          }
+          const owned = this.inventory.count(def.id);
+          if (owned <= 0 && !here) return []; // don't own it → hide entirely
+          const holders = this.slotHolders(def.id, slot, id); // other party members wearing a copy
+          const free = here || owned - holders.length > 0;
+          let detail = equipSummary(def);
+          if (owned > 1) detail += ` ·×${owned}`;
+          if (!free && holders.length) detail += ` · ${t("equip.heldBy", { name: holders[0] })}`;
+          return [{ id: def.id, name: def.name, detail, equipped: here, enabled: free }];
+        }),
       equip: (slot, eid) => this.setEquip(id, slot, eid),
     };
 
@@ -2134,10 +2155,24 @@ export abstract class ArenaCombatMode extends GameMode {
     p.addition = p.additions.find((a) => a.name === cfg.additionName) ?? BASIC_ATTACK;
   }
 
-  /** Set a character's equipment (store + live avatar if it's in the party). */
+  /** Names of OTHER party members currently wearing a copy of `equipId` in `slot` (for the
+   *  availability count and the "held by X" note). Excludes the character being edited. */
+  private slotHolders(equipId: string, slot: EquipSlot, exceptBearerId: string): string[] {
+    return this.partyBearers
+      .filter((b) => b.id !== exceptBearerId && this.roster.get(b).equipment[slot] === equipId)
+      .map((b) => b.name);
+  }
+
+  /** Set a character's equipment (store + live avatar if it's in the party). Outside Training the
+   *  gear must be owned and a free copy available — a spoofed call for a taken/unowned item is a
+   *  no-op (the UI already greys those out). */
   private setEquip(bearerId: string, slot: EquipSlot, id?: string): void {
     const bearer = bearerById(bearerId);
     if (!bearer) return;
+    if (id && !this.allowAllGear) {
+      const free = this.roster.get(bearer).equipment[slot] === id || this.inventory.count(id) - this.slotHolders(id, slot, bearerId).length > 0;
+      if (!free) return;
+    }
     this.roster.get(bearer).equipment[slot] = id;
     const live = this.party.find((m) => m.avatar.bearer.id === bearerId)?.avatar;
     if (live) {

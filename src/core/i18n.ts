@@ -77,6 +77,7 @@ const en: Dict = {
   "equip.empty": "(empty)",
   "equip.none": "— None",
   "equip.back": "‹ Back",
+  "equip.heldBy": "held by {name}",
 
   // Addition
   "addition.unavailable": "Additions unavailable in this mode.",
@@ -293,6 +294,7 @@ const fr: Dict = {
   "equip.empty": "(vide)",
   "equip.none": "— Aucun",
   "equip.back": "‹ Retour",
+  "equip.heldBy": "équipée par {name}",
 
   "addition.unavailable": "Additions indisponibles dans ce mode.",
   "addition.none": "Ce personnage n'a pas d'Additions — il attaque directement.",

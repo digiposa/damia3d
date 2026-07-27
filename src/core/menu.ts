@@ -49,9 +49,12 @@ export interface EquipSlotState {
 export interface EquipOption {
   id: string;
   name: string;
-  /** One-line bonuses / effect summary. */
+  /** One-line bonuses / effect summary (may note copies owned / who holds it). */
   detail: string;
   equipped: boolean;
+  /** False = owned but every copy is in use by another member — shown greyed, not selectable.
+   *  Undefined/true = selectable (a free copy, already worn here, or Training's free-for-all). */
+  enabled?: boolean;
 }
 
 /** Equipment data + actions exposed to the System menu's Equipment tab. */
