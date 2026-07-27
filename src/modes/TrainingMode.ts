@@ -110,14 +110,14 @@ const PLAYER_REACH = 2.3;
 /** How close a ranged attacker (bow) must be to loose an arrow. */
 const RANGED_REACH = 9;
 
-/** Seconds between a ranged bearer's shots — paced to Shana's draw→loose clip (~1.68s of clip at
- *  the 1.2× strike playback ≈ 1.4s), so one shot is one full nock-draw-release. */
-const RANGED_COOLDOWN = 1.35;
-
 /** Delay (s) after the Attack press before the arrow actually leaves — synced to the "loose" frame
  *  of the combined draw→shoot clip (the bow is fully drawn ~1.0s of clip in / ~0.85s real at 1.2×,
  *  and the string releases just after). Before the draw animation existed this was a snappy 0.22s. */
 const ARROW_RELEASE_DELAY = 0.9;
+
+/** How long a basic attacker is rooted while its shot plays (the draw→loose clip, ~1.68s at the
+ *  1.2× strike playback ≈ 1.4s). She's free to move again while the ATB gauge refills. */
+const ATTACK_ROOT_TIME = 1.4;
 
 /** Pressing Attack with nobody in reach locks onto the nearest enemy within this radius and walks over. */
 const ACQUIRE_RANGE = 20;
@@ -327,7 +327,9 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Current combat-stance state, for detecting the enter/leave edge (float-text tag). */
   private inCombat = false;
   /** Ranged fire cooldown (real seconds) so bow bearers don't spray arrows. */
-  private rangedCooldownT = 0;
+  /** While > 0 the controlled basic attacker is rooted mid-shot (the bow draw→loose plays). Set on
+   *  fire, ticks down; movement resumes while the ATB gauge refills. */
+  private attackAnimT = 0;
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
 
@@ -840,7 +842,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // running or while a ranged shot is in progress/cooling down (no move-spam/kiting),
     // and guarding roots in place too. The post-whiff lockout doesn't root (you may
     // reposition while you can't attack).
-    const rooted = this.player.guardActive || this.runner.active || this.rangedCooldownT > 0;
+    const rooted = this.player.guardActive || this.runner.active || this.attackAnimT > 0;
     const before = this.player.position.clone();
     // Walk vs run: gauged by joystick magnitude on touch (past RUN_THRESHOLD = run); desktop
     // click-to-move has no analog input, so it defaults to a run. Holding Alt forces a walk
@@ -867,7 +869,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
-    if (this.rangedCooldownT > 0) this.rangedCooldownT = Math.max(0, this.rangedCooldownT - dt);
+    if (this.attackAnimT > 0) this.attackAnimT = Math.max(0, this.attackAnimT - dt);
 
     // Attack is the ⚔ button / click / Space (the timed combo). The other ATB actions
     // are the left-column buttons (or G/R/T/F keys); each is gated by the ATB gauge.
@@ -1519,8 +1521,11 @@ export abstract class ArenaCombatMode extends GameMode {
       return;
     }
 
-    // In reach: ranged bearers fire on a fixed cadence — one arrow per draw, no spraying.
-    if (this.isRanged() && this.rangedCooldownT > 0) return;
+    // A basic attacker (bow: Shana/Miranda) fires on its ATB cadence: only when the gauge is full,
+    // and firing spends it (below). This unifies its cadence with melee Additions — both gate on
+    // the same gauge and the ⚔ button's ready-glow — instead of a parallel fixed cooldown. In
+    // Dragoon form the attack is the D'Attack combo, which gates inside the runner instead.
+    if (this.player.usesBasicAttack && !this.player.transformed && !this.runner.gauge.isReady) return;
     if (this.actionRecoveryT > 0) return; // post-action breather
 
     // In Dragoon form the Attack command is the D'Attack (its own combo + damage formula).
@@ -1536,6 +1541,8 @@ export abstract class ArenaCombatMode extends GameMode {
     // earn SP through their timing presses. No SP while transformed (the gauge is draining).
     if (this.player.usesBasicAttack && !this.comboIsDragoon) {
       this.player.gainSp(this.player.spPerBasicAttack);
+      this.runner.gauge.spend(); // firing spends the ATB — it must refill before the next shot
+      this.attackAnimT = ATTACK_ROOT_TIME; // rooted while the draw→loose plays
     }
     // A single-hit attack (basic / archer D'Attack) resolves at once → close it out now;
     // multi-hit combos close in resolveTimingPress when they complete or break.
@@ -1592,9 +1599,9 @@ export abstract class ArenaCombatMode extends GameMode {
       ? this.dragoonHitDamage(k, df, mods)
       : this.additionHitDamage(k, df, mods);
 
-    // Ranged bearers loose an arrow: damage lands when it reaches the target.
+    // Ranged bearers loose an arrow: damage lands when it reaches the target. (Cadence is the ATB
+    // gauge now — spent by the caller when a basic shot fires — not a separate cooldown.)
     if (this.isRanged()) {
-      this.rangedCooldownT = RANGED_COOLDOWN; // pace shots to the draw animation
       const from = this.player.position.add(new Vector3(0, 1.3, 0));
       const to = target.position.add(new Vector3(0, 1.2, 0));
       // Hold the arrow until the "loose" frame of the draw→shoot clip (see ARROW_RELEASE_DELAY).
@@ -1918,7 +1925,7 @@ export abstract class ArenaCombatMode extends GameMode {
       this.arrows.push(
         new Arrow(this.scene, from, to, ARROW_SPEED, () => {
           if (target.alive) this.landDamage(target, dmg, attacker === this.player);
-        }, 0.22),
+        }, ARROW_RELEASE_DELAY),
       );
       return;
     }
@@ -2242,7 +2249,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // Magic/Return); each also needs its own precondition. Transform appears once SP is full.
     const transformed = p.transformed;
     const ready = this.runner.gauge.isReady && !this.runner.active; // ATB full, no combo
-    const canStart = ready && !p.guardActive && this.rangedCooldownT <= 0;
+    const canStart = ready && !p.guardActive && this.attackAnimT <= 0;
 
     // Attack stays usable mid-combo (timing presses) and when ready to begin; glow = ready.
     // Its icon swaps with the form: blue sword (human) ↔ red sword (dragoon).
