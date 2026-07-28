@@ -1022,17 +1022,31 @@ export class Player {
       const backSocket = new TransformNode(`weaponBackSocket:${this.bearer.id}`, scene);
       backSocket.parent = back;
       backSocket.scaling = new Vector3(scale / bs.x, scale / bs.y, scale / bs.z);
-      // Sheathed placement, in the cancelled frame (world units): lay the weapon across the back.
-      const backWeapon = new TransformNode(`weaponBack:${this.bearer.id}`, scene);
-      backWeapon.parent = backSocket;
-      backWeapon.rotation = BACK_ROT.clone();
-      backWeapon.position = BACK_POS.clone();
-      backWeapon.scaling.setAll(wScale);
-      const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
-      backMount.parent = backWeapon;
-      backMount.rotation.x = 0; // no flip → head/mass hangs DOWN, handle up (unlike the hand's PI)
-      backMount.position.y = BACK_GRIP; // back seat is independent of the hand grip
-      this.weaponBackMount = backMount;
+      if (this.bearer.weaponBackRotation || this.bearer.weaponBackOffset) {
+        // Per-weapon slung pose: one clean node in the world-unit frame (identical maths to the
+        // quiver's back item), fully specified by the bearer — no sword-tuned defaults.
+        const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
+        backMount.parent = backSocket;
+        if (this.bearer.weaponBackOffset) backMount.position = Vector3.FromArray(this.bearer.weaponBackOffset);
+        if (this.bearer.weaponBackRotation) {
+          const [rx, ry, rz] = this.bearer.weaponBackRotation;
+          backMount.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
+        }
+        backMount.scaling.setAll(this.bearer.weaponBackScale ?? wScale);
+        this.weaponBackMount = backMount;
+      } else {
+        // Sheathed placement, in the cancelled frame (world units): lay the weapon across the back.
+        const backWeapon = new TransformNode(`weaponBack:${this.bearer.id}`, scene);
+        backWeapon.parent = backSocket;
+        backWeapon.rotation = BACK_ROT.clone();
+        backWeapon.position = BACK_POS.clone();
+        backWeapon.scaling.setAll(wScale);
+        const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
+        backMount.parent = backWeapon;
+        backMount.rotation.x = 0; // no flip → head/mass hangs DOWN, handle up (unlike the hand's PI)
+        backMount.position.y = BACK_GRIP; // back seat is independent of the hand grip
+        this.weaponBackMount = backMount;
+      }
     }
 
     for (const mesh of res.meshes) {

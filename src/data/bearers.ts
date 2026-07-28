@@ -104,12 +104,20 @@ export interface Bearer {
    *  metallic tuning — for vertex-coloured props like Shana's bow, which otherwise blooms into a
    *  glowing wire under the GlowLayer. */
   weaponCellShaded?: boolean;
-  /** Keep the weapon in the hand at all times (never holster to the back) — for a bow, which reads
-   *  better held than slung, and avoids the sword-tuned back placement. */
+  /** Keep the weapon in the hand at all times (never holster to the back) — avoids the sword-tuned
+   *  back placement for a weapon whose sheathed pose isn't tuned. */
   weaponNoSheath?: boolean;
   /** Full hand-mount orientation in DEGREES [x,y,z], replacing the default blade-up flip — for
    *  weapons that aren't a +Y blade (Shana's bow stands vertical, held sideways). */
   weaponRotation?: [number, number, number];
+  /** Sheathed (on-back) pose overrides for the weapon, in the spine's scale-cancelled (world-unit)
+   *  frame — same clean single-node placement as {@link backModelOffset}/{@link backModelRotation},
+   *  bypassing the sword-tuned back defaults. Set either to opt a weapon (e.g. the bow) into a proper
+   *  slung-on-the-back pose while still drawing to the hand in combat. */
+  weaponBackRotation?: [number, number, number];
+  weaponBackOffset?: [number, number, number];
+  /** Uniform world scale of the sheathed weapon. Default: the hand-held {@link weaponScale}. */
+  weaponBackScale?: number;
   /** Optional GLB permanently strapped to the model's spine bone (e.g. Shana's quiver). Unlike
    *  {@link weaponModel} it never draws to the hand — it just rides the back through every animation.
    *  Only used alongside {@link model}. */
@@ -172,11 +180,12 @@ export const BEARERS: Bearer[] = [
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
   // Shana carries a Tripo-made bow (shana_bow.glb): painted (cellShaded so it doesn't bloom under the
-  // GlowLayer), kept in hand (noSheath). The GLB pivot was re-centred on the riser, so grip 0 seats
-  // it in the fist and rotation [0,0,90] stands it upright at her side. Her quiver (shana_quiver.glb)
-  // rides the spine permanently (backModel*): re-centred pivot, flipped 180° so the arrows rise over
-  // the shoulder, hugged to the back. All tuned via src/dev/poseViewer.
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponNoSheath: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], deathAnim: "shana_death", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  // GlowLayer). The GLB pivot was re-centred on the riser, so grip 0 seats it in the fist and rotation
+  // [0,0,90] stands it upright at her side. Out of combat it now slings to her back (weaponBack*),
+  // drawing to the hand when enemies are near. Her quiver (shana_quiver.glb) rides the spine
+  // permanently (backModel*): re-centred pivot, flipped 180° so the arrows rise over the shoulder,
+  // hugged to the back. All tuned via src/dev/poseViewer.
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, weaponBackRotation: [0, 0, 90], weaponBackOffset: [0.1, 0, -0.2], weaponBackScale: 1.4, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], deathAnim: "shana_death", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
