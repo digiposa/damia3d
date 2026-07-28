@@ -32,6 +32,9 @@ const MODEL_TARGET_H = 1.8;
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
 const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
+/** Left-hand bone name, same rig order — for a bow, held in the bow hand (left) while the right
+ *  draws the string. Selected via the bearer's {@link Bearer.weaponLeftHand}. */
+const LEFT_HAND_BONES = ["CC_Base_L_Hand", "mixamorig:LeftHand", "LeftHand"];
 /** Upper-back / spine bone the weapon is holstered on while sheathed (out of combat), by rig. */
 const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "mixamorig:Spine", "CC_Base_Spine01"];
 /** Sheathed pose (tuned from screenshots), in the scale-cancelled spine-bone frame:
@@ -961,7 +964,8 @@ export class Player {
    *  (large, mirrored) world scale is cancelled by a socket, then the weapon is sized in world units;
    *  the mesh is flipped and grip-aligned so the haft seats in the fist and the head points up. */
   private async attachWeapon(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
-    const hand = HAND_BONES.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
+    const handBones = this.bearer.weaponLeftHand ? LEFT_HAND_BONES : HAND_BONES;
+    const hand = handBones.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
       (n): n is NonNullable<typeof n> => !!n,
     );
     if (!hand) return;

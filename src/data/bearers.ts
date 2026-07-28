@@ -110,6 +110,9 @@ export interface Bearer {
   /** Full hand-mount orientation in DEGREES [x,y,z], replacing the default blade-up flip — for
    *  weapons that aren't a +Y blade (Shana's bow stands vertical, held sideways). */
   weaponRotation?: [number, number, number];
+  /** Attach the weapon to the LEFT hand instead of the right — the bow hand, so the right can draw
+   *  the string. */
+  weaponLeftHand?: boolean;
   /** Sheathed (on-back) pose overrides for the weapon, in the spine's scale-cancelled (world-unit)
    *  frame — same clean single-node placement as {@link backModelOffset}/{@link backModelRotation},
    *  bypassing the sword-tuned back defaults. Set either to opt a weapon (e.g. the bow) into a proper
@@ -185,7 +188,7 @@ export const BEARERS: Bearer[] = [
   // drawing to the hand when enemies are near. Her quiver (shana_quiver.glb) rides the spine
   // permanently (backModel*): re-centred pivot, flipped 180° so the arrows rise over the shoulder,
   // hugged to the back. All tuned via src/dev/poseViewer.
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, weaponBackRotation: [0, 0, 10], weaponBackOffset: [0.1, 0, -0.2], weaponBackScale: 1.4, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], deathAnim: "shana_death", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponLeftHand: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, weaponBackRotation: [0, 0, 10], weaponBackOffset: [0.1, 0, -0.2], weaponBackScale: 1.4, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], deathAnim: "shana_death", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
