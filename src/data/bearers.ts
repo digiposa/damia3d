@@ -226,5 +226,5 @@ export function defaultPartyBearers(): Bearer[] {
 
 /** Every GLB a bearer needs on screen (body, Dragoon form, weapon) — for prefetch/loading sets. */
 export function bearerModelNames(b: Bearer): string[] {
-  return [b.model, b.dragoonModel, b.weaponModel].filter((n): n is string => !!n);
+  return [b.model, b.dragoonModel, b.weaponModel, b.backModel].filter((n): n is string => !!n);
 }
