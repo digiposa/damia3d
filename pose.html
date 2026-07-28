@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Damia3D · Pose Viewer (dev)</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #14161a; overflow: hidden; }
+      #renderCanvas { width: 100vw; height: 100vh; display: block; touch-action: none; }
+      #hud {
+        position: fixed; left: 10px; bottom: 10px; z-index: 5;
+        font: 600 13px/1.3 system-ui, sans-serif; color: #eafaef;
+        background: rgba(0,0,0,0.45); padding: 6px 10px; border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="renderCanvas"></canvas>
+    <div id="hud">loading…</div>
+    <script type="module" src="/src/dev/poseViewer.ts"></script>
+  </body>
+</html>
