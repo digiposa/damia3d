@@ -415,6 +415,7 @@ export class SurvivalMode extends ArenaCombatMode {
 
   protected override onMemberDowned(member: PartyMember): void {
     this.popText(member.position.add(new Vector3(0, 2.6, 0)), "✖", "#ff6a6a");
+    member.avatar.playDeath(); // collapse now (the just-downed member is about to lose control)
     this.takeControlOfLiving(); // front the next living member (no-op if none — wipe fires next frame)
   }
 

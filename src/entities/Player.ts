@@ -19,7 +19,7 @@ import { Humanoid } from "./humanoid";
 import { DragoonForm } from "./DragoonForm";
 import { flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import { instantiateModel } from "../core/AssetService";
-import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
 const WALK_SPEED = 3.2; // world units per second (gentle joystick / combat pace)
@@ -136,9 +136,12 @@ export class Player {
     runCombat?: AnimationGroup;
     draw?: AnimationGroup;
     sheathe?: AnimationGroup;
+    death?: AnimationGroup;
   } = {};
   private modelCurrent?: AnimationGroup;
   private modelAttacking = false;
+  /** True once the death collapse has been triggered (KO); cleared by {@link animate} on revive. */
+  private downed = false;
   /** Weapon holstering: the top-level weapon meshes and the two mount points they swap between —
    *  the hand (drawn, in combat) and the back (sheathed, out of combat). */
   private weaponMeshes: AbstractMesh[] = [];
@@ -674,6 +677,12 @@ export class Player {
   /** Advance the active figure's idle/walk/run animation (visual only). `running` selects the run
    *  clip over the walk clip while moving (gauged by joystick magnitude / desktop click-to-move). */
   animate(dt: number, moving: boolean, running = false): void {
+    // Downed: hold the collapsed death pose. Auto-recover when HP is restored (revive spell/item)
+    // so the caller doesn't have to thread a separate "un-KO" signal back to the model.
+    if (this.downed) {
+      if (this.hp > 0) this.downed = false; // revived → fall through and resume normal locomotion
+      else return; // still dead → let the frozen death clip own the body
+    }
     if (this.dragoonActive && this.dragoonModelRoot) return; // static GLB dragoon model (no clips yet)
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.update(dt, moving);
@@ -862,6 +871,49 @@ export class Player {
 
     if (this.bearer.weaponModel) await this.attachWeapon(this.bearer.weaponModel, scene, res.skeletons[0]);
     if (this.bearer.backModel) await this.attachBackItem(this.bearer.backModel, scene, res.skeletons[0]);
+    if (this.bearer.deathAnim) await this.loadDeathAnim(this.bearer.deathAnim, scene, res.skeletons[0]);
+  }
+
+  /** Load a standalone animation-only GLB (a Mixamo clip, same mixamorig skeleton) and retarget it
+   *  onto this model's live skeleton by bone name, storing it as the death clip. The clip's own nodes
+   *  and skeleton are discarded — only the retargeted, scene-owned {@link AnimationGroup} is kept. */
+  private async loadDeathAnim(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
+    if (!skeleton) return;
+    const res = await instantiateModel(scene, name).catch(() => undefined);
+    if (!res || this.root.isDisposed()) {
+      res?.dispose();
+      return;
+    }
+    const src = res.animationGroups[0];
+    if (src) {
+      const nameToNode = new Map<string, TransformNode>();
+      for (const b of skeleton.bones) {
+        const n = b.getTransformNode();
+        if (n) nameToNode.set(n.name, n);
+      }
+      const group = new AnimationGroup(`death:${this.bearer.id}`, scene);
+      for (const ta of src.targetedAnimations) {
+        const node = nameToNode.get((ta.target as { name?: string }).name ?? "");
+        if (node) group.addTargetedAnimation(ta.animation.clone(), node); // clone: src is disposed below
+      }
+      this.modelAnims.death = group;
+      this.modelDisposables.push(group);
+    }
+    res.dispose(); // drop the clip's throwaway nodes/skeleton + source group (animations were cloned)
+  }
+
+  /** Play the one-shot death collapse and hold the final frame. Idempotent (a downed member calls it
+   *  every frame); a no-op without a death clip, so other bearers keep their old "idle while KO" look.
+   *  {@link animate} holds the pose while downed and auto-clears the flag when HP is restored (revive). */
+  playDeath(): void {
+    const g = this.modelAnims.death;
+    if (!g || this.downed) return;
+    this.downed = true;
+    this.modelAttacking = false;
+    this.modelCurrent?.stop();
+    this.modelCurrent = g;
+    g.start(false, 1, g.from, g.to);
+    g.onAnimationGroupEndObservable.addOnce(() => g.goToFrame(g.to)); // freeze collapsed on the ground
   }
 
   /** Strap a GLB permanently to the model's spine bone so it rides the back through every animation

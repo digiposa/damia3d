@@ -123,6 +123,9 @@ export interface Bearer {
   backModelOffset?: [number, number, number];
   /** Flat-shade the back item (painted/wooden look) instead of the metallic weapon tuning. */
   backModelCellShaded?: boolean;
+  /** Optional animation-only GLB (a Mixamo clip on the same mixamorig skeleton) retargeted onto the
+   *  model as its death collapse, played once on KO. Only used alongside {@link model}. */
+  deathAnim?: string;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -173,7 +176,7 @@ export const BEARERS: Bearer[] = [
   // it in the fist and rotation [0,0,90] stands it upright at her side. Her quiver (shana_quiver.glb)
   // rides the spine permanently (backModel*): re-centred pivot, flipped 180° so the arrows rise over
   // the shoulder, hugged to the back. All tuned via src/dev/poseViewer.
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponNoSheath: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponNoSheath: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], deathAnim: "shana_death", weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
@@ -226,5 +229,5 @@ export function defaultPartyBearers(): Bearer[] {
 
 /** Every GLB a bearer needs on screen (body, Dragoon form, weapon) — for prefetch/loading sets. */
 export function bearerModelNames(b: Bearer): string[] {
-  return [b.model, b.dragoonModel, b.weaponModel, b.backModel].filter((n): n is string => !!n);
+  return [b.model, b.dragoonModel, b.weaponModel, b.backModel, b.deathAnim].filter((n): n is string => !!n);
 }

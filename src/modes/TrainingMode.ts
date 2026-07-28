@@ -1816,8 +1816,9 @@ export abstract class ArenaCombatMode extends GameMode {
    * approach, strike (auto-resolving the full Addition), or hold while charging.
    */
   private updateAiMember(member: PartyMember, dt: number, cdt: number, aliveEnemies: Enemy[]): void {
-    // A downed member (KO in Survival) neither charges nor acts — it just holds its pose.
+    // A downed member (KO in Survival) neither charges nor acts — it collapses and holds the pose.
     if (member.avatar.hp <= 0) {
+      member.avatar.playDeath(); // idempotent: triggers the collapse once, then animate() holds it
       member.avatar.animate(dt, false);
       member.syncHud(this.scene);
       return;

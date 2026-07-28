@@ -76,7 +76,8 @@ player.root.rotation.y = (num("yaw", 0) * Math.PI) / 180;
 
 const hud = document.getElementById("hud")!;
 void player.modelReady.then(() => {
-  player.setCombat(true); // weapon in hand (not sheathed)
+  if (q.has("death")) player.playDeath(); // preview the death collapse
+  else player.setCombat(true); // weapon in hand (not sheathed)
   const r = bearer.weaponRotation ?? [0, 0, 0];
   const br = bearer.backModelRotation ?? [0, 0, 0];
   const bo = bearer.backModelOffset ?? [0, 0, 0];
