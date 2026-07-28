@@ -44,6 +44,8 @@ const BACK_GRIP = 0.5;
 const WEAPON_SCALE = 0.9;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
 const WEAPON_GRIP_Y = 0.6;
+/** Uniform world scale of a back-strapped item (Shana's quiver) when the bearer gives no override. */
+const BACK_ITEM_SCALE = 1.3;
 const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 100 at D'Lv5)
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
@@ -859,6 +861,48 @@ export class Player {
     this.playModel(this.modelAnims.idle, true);
 
     if (this.bearer.weaponModel) await this.attachWeapon(this.bearer.weaponModel, scene, res.skeletons[0]);
+    if (this.bearer.backModel) await this.attachBackItem(this.bearer.backModel, scene, res.skeletons[0]);
+  }
+
+  /** Strap a GLB permanently to the model's spine bone so it rides the back through every animation
+   *  (Shana's quiver). Unlike {@link attachWeapon} there is no hand mount and no holster swap — the
+   *  socket cancels the bone's (large, mirrored) world scale, then a single node places the item in a
+   *  clean world-unit frame via the bearer's backModelOffset / backModelRotation / backModelScale. */
+  private async attachBackItem(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
+    const spine = BACK_BONES.map((n) => skeleton?.bones.find((b) => b.name === n)?.getTransformNode()).find(
+      (n): n is NonNullable<typeof n> => !!n,
+    );
+    if (!spine) return;
+    const res = await instantiateModel(scene, name).catch(() => undefined);
+    if (!res || this.root.isDisposed()) {
+      res?.dispose();
+      return;
+    }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
+    if (this.bearer.backModelCellShaded) flattenCellShaded(res.meshes);
+    else tuneWeapon(res.meshes);
+
+    const scale = this.bearer.scale ?? 1;
+    const iScale = this.bearer.backModelScale ?? BACK_ITEM_SCALE;
+    spine.computeWorldMatrix(true);
+    const ss = spine.absoluteScaling;
+    // Socket cancels the bone's huge, mirrored world scale — ONLY scale, so the mount below lives in
+    // a clean ~world-unit frame (a position on the socket itself would be flung metres away).
+    const socket = new TransformNode(`backItemSocket:${this.bearer.id}`, scene);
+    socket.parent = spine;
+    socket.scaling = new Vector3(scale / ss.x, scale / ss.y, scale / ss.z);
+    const mount = new TransformNode(`backItem:${this.bearer.id}`, scene);
+    mount.parent = socket;
+    if (this.bearer.backModelOffset) mount.position = Vector3.FromArray(this.bearer.backModelOffset);
+    if (this.bearer.backModelRotation) {
+      const [rx, ry, rz] = this.bearer.backModelRotation;
+      mount.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
+    }
+    mount.scaling.setAll(iScale);
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = mount;
+      mesh.isPickable = false;
+    }
   }
 
   /** Attach a weapon GLB to the model's right-hand bone so it follows every animation. The bone's

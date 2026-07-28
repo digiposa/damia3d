@@ -8,6 +8,9 @@
  *   ?bearer=shana            which bearer to show (default shana)
  *   &rx=90&ry=90&rz=0        weaponRotation override (degrees)
  *   &scale=1.4&grip=0.5      weaponScale / weaponGrip overrides
+ *   &bx=0&by=0&bz=0          backModelRotation override (degrees)
+ *   &bscale=1.3              backModelScale override
+ *   &box=0&boy=0&boz=-0.15   backModelOffset override (world units on the spine)
  *   &yaw=0                   spin the figure about Y (degrees)
  *   &alpha=1.6&beta=1.3&radius=3.2&ty=1.2   camera orbit (rad) / target height
  * Served at /pose.html in `npm run dev`.
@@ -60,6 +63,13 @@ if (q.has("rx") || q.has("ry") || q.has("rz")) {
 }
 if (q.has("scale")) bearer.weaponScale = num("scale", 1);
 if (q.has("grip")) bearer.weaponGrip = num("grip", 0.5);
+if (q.has("bx") || q.has("by") || q.has("bz")) {
+  bearer.backModelRotation = [num("bx", 0), num("by", 0), num("bz", 0)];
+}
+if (q.has("bscale")) bearer.backModelScale = num("bscale", 1.3);
+if (q.has("box") || q.has("boy") || q.has("boz")) {
+  bearer.backModelOffset = [num("box", 0), num("boy", 0), num("boz", 0)];
+}
 
 const player = new Player(scene, bearer);
 player.root.rotation.y = (num("yaw", 0) * Math.PI) / 180;
@@ -68,7 +78,11 @@ const hud = document.getElementById("hud")!;
 void player.modelReady.then(() => {
   player.setCombat(true); // weapon in hand (not sheathed)
   const r = bearer.weaponRotation ?? [0, 0, 0];
-  hud.textContent = `${bearerId} · rot[${r.join(",")}]° · scale ${bearer.weaponScale ?? "def"} · grip ${bearer.weaponGrip ?? "def"}`;
+  const br = bearer.backModelRotation ?? [0, 0, 0];
+  const bo = bearer.backModelOffset ?? [0, 0, 0];
+  hud.textContent =
+    `bow rot[${r.join(",")}]° scale ${bearer.weaponScale ?? "def"} grip ${bearer.weaponGrip ?? "def"}` +
+    (bearer.backModel ? ` · quiver rot[${br.join(",")}]° scale ${bearer.backModelScale ?? "def"} off[${bo.join(",")}]` : "");
   hud.dataset.ready = "1"; // Playwright waits on this before screenshotting
 });
 

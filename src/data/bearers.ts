@@ -110,6 +110,19 @@ export interface Bearer {
   /** Full hand-mount orientation in DEGREES [x,y,z], replacing the default blade-up flip — for
    *  weapons that aren't a +Y blade (Shana's bow stands vertical, held sideways). */
   weaponRotation?: [number, number, number];
+  /** Optional GLB permanently strapped to the model's spine bone (e.g. Shana's quiver). Unlike
+   *  {@link weaponModel} it never draws to the hand — it just rides the back through every animation.
+   *  Only used alongside {@link model}. */
+  backModel?: string;
+  /** Back-item orientation in DEGREES [x,y,z] in the spine's scale-cancelled (world-unit) frame. */
+  backModelRotation?: [number, number, number];
+  /** Uniform world scale of the back item. Default {@link BACK_ITEM_SCALE}. */
+  backModelScale?: number;
+  /** Back-item position offset [x,y,z] in world units on the spine frame: shift it across the back,
+   *  drop it down, and push it off the body. */
+  backModelOffset?: [number, number, number];
+  /** Flat-shade the back item (painted/wooden look) instead of the metallic weapon tuning. */
+  backModelCellShaded?: boolean;
   /** Weapon the placeholder figure carries (default "sword"). */
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
@@ -157,8 +170,10 @@ export const BEARERS: Bearer[] = [
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },
   // Shana carries a Tripo-made bow (shana_bow.glb): painted (cellShaded so it doesn't bloom under the
   // GlowLayer), kept in hand (noSheath). The GLB pivot was re-centred on the riser, so grip 0 seats
-  // it in the fist and rotation [0,0,90] stands it upright at her side — tuned via src/dev/poseViewer.
-  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponNoSheath: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
+  // it in the fist and rotation [0,0,90] stands it upright at her side. Her quiver (shana_quiver.glb)
+  // rides the spine permanently (backModel*): re-centred pivot, flipped 180° so the arrows rise over
+  // the shoulder, hugged to the back. All tuned via src/dev/poseViewer.
+  { id: "shana", name: "Shana", classId: "whiteSilver", portrait: shanaPortrait, model: "shana", weaponModel: "shana_bow", weaponCellShaded: true, weaponNoSheath: true, weaponRotation: [0, 0, 90], weaponScale: 1.4, weaponGrip: 0, backModel: "shana_quiver", backModelCellShaded: true, backModelRotation: [0, 0, 180], backModelScale: 1.0, backModelOffset: [0, -0.06, -0.11], weapon: "bow", hair: "bob", outfit: "archer", color: C_LIGHT, storyPlayable: true },
   { id: "miranda", name: "Miranda", classId: "whiteSilver", portrait: mirandaPortrait, weapon: "bow", hair: "flow", outfit: "valkyrie", color: C_LIGHT, storyPlayable: true },
   // Violet (Thunder) — martial artist (fists)
   { id: "kanzas", name: "Kanzas", classId: "thunder", portrait: kanzasPortrait, weapon: "fist", hair: "firebrand", outfit: "enforcer", color: C_THUNDER, storyPlayable: false },
