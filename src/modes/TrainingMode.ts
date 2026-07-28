@@ -873,8 +873,11 @@ export abstract class ArenaCombatMode extends GameMode {
     }
     this.camera.follow(this.player.position);
     this.camera.tickShake(dt);
-    // Procedural walk/run/idle animation (visual only, uses real time).
-    this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6, running);
+    // Procedural walk/run/idle animation (visual only, uses real time). While an Addition combo is
+    // running (or a ranged shot is mid-flight), stay in the attack stance so the swing doesn't snap
+    // back to idle between timing presses.
+    const attacking = this.runner.active || this.attackAnimT > 0;
+    this.player.animate(dt, Vector3.DistanceSquared(before, this.player.position) > 1e-6, running, attacking);
     this.updateCombatState(dt); // toggle the party's combat vs exploration stance
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
@@ -1189,7 +1192,7 @@ export abstract class ArenaCombatMode extends GameMode {
       for (const m of this.party) {
         if (m !== this.controlled) this.updateAiMember(m, dt * COMBO_TIME_SCALE, worldDt, aliveEnemies);
       }
-      this.player.animate(dt, false, false);
+      this.player.animate(dt, false, false, true); // mashing an attack item — hold the attack stance
       this.camera.follow(this.player.position);
     }
     this.camera.tickShake(dt);

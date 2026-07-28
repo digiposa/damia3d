@@ -679,7 +679,7 @@ export class Player {
 
   /** Advance the active figure's idle/walk/run animation (visual only). `running` selects the run
    *  clip over the walk clip while moving (gauged by joystick magnitude / desktop click-to-move). */
-  animate(dt: number, moving: boolean, running = false): void {
+  animate(dt: number, moving: boolean, running = false, attacking = false): void {
     // Downed: hold the collapsed death pose. Auto-recover when HP is restored (revive spell/item)
     // so the caller doesn't have to thread a separate "un-KO" signal back to the model.
     if (this.downed) {
@@ -695,6 +695,15 @@ export class Player {
       this.updateWeaponHolster(); // draw / sheathe on a combat-stance change
       // The draw/sheathe clip (like the attack) owns the body until it ends — don't override it.
       if (!this.modelAttacking && !this.weaponTransition) {
+        // Mid-Addition, between the swings of a combo: hold a fighting posture instead of relaxing
+        // to the peaceful idle. The one-shot strike clip ends between timing presses, and these
+        // models have no combat-idle, so without this the attack visibly "cuts" back to idle each
+        // gap. Use the combat idle if the model has one, else just hold the strike's final pose
+        // (leave modelCurrent where the last strike left it) until the combo resolves.
+        if (attacking && !moving) {
+          if (this.modelAnims.idleCombat) this.playModel(this.modelAnims.idleCombat, true);
+          return; // else: hold the current (post-strike) pose — don't override to idle
+        }
         const idle = (this.combat && this.modelAnims.idleCombat) || this.modelAnims.idle;
         const walk = (this.combat && this.modelAnims.walkCombat) || this.modelAnims.walk;
         const run = (this.combat && this.modelAnims.runCombat) || this.modelAnims.run;
