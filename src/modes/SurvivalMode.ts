@@ -51,14 +51,13 @@ const BEST_KEY = "damia3d.survival.best";
 /** A "mini-boss" (Commander) reinforces the wave every this-many waves. */
 const BOSS_EVERY = 5;
 /**
- * Survival enemy scaling. The base defs are tutorial-tier (a Seles Knight has 4 HP, AT 2), so a
- * geared character one-shots every mob — which also cuts Additions short (the target dies on hit 1,
- * before the timing window even opens). Survival lifts the base stats well above tutorial values and
- * ramps them per wave. First-pass values — tune from play.
- *   stat × (base + perWave × (wave − 1))
+ * Survival enemy scaling: stat × (base + perWave × (wave − 1)). Currently NEUTRAL (×1) — early waves
+ * use the raw base defs, so enemies don't one-shot the player. The Addition-can-always-complete fix
+ * lives in the combat core (damage lands at the end of the QTE), not here. Turn these up later to
+ * ramp difficulty once the curve is calibrated.
  */
-const HP_SCALE = { base: 8, perWave: 2 };
-const AT_SCALE = { base: 3, perWave: 0.5 };
+const HP_SCALE = { base: 1, perWave: 0 };
+const AT_SCALE = { base: 1, perWave: 0 };
 /** How many reward cards to offer on a level-up. */
 const CARDS_PER_LEVEL = 3;
 

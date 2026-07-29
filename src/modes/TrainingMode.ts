@@ -333,6 +333,9 @@ export abstract class ArenaCombatMode extends GameMode {
   private attackAnimT = 0;
   private runner = new AdditionRunner();
   private comboTarget?: Enemy;
+  /** Damage accrued over the current Addition/D'Attack, applied all at once when it ends (canon PS1:
+   *  the combo's damage lands at the end of the QTE, so a weak enemy survives the whole combo). */
+  private comboDamage = 0;
 
   /** True while an overlay (debug/selection/game-over) is open — pauses gameplay. */
   protected paused = false;
@@ -908,9 +911,8 @@ export abstract class ArenaCombatMode extends GameMode {
     this.runner.setFillTime(this.player.atbFillTime);
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
-      this.comboTarget = undefined;
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
-      this.finishAction(); // a lapsed combo closes the action too
+      this.finishAction(); // a lapsed combo closes the action (and lands the hits already landed)
     }
     // Slowed (or frozen, at scale 0) while the player combos.
     if (worldScale > 0) {
@@ -1006,8 +1008,20 @@ export abstract class ArenaCombatMode extends GameMode {
    *  Dragoon form just spent its last turn — revert now (at the action's END, so the boosted
    *  stats covered the whole action). Death (HP 0) reverts separately and immediately. */
   private finishAction(): void {
+    this.landComboDamage(); // canon: an Addition's damage lands at the END of the QTE, not per hit
+    this.comboTarget = undefined;
     this.actionRecoveryT = ACTION_RECOVERY;
     if (this.player.dragoonSpent) this.player.revert();
+  }
+
+  /** Apply the whole Addition/D'Attack total to its target in one blow (see {@link applyHit}). Landing
+   *  the damage only here means the enemy can't die mid-combo, so the QTE always plays out — you can
+   *  always finish an Addition even on a weak foe. Includes the hits landed before a broken combo. */
+  private landComboDamage(): void {
+    if (this.comboDamage > 0 && this.comboTarget && this.comboTarget.alive) {
+      this.landDamage(this.comboTarget, this.comboDamage, true);
+    }
+    this.comboDamage = 0;
   }
 
   private doGuard(m: PartyMember): boolean {
@@ -1547,6 +1561,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const res = this.runner.press(def);
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
+    this.comboDamage = 0; // fresh combo — start its damage tally from zero
     this.player.face(target.position.subtract(this.player.position));
     this.player.tickDragoon(); // one attack = one Dragoon turn
     this.applyHit(target, res.hits); // guaranteed hit 1
@@ -1570,9 +1585,8 @@ export abstract class ArenaCombatMode extends GameMode {
     const res = this.runner.press(add);
 
     if (res.kind === "miss") {
-      this.comboTarget = undefined;
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
-      this.finishAction(); // a broken combo still closes the action (breather + Dragoon revert)
+      this.finishAction(); // broken combo → lands the hits you did land, then closes the action
       return;
     }
     if (res.kind !== "hit" || !target || !target.alive) return;
@@ -1587,8 +1601,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), TEXT.perfect);
     if (res.completed) {
       if (!dragoon) this.player.recordAddition(add);
-      this.comboTarget = undefined;
-      this.finishAction(); // combo finished cleanly → breather + Dragoon revert if spent
+      this.finishAction(); // combo finished cleanly → lands the total, breather + Dragoon revert
     }
   }
 
@@ -1633,7 +1646,11 @@ export abstract class ArenaCombatMode extends GameMode {
       return;
     }
 
-    this.landDamage(target, dmg, true); // applyHit is the controlled player's Addition/D'Attack
+    // Melee Addition/D'Attack: don't apply the hit now. Accumulate it and land the whole total when
+    // the combo ends (see finishAction/landComboDamage) — canon PS1, and it keeps the enemy alive
+    // through the QTE so the Addition always completes. A spark still fires per swing for feedback.
+    this.comboDamage += dmg;
+    this.atmosphere?.spark(target.headPosition);
   }
 
   /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
