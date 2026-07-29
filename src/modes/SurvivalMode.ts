@@ -51,13 +51,15 @@ const BEST_KEY = "damia3d.survival.best";
 /** A "mini-boss" (Commander) reinforces the wave every this-many waves. */
 const BOSS_EVERY = 5;
 /**
- * Survival enemy scaling: stat × (base + perWave × (wave − 1)). Currently NEUTRAL (×1) — early waves
- * use the raw base defs, so enemies don't one-shot the player. The Addition-can-always-complete fix
- * lives in the combat core (damage lands at the end of the QTE), not here. Turn these up later to
- * ramp difficulty once the curve is calibrated.
+ * Survival enemy scaling: the tutorial-tier base def stats × (base + perLevel × (avgLevel − 1)),
+ * driven by the party's AVERAGE level so difficulty tracks the party's growth (levels + reward cards
+ * + loot) rather than the raw wave count. HP is the main lever (attrition); AT ramps far more gently
+ * since there's no healing between waves — a steep AT curve one-shots the player. Nothing here is
+ * final: first-pass values, and the whole balance will be revisited (esp. once more enemy types
+ * exist — for now it's just the Knight + Commander, so some imbalance is expected/accepted).
  */
-const HP_SCALE = { base: 1, perWave: 0 };
-const AT_SCALE = { base: 1, perWave: 0 };
+const HP_SCALE = { base: 1, perLevel: 0.6 };
+const AT_SCALE = { base: 1, perLevel: 0.12 };
 /** How many reward cards to offer on a level-up. */
 const CARDS_PER_LEVEL = 3;
 
@@ -181,9 +183,9 @@ export class SurvivalMode extends ArenaCombatMode {
    *  AT_SCALE). Cloning keeps the shared def untouched — the Enemy reads maxHp/at from this copy
    *  everywhere (HP bar, self-heal clamp, damage dealt), so scaling stays consistent. */
   private scaledDef(def: EnemyDef): EnemyDef {
-    const w = this.wave;
-    const hpMult = HP_SCALE.base + HP_SCALE.perWave * (w - 1);
-    const atMult = AT_SCALE.base + AT_SCALE.perWave * (w - 1);
+    const lv = this.partyLevelAverage();
+    const hpMult = HP_SCALE.base + HP_SCALE.perLevel * (lv - 1);
+    const atMult = AT_SCALE.base + AT_SCALE.perLevel * (lv - 1);
     return {
       ...def,
       stats: {
@@ -216,6 +218,12 @@ export class SurvivalMode extends ArenaCombatMode {
   /** The highest level any party member has reached (drives the level-up card trigger). */
   private partyLevelReached(): number {
     return this.party.reduce((max, m) => Math.max(max, m.avatar.level), 1);
+  }
+
+  /** The party's average level — drives enemy stat scaling so difficulty tracks the party's power. */
+  private partyLevelAverage(): number {
+    if (!this.party.length) return 1;
+    return this.party.reduce((sum, m) => sum + m.avatar.level, 0) / this.party.length;
   }
 
   /** Stat-card scaling tier: steps up every 5 party levels so a flat bonus keeps pace with the
