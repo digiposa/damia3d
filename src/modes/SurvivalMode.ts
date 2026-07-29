@@ -8,7 +8,7 @@ import { selectableBearers, type Bearer } from "../data/bearers";
 import { DEFAULT_GAMBIT_IDS } from "../combat/Gambit";
 import { Enemy } from "../entities/Enemy";
 import type { PartyMember } from "../entities/PartyMember";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, type EnemyDef } from "../data/enemies";
 import { HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
 import { lootCandidates } from "../data/loot";
 import { equipSummary, type EquipDef, type EquipSlot } from "../data/equipment";
@@ -50,6 +50,15 @@ const LOOT_ICON: Record<EquipSlot, string> = {
 const BEST_KEY = "damia3d.survival.best";
 /** A "mini-boss" (Commander) reinforces the wave every this-many waves. */
 const BOSS_EVERY = 5;
+/**
+ * Survival enemy scaling. The base defs are tutorial-tier (a Seles Knight has 4 HP, AT 2), so a
+ * geared character one-shots every mob — which also cuts Additions short (the target dies on hit 1,
+ * before the timing window even opens). Survival lifts the base stats well above tutorial values and
+ * ramps them per wave. First-pass values — tune from play.
+ *   stat × (base + perWave × (wave − 1))
+ */
+const HP_SCALE = { base: 8, perWave: 2 };
+const AT_SCALE = { base: 3, perWave: 0.5 };
 /** How many reward cards to offer on a level-up. */
 const CARDS_PER_LEVEL = 3;
 
@@ -160,13 +169,30 @@ export class SurvivalMode extends ArenaCombatMode {
     const isBoss = this.wave % BOSS_EVERY === 0;
     const knights = Math.min(8, 2 + Math.floor(this.wave / 2));
     for (let i = 0; i < knights; i++) {
-      this.addEnemy(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition(6)));
+      this.addEnemy(new Enemy(this.scene, this.scaledDef(KNIGHT_OF_SANDORA), this.ringPosition(6)));
     }
-    if (isBoss) this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(9)));
+    if (isBoss) this.addEnemy(new Enemy(this.scene, this.scaledDef(COMMANDER_SELES), this.ringPosition(9)));
     this.showBanner(
       isBoss ? t("survival.miniBoss", { n: this.wave }) : t("survival.wave", { n: this.wave }),
       isBoss ? "#ff8a5c" : "#ffe08a",
     );
+  }
+
+  /** A wave-scaled clone of an enemy def: HP and AT lifted off the tutorial-tier base (see HP_SCALE /
+   *  AT_SCALE). Cloning keeps the shared def untouched — the Enemy reads maxHp/at from this copy
+   *  everywhere (HP bar, self-heal clamp, damage dealt), so scaling stays consistent. */
+  private scaledDef(def: EnemyDef): EnemyDef {
+    const w = this.wave;
+    const hpMult = HP_SCALE.base + HP_SCALE.perWave * (w - 1);
+    const atMult = AT_SCALE.base + AT_SCALE.perWave * (w - 1);
+    return {
+      ...def,
+      stats: {
+        ...def.stats,
+        maxHp: Math.max(1, Math.round(def.stats.maxHp * hpMult)),
+        at: Math.max(1, Math.round(def.stats.at * atMult)),
+      },
+    };
   }
 
   // --- ArenaCombatMode hooks ------------------------------------------------
