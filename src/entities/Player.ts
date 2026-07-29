@@ -767,6 +767,11 @@ export class Player {
     if (this.modelRoot) {
       const a = this.modelAnims.attack;
       if (!a) return; // no attack clip yet — stay in the current loop
+      // These strike clips are a full 1–2s swing (neutral → hit → neutral). An Addition calls
+      // strike() on EVERY hit, so restarting the clip each timing press would snap the in-progress
+      // swing back to its neutral first frame — reading as a "cut to idle" mid-combo. If a swing is
+      // already playing, let it run to completion instead of restarting it.
+      if (this.modelAttacking && this.modelCurrent === a) return;
       this.modelAttacking = true;
       this.modelCurrent?.stop();
       this.modelCurrent = a;
