@@ -1,6 +1,116 @@
 # Design notes / backlog
 
-Living list of agreed reworks and open design questions. Not user-facing.
+Living list of agreed design decisions, reworks, and open questions. Not user-facing. The first
+part below (**"Decisions log"**) records systems we've built and *why*, so reworking them later
+doesn't mean re-reading all of `src/`. The older **"Review queue"** and per-system sections that
+follow are the original backlog.
+
+---
+
+# Decisions log (implemented systems)
+
+Each entry: the decision, where it lives in code, and what's still open / tunable. Nothing is final.
+
+## Project framing / positioning
+
+- **Primary goal = fidelity to the PS1 game.** Damia3D is a faithful tribute; canon behaviour wins
+  over invention wherever we can manage it.
+- **Original assets are only a fallback**, not the goal: if Sony ever objects, the plan is to take it
+  down or swap to original assets while staying a love letter to LoD. (This reversed an earlier
+  framing where "original game" was the stated aim — it is *not*.)
+- Public one-liner used for the Discord preview: *unofficial, non-commercial fan project, not
+  affiliated with Sony.*
+- **Dev/deploy:** work directly on `main`, every change pushed → GitHub Pages auto-deploys (only
+  `main` deploys). See `CLAUDE.md`. The in-game top-left `build <hash>` shows the deployed commit.
+
+## Game modes & the mode-flag pattern
+
+- `ArenaCombatMode` (in `src/modes/TrainingMode.ts`) is the shared combat core; **Training** and
+  **Survival** are subclasses that flip behaviour via protected flags:
+  `showDebugTools`, `startFullSp`, `reviveOnZero`, `unlockDragoonOnBuild`, `shareXpWithParty`,
+  `allowPartyEditing`, `allowAllGear`.
+- **Training** = sandbox: all flags permissive (spawn tools, full SP, revive on zero, all gear,
+  party editing). A place to test freely.
+- **Survival** = roguelite: lean, no revive, earn SP/Dragoon over the run, owned-gear only, party
+  fixed at start and grown only via reward cards.
+- **Story** *(planned)* — will follow the PS1 scenario, plus an original **prologue set during the
+  Dragon Campaign**. Still a stub.
+
+## Equipment ownership (Étape 1 — done)
+
+- **Training = all gear free** (sandbox). **Survival/Story = you can only equip what you actually
+  own.** Decided to match LoD's model.
+- Model: a shared **`EquipInventory`** stash (`src/data/inventory.ts`) — count per item id, plus a
+  `granted` set so party rebuilds don't re-grant loadouts. `grantLoadout(bearer)` gives a member
+  their class starting kit once.
+- **Weapons are class-bound** (Dart & Zieg share the redEye weapons via each class's
+  `equipmentUser` tag) — already worked through the class binding, no data migration needed.
+- **Availability is derived, not bookkept:** `available(x) = owned(x) − (party members wearing x)`.
+  Owning 1 Bastard Sword → Dart *or* Zieg; owning 2 → both. `slotHolders()` computes who's wearing
+  what; the equip menu greys out owned-but-taken items (`EquipOption.enabled`, `SystemMenu`).
+- Lives in: `inventory.ts`, `TrainingMode` (`allowAllGear`, `inventory`, `slotHolders`, gated
+  `setEquip`), `SurvivalMode` (`allowAllGear = false`), `core/menu.ts` + `ui/SystemMenu.ts`.
+
+## Survival mode design
+
+- **Solo start**, party grows only via recruit reward cards (cap 3). No healing between waves —
+  HP/MP/SP persist, so **attrition is the core challenge**. Wipe → Game Over + saved best (waves).
+- **Waves:** `knights = min(8, 2 + floor(wave/2))`; a **Commander mini-boss every `BOSS_EVERY` (5)
+  waves**. `onEnemiesCleared` → next wave (no breather).
+- **Reward cards on level-up** (`RewardCards` UI, 1-of-`CARDS_PER_LEVEL` (3)):
+  - Pool: recruit ally, unlock Dragoon Spirit, **run-wide stat bonuses**, full heal, potions.
+  - **Stat cards are run-wide** (whole party, present + future recruits inherit via
+    `runStatBonuses` / `applyRunBonuses`) — they used to touch only the leader.
+  - **Amounts scale** with `rewardTier() = 1 + floor((level−1)/5)` (×1 early → ×8 late), so a flat
+    bonus stays relevant.
+  - **Weighted draw + light anti-repeat:** `WEIGHT` (dragoon 6, recruit 5, heal 3, stat/potions 2),
+    sampled without replacement; a card shown last draw gets a `REPEAT_PENALTY` (0.2) so screens
+    don't repeat back-to-back. Situational cards no longer get drowned.
+- **Boss loot (Étape 2 — done):** on a boss kill, a 1-of-3 **gear** pick (reuses the card UI).
+  Candidates = the *next unowned* rung up each party ladder (`lootCandidates` in `src/data/loot.ts`):
+  weapons follow the **canon AT curve**, armour its defence tier, accessories their headline stat;
+  class-filtered and deduped. **Manual**: picking banks the item in the stash (equip from the menu),
+  no auto-equip. A boss kill that also levels up queues both screens (`pendingOffers`).
+- **Enemy scaling** (`SurvivalMode.scaledDef`): tutorial base stats × `(base + perLevel×(avgLevel−1))`,
+  driven by the party's **average level** (tracks card/loot power, not raw wave count). `HP_SCALE`
+  `{base 1, perLevel 0.6}` is the main lever; `AT_SCALE` `{base 1, perLevel 0.12}` ramps gently
+  because there's no between-wave healing (steep AT one-shots the player). DF deliberately **not**
+  scaled (base Knight DF 40 already crushes damage; raising it makes sponges).
+  - **Open / accepted:** balance is intentionally rough — only the Knight + Commander exist, so
+    variety (not stat inflation) is the real fix. Curve is first-pass, expected to be re-tuned.
+    Reward-card *content* additions (MDF/SP/MP cards) were paused.
+
+## Combat feel decisions
+
+- **Additions deal their damage at the END of the QTE (canon PS1).** Each landed hit is accumulated
+  (`comboDamage`) and the total lands once when the combo ends — complete, break, or lapse — via
+  `landComboDamage()` in `finishAction()`. Consequence: **the enemy can't die mid-combo**, so you
+  can always finish an Addition even on a 4-HP mob; the big number pops at the end. A broken combo
+  still lands the hits you did land. Ranged (single shot, arrow) still lands on arrival.
+  - This replaced per-hit damage, which let weak enemies die on hit 1 before the timing window even
+    opened (you couldn't perform the Addition). Lives in `TrainingMode` (`applyHit`, `comboDamage`,
+    `landComboDamage`, `finishAction`).
+- **Attack stance held through an Addition:** the one-shot strike clip is 1–2 s and was restarted on
+  every hit, snapping the swing back to its neutral first frame (read as "cut to idle"). Now
+  `strike()` won't restart a swing already in progress, and `animate(…, attacking)` keeps a combat
+  stance between swings (combat-idle if the model has one, else holds the strike's end pose) instead
+  of relaxing to the peaceful idle. Lives in `src/entities/Player.ts`, driven from `TrainingMode`.
+
+## Character models & weapon-mount conventions
+
+- **Shana's bow (Tripo `shana_bow.glb`):** slung on her **back out of combat**, drawn to hand when
+  enemies are near (the standard holster: `draw`/`sheathe` by combat stance). Held in the **left
+  (bow) hand** (`weaponLeftHand`), stood vertical via `weaponRotation`. Sheathed pose is tuned
+  per-weapon via `weaponBack{Rotation,Offset,Scale}` (same clean spine-socket placement as the
+  quiver), bypassing the sword-tuned back defaults. Quiver (`shana_quiver.glb`) rides the spine
+  permanently (`backModel*`). Death collapse via `deathAnim` (`shana_death`).
+- **Most polished models so far:** Damia, Shana, Haschel. Others are still procedural placeholders
+  or rougher GLBs.
+- Lives in: `src/entities/Player.ts` (holster, hand/back mounts), `src/data/bearers.ts` (per-bearer
+  weapon/back/model flags).
+
+---
+
 
 ## Review queue (tick as each point is settled)
 
