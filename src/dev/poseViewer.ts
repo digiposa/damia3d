@@ -12,6 +12,7 @@
  *   &bscale=1.3              backModelScale override
  *   &box=0&boy=0&boz=-0.15   backModelOffset override (world units on the spine)
  *   &yaw=0                   spin the figure about Y (degrees)
+ *   &anim=walk&frame=18      force-play a named clip (idle/walk/run/attack/draw…), optionally freeze a frame
  *   &alpha=1.6&beta=1.3&radius=3.2&ty=1.2   camera orbit (rad) / target height
  * Served at /pose.html in `npm run dev`.
  */
@@ -78,6 +79,19 @@ const hud = document.getElementById("hud")!;
 void player.modelReady.then(() => {
   if (q.has("death")) player.playDeath(); // preview the death collapse
   else player.setCombat(true); // weapon in hand (not sheathed)
+  // Dev: force-play a named clip and optionally freeze a frame (rig-inspection only).
+  const animName = q.get("anim");
+  if (animName) {
+    for (const g of scene.animationGroups) g.stop();
+    const g = scene.animationGroups.find((a) => a.name.toLowerCase().includes(animName.toLowerCase()));
+    if (g) {
+      g.start(true);
+      if (q.has("frame")) {
+        g.goToFrame(num("frame", 0));
+        g.pause();
+      }
+    }
+  }
   const r = bearer.weaponRotation ?? [0, 0, 0];
   const br = bearer.backModelRotation ?? [0, 0, 0];
   const bo = bearer.backModelOffset ?? [0, 0, 0];
