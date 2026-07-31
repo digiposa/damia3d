@@ -72,6 +72,52 @@ The user auto-rigs + picks animations on **Mixamo** and downloads one **FBX per 
 The Addition-animation work (mapping each Addition's hits to clips, starting with the **blueSea**
 archetype — Damia, Meru, Lenus — and Damia first) is the phase this pipeline feeds.
 
+## Shortcut — skin transfer from a same-archetype donor (skip Mixamo entirely)
+
+When a new character shares an archetype with one that is **already rigged** (Shana↔Miranda are both
+whiteSilver archers; Damia↔Meru↔Lenus are all blueSea), you can skip steps 4–5 completely: reuse the
+donor's skeleton **and** its full clip set, and only move the geometry across. No FBX round-trip, no
+Mixamo, no waiting on the user. All of this is Claude-side, offline (`@gltf-transform` + `meshoptimizer`
+in a scratchpad; the scripts are ephemeral by the same convention as the rest of the toolchain).
+
+Two flavours, pick by inspecting the target's skin:
+
+1. **Clip graft (cheapest)** — target already carries a **compatible `mixamorig` skeleton**. Just copy
+   the donor's animation channels onto it **by node name** (the `merge_char` pattern) — no weight work.
+   Only possible when the bone names match.
+
+2. **Skin transfer (what we actually used)** — target is un-rigged or on a *different* skeleton
+   (Miranda came from Tripo with no skin; Meru was on a Character-Creator `CC_Base_*` rig, so its bone
+   names share nothing with Damia's `mixamorig`). Replace the target's rig with the donor's:
+   - normalise both meshes into one frame, then **transfer skin weights by nearest-neighbour** (a
+     spatial-hash grid keeps 70–80 k verts fast),
+   - keep the donor's skeleton + `inverseBindMatrices` + **all clips**, swap in the target's geometry,
+     `JOINTS_0`/`WEIGHTS_0` from the transfer, and the target's texture,
+   - finish with the standard WebP + meshopt optimise.
+
+   Aligning the two meshes has two sub-cases:
+   - **POSITION-space** (Shana→Miranda): both are clean Tripo T-poses in the **same** orientation, so
+     normalise straight off the `POSITION` accessor and map the new mesh into the donor's POSITION space.
+   - **World-space bind eval** (Damia→Meru): the bind poses differ in orientation (Meru's mesh was
+     authored along Z, Damia along Y) and skeleton, so evaluate each vertex's **bind-pose world**
+     position (`Σ wⱼ · worldMatrix(jointⱼ) · IBMⱼ · pos`, via `Node.getWorldMatrix()`), which makes both
+     upright and comparable automatically. Match there, then reproject the geometry back into the
+     donor's skin space per vertex: `A = Σ w'ⱼ · worldⱼ · IBMⱼ` (the same weighted matrix the donor's
+     own skinning uses), so `POSITION_out = A⁻¹ · targetWorld`.
+
+**Where it shines / where it doesn't.** The body (torso, limbs, face) comes out clean and animates on
+the donor's full clip set — Miranda was flawless. The failure modes are exactly the two you'd predict:
+- **Costume/hair with no dedicated bones** — verts far from any donor vertex get weighted rigidly to the
+  nearest body bone, so Meru's dancer skirt and ponytail move in a block (fine at idle/walk, stiff on a
+  hard attack). This is the same "fixed humanoid skeleton" limit noted below, just surfaced by proximity.
+- **Proportion mismatch** — if the target is a different build than the donor (Meru is smaller than
+  Damia), extremities (hands/feet) can stretch. Same-proportion donors (Shana/Miranda) avoid it.
+
+A high `far` ratio in the transfer log (fraction of target verts with no close donor match — ~25 % for
+Meru vs ~0 % for Miranda) predicts how much of this you'll see. Always render idle/walk/attack/back in
+`pose.html` before committing, and keep the original model as a backup so a bad transfer is a one-file
+rollback.
+
 ## Conventions
 
 ### File naming (`src/assets/models/`, lowercase, no spaces)
@@ -132,8 +178,10 @@ When we do a quality pass, the upgrade path (keep FBX/GLB export so the graft pi
 
 | Character | Archetype | Model | Notes |
 |---|---|---|---|
-| Damia | blueSea | ✅ base + dragoon + weapon | most complete (animation reference) |
-| Meru | blueSea | ✅ base + weapon | |
+| Damia | blueSea | ✅ base + dragoon + weapon | most complete (animation reference); skin-transfer donor for blueSea |
+| Meru | blueSea | ✅ base + weapon | skin-transferred from Damia (world-space); skirt/ponytail stiff on hard attacks |
+| Shana | whiteSilver | ✅ base + weapon | rigged via Mixamo; skin-transfer donor for whiteSilver |
+| Miranda | whiteSilver | ✅ base + weapon | skin-transferred from Shana (POSITION-space), reuses Shana's bow/quiver |
 | Haschel | thunder | ✅ base | |
-| Lenus | blueSea | ❌ portrait only | next candidate to complete the blueSea trio |
+| Lenus | blueSea | ❌ portrait only | completes the blueSea trio — skin-transfer from Damia (same as Meru) |
 | others | — | ❌ procedural | |
