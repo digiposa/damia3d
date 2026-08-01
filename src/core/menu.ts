@@ -152,4 +152,6 @@ export type SystemSection = "characters" | "party" | "gambits" | "config";
 export interface GameHost {
   /** Open the in-game System menu (pauses the game), optionally on a section. */
   openSystemMenu(section?: SystemSection): void;
+  /** Leave the current mode and return to the title screen (disposes the running mode). */
+  toMainMenu(): void;
 }

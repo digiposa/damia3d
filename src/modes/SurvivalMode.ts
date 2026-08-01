@@ -558,7 +558,9 @@ export class SurvivalMode extends ArenaCombatMode {
       this.paused = true; // held until a party is picked
     });
     const quit = this.overlayButton(t("survival.quit"), "rgba(80,80,96,0.4)", () => {
-      this.host.openSystemMenu();
+      this.gameOver?.remove();
+      this.gameOver = undefined;
+      this.host.toMainMenu(); // straight to the title screen (was opening the System menu behind this overlay)
     });
 
     box.append(title, waves, kills, bestLine, retry, quit);

@@ -83,6 +83,11 @@ export class Game implements GameHost {
   }
 
   /** Show the title screen, tearing down any running mode. */
+  /** GameHost: leave the running mode and return to the title screen (e.g. Survival's Game Over). */
+  toMainMenu(): void {
+    this.openMainMenu();
+  }
+
   private openMainMenu(): void {
     this.system.hide();
     this.modes.clear();
