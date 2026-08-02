@@ -5,7 +5,8 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { Animation } from "@babylonjs/core/Animations/animation";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
 import type { EnemyDef } from "../data/enemies";
@@ -213,11 +214,9 @@ export class Enemy {
     else tuneImportedMetal(res.meshes);
 
     fitHeight(res.meshes, modelRoot, 1.8); // ≈ our characters' height; exports arrive at any scale
-    modelRoot.parent = this.root;
-
-    // Attach the enemy's weapon model to the right-hand bone (our AI models are rigged weaponless),
-    // so it follows every animation with no baked-in bending.
-    if (this.def.weaponModel) await this.attachWeapon(this.def.weaponModel, scene, res.skeletons[0]);
+    // Some exports face away from the enemy's forward (+Z, toward the target). A per-def yaw spins the
+    // mesh so its head points where the enemy looks (matters for the attack lunge direction).
+    if (this.def.modelYaw) modelRoot.rotation.y = (this.def.modelYaw * Math.PI) / 180;
 
     // Match clips by keyword so both our Mixamo names (Idle/Walking/Slash) and the Quaternius
     // convention (…|Idle, …|Run, …|Run_swordAttack) resolve without per-pack special-casing.
@@ -231,7 +230,64 @@ export class Enemy {
     this.anims.throw = groups.find((a) => has(a, "throw", "dagger", "knife"));
     this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
+
+    // Non-rigged mesh (e.g. a Tripo quadruped like the Berserk Mouse): Mixamo can't auto-rig
+    // non-humanoids, so the model arrives with no clips. Synthesise body-level "rigid" animation
+    // (bob / hop / lunge / topple) on an intermediate node, so idle/walk/attack/death drive it
+    // through the same play() path. TODO: replace with a real skeleton rig for a proper beauty pass.
+    if (groups.length === 0) {
+      const animRoot = new TransformNode(`enemyAnim:${this.def.id}`, scene);
+      animRoot.parent = this.root;
+      modelRoot.parent = animRoot;
+      this.buildRigidAnims(scene, animRoot);
+    } else {
+      modelRoot.parent = this.root;
+    }
+
+    // Attach the enemy's weapon model to the right-hand bone (our AI models are rigged weaponless),
+    // so it follows every animation with no baked-in bending.
+    if (this.def.weaponModel) await this.attachWeapon(this.def.weaponModel, scene, res.skeletons[0]);
+
     this.play(this.anims.idle);
+  }
+
+  /**
+   * Build body-level "rigid" clips for a non-rigged mesh, targeting an intermediate node above the
+   * model (identity baseline, so it stacks on top of fitHeight's placement). Amplitudes are in the
+   * ~1.8-tall model frame. Assigned straight into {@link anims} so play()/playOneShot()/playDeath()
+   * drive them unchanged. A stop-gap until non-humanoids get a real skeleton.
+   */
+  private buildRigidAnims(scene: Scene, node: TransformNode): void {
+    const FPS = 60;
+    const clip = (name: string, tracks: [string, { frame: number; value: number }[]][]): AnimationGroup => {
+      const g = new AnimationGroup(`${this.def.id}:${name}`, scene);
+      for (const [prop, keys] of tracks) {
+        const a = new Animation(`${this.def.id}:${name}:${prop}`, prop, FPS, Animation.ANIMATIONTYPE_FLOAT, Animation.ANIMATIONLOOPMODE_CYCLE);
+        a.setKeys(keys);
+        g.addTargetedAnimation(a, node);
+      }
+      this.modelDisposables.push(g);
+      return g;
+    };
+    // idle: slow vertical "breathing" bob.
+    this.anims.idle = clip("idle", [
+      ["position.y", [{ frame: 0, value: 0 }, { frame: 60, value: 0.04 }, { frame: 120, value: 0 }]],
+    ]);
+    // walk: springy hops with a slight forward pitch (nose dips as it lands).
+    this.anims.walk = clip("walk", [
+      ["position.y", [{ frame: 0, value: 0 }, { frame: 8, value: 0.16 }, { frame: 16, value: 0 }, { frame: 24, value: 0.06 }, { frame: 30, value: 0 }]],
+      ["rotation.x", [{ frame: 0, value: 0 }, { frame: 8, value: -0.12 }, { frame: 16, value: 0.06 }, { frame: 30, value: 0 }]],
+    ]);
+    // attack (Bite): lunge forward (+Z = toward the target), snap the head down, recoil.
+    this.anims.attack = clip("attack", [
+      ["position.z", [{ frame: 0, value: 0 }, { frame: 8, value: 0.6 }, { frame: 16, value: 0.55 }, { frame: 30, value: 0 }]],
+      ["rotation.x", [{ frame: 0, value: 0 }, { frame: 8, value: 0.28 }, { frame: 16, value: 0.12 }, { frame: 30, value: 0 }]],
+    ]);
+    // death: topple onto its side and sink.
+    this.anims.death = clip("death", [
+      ["rotation.z", [{ frame: 0, value: 0 }, { frame: 48, value: 1.45 }]],
+      ["position.y", [{ frame: 0, value: 0 }, { frame: 36, value: 0.05 }, { frame: 48, value: -0.12 }]],
+    ]);
   }
 
   /** Load a weapon GLB and parent it to the model's right-hand bone so it follows every animation.

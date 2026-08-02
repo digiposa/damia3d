@@ -156,6 +156,20 @@ GLBs are binary and inflate the git repo + the Pages download. Keep meshes **low
 the WebP + meshopt optimization, and if the roster grows large, switch to lazy-loading / Git LFS so
 mobile page-load stays fast.
 
+## Non-humanoid enemies (quadrupeds, winged creatures) — procedural stop-gap ⚠️ DEBT
+
+Mixamo can only auto-rig humanoids, so non-humanoid mobs (the Forest's Berserk Mouse — a winged
+demon-rat — and its like) arrive from Tripo as **un-rigged static meshes**. As an interim, the engine
+**synthesises body-level "rigid" animation** for any enemy whose model has zero clips
+(`Enemy.buildRigidAnims`): idle bob, walk hop, attack lunge, death topple, driven on an intermediate
+node through the normal `idle/walk/attack/death` path. It reads fine at minor-enemy tier but the body
+moves as **one block** — no legs/wings/jaw/tail articulation.
+
+**This is acknowledged technical debt.** Non-humanoids MUST get a proper skeleton rig + hand-keyed
+(or mocap) clips in a later beauty pass — via a manual Blender rig (bones for legs/wings/tail/jaw) or
+a reusable quadruped skeleton we skin-transfer onto same-shape creatures. Until then, new
+non-humanoids reuse the procedural path (set `model`, `scale`, and `modelYaw` on the `EnemyDef`).
+
 ## Known limitations & future "beauty pass"
 
 We currently rig on **Mixamo** (free, zero-setup) and accept its weaknesses for now:

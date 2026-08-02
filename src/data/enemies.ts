@@ -54,6 +54,9 @@ export interface EnemyDef {
    * metallic PBR tuning used for genuinely metal assets.
    */
   cellShaded?: boolean;
+  /** Yaw (degrees) spinning the model so its front faces the enemy's forward (+Z, toward the target).
+   *  Needed for exports whose authored facing isn't +Z — e.g. a Tripo creature that looks backward. */
+  modelYaw?: number;
   /** Optional weapon GLB (base filename in src/assets/models/) attached to the model's right-hand
    *  bone (mixamorig:RightHand). The blade is authored along the mesh's own axis; the engine seats
    *  the grip in the fist and points it out. */
@@ -229,6 +232,11 @@ export const BERSERK_MOUSE: EnemyDef = {
   ],
   expReward: 1, // JP (EU/US: 3)
   goldReward: 1, // JP (EU/US: 3)
-  bodyColor: [0.28, 0.24, 0.34], // Darkness-tinted placeholder capsule until the model lands
-  scale: 1.1,
+  model: "berserk_mouse", // Tripo quadruped, un-rigged → engine synthesises rigid idle/walk/attack
+  cellShaded: true, // painted Tripo texture — render flat-diffuse
+  // fitHeight normalises to 1.8 (human height); this flat, wide critter needs shrinking to a big-rat
+  // size. scale multiplies the whole enemy (model + health bar). Tune in-game if too big/small.
+  scale: 0.45,
+  modelYaw: 0, // flip to 180 if it faces away from its target in-game
+  bodyColor: [0.28, 0.24, 0.34], // fallback capsule tint if the model fails to load
 };
