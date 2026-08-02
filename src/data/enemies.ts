@@ -240,3 +240,32 @@ export const BERSERK_MOUSE: EnemyDef = {
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.28, 0.24, 0.34], // fallback capsule tint if the model fails to load
 };
+
+/**
+ * Trent — Earth, an ambulatory quadrupedal tree-creature. Counters Additions. Canon moveset:
+ * ~Trunk Slap (1.5× physical) above 25% HP, Pellet (1.5× Earth-elemental magic) at/below 50%.
+ * Under the basic AI it uses its first attack (Trunk Slap); Pellet — its Earth magic — is kept for a
+ * future HP-threshold behaviour. JP stats (AT/MAT/MDF higher, Gold lower than EU/US). Non-humanoid
+ * (un-rigged Tripo mesh) → rigid procedural animation, same as the Berserk Mouse.
+ */
+export const TRENT: EnemyDef = {
+  id: "trent",
+  name: "Trent",
+  element: "Earth",
+  stats: { maxHp: 6, at: 3, df: 160, mat: 3, mdf: 120 }, // JP (EU/US: hp5 at2 mat2 mdf40)
+  spd: 30,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Trunk Slap", kind: "physical", multiplier: 1.5 }, // >25% HP — the active attack
+    { name: "Pellet", kind: "magical", multiplier: 1.5, element: "Earth" }, // ≤50% HP — inactive under basic AI (v1)
+  ],
+  expReward: 4,
+  goldReward: 3, // JP (EU/US: 9)
+  model: "trent", // Tripo quadruped, un-rigged → engine synthesises rigid idle/walk/attack
+  cellShaded: true, // painted Tripo texture — render flat-diffuse
+  scale: 0.7, // bigger than the Berserk Mouse (a treant); fitHeight normalises to 1.8. Tune in-game.
+  modelYaw: 0, // flip to 180 if it faces away from its target in-game
+  bodyColor: [0.3, 0.34, 0.22], // fallback capsule tint if the model fails to load
+};

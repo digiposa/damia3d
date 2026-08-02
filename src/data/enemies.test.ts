@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE } from "./enemies";
+import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT } from "./enemies";
 
 describe("Commander — Seles boss", () => {
   it("matches the wiki stats", () => {
@@ -53,5 +53,25 @@ describe("Berserk Mouse — Forest minor enemy", () => {
   it("knows Bite (1×, active) and Chisel (2×)", () => {
     expect(BERSERK_MOUSE.attacks.map((a) => a.name)).toEqual(["Bite", "Chisel"]);
     expect(BERSERK_MOUSE.attacks[0]).toMatchObject({ kind: "physical", multiplier: 1 });
+  });
+});
+
+describe("Trent — Forest minor enemy", () => {
+  it("uses the Japanese PS1 stats", () => {
+    expect(TRENT.stats).toEqual({ maxHp: 6, at: 3, df: 160, mat: 3, mdf: 120 });
+    expect(TRENT.spd).toBe(30);
+    expect(TRENT.expReward).toBe(4);
+    expect(TRENT.goldReward).toBe(3);
+  });
+
+  it("is an Earth creature that counters Additions", () => {
+    expect(TRENT.element).toBe("Earth");
+    expect(TRENT.countersAdditions).toBe(true);
+  });
+
+  it("knows Trunk Slap (1.5× phys, active) and an Earth-magic Pellet (1.5×)", () => {
+    expect(TRENT.attacks.map((a) => a.name)).toEqual(["Trunk Slap", "Pellet"]);
+    expect(TRENT.attacks[0]).toMatchObject({ kind: "physical", multiplier: 1.5 });
+    expect(TRENT.attacks[1]).toMatchObject({ kind: "magical", element: "Earth" });
   });
 });

@@ -173,6 +173,7 @@ const en: Dict = {
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
   "spawn.berserkMouse": "🐀  Berserk Mouse",
+  "spawn.trent": "🌳  Trent",
 
   // HUD / combat
   "combat.press": "▸ PRESS!",
@@ -382,6 +383,7 @@ const fr: Dict = {
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
   "spawn.berserkMouse": "🐀  Berserk Mouse",
+  "spawn.trent": "🌳  Trent",
 
   "combat.press": "▸ APPUIE !",
   "combat.perfect": "PARFAIT",
