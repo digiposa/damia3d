@@ -488,7 +488,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnGoblin: () => this.spawnGoblin(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent", "goblin", "goblin_weapon"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -2273,7 +2273,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.addEnemy(new Enemy(this.scene, TRENT, this.ringPosition()));
   }
 
-  /** Spawn a Forest minor enemy — Goblin (placeholder capsule until it gets a clean rig). */
+  /** Spawn a Forest minor enemy — Goblin (Knight-skinned rig + bone club). */
   private async spawnGoblin(): Promise<void> {
     await this.ensureEnemyAssets(GOBLIN);
     if (this.scene.isDisposed) return;
