@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT } from "./enemies";
+import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT, GOBLIN } from "./enemies";
 
 describe("Commander — Seles boss", () => {
   it("matches the wiki stats", () => {
@@ -73,5 +73,25 @@ describe("Trent — Forest minor enemy", () => {
     expect(TRENT.attacks.map((a) => a.name)).toEqual(["Trunk Slap", "Pellet"]);
     expect(TRENT.attacks[0]).toMatchObject({ kind: "physical", multiplier: 1.5 });
     expect(TRENT.attacks[1]).toMatchObject({ kind: "magical", element: "Earth" });
+  });
+});
+
+describe("Goblin — Forest minor enemy", () => {
+  it("uses the Japanese PS1 stats", () => {
+    expect(GOBLIN.stats).toEqual({ maxHp: 5, at: 2, df: 120, mat: 3, mdf: 120 });
+    expect(GOBLIN.spd).toBe(40);
+    expect(GOBLIN.expReward).toBe(4);
+    expect(GOBLIN.goldReward).toBe(2);
+  });
+
+  it("is a Fire humanoid that counters Additions", () => {
+    expect(GOBLIN.element).toBe("Fire");
+    expect(GOBLIN.countersAdditions).toBe(true);
+  });
+
+  it("knows Bone Club (1.5×, active), a thrown stone (3×) and a Kick (4×)", () => {
+    expect(GOBLIN.attacks.map((a) => a.name)).toEqual(["Bone Club", "Throw Stone", "Kick"]);
+    expect(GOBLIN.attacks[0]).toMatchObject({ kind: "physical", multiplier: 1.5 });
+    expect(GOBLIN.attacks[1].name).toMatch(/throw/i); // picked up as the ranged attack
   });
 });

@@ -26,6 +26,9 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
+- **Review cohérence des attaques des mobs Forest** (une fois les 4 en place : Berserk Mouse, Trent,
+  Goblin, Assassin Cock) : recroiser chaque moveset avec le wiki (noms, multiplicateurs, seuils HP,
+  physique vs magie) et vérifier la cohérence de l'ensemble avant de figer.
 - **Contre-attaque ennemie sur Additions (`countersAdditions`) — À IMPLÉMENTER.** Le champ
   `EnemyDef.countersAdditions` est renseigné par mob (canon) mais **dormant** : rien ne le lit.
   La formule de dégâts existe déjà et est testée (`additionCounter()` dans `src/combat/formula.ts`).

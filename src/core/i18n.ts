@@ -174,6 +174,7 @@ const en: Dict = {
   "spawn.commander": "👑  Commander (boss)",
   "spawn.berserkMouse": "🐀  Berserk Mouse",
   "spawn.trent": "🌳  Trent",
+  "spawn.goblin": "👺  Goblin",
 
   // HUD / combat
   "combat.press": "▸ PRESS!",
@@ -384,6 +385,7 @@ const fr: Dict = {
   "spawn.commander": "👑  Commander (boss)",
   "spawn.berserkMouse": "🐀  Berserk Mouse",
   "spawn.trent": "🌳  Trent",
+  "spawn.goblin": "👺  Goblin",
 
   "combat.press": "▸ APPUIE !",
   "combat.perfect": "PARFAIT",

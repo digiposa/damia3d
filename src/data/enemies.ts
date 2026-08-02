@@ -271,3 +271,34 @@ export const TRENT: EnemyDef = {
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.3, 0.34, 0.22], // fallback capsule tint if the model fails to load
 };
+
+/**
+ * Goblin — Fire, a small greenish humanoid swinging a large bone as a club. Counters Additions.
+ * Canon moveset: ~Bone Club (1.5× physical) above 50% HP; at/below 50% either Throw Stone (3×) or
+ * ~Kick (4×). Under the basic AI it melees with Bone Club and throws stones from range (Throw Stone
+ * is picked up as the ranged attack once the rigged model brings a throw clip); Kick waits on a
+ * future HP-threshold behaviour. JP stats (HP/MAT higher, Gold lower than EU/US).
+ *
+ * Being humanoid it should get a REAL rig (Mixamo auto-rig of Goblin.fbx) — its squat build is too
+ * far from our Knight to skin-transfer cleanly. Until that rigged GLB lands it shows the placeholder
+ * capsule; then set `model: "goblin"` + `weaponModel: "goblin_weapon"` (bone club on the hand bone).
+ */
+export const GOBLIN: EnemyDef = {
+  id: "goblin",
+  name: "Goblin",
+  element: "Fire",
+  stats: { maxHp: 5, at: 2, df: 120, mat: 3, mdf: 120 }, // JP (EU/US: hp4 mat1)
+  spd: 40,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Bone Club", kind: "physical", multiplier: 1.5 }, // >50% HP — the active melee attack
+    { name: "Throw Stone", kind: "physical", multiplier: 3 }, // ≤50% HP — thrown (ranged once rigged)
+    { name: "Kick", kind: "physical", multiplier: 4 }, // ≤50% HP — inactive under basic AI (v1)
+  ],
+  expReward: 4,
+  goldReward: 2, // JP (EU/US: 6)
+  bodyColor: [0.32, 0.4, 0.24], // greenish placeholder capsule until the Mixamo-rigged model lands
+  scale: 0.7, // a small humanoid, shorter than the ~1.8 party
+};
