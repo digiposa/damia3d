@@ -25,37 +25,51 @@ export class Arrow {
     /** Optional live target: when set, the projectile re-aims at it each frame (homing) so it
      *  reaches a moving target — the hit always connects (turn-based combat, no live dodging). */
     private follow?: () => Vector3,
+    /** Projectile look: a fletched arrow/dagger (default) or a thrown rock (Goblin's Throw Stone). */
+    kind: "arrow" | "stone" = "arrow",
   ) {
     this.root = new TransformNode("arrow", scene);
     this.root.position = from.clone();
-    if (delay > 0) this.root.setEnabled(false); // hidden while the archer draws
+    if (delay > 0) this.root.setEnabled(false); // hidden while the thrower winds up
 
-    const shaftMat = new StandardMaterial("arrowShaftMat", scene);
-    shaftMat.diffuseColor = new Color3(0.7, 0.58, 0.36);
-    shaftMat.specularColor = new Color3(0.08, 0.08, 0.08);
-    const headMat = new StandardMaterial("arrowHeadMat", scene);
-    headMat.diffuseColor = new Color3(0.72, 0.74, 0.8);
-    headMat.specularColor = new Color3(0.1, 0.1, 0.1);
+    if (kind === "stone") {
+      // A small grey rock: one low-poly, slightly-squashed sphere. No orientation needed.
+      const rockMat = new StandardMaterial("rockMat", scene);
+      rockMat.diffuseColor = new Color3(0.42, 0.4, 0.37);
+      rockMat.specularColor = new Color3(0.05, 0.05, 0.05);
+      const rock = MeshBuilder.CreateSphere("stone", { diameter: 0.16, segments: 5 }, scene);
+      rock.scaling = new Vector3(1, 0.8, 1.1); // irregular, not a perfect ball
+      rock.material = rockMat;
+      rock.isPickable = false;
+      rock.parent = this.root;
+    } else {
+      const shaftMat = new StandardMaterial("arrowShaftMat", scene);
+      shaftMat.diffuseColor = new Color3(0.7, 0.58, 0.36);
+      shaftMat.specularColor = new Color3(0.08, 0.08, 0.08);
+      const headMat = new StandardMaterial("arrowHeadMat", scene);
+      headMat.diffuseColor = new Color3(0.72, 0.74, 0.8);
+      headMat.specularColor = new Color3(0.1, 0.1, 0.1);
 
-    // Built pointing along +Z; lookAt() then aims the whole arrow at the target.
-    const shaft = MeshBuilder.CreateBox("arrowShaft", { width: 0.03, height: 0.03, depth: 0.5 }, scene);
-    shaft.material = shaftMat;
-    shaft.isPickable = false;
-    shaft.parent = this.root;
+      // Built pointing along +Z; lookAt() then aims the whole arrow at the target.
+      const shaft = MeshBuilder.CreateBox("arrowShaft", { width: 0.03, height: 0.03, depth: 0.5 }, scene);
+      shaft.material = shaftMat;
+      shaft.isPickable = false;
+      shaft.parent = this.root;
 
-    const head = MeshBuilder.CreateCylinder("arrowHead", { height: 0.12, diameterTop: 0, diameterBottom: 0.06, tessellation: 6 }, scene);
-    head.rotation.x = Math.PI / 2; // cone tip toward +Z
-    head.position.z = 0.31;
-    head.material = headMat;
-    head.isPickable = false;
-    head.parent = this.root;
+      const head = MeshBuilder.CreateCylinder("arrowHead", { height: 0.12, diameterTop: 0, diameterBottom: 0.06, tessellation: 6 }, scene);
+      head.rotation.x = Math.PI / 2; // cone tip toward +Z
+      head.position.z = 0.31;
+      head.material = headMat;
+      head.isPickable = false;
+      head.parent = this.root;
 
-    for (const dx of [-0.03, 0.03]) {
-      const fletch = MeshBuilder.CreateBox("arrowFletch", { width: 0.005, height: 0.07, depth: 0.1 }, scene);
-      fletch.position = new Vector3(dx, 0, -0.22);
-      fletch.material = headMat;
-      fletch.isPickable = false;
-      fletch.parent = this.root;
+      for (const dx of [-0.03, 0.03]) {
+        const fletch = MeshBuilder.CreateBox("arrowFletch", { width: 0.005, height: 0.07, depth: 0.1 }, scene);
+        fletch.position = new Vector3(dx, 0, -0.22);
+        fletch.material = headMat;
+        fletch.isPickable = false;
+        fletch.parent = this.root;
+      }
     }
 
     this.target = to.clone();

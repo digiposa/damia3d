@@ -488,7 +488,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnGoblin: () => this.spawnGoblin(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent", "goblin", "goblin_weapon"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -1812,7 +1812,8 @@ export abstract class ArenaCombatMode extends GameMode {
       const torso = (): Vector3 => this.player.position.add(new Vector3(0, 1.0, 0));
       // Release in sync with the throw (arm fully forward ≈ mid-clip); home on the player so the
       // dagger reaches them even if they move — the hit always connects (turn-based, no live dodge).
-      this.arrows.push(new Arrow(this.scene, from, torso(), ARROW_SPEED, applyHit, enemy.throwReleaseDelay, torso));
+      const projectile = /stone|rock/i.test(action.name) ? "stone" : "arrow"; // Goblin lobs a rock
+      this.arrows.push(new Arrow(this.scene, from, torso(), ARROW_SPEED, applyHit, enemy.throwReleaseDelay, torso, projectile));
     } else {
       applyHit();
     }
@@ -2272,7 +2273,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.addEnemy(new Enemy(this.scene, TRENT, this.ringPosition()));
   }
 
-  /** Spawn a Forest minor enemy — Goblin (Mixamo-rigged humanoid with a bone club). */
+  /** Spawn a Forest minor enemy — Goblin (placeholder capsule until it gets a clean rig). */
   private async spawnGoblin(): Promise<void> {
     await this.ensureEnemyAssets(GOBLIN);
     if (this.scene.isDisposed) return;

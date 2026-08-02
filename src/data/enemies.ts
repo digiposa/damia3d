@@ -279,9 +279,11 @@ export const TRENT: EnemyDef = {
  * is picked up as the ranged attack once the rigged model brings a throw clip); Kick waits on a
  * future HP-threshold behaviour. JP stats (HP/MAT higher, Gold lower than EU/US).
  *
- * Humanoid → real Mixamo rig (auto-rigged from Goblin.fbx; its squat build was too far from our Knight
- * to skin-transfer cleanly). Its own Run/Attack/Death clips + idle & throw grafted from the Knight
- * (shared mixamorig skeleton). The bone club rides mixamorig:RightHand.
+ * Humanoid, so it wants a real rig — but Mixamo's auto-rig botched the shoulder/arm weights on its
+ * squat proportions (mesh stretches on any arm motion; only idle survived). Its Tripo mesh + bone club
+ * are ready (Goblin.glb / Goblin__Weapon.glb in the scratchpad pipeline); once re-rigged with cleaner
+ * weights (AccuRIG, or a manual Blender rig), set `model: "goblin"` + `weaponModel: "goblin_weapon"`.
+ * Until then it shows the placeholder capsule.
  */
 export const GOBLIN: EnemyDef = {
   id: "goblin",
@@ -294,15 +296,11 @@ export const GOBLIN: EnemyDef = {
   countersAdditions: true,
   attacks: [
     { name: "Bone Club", kind: "physical", multiplier: 1.5 }, // >50% HP — the active melee attack
-    { name: "Throw Stone", kind: "physical", multiplier: 3 }, // ≤50% HP — thrown (ranged once rigged)
+    { name: "Throw Stone", kind: "physical", multiplier: 3 }, // ≤50% HP — thrown (Arrow renders a stone)
     { name: "Kick", kind: "physical", multiplier: 4 }, // ≤50% HP — inactive under basic AI (v1)
   ],
   expReward: 4,
   goldReward: 2, // JP (EU/US: 6)
-  model: "goblin", // Mixamo-rigged (walk/attack/death/idle/throw) — real humanoid animation
-  weaponModel: "goblin_weapon", // the bone club, on mixamorig:RightHand
-  cellShaded: true, // painted Tripo texture — render flat-diffuse
-  scale: 0.7, // a small humanoid, shorter than the ~1.8 party. Tune in-game.
-  modelYaw: 0, // mixamorig faces forward like the Knight; flip to 180 if needed
-  bodyColor: [0.32, 0.4, 0.24], // fallback capsule tint if the model fails to load
+  bodyColor: [0.32, 0.4, 0.24], // greenish placeholder capsule until a clean rig lands
+  scale: 0.7, // a small humanoid, shorter than the ~1.8 party
 };
