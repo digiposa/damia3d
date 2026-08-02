@@ -27,7 +27,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, TRAINING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, BERSERK_MOUSE, TRAINING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -483,6 +483,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnDummy: () => this.spawnDummy(),
         onSpawnKnight: () => this.spawnKnight(),
         onSpawnCommander: () => this.spawnCommander(),
+        onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
         onSpawnTabShown: () => prefetchModels(["commander", "commander_sword"]),
@@ -2253,6 +2254,13 @@ export abstract class ArenaCombatMode extends GameMode {
     await this.ensureEnemyAssets(COMMANDER_SELES);
     if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
+  }
+
+  /** Spawn a Forest minor enemy — Berserk Mouse (no model yet → placeholder capsule). */
+  private async spawnBerserkMouse(): Promise<void> {
+    await this.ensureEnemyAssets(BERSERK_MOUSE);
+    if (this.scene.isDisposed) return;
+    this.addEnemy(new Enemy(this.scene, BERSERK_MOUSE, this.ringPosition()));
   }
 
   /** A random spawn position on a ring around the player, kept inside the arena. */

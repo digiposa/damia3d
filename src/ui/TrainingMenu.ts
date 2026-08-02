@@ -31,6 +31,7 @@ export interface TrainingCallbacks {
   onSpawnDummy: () => void | Promise<void>;
   onSpawnKnight: () => void | Promise<void>;
   onSpawnCommander: () => void | Promise<void>;
+  onSpawnBerserkMouse: () => void | Promise<void>;
   /** Fired when the Spawn tab is shown — the mode prefetches the listed enemies' models. */
   onSpawnTabShown?: () => void;
   onResume: () => void;
@@ -233,6 +234,7 @@ export class TrainingMenu {
       spawnButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
       spawnButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
       spawnButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
+      spawnButton(t("spawn.berserkMouse"), "rgba(70,55,95,0.9)", this.cb.onSpawnBerserkMouse),
     );
     return box;
   }

@@ -172,6 +172,7 @@ const en: Dict = {
   "spawn.dummy": "🎯  Training Dummy",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
+  "spawn.berserkMouse": "🐀  Berserk Mouse",
 
   // HUD / combat
   "combat.press": "▸ PRESS!",
@@ -380,6 +381,7 @@ const fr: Dict = {
   "spawn.dummy": "🎯  Mannequin d'entraînement",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
+  "spawn.berserkMouse": "🐀  Berserk Mouse",
 
   "combat.press": "▸ APPUIE !",
   "combat.perfect": "PARFAIT",

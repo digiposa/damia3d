@@ -195,3 +195,40 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
   cellShaded: true,
   weaponModel: "commander_sword",
 };
+
+/* ============================================================================
+ * Forest — Disc 1, area #2 (Seles → Forest → Hellena Prison). Four minor enemies,
+ * one per element: Berserk Mouse (Darkness), Assassin Cock (Wind), Trent (Earth),
+ * Goblin (Fire). Added in canonical order of appearance.
+ *
+ * STAT CONVENTION: we use the Japanese PS1 values when known (they usually differ
+ * from — and are often higher than — the EU/US numbers on thelegendofdragoon.org).
+ * The fandom wiki lists JP figures in parentheses. When only EU/US stats exist, we
+ * use those and flag the gap. Movesets/flags come from the tier-2 wiki (version-agnostic).
+ * ========================================================================== */
+
+/**
+ * Berserk Mouse — Darkness critter, "quite large and aggressive". Counters Additions.
+ * Canon moveset: ~Bite (1×) above 50% HP, Chisel (2×) at/below 50%, plus a "Run away!".
+ * Under the basic AI it uses its first melee attack (Bite); Chisel is kept for a future
+ * HP-threshold behaviour, and the flee action isn't modelled yet. Stats are the JP values
+ * (HP/AT/MAT/SPD higher, EXP/Gold lower than EU/US). No model yet → placeholder capsule.
+ */
+export const BERSERK_MOUSE: EnemyDef = {
+  id: "berserk_mouse",
+  name: "Berserk Mouse",
+  element: "Darkness",
+  stats: { maxHp: 4, at: 2, df: 80, mat: 2, mdf: 120 }, // JP (EU/US: hp2 at1 mat1)
+  spd: 50, // JP (EU/US: 45)
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Bite", kind: "physical", multiplier: 1 }, // >50% HP — the active melee attack
+    { name: "Chisel", kind: "physical", multiplier: 2 }, // ≤50% HP — inactive under basic AI (v1)
+  ],
+  expReward: 1, // JP (EU/US: 3)
+  goldReward: 1, // JP (EU/US: 3)
+  bodyColor: [0.28, 0.24, 0.34], // Darkness-tinted placeholder capsule until the model lands
+  scale: 1.1,
+};
