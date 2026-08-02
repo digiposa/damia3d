@@ -26,6 +26,13 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
+- **Contre-attaque ennemie sur Additions (`countersAdditions`) — À IMPLÉMENTER.** Le champ
+  `EnemyDef.countersAdditions` est renseigné par mob (canon) mais **dormant** : rien ne le lit.
+  La formule de dégâts existe déjà et est testée (`additionCounter()` dans `src/combat/formula.ts`).
+  Manque le **déclencheur** dans le flux de combat. Canon fidèle = fenêtres de contre par *press*
+  d'Additions précises (table « Counterattack Opportunities » du wiki, ex. Dart Volcano press 2) ;
+  v1 possible = contre probabiliste quand le joueur touche/rate une Addition vs un mob qui contre.
+  Concerne déjà Berserk Mouse + Trent (et la plupart des mobs Forest).
 - **Rework du système de statuts/buffs/debuffs** général (les statuts Dragoon actuels sont
   ad-hoc ; il en faut un vrai, alimenté aussi par objets/attaques/équipement).
 - Équipement qui donne du SP quand on est touché (Knight Helm, etc.) — pas encore branché.

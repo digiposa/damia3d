@@ -262,7 +262,9 @@ export function rareMonsterBasic(
   return d;
 }
 
-/** Addition Counter: floor{ floor[AT^2 * 250 / DF] / 100 }, then Fear pair & Power. */
+/** Addition Counter: floor{ floor[AT^2 * 250 / DF] / 100 }, then Fear pair & Power.
+ *  NOTE: this formula is ready but not yet triggered in combat — no enemy performs a counter yet
+ *  (see `EnemyDef.countersAdditions`, dormant). Wiring it is in the docs/WIP.md Backlog. */
 export function additionCounter(
   attackerAt: number,
   targetDf: number,

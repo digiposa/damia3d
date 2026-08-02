@@ -29,7 +29,9 @@ export interface EnemyDef {
   /** Physical / magical avoidance, as a percentage (0–100). */
   aAv: number;
   mAv: number;
-  /** Whether the enemy can counter the player's Additions. */
+  /** Whether the enemy can counter the player's Additions. TODO: dormant — not yet read by combat.
+   *  The counter damage formula (`additionCounter` in combat/formula.ts) exists + is tested; what's
+   *  missing is the trigger in the combat flow. See the Backlog in docs/WIP.md. */
   countersAdditions: boolean;
   /** Actions the enemy can take. The first is its default basic attack. */
   attacks: EnemyAttack[];
@@ -265,7 +267,7 @@ export const TRENT: EnemyDef = {
   goldReward: 3, // JP (EU/US: 9)
   model: "trent", // Tripo quadruped, un-rigged → engine synthesises rigid idle/walk/attack
   cellShaded: true, // painted Tripo texture — render flat-diffuse
-  scale: 0.7, // bigger than the Berserk Mouse (a treant); fitHeight normalises to 1.8. Tune in-game.
+  scale: 1.4, // a looming treant — taller than the ~1.8 party (fitHeight normalises to 1.8, ×1.4 ≈ 2.5)
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.3, 0.34, 0.22], // fallback capsule tint if the model fails to load
 };
