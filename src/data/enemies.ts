@@ -279,11 +279,11 @@ export const TRENT: EnemyDef = {
  * is picked up as the ranged attack once the rigged model brings a throw clip); Kick waits on a
  * future HP-threshold behaviour. JP stats (HP/MAT higher, Gold lower than EU/US).
  *
- * Humanoid, but Mixamo's auto-rig botched its shoulder/arm weights (squat proportions → the mesh
- * stretched on any arm motion). Instead we skin-transferred the Knight of Sandora's clean weights +
- * mixamorig skeleton onto the goblin mesh (proximity), reusing the Knight's clips
- * (Idle/Walking/Slash/Death/Throw). Deforms coherently (a bit stiff at the forearms). The bone club
- * rides mixamorig:RightHand; Throw Stone lobs a rock (Arrow's "stone" projectile).
+ * Humanoid, but automatic rigging fought its squat proportions: Mixamo's auto-weights stretched the
+ * mesh on any arm motion, and even a Knight skin-transfer stayed too stiff. So — like the Berserk
+ * Mouse / Trent — it runs on the UN-rigged mesh with rigid procedural animation (bob/hop/lunge/topple).
+ * No skeleton means no hand socket, so the bone club (Goblin__Weapon.glb, kept in the upload/pipeline)
+ * is dropped until a proper rig; and with no throw clip, Throw Stone falls back to melee.
  */
 export const GOBLIN: EnemyDef = {
   id: "goblin",
@@ -295,16 +295,15 @@ export const GOBLIN: EnemyDef = {
   mAv: 0,
   countersAdditions: true,
   attacks: [
-    { name: "Bone Club", kind: "physical", multiplier: 1.5 }, // >50% HP — the active melee attack
-    { name: "Throw Stone", kind: "physical", multiplier: 3 }, // ≤50% HP — thrown, lands as a rock
+    { name: "Bone Club", kind: "physical", multiplier: 1.5 }, // >50% HP — the active attack
+    { name: "Throw Stone", kind: "physical", multiplier: 3 }, // ≤50% HP — no throw clip yet → melee
     { name: "Kick", kind: "physical", multiplier: 4 }, // ≤50% HP — inactive under basic AI (v1)
   ],
   expReward: 4,
   goldReward: 2, // JP (EU/US: 6)
-  model: "goblin", // goblin mesh on the Knight's skin-transferred rig (Idle/Walk/Slash/Death/Throw)
-  weaponModel: "goblin_weapon", // the bone club, on mixamorig:RightHand
+  model: "goblin", // un-rigged Tripo mesh → engine synthesises rigid idle/walk/attack (Trent/Berserk path)
   cellShaded: true, // painted Tripo texture — render flat-diffuse
   scale: 0.7, // a small humanoid, shorter than the ~1.8 party. Tune in-game.
-  modelYaw: 0, // mixamorig faces forward like the Knight; flip to 180 if needed
+  modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.32, 0.4, 0.24], // fallback capsule tint if the model fails to load
 };
