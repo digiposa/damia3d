@@ -233,18 +233,26 @@ export class TrainingMenu {
   private renderSpawn(): HTMLElement {
     this.cb.onSpawnTabShown?.(); // let the mode prefetch the listed enemies' models
     const box = section(t("debug.spawn"));
-    // Grouped by location (canonical order) so the bestiary stays legible as the roster grows.
+    // Grouped into collapsible locations (canonical order) so the bestiary stays legible as the roster
+    // grows: tap a location header to fold/unfold its mobs. Forest (newest) starts open.
     box.append(
-      label(t("spawn.locTest")),
-      spawnButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
-      label(t("spawn.locSeles")),
-      spawnButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
-      spawnButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
-      label(t("spawn.locForest")),
-      spawnButton(t("spawn.berserkMouse"), "rgba(70,55,95,0.9)", this.cb.onSpawnBerserkMouse),
-      spawnButton(t("spawn.trent"), "rgba(55,80,45,0.9)", this.cb.onSpawnTrent),
-      spawnButton(t("spawn.goblin"), "rgba(70,90,40,0.9)", this.cb.onSpawnGoblin),
-      spawnButton(t("spawn.assassinCock"), "rgba(95,55,45,0.9)", this.cb.onSpawnAssassinCock),
+      locationGroup(t("spawn.locTest"), [
+        spawnButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
+      ]),
+      locationGroup(t("spawn.locSeles"), [
+        spawnButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
+        spawnButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
+      ]),
+      locationGroup(
+        t("spawn.locForest"),
+        [
+          spawnButton(t("spawn.berserkMouse"), "rgba(70,55,95,0.9)", this.cb.onSpawnBerserkMouse),
+          spawnButton(t("spawn.trent"), "rgba(55,80,45,0.9)", this.cb.onSpawnTrent),
+          spawnButton(t("spawn.goblin"), "rgba(70,90,40,0.9)", this.cb.onSpawnGoblin),
+          spawnButton(t("spawn.assassinCock"), "rgba(95,55,45,0.9)", this.cb.onSpawnAssassinCock),
+        ],
+        true,
+      ),
     );
     return box;
   }
@@ -377,6 +385,49 @@ function spawnButton(labelText: string, bg: string, onClick: () => void | Promis
     });
   });
   return btn;
+}
+
+/** A collapsible location group: a tappable header (chevron + name + mob count) that folds its list of
+ *  spawn buttons. Keeps the debug bestiary legible as the roster grows. Collapsed unless `startOpen`. */
+function locationGroup(title: string, buttons: HTMLElement[], startOpen = false): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.style.marginBottom = "10px";
+  let open = startOpen;
+
+  const header = document.createElement("button");
+  Object.assign(header.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    width: "100%",
+    font: "800 12px/1 ui-monospace, monospace",
+    letterSpacing: "0.08em",
+    color: "#8fb0d8",
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid #3a4a5e",
+    borderRadius: "9px",
+    padding: "10px 12px",
+    marginBottom: "6px",
+    cursor: "pointer",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+
+  const list = document.createElement("div");
+  list.style.display = open ? "block" : "none";
+  for (const b of buttons) list.append(b);
+
+  const render = (): void => {
+    header.textContent = `${open ? "▾" : "▸"}  ${title.toUpperCase()}  ·  ${buttons.length}`;
+  };
+  render();
+  tap(header, () => {
+    open = !open;
+    list.style.display = open ? "block" : "none";
+    render();
+  });
+
+  wrap.append(header, list);
+  return wrap;
 }
 
 function bigButton(labelText: string, bg: string, onClick: () => void): HTMLButtonElement {
