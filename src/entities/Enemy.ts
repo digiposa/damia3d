@@ -142,9 +142,7 @@ export class Enemy {
       marginTop: "-3px",
       borderRadius: "3px",
       background: "rgba(10,14,22,0.85)",
-      // Frame tinted by the enemy's element (the fill stays green→red for HP) — the in-arena element cue.
-      border: `1.5px solid ${ELEMENT_COLOR[def.element]}`,
-      boxShadow: `0 0 3px ${ELEMENT_COLOR[def.element]}`,
+      border: "1px solid rgba(0,0,0,0.6)",
       overflow: "hidden",
       pointerEvents: "none",
       zIndex: "12",
@@ -154,9 +152,9 @@ export class Enemy {
       position: "absolute",
       inset: "0",
       transformOrigin: "left",
-      background: def.isBoss
-        ? "linear-gradient(90deg, #b14, #f73)"
-        : "linear-gradient(90deg, #6ab04c, #c0392b)",
+      // Fill IS the enemy's element colour (length still shows HP) — a bold in-arena element cue. A
+      // top gloss keeps it readable; the empty track darkens as HP drops.
+      background: `linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0) 45%), ${ELEMENT_COLOR[def.element]}`,
     } satisfies Partial<CSSStyleDeclaration>);
     this.bar.appendChild(this.barFill);
     document.body.appendChild(this.bar);
