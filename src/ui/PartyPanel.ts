@@ -1,10 +1,13 @@
 import { t } from "../core/i18n";
 import { scaleHud } from "../core/device";
+import { ELEMENT_COLOR, type Element } from "../combat/element";
 
 /** One party member's row in the HUD panel. */
 export interface PartyRowView {
   name: string;
   portrait?: string;
+  /** The Dragoon's element — tints the portrait frame (our characters are Dragoons, so this is their cue). */
+  element?: Element;
   /** Alternate portrait used only while {@link transformed} (Dragoon form); falls back to {@link portrait}. */
   dragoonPortrait?: string;
   level: number;
@@ -51,7 +54,7 @@ interface Row {
   sp: Gauge;
   mp: Gauge;
   /** Last-written row state, so per-frame set() skips unchanged style writes. */
-  cache: { shown?: boolean; controlled?: boolean; level?: number; portrait?: string; extras?: boolean };
+  cache: { shown?: boolean; controlled?: boolean; level?: number; portrait?: string; extras?: boolean; elementBorder?: string };
 }
 
 /**
@@ -200,6 +203,13 @@ export class PartyPanel {
           row.portraitInitial.textContent = v.name.charAt(0);
           row.portraitInitial.style.display = "flex";
         }
+      }
+
+      // Tint the portrait frame by the Dragoon's element (falls back to the gold frame if unknown).
+      const elBorder = v.element ? ELEMENT_COLOR[v.element] : "#caa24a";
+      if (c.elementBorder !== elBorder) {
+        c.elementBorder = elBorder;
+        row.portrait.style.borderColor = elBorder;
       }
 
       // The member's name is overlaid in the HP gauge to save a whole line.

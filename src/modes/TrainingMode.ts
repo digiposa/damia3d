@@ -2312,6 +2312,7 @@ export abstract class ArenaCombatMode extends GameMode {
         const row: PartyRowView = {
           name: a.bearer.name,
           portrait: a.bearer.portrait,
+          element: dragoonClass(a.bearer.classId)?.element,
           dragoonPortrait: a.bearer.dragoonPortrait,
           level: a.level,
           hp: a.hp,
