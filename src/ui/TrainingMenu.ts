@@ -233,10 +233,14 @@ export class TrainingMenu {
   private renderSpawn(): HTMLElement {
     this.cb.onSpawnTabShown?.(); // let the mode prefetch the listed enemies' models
     const box = section(t("debug.spawn"));
+    // Grouped by location (canonical order) so the bestiary stays legible as the roster grows.
     box.append(
+      label(t("spawn.locTest")),
       spawnButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
+      label(t("spawn.locSeles")),
       spawnButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
       spawnButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
+      label(t("spawn.locForest")),
       spawnButton(t("spawn.berserkMouse"), "rgba(70,55,95,0.9)", this.cb.onSpawnBerserkMouse),
       spawnButton(t("spawn.trent"), "rgba(55,80,45,0.9)", this.cb.onSpawnTrent),
       spawnButton(t("spawn.goblin"), "rgba(70,90,40,0.9)", this.cb.onSpawnGoblin),

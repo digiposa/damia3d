@@ -333,6 +333,6 @@ export const ASSASSIN_COCK: EnemyDef = {
   model: "assassin_cock", // un-rigged Tripo bird → engine synthesises rigid idle/walk/attack
   cellShaded: true, // painted Tripo texture — render flat-diffuse
   scale: 0.5, // a big fighting-cock, small-critter sized. Tune in-game.
-  modelYaw: 0, // flip to 180 if it faces away from its target in-game
+  modelYaw: 90, // its Tripo mesh faces -X; +90° points the head at +Z (the enemy's forward)
   bodyColor: [0.5, 0.32, 0.24], // reddish placeholder capsule if the model fails to load
 };

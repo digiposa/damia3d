@@ -169,6 +169,9 @@ const en: Dict = {
 
   // Spawn menu
   "spawn.title": "Spawn enemies",
+  "spawn.locTest": "Test",
+  "spawn.locSeles": "Seles",
+  "spawn.locForest": "Forest",
   "spawn.dummy": "🎯  Training Dummy",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
@@ -381,6 +384,9 @@ const fr: Dict = {
   "balance.ratio": "Ratio",
   "balance.none": "Aucune Addition (attaquant basique).",
   "spawn.title": "Apparition d'ennemis",
+  "spawn.locTest": "Test",
+  "spawn.locSeles": "Seles",
+  "spawn.locForest": "Forêt",
   "spawn.dummy": "🎯  Mannequin d'entraînement",
   "spawn.knight": "🛡  Knight of Sandora",
   "spawn.commander": "👑  Commander (boss)",
