@@ -10,7 +10,7 @@ import { Animation } from "@babylonjs/core/Animations/animation";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
 import type { EnemyDef } from "../data/enemies";
-import type { Element } from "../combat/element";
+import { ELEMENT_COLOR, type Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
 import { tuneImportedMetal, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import { instantiateModel, hasContainer } from "../core/AssetService";
@@ -142,7 +142,9 @@ export class Enemy {
       marginTop: "-3px",
       borderRadius: "3px",
       background: "rgba(10,14,22,0.85)",
-      border: "1px solid rgba(0,0,0,0.6)",
+      // Frame tinted by the enemy's element (the fill stays green→red for HP) — the in-arena element cue.
+      border: `1.5px solid ${ELEMENT_COLOR[def.element]}`,
+      boxShadow: `0 0 3px ${ELEMENT_COLOR[def.element]}`,
       overflow: "hidden",
       pointerEvents: "none",
       zIndex: "12",
