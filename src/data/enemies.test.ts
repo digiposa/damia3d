@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT, GOBLIN } from "./enemies";
+import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK } from "./enemies";
 
 describe("Commander — Seles boss", () => {
   it("matches the wiki stats", () => {
@@ -93,5 +93,25 @@ describe("Goblin — Forest minor enemy", () => {
     expect(GOBLIN.attacks.map((a) => a.name)).toEqual(["Bone Club", "Throw Stone", "Kick"]);
     expect(GOBLIN.attacks[0]).toMatchObject({ kind: "physical", multiplier: 1.5 });
     expect(GOBLIN.attacks[1].name).toMatch(/throw/i); // picked up as the ranged attack
+  });
+});
+
+describe("Assassin Cock — Forest minor enemy", () => {
+  it("uses the Japanese PS1 stats", () => {
+    expect(ASSASSIN_COCK.stats).toEqual({ maxHp: 4, at: 2, df: 100, mat: 3, mdf: 120 });
+    expect(ASSASSIN_COCK.spd).toBe(50);
+    expect(ASSASSIN_COCK.expReward).toBe(5);
+    expect(ASSASSIN_COCK.goldReward).toBe(2);
+  });
+
+  it("is a Wind creature that counters Additions", () => {
+    expect(ASSASSIN_COCK.element).toBe("Wind");
+    expect(ASSASSIN_COCK.countersAdditions).toBe(true);
+  });
+
+  it("knows Talon Kick (2× phys, active) and a Non-Elemental Cry", () => {
+    expect(ASSASSIN_COCK.attacks.map((a) => a.name)).toEqual(["Talon Kick", "Cry"]);
+    expect(ASSASSIN_COCK.attacks[0]).toMatchObject({ kind: "physical", multiplier: 2 });
+    expect(ASSASSIN_COCK.attacks[1]).toMatchObject({ kind: "magical", element: "Non-Elemental" });
   });
 });

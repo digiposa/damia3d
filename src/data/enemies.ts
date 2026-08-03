@@ -307,3 +307,32 @@ export const GOBLIN: EnemyDef = {
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.32, 0.4, 0.24], // fallback capsule tint if the model fails to load
 };
+
+/**
+ * Assassin Cock — Wind, an aggressive fighting-cock (recolor of Hellena's Fowl Fighter). Counters
+ * Additions. Canon moveset: ~Talon Kick (2× physical) above 50% HP; ~Cry (1× Non-Elemental magic, a
+ * party AoE) at/below 50%. Under the basic AI it uses Talon Kick; Cry (AoE + HP-gated) waits on a
+ * future behaviour. JP stats (HP/MAT/SPD higher, Gold lower than EU/US). Non-humanoid bird → rigid
+ * procedural animation (same path as the Berserk Mouse / Trent).
+ */
+export const ASSASSIN_COCK: EnemyDef = {
+  id: "assassin_cock",
+  name: "Assassin Cock",
+  element: "Wind",
+  stats: { maxHp: 4, at: 2, df: 100, mat: 3, mdf: 120 }, // JP (EU/US: hp3 mat2)
+  spd: 50, // JP (EU/US: 45)
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Talon Kick", kind: "physical", multiplier: 2 }, // >50% HP — the active attack
+    { name: "Cry", kind: "magical", multiplier: 1, element: "Non-Elemental" }, // ≤50% party AoE — inactive (v1)
+  ],
+  expReward: 5,
+  goldReward: 2, // JP (EU/US: 6)
+  model: "assassin_cock", // un-rigged Tripo bird → engine synthesises rigid idle/walk/attack
+  cellShaded: true, // painted Tripo texture — render flat-diffuse
+  scale: 0.5, // a big fighting-cock, small-critter sized. Tune in-game.
+  modelYaw: 0, // flip to 180 if it faces away from its target in-game
+  bodyColor: [0.5, 0.32, 0.24], // reddish placeholder capsule if the model fails to load
+};

@@ -27,7 +27,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, BERSERK_MOUSE, TRENT, GOBLIN, TRAINING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -486,9 +486,10 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
         onSpawnTrent: () => this.spawnTrent(),
         onSpawnGoblin: () => this.spawnGoblin(),
+        onSpawnAssassinCock: () => this.spawnAssassinCock(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent", "goblin"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -2278,6 +2279,13 @@ export abstract class ArenaCombatMode extends GameMode {
     await this.ensureEnemyAssets(GOBLIN);
     if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, GOBLIN, this.ringPosition()));
+  }
+
+  /** Spawn a Forest minor enemy — Assassin Cock (non-humanoid bird, procedural animation). */
+  private async spawnAssassinCock(): Promise<void> {
+    await this.ensureEnemyAssets(ASSASSIN_COCK);
+    if (this.scene.isDisposed) return;
+    this.addEnemy(new Enemy(this.scene, ASSASSIN_COCK, this.ringPosition()));
   }
 
   /** A random spawn position on a ring around the player, kept inside the arena. */
