@@ -26,6 +26,12 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
+- **Knight of Sandora (Black Castle) — volontairement non touché pour l'instant.** Trouvailles de la
+  review à reprendre plus tard : HP JP = **200** (déduit du soin JAP 60 = 30% du max ; on est à 180 US) ;
+  autres stats JP inconnues ; son **HP Recovery** canon (soigne 30% du max) n'est PAS implémenté — le
+  commentaire de la def dit « self-heals » à tort (le soin 30% dans Enemy.ts est celui du script du
+  Commander). La version Seles, elle, est validée : stats JP conformes, IA distance (slash mêlée /
+  dague à distance) actée, fuite d'escouade non implémentée par choix.
 - **Review cohérence des attaques des mobs Forest** (une fois les 4 en place : Berserk Mouse, Trent,
   Goblin, Assassin Cock) : recroiser chaque moveset avec le wiki (noms, multiplicateurs, seuils HP,
   physique vs magie) et vérifier la cohérence de l'ensemble avant de figer.
