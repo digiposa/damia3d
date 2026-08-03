@@ -15,6 +15,22 @@ export type Element =
   | "Thunder"
   | "Non-Elemental";
 
+/**
+ * Official per-element UI colour — one hex per element (the lightest tone of each palette gradient).
+ * Used to tint enemy/mob chips by element. Values are eye-matched from the reference palette; swap in
+ * exact hex if they drift. Order follows the palette (Fire → Non-Elemental).
+ */
+export const ELEMENT_COLOR: Record<Element, string> = {
+  Fire: "#b31d1d",
+  Water: "#226f80",
+  Wind: "#1f8a57",
+  Earth: "#8f5e14",
+  Light: "#9a8f22",
+  Darkness: "#1a2170",
+  Thunder: "#7d20c4",
+  "Non-Elemental": "#454545",
+};
+
 const OPPOSITE: Partial<Record<Element, Element>> = {
   Fire: "Water",
   Water: "Fire",

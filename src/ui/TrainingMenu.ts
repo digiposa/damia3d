@@ -1,5 +1,6 @@
 import { hasTouch } from "../core/device";
 import { t } from "../core/i18n";
+import { ELEMENT_COLOR } from "../combat/element";
 
 /** One Addition's DPS readout: completing it vs. spamming the free hit 1. */
 export interface BalanceRow {
@@ -237,19 +238,19 @@ export class TrainingMenu {
     // grows: tap a location header to fold/unfold its mobs. Forest (newest) starts open.
     box.append(
       locationGroup(t("spawn.locTest"), [
-        spawnButton(t("spawn.dummy"), "rgba(90,72,40,0.92)", this.cb.onSpawnDummy),
+        spawnButton(t("spawn.dummy"), ELEMENT_COLOR["Non-Elemental"], this.cb.onSpawnDummy),
       ]),
       locationGroup(t("spawn.locSeles"), [
-        spawnButton(t("spawn.knight"), "rgba(40,70,110,0.9)", this.cb.onSpawnKnight),
-        spawnButton(t("spawn.commander"), "rgba(90,55,120,0.9)", this.cb.onSpawnCommander),
+        spawnButton(t("spawn.knight"), ELEMENT_COLOR.Fire, this.cb.onSpawnKnight),
+        spawnButton(t("spawn.commander"), ELEMENT_COLOR.Darkness, this.cb.onSpawnCommander),
       ]),
       locationGroup(
         t("spawn.locForest"),
         [
-          spawnButton(t("spawn.berserkMouse"), "rgba(70,55,95,0.9)", this.cb.onSpawnBerserkMouse),
-          spawnButton(t("spawn.trent"), "rgba(55,80,45,0.9)", this.cb.onSpawnTrent),
-          spawnButton(t("spawn.goblin"), "rgba(70,90,40,0.9)", this.cb.onSpawnGoblin),
-          spawnButton(t("spawn.assassinCock"), "rgba(95,55,45,0.9)", this.cb.onSpawnAssassinCock),
+          spawnButton(t("spawn.berserkMouse"), ELEMENT_COLOR.Darkness, this.cb.onSpawnBerserkMouse),
+          spawnButton(t("spawn.trent"), ELEMENT_COLOR.Earth, this.cb.onSpawnTrent),
+          spawnButton(t("spawn.goblin"), ELEMENT_COLOR.Fire, this.cb.onSpawnGoblin),
+          spawnButton(t("spawn.assassinCock"), ELEMENT_COLOR.Wind, this.cb.onSpawnAssassinCock),
         ],
         true,
       ),
