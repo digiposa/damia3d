@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK } from "./enemies";
 
 describe("Commander — Seles boss", () => {
-  it("matches the wiki stats", () => {
-    expect(COMMANDER_SELES.stats).toEqual({ maxHp: 14, at: 2, df: 40, mat: 4, mdf: 40 });
+  it("matches the wiki stats (JP hp)", () => {
+    expect(COMMANDER_SELES.stats).toEqual({ maxHp: 15, at: 2, df: 40, mat: 4, mdf: 40 });
     expect(COMMANDER_SELES.element).toBe("Darkness");
     expect(COMMANDER_SELES.expReward).toBe(20);
     expect(COMMANDER_SELES.goldReward).toBe(20);

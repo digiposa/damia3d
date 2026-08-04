@@ -152,7 +152,7 @@ export const COMMANDER_SELES: EnemyDef = {
   id: "commander_seles",
   name: "Commander",
   element: "Darkness",
-  stats: { maxHp: 14, at: 2, df: 40, mat: 4, mdf: 40 },
+  stats: { maxHp: 15, at: 2, df: 40, mat: 4, mdf: 40 }, // JP hp (EU/US: 14); other stats identical across versions
   spd: 40,
   aAv: 0,
   mAv: 0,
