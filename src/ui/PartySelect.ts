@@ -26,6 +26,8 @@ export class PartySelect {
     private maxParty = 3,
     /** Optional sub-title override (defaults to the Survival wording for the given maxParty). */
     hintText?: string,
+    /** When provided, renders a "Back" button under Start (e.g. return to the title screen). */
+    onBack?: () => void,
   ) {
     this.backdrop = document.createElement("div");
     Object.assign(this.backdrop.style, {
@@ -80,6 +82,22 @@ export class PartySelect {
     });
 
     this.backdrop.append(title, hint, this.grid, this.startBtn);
+    if (onBack) {
+      const back = document.createElement("button");
+      back.textContent = `‹ ${t("common.back")}`;
+      Object.assign(back.style, {
+        width: "min(92vw, 560px)",
+        padding: "11px",
+        borderRadius: "12px",
+        border: "1px solid rgba(160,170,190,0.35)",
+        background: "rgba(60,66,80,0.3)",
+        color: "#cfd8e6",
+        font: "700 14px/1 system-ui, sans-serif",
+        cursor: "pointer",
+      } satisfies Partial<CSSStyleDeclaration>);
+      back.addEventListener("pointerup", onBack);
+      this.backdrop.appendChild(back);
+    }
     document.body.appendChild(this.backdrop);
     this.refresh();
   }

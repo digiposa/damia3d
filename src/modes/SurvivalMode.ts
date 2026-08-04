@@ -127,7 +127,13 @@ export class SurvivalMode extends ArenaCombatMode {
       this.showNextOffer(); // chosen — show the next queued screen, or resume if none remain
     });
     // Straight into character selection (solo — allies are recruited as rare rewards).
-    this.select = new PartySelect(selectableBearers(), (party) => this.beginRun(party), 1);
+    this.select = new PartySelect(
+      selectableBearers(),
+      (party) => this.beginRun(party),
+      1,
+      undefined,
+      () => this.host.toMainMenu(), // back out to the title screen (disposes this mode + the picker)
+    );
     this.paused = true;
     this.select.show();
   }

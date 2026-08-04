@@ -2453,7 +2453,13 @@ export class TrainingMode extends ArenaCombatMode {
 
   override enter(): void {
     super.enter(); // arena, camera, atmosphere, a bootstrap party, combat + debug UI
-    this.select = new PartySelect(selectableBearers(), (party) => this.beginSession(party), 1, t("training.selectSoloHint"));
+    this.select = new PartySelect(
+      selectableBearers(),
+      (party) => this.beginSession(party),
+      1,
+      t("training.selectSoloHint"),
+      () => this.host.toMainMenu(), // back out to the title screen (disposes this mode + the picker)
+    );
     this.paused = true;
     this.select.show();
   }
