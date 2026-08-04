@@ -144,9 +144,11 @@ export const KNIGHT_OF_SANDORA = KNIGHT_OF_SANDORA_SELES;
 
 /**
  * Commander — Seles Boss. Confronts Dart in Seles alongside two Knights of
- * Sandora. Once the Knights fall it uses Power Up (single use): Sword Slash is
- * replaced by Slash Twice (2×) and Burn Out rises to 1.5×. Recovers 30% HP when
- * below 51%. Darkness element; does not counter Additions.
+ * Sandora. House-rule script (adapted from the canon "knights defeated" trigger):
+ * the turn he first drops below 50% HP he uses Power Up AND recovers 30% HP in
+ * one action (single use) — Sword Slash is replaced by Slash Twice (2×) and Burn
+ * Out rises to 1.5×. Burn Out is a 10 s-cooldown Fire spell (like the player's).
+ * Darkness element; does not counter Additions.
  */
 export const COMMANDER_SELES: EnemyDef = {
   id: "commander_seles",

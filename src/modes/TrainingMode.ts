@@ -1838,6 +1838,8 @@ export abstract class ArenaCombatMode extends GameMode {
       const projectile = /stone|rock/i.test(action.name) ? "stone" : "arrow"; // Goblin lobs a rock
       this.arrows.push(new Arrow(this.scene, from, torso(), ARROW_SPEED, applyHit, enemy.throwReleaseDelay, torso, projectile));
     } else {
+      // Enemy spells burst with the same elemental VFX as the player's casts (Commander's Burn Out).
+      if (magical) this.spellFx?.burst(action.element ?? "Non-Elemental", this.player.position, 1);
       applyHit();
     }
   }
@@ -2275,11 +2277,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.addEnemy(new Enemy(this.scene, KNIGHT_OF_SANDORA, this.ringPosition()));
   }
 
-  /**
-   * Spawn the Commander boss on its own. (Its Power Up still triggers if Knights
-   * are present and then defeated — spawn some alongside to see the scripted
-   * Seles behaviour.)
-   */
+  /** Spawn the Commander boss (Power Up + heal fire the first time he drops below 50% HP). */
   private async spawnCommander(): Promise<void> {
     await this.ensureEnemyAssets(COMMANDER_SELES);
     if (this.scene.isDisposed) return;

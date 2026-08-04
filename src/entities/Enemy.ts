@@ -23,6 +23,8 @@ const ATTACK_RANGE = 1.7;
 const THROW_RANGE = 10;
 /** Seconds between the enemy's attacks. */
 const ATTACK_INTERVAL = 1.4;
+/** Seconds between the Commander's Burn Out casts — a cooldown spell, like the player's Burn Out. */
+const BURNOUT_COOLDOWN = 10;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
 const WEAPON_SCALE = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
@@ -60,7 +62,8 @@ export class Enemy {
   private scale: number;
   private attackCooldown = 0;
   private poweredUp = false;
-  private escortsSeen = false;
+  /** Commander only: seconds until Burn Out is ready again (counts down in {@link aiUpdate}). */
+  private burnOutCooldown = 0;
   private bodyMat: StandardMaterial;
 
   /** Resolves once the optional rigged model has loaded (or immediately if there's none). */
@@ -500,6 +503,7 @@ export class Enemy {
     if (this.dead) return null;
     // The training dummy just stands there: no chasing, no attacks.
     if (this.def.behavior === "dummy") return null;
+    this.burnOutCooldown = Math.max(0, this.burnOutCooldown - dt); // Commander spell recharge (thaws even stunned)
     // Stunned: frozen — no chase, no attack (cooldown still thaws).
     if (this.stunned) {
       this.attackCooldown = Math.max(0, this.attackCooldown - dt);
@@ -558,34 +562,34 @@ export class Enemy {
     return a ? ((a.to - a.from) / 60) * 0.5 : 0.4; // clip plays at speed 1.0, Babylon 60 fps
   }
 
-  private chooseAction(ctx: EnemyContext): EnemyAction {
-    if (this.def.behavior === "commander") return this.commanderAction(ctx);
+  private chooseAction(_ctx: EnemyContext): EnemyAction {
+    if (this.def.behavior === "commander") return this.commanderAction();
     // Melee: the first non-thrown attack (a thrown one is reserved for range).
     const a = this.def.attacks.find((x) => !/throw/i.test(x.name)) ?? this.def.attacks[0];
     return { kind: a.kind, name: a.name, multiplier: a.multiplier };
   }
 
-  /** The Seles Commander's "if → then" script. */
-  private commanderAction(ctx: EnemyContext): EnemyAction {
+  /** The Seles Commander's "if → then" script (house rules):
+   *  - The turn he first drops below 50% HP: Power Up AND HP recover together — one action that
+   *    powers him up (Slash Twice replaces Sword Slash, Burn Out 1.2× → 1.5×) and heals 30% max HP.
+   *  - Burn Out is a cooldown spell (like the player's): cast whenever its 10 s recharge is ready.
+   *  - Otherwise the auto attack: Sword Slash (1×), or Slash Twice (2×) once powered. */
+  private commanderAction(): EnemyAction {
     const max = this.def.stats.maxHp;
-    if (ctx.knightsAlive > 0) this.escortsSeen = true;
 
-    // Power Up once the escorting Knights are defeated (single use).
-    if (!this.poweredUp && this.escortsSeen && ctx.knightsAlive === 0) {
+    // Power Up + HP recover, together, the first time he's below 50% (single use).
+    if (!this.poweredUp && this.hp < 0.5 * max) {
       this.poweredUp = true;
       this.markPowered();
-      return { kind: "physical", name: "Slash Twice", multiplier: 2 };
+      return { kind: "heal", name: "Power Up", amount: Math.max(1, Math.floor(0.3 * max)) };
     }
 
-    // Recover 30% HP when below 51%.
-    if (this.hp < 0.51 * max && Math.random() < 0.35) {
-      return { kind: "heal", name: "HP recovers", amount: Math.max(1, Math.floor(0.3 * max)) };
-    }
-
-    // Burn Out (Fire magic; 1.5× once powered up) or a melee strike.
-    if (Math.random() < 0.4) {
+    // Burn Out (Fire magic; 1.5× once powered) whenever its recharge is ready.
+    if (this.burnOutCooldown <= 0) {
+      this.burnOutCooldown = BURNOUT_COOLDOWN;
       return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2, element: "Fire" };
     }
+
     return this.poweredUp
       ? { kind: "physical", name: "Slash Twice", multiplier: 2 }
       : { kind: "physical", name: "Sword Slash", multiplier: 1 };
