@@ -405,24 +405,42 @@ export class SystemMenu {
     const slots = document.createElement("div");
     Object.assign(slots.style, {
       display: "grid",
-      gridTemplateColumns: `repeat(${p.slots.length}, 1fr)`,
+      gridTemplateColumns: `repeat(${p.slots.length + (p.canAdd ? 1 : 0)}, 1fr)`,
       gap: "6px",
       marginBottom: "8px",
     } satisfies Partial<CSSStyleDeclaration>);
     p.slots.forEach((s, i) => {
       const b = bearerById(s.id);
-      slots.appendChild(
-        slotCard(
-          b ? { name: b.name, portrait: b.portrait, color: b.color } : undefined,
-          i === p.activeSlot,
-          s.controlled,
-          () => {
-            p.selectSlot(i);
-            this.render();
-          },
-        ),
+      const card = slotCard(
+        b ? { name: b.name, portrait: b.portrait, color: b.color } : undefined,
+        i === p.activeSlot,
+        s.controlled,
+        () => {
+          p.selectSlot(i);
+          this.render();
+        },
       );
+      // Kick badge (✖) — only while 2+ members, so the party can shrink to solo/duo but never to zero.
+      if (p.remove && p.slots.length > 1) {
+        card.style.position = "relative";
+        card.appendChild(
+          kickBadge(() => {
+            p.remove?.(i);
+            this.render();
+          }),
+        );
+      }
+      slots.appendChild(card);
     });
+    // "+" slot: select it, then tap a roster character below to append them (up to 3).
+    if (p.canAdd) {
+      slots.appendChild(
+        slotCard({ name: "+", color: [0.4, 0.4, 0.4] }, p.activeSlot === p.slots.length, false, () => {
+          p.selectSlot(p.slots.length);
+          this.render();
+        }),
+      );
+    }
     box.appendChild(slots);
     box.appendChild(hint(t("party.hint")));
     box.appendChild(divider());
@@ -886,6 +904,34 @@ function slotCard(
     onClick();
   });
   return el;
+}
+
+/** The ✖ overlay on a party slot card: kicks that member. Swallows the tap so it doesn't also
+ *  select the slot underneath. */
+function kickBadge(onClick: () => void): HTMLButtonElement {
+  const x = document.createElement("button");
+  x.textContent = "✕";
+  Object.assign(x.style, {
+    position: "absolute",
+    top: "-7px",
+    right: "-7px",
+    width: "22px",
+    height: "22px",
+    borderRadius: "50%",
+    border: "1px solid #b0404a",
+    background: "rgba(120,28,38,0.95)",
+    color: "#ffd9dc",
+    font: "800 11px/1 system-ui, sans-serif",
+    cursor: "pointer",
+    zIndex: "1",
+    touchAction: "manipulation",
+  } satisfies Partial<CSSStyleDeclaration>);
+  x.addEventListener("pointerup", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    onClick();
+  });
+  return x;
 }
 
 /** A small status pill: coloured text on a dark chip (readable on light or dark rows). */

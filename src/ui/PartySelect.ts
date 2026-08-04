@@ -24,6 +24,8 @@ export class PartySelect {
     private roster: Bearer[],
     private onStart: (party: Bearer[]) => void,
     private maxParty = 3,
+    /** Optional sub-title override (defaults to the Survival wording for the given maxParty). */
+    hintText?: string,
   ) {
     this.backdrop = document.createElement("div");
     Object.assign(this.backdrop.style, {
@@ -47,7 +49,7 @@ export class PartySelect {
     Object.assign(title.style, { font: "800 20px/1.2 system-ui, sans-serif", textAlign: "center" });
 
     const hint = document.createElement("div");
-    hint.textContent = this.maxParty === 1 ? t("survival.selectSoloHint") : t("survival.selectHint");
+    hint.textContent = hintText ?? (this.maxParty === 1 ? t("survival.selectSoloHint") : t("survival.selectHint"));
     Object.assign(hint.style, { opacity: "0.7", font: "600 13px/1.3 system-ui, sans-serif", textAlign: "center" });
 
     this.grid = document.createElement("div");

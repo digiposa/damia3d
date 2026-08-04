@@ -122,15 +122,19 @@ export interface PartySlotView {
   controlled: boolean;
 }
 
-/** Party composition (pick the 3 members) exposed to the System menu's Party tab. */
+/** Party composition (1 to 3 members) exposed to the System menu's Party tab. */
 export interface PartyComposeView {
   slots: PartySlotView[];
-  /** The slot currently being edited. */
+  /** The slot currently being edited. May equal `slots.length` when the "+" (add) slot is selected. */
   activeSlot: number;
-  /** Choose which slot to edit. */
+  /** Choose which slot to edit (`slots.length` = the "+" slot, when {@link canAdd}). */
   selectSlot: (slot: number) => void;
-  /** Assign a roster bearer (by id) to the active slot. */
+  /** Assign a roster bearer (by id) to the active slot (appends when the "+" slot is active). */
   assign: (bearerId: string) => void;
+  /** Kick the member in a slot — only offered while the party has 2+ members (solo/duo play). */
+  remove?: (slot: number) => void;
+  /** A new member can still be added (below the 3-member cap) — renders the "+" slot. */
+  canAdd?: boolean;
 }
 
 /** Per-mode data the System menu reads. */

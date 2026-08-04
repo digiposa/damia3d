@@ -101,6 +101,7 @@ function rgba(c: [number, number, number], a: number): string {
 }
 import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
+import { PartySelect } from "../ui/PartySelect";
 import { TimingSight } from "../ui/TimingSight";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
 import { floatingText } from "../ui/FloatingText";
@@ -803,9 +804,30 @@ export abstract class ArenaCombatMode extends GameMode {
   private assignToSlot(b: Bearer): void {
     const slot = this.activeSlot;
     const existing = this.partyBearers.findIndex((x) => x.id === b.id);
+    // "+" slot active: append a new member (cap 3; a bearer already in the party can't be added twice).
+    if (slot >= this.partyBearers.length) {
+      if (this.partyBearers.length >= 3 || existing >= 0) return;
+      this.partyBearers.push(b);
+      this.gambitIds.push([...DEFAULT_GAMBIT_IDS]);
+      this.activeSlot = this.partyBearers.length - 1;
+      this.buildParty();
+      return;
+    }
     if (existing === slot) return; // no change
     if (existing >= 0) this.partyBearers[existing] = this.partyBearers[slot]; // swap to dedupe
     this.partyBearers[slot] = b;
+    this.buildParty();
+  }
+
+  /** Kick a member (Party tab ✖) so the party can play solo or duo. Never below one member; gambit
+   *  slots stay aligned; control falls back to the leader if the controlled member is kicked. */
+  private removeFromParty(slot: number): void {
+    if (this.partyBearers.length <= 1 || slot < 0 || slot >= this.partyBearers.length) return;
+    this.partyBearers.splice(slot, 1);
+    this.gambitIds.splice(slot, 1);
+    if (this.controlledIndex === slot) this.controlledIndex = 0;
+    else if (this.controlledIndex > slot) this.controlledIndex -= 1;
+    this.activeSlot = Math.min(this.activeSlot, this.partyBearers.length - 1);
     this.buildParty();
   }
 
@@ -2063,12 +2085,16 @@ export abstract class ArenaCombatMode extends GameMode {
             })),
             activeSlot: this.activeSlot,
             selectSlot: (s) => {
-              this.activeSlot = Math.min(Math.max(s, 0), this.partyBearers.length - 1);
+              // The "+" slot (index === length) is selectable while below the 3-member cap.
+              const maxSel = this.partyBearers.length < 3 ? this.partyBearers.length : this.partyBearers.length - 1;
+              this.activeSlot = Math.min(Math.max(s, 0), maxSel);
             },
             assign: (id) => {
               const b = bearerById(id);
               if (b) this.assignToSlot(b);
             },
+            remove: (i) => this.removeFromParty(i),
+            canAdd: this.partyBearers.length < 3,
           }
         : undefined,
       gambits: {
@@ -2415,6 +2441,41 @@ export abstract class ArenaCombatMode extends GameMode {
 /** The Training sandbox: the shared arena-combat core plus the debug spawn/level/DPS tools. */
 export class TrainingMode extends ArenaCombatMode {
   readonly name = "Training";
+
+  /** Entry character picker (same flow as Survival): start solo with a chosen bearer, then grow or
+   *  shrink the party from the System menu's Party tab ("+" to add, ✖ to kick). */
+  private select?: PartySelect;
+
+  /** Hold the entry gate's unpause while the picker is up — {@link beginSession} unpauses. */
+  protected override onAssetsReady(): void {
+    if (!this.select) this.paused = false;
+  }
+
+  override enter(): void {
+    super.enter(); // arena, camera, atmosphere, a bootstrap party, combat + debug UI
+    this.select = new PartySelect(selectableBearers(), (party) => this.beginSession(party), 1, t("training.selectSoloHint"));
+    this.paused = true;
+    this.select.show();
+  }
+
+  /** Start the session with the picked character (replaces the bootstrap party). */
+  private beginSession(party: Bearer[]): void {
+    this.select?.dispose();
+    this.select = undefined;
+    this.partyBearers = party;
+    this.gambitIds = party.map(() => [...DEFAULT_GAMBIT_IDS]);
+    this.controlledIndex = 0;
+    this.buildParty();
+    // Gate on the picked character's models (usually instant — the menu prefetches the roster).
+    void this.gateAssets().then(() => {
+      if (!this.scene.isDisposed) this.paused = false;
+    });
+  }
+
+  override dispose(): void {
+    this.select?.dispose();
+    super.dispose();
+  }
 }
 
 /** Floating-damage colour: orange when boosted (weakness), blue-grey when resisted, else gold. */
