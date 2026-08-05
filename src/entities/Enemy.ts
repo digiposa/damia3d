@@ -76,6 +76,8 @@ export class Enemy {
     attack?: AnimationGroup;
     slashTwice?: AnimationGroup;
     powerUp?: AnimationGroup;
+    /** Spell-cast clip (magical attacks like the Commander's Burn Out); falls back to `attack`. */
+    cast?: AnimationGroup;
     throw?: AnimationGroup;
     death?: AnimationGroup;
   } = {};
@@ -230,6 +232,7 @@ export class Enemy {
     this.anims.idle = groups.find((a) => has(a, "idle")) ?? groups[0];
     this.anims.slashTwice = groups.find((a) => has(a, "twice", "double", "multi"));
     this.anims.powerUp = groups.find((a) => has(a, "power"));
+    this.anims.cast = groups.find((a) => has(a, "cast", "spell", "magic", "burn"));
     this.anims.throw = groups.find((a) => has(a, "throw", "dagger", "knife"));
     this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
@@ -546,6 +549,7 @@ export class Enemy {
     const wasPowered = this.poweredUp;
     const action = this.chooseAction(ctx);
     if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
+    else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack); // spell cast
     else this.playAttack(action.name);
     return action;
   }
