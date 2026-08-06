@@ -118,6 +118,47 @@ Meru vs ~0 % for Miranda) predicts how much of this you'll see. Always render id
 `pose.html` before committing, and keep the original model as a backup so a bad transfer is a one-file
 rollback.
 
+## Standard animation set — the per-character checklist
+
+The engine's `Player` animation slots define what a character can do on screen. **Damia's 9-clip set
+is the baseline**; Shana adds the 10th (death). Upload names follow `Character__Clip.fbx`.
+
+### Tier 1 — REQUIRED (the base 9, all playable characters)
+
+| # | Clip (merged name) | Upload name | Plays when |
+|---|---|---|---|
+| 1 | `idle` | `Char__Idle_NC.fbx` | standing, exploration |
+| 2 | `idlecombat` | `Char__Idle_C.fbx` | standing, enemies near |
+| 3 | `walk` | `Char__Walk_NC.fbx` | walking, exploration |
+| 4 | `walkcombat` | `Char__Walk_C.fbx` | walking, combat |
+| 5 | `run` | `Char__Run_NC.fbx` | running, exploration |
+| 6 | `runcombat` | `Char__Run_C.fbx` | running, combat |
+| 7 | `attack` | `Char__Attack.fbx` | every landed blow (strike/D'Attack) |
+| 8 | `draw` | `Char__Weapon_Draw.fbx` | entering combat (weapon out / fists up) |
+| 9 | `sheathe` | `Char__Weapon_Sheath.fbx` | leaving combat |
+
+### Tier 2 — NEXT (slot exists or is planned; Damia herself is missing these)
+
+| # | Clip | Engine status | Notes |
+|---|---|---|---|
+| 10 | `death` | ✅ slot ready (`deathAnim`, separate grafted GLB à la `shana_death`) | one per character (collapse fitting the silhouette) |
+| 11 | per-Addition hits | planned (the pipeline's end-goal phase) | 1 clip per Addition hit — blueSea archetype first, **Damia pilot** |
+| 12 | `cast` (magic/attack items) | enemies have the slot; Player TODO | spell-throw gesture |
+| 13 | `hurt` (hit reaction) | Player TODO | small stagger |
+| 14 | Dragoon-form set | ❌ `damia_dragoon.glb` has ZERO clips today | fly-idle, D'Attack, cast, transform — its own mini-set |
+
+### Roster status (measured on the shipped GLBs)
+
+| Character | Base 9 | Death | Gaps |
+|---|---|---|---|
+| Damia | ✅ 9/9 | ❌ | death; (reference otherwise) |
+| Meru | ✅ 9/9 (grafted from Damia) | ❌ | death |
+| Shana | ✅ 9/9 | ✅ `shana_death` | — the only complete one |
+| Miranda | ✅ 9/9 (grafted from Shana) | ❌ | death — can reuse `shana_death` (same skeleton) |
+| Haschel | 🟡 6/9 | ❌ | missing `Walk_C`, `Run_NC`, `Run_C`; death |
+| Rose | ❌ 0/9 — un-rigged static mesh | ❌ | needs the full Mixamo pass (humanoid, auto-rig OK) |
+| others | procedural humanoid fallback | — | model + full set when prioritised |
+
 ## Conventions
 
 ### File naming (`src/assets/models/`, lowercase, no spaces)
