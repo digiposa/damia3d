@@ -727,10 +727,26 @@ export class Player {
    *  out of it. Plays the draw/sheathe clip and reparents the weapon partway through; falls back to
    *  an instant snap if the character has no such clip. Called each frame from {@link animate}. */
   private updateWeaponHolster(): void {
-    if (this.weaponTransition || !this.weaponMeshes.length) return; // one transition at a time
+    if (this.weaponTransition) return; // one transition at a time
     const wantSheathed = !this.combat;
     if (wantSheathed === this.weaponSheathed) return;
     const clip = wantSheathed ? this.modelAnims.sheathe : this.modelAnims.draw;
+    // Weaponless bearers (fist fighters like Haschel): no holster to move, but still play the
+    // draw/sheathe clip as a stance transition (raising/lowering the fists). The very first
+    // reconcile (spawn) just snaps the flag — no transition animation out of thin air.
+    if (!this.weaponMeshes.length) {
+      const first = this.weaponSheathed === undefined;
+      this.weaponSheathed = wantSheathed;
+      if (first || !clip) return;
+      this.weaponTransition = wantSheathed ? "sheathe" : "draw";
+      this.modelCurrent?.stop();
+      this.modelCurrent = clip;
+      clip.start(false, 1, clip.from, clip.to);
+      clip.onAnimationGroupEndObservable.addOnce(() => {
+        this.weaponTransition = undefined;
+      });
+      return;
+    }
     if (!clip || !this.weaponBackMount) {
       this.applyWeaponSheath(wantSheathed); // no clip / no back mount → snap
       return;
