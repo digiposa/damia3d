@@ -1796,6 +1796,14 @@ export abstract class ArenaCombatMode extends GameMode {
     if (action.kind === "heal") {
       enemy.heal(action.amount);
       this.popText(enemy.headPosition, `+${action.amount}`, TEXT.hp);
+      // The Commander's Power Up: wrap the buff clip in a fiery aura — a strong flame burst (with
+      // the scene flash) on trigger, then a softer sustain pulse mid-animation.
+      if (/power/i.test(action.name)) {
+        this.spellFx?.burst("Fire", enemy.position, 1.3);
+        window.setTimeout(() => {
+          if (!this.scene.isDisposed && enemy.alive) this.spellFx?.burst("Fire", enemy.position, 0.5);
+        }, 600);
+      }
       return;
     }
 
