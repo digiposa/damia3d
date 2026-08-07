@@ -261,6 +261,8 @@ export abstract class ArenaCombatMode extends GameMode {
   protected camera!: IsoCamera;
   protected atmosphere?: Atmosphere;
   protected spellFx?: SpellFx;
+  /** Enemy currently wearing a buff aura (Power Up) — the aura follows it until it fades/dies. */
+  private auraSource?: Enemy;
   private hud!: PartyPanel;
   /**
    * GLB decor layout (Quaternius Fantasy Props). Empty for now — the ringside crates/barrels/racks
@@ -1778,6 +1780,11 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   private updateEnemies(cdt: number): void {
+    // Keep a playing buff aura glued to its caster (Power Up).
+    if (this.auraSource) {
+      if (this.auraSource.alive) this.spellFx?.moveAura(this.auraSource.position);
+      else this.auraSource = undefined;
+    }
     let knightsAlive = 0; // count in a loop — no throwaway filtered array each frame
     for (const e of this.enemies) if (e.alive && e.def.id.startsWith("knight_of_sandora")) knightsAlive++;
     const ctx = { knightsAlive };
@@ -1796,13 +1803,11 @@ export abstract class ArenaCombatMode extends GameMode {
     if (action.kind === "heal") {
       enemy.heal(action.amount);
       this.popText(enemy.headPosition, `+${action.amount}`, TEXT.hp);
-      // The Commander's Power Up: wrap the buff clip in a fiery aura — a strong flame burst (with
-      // the scene flash) on trigger, then a softer sustain pulse mid-animation.
+      // The Commander's Power Up: a buff aura — energy rising from the ground and wrapping him for
+      // the length of the clip (NOT an impact burst, which reads as taking damage).
       if (/power/i.test(action.name)) {
-        this.spellFx?.burst("Fire", enemy.position, 1.3);
-        window.setTimeout(() => {
-          if (!this.scene.isDisposed && enemy.alive) this.spellFx?.burst("Fire", enemy.position, 0.5);
-        }, 600);
+        this.spellFx?.powerUp(enemy.position, 1.5);
+        this.auraSource = enemy; // followed each frame in updateEnemies
       }
       return;
     }

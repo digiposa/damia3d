@@ -38,6 +38,13 @@ export class SpellFx {
   private flashT = 0;
   private flashDur = 0.14;
 
+  /** Buff aura (Power Up): continuously-emitting systems gated by {@link auraT}. */
+  private readonly auraColumn: ParticleSystem;
+  private readonly auraSparks: ParticleSystem;
+  private readonly auraLight: PointLight;
+  private auraT = 0;
+  private auraDur = 1;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this.dot = softDotTexture(scene);
@@ -58,11 +65,60 @@ export class SpellFx {
     this.flashLight = new PointLight("fxFlash", new Vector3(0, 2, 0), scene);
     this.flashLight.range = 16;
     this.flashLight.intensity = 0;
+
+    // Buff aura (Power Up): a rising column + swirling motes, emitted continuously for a duration.
+    this.auraColumn = this.buildAuraColumn();
+    this.auraSparks = this.buildAuraSparks();
+    this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
+    this.auraLight.range = 9;
+    this.auraLight.intensity = 0;
+
     this.flashObs = scene.onBeforeRenderObservable.add(() => {
-      if (this.flashT <= 0) return;
-      this.flashT = Math.max(0, this.flashT - scene.getEngine().getDeltaTime() / 1000);
-      this.flashLight.intensity = this.flashPeak * (this.flashT / this.flashDur);
+      const dt = scene.getEngine().getDeltaTime() / 1000;
+      if (this.flashT > 0) {
+        this.flashT = Math.max(0, this.flashT - dt);
+        this.flashLight.intensity = this.flashPeak * (this.flashT / this.flashDur);
+      }
+      if (this.auraT > 0) {
+        this.auraT = Math.max(0, this.auraT - dt);
+        // Swell in over the first fifth, then ebb away — a build-up, never a hit flash.
+        const p = 1 - this.auraT / this.auraDur;
+        this.auraLight.intensity = 2.2 * (p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8);
+        if (this.auraT === 0) {
+          this.auraColumn.emitRate = 0;
+          this.auraSparks.emitRate = 0;
+          this.auraLight.intensity = 0;
+        }
+      }
     });
+  }
+
+  /**
+   * A sustained buff aura around a character (Power Up): energy CLIMBING from the ground and
+   * wrapping the body, held for `duration`. Deliberately the opposite read of {@link burst}, which
+   * is an impact and looks like taking damage. Follows the caster while it plays.
+   */
+  powerUp(position: Vector3, duration = 1.3, tint = new Color3(1, 0.62, 0.16)): void {
+    for (const ps of [this.auraColumn, this.auraSparks]) {
+      ps.emitter = position.clone();
+      ps.color1 = new Color4(Math.min(1, tint.r + 0.25), Math.min(1, tint.g + 0.3), Math.min(1, tint.b + 0.2), 1);
+      ps.color2 = new Color4(tint.r, tint.g, tint.b, 1);
+      ps.colorDead = new Color4(tint.r * 0.4, tint.g * 0.25, tint.b * 0.2, 0);
+    }
+    this.auraColumn.emitRate = 420;
+    this.auraSparks.emitRate = 140;
+    this.auraLight.diffuse = tint;
+    this.auraLight.position = position.add(new Vector3(0, 1.4, 0));
+    this.auraDur = duration;
+    this.auraT = duration;
+  }
+
+  /** Move a playing aura with its caster (called per frame while the buff clip runs). */
+  moveAura(position: Vector3): void {
+    if (this.auraT <= 0) return;
+    this.auraColumn.emitter = position.clone();
+    this.auraSparks.emitter = position.clone();
+    this.auraLight.position = position.add(new Vector3(0, 1.4, 0));
   }
 
   /** Fire the element's effect at a world position (feet of the target). */
@@ -89,6 +145,7 @@ export class SpellFx {
     for (const d of this.disposables) d.dispose();
     if (this.flashObs) this.scene.onBeforeRenderObservable.remove(this.flashObs);
     this.flashLight.dispose();
+    this.auraLight.dispose();
   }
 
   // --- per-element builders -------------------------------------------------
@@ -100,6 +157,58 @@ export class SpellFx {
     ps.emitRate = 0;
     ps.updateSpeed = 0.02;
     return { ps, yOffset, count };
+  }
+
+  /** Power Up, part 1: a column of energy streaming UP from the ground around the body. */
+  private buildAuraColumn(): ParticleSystem {
+    const ps = new ParticleSystem("fxAuraColumn", 900, this.scene);
+    ps.particleTexture = this.streak;
+    // A flat ring of emission at the feet, all directions pointing up → a rising sleeve, not a blast.
+    // Tight ring at the feet so the streaks hug the body instead of pooling on the ground.
+    ps.createBoxEmitter(
+      new Vector3(-0.08, 1, -0.08),
+      new Vector3(0.08, 1, 0.08),
+      new Vector3(-0.45, 0, -0.45),
+      new Vector3(0.45, 0, 0.45),
+    );
+    ps.minSize = 0.22;
+    ps.maxSize = 0.7;
+    ps.addSizeGradient(0, 0.5); // thin at the ground…
+    ps.addSizeGradient(0.4, 1); // …swelling as it climbs…
+    ps.addSizeGradient(1, 0.15); // …thinning out at the top
+    ps.minLifeTime = 0.6;
+    ps.maxLifeTime = 1.1;
+    ps.minEmitPower = 4.5;
+    ps.maxEmitPower = 8; // clears a ~2.3-unit boss, head height and beyond
+    ps.gravity = new Vector3(0, 7, 0); // keeps accelerating upward
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.emitRate = 0;
+    ps.updateSpeed = 0.02;
+    ps.start();
+    this.disposables.push(ps);
+    return ps;
+  }
+
+  /** Power Up, part 2: bright motes spiralling around the caster while the aura holds. */
+  private buildAuraSparks(): ParticleSystem {
+    const ps = new ParticleSystem("fxAuraSparks", 400, this.scene);
+    ps.particleTexture = this.dot;
+    ps.createCylinderEmitter(0.9, 2.4, 0.6, 0.35);
+    ps.minSize = 0.1;
+    ps.maxSize = 0.3;
+    ps.minLifeTime = 0.6;
+    ps.maxLifeTime = 1.2;
+    ps.minEmitPower = 0.8;
+    ps.maxEmitPower = 2.2;
+    ps.gravity = new Vector3(0, 3.4, 0);
+    ps.minAngularSpeed = -3;
+    ps.maxAngularSpeed = 3;
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.emitRate = 0;
+    ps.updateSpeed = 0.02;
+    ps.start();
+    this.disposables.push(ps);
+    return ps;
   }
 
   private buildFire(): Burst[] {
