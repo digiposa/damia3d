@@ -3,10 +3,16 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { softDotTexture } from "./atmosphere";
 import type { Element } from "../combat/element";
+
+/** How long one Power Up ground ring takes to expand and fade. */
+const RING_DUR = 0.75;
 
 /**
  * Procedural elemental spell VFX (attack items today; any magic later). Pure Babylon particle
@@ -44,6 +50,8 @@ export class SpellFx {
   private readonly auraLight: PointLight;
   private auraT = 0;
   private auraDur = 1;
+  /** Crisp ground rings that expand and fade — the readable "buff" beat under the particles. */
+  private readonly auraRings: { mesh: Mesh; mat: StandardMaterial; t: number; delay: number }[] = [];
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -72,6 +80,19 @@ export class SpellFx {
     this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
     this.auraLight.range = 9;
     this.auraLight.intensity = 0;
+    for (let i = 0; i < 2; i++) {
+      const mesh = MeshBuilder.CreateTorus(`fxAuraRing${i}`, { diameter: 1, thickness: 0.07, tessellation: 48 }, scene);
+      const mat = new StandardMaterial(`fxAuraRingMat${i}`, scene);
+      mat.disableLighting = true;
+      mat.emissiveColor = new Color3(1, 0.62, 0.16);
+      mat.alpha = 0;
+      mat.backFaceCulling = false;
+      mesh.material = mat;
+      mesh.isPickable = false;
+      mesh.setEnabled(false);
+      this.auraRings.push({ mesh, mat, t: 0, delay: 0 });
+      this.disposables.push(mesh, mat);
+    }
 
     this.flashObs = scene.onBeforeRenderObservable.add(() => {
       const dt = scene.getEngine().getDeltaTime() / 1000;
@@ -83,12 +104,26 @@ export class SpellFx {
         this.auraT = Math.max(0, this.auraT - dt);
         // Swell in over the first fifth, then ebb away — a build-up, never a hit flash.
         const p = 1 - this.auraT / this.auraDur;
-        this.auraLight.intensity = 2.2 * (p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8);
+        this.auraLight.intensity = 1.5 * (p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8);
         if (this.auraT === 0) {
           this.auraColumn.emitRate = 0;
           this.auraSparks.emitRate = 0;
           this.auraLight.intensity = 0;
         }
+      }
+      // Ground rings: each waits out its stagger, then expands outward while fading.
+      for (const r of this.auraRings) {
+        if (r.delay > 0) {
+          r.delay = Math.max(0, r.delay - dt);
+          continue;
+        }
+        if (r.t <= 0) continue;
+        r.t = Math.max(0, r.t - dt);
+        const k = 1 - r.t / RING_DUR; // 0 → 1
+        const s = 0.7 + k * 2.6;
+        r.mesh.scaling.set(s, 1, s);
+        r.mat.alpha = 0.85 * (1 - k) ** 1.5;
+        if (r.t === 0) r.mesh.setEnabled(false);
       }
     });
   }
@@ -105,12 +140,22 @@ export class SpellFx {
       ps.color2 = new Color4(tint.r, tint.g, tint.b, 1);
       ps.colorDead = new Color4(tint.r * 0.4, tint.g * 0.25, tint.b * 0.2, 0);
     }
-    this.auraColumn.emitRate = 420;
-    this.auraSparks.emitRate = 140;
+    this.auraColumn.emitRate = 190;
+    this.auraSparks.emitRate = 70;
     this.auraLight.diffuse = tint;
     this.auraLight.position = position.add(new Vector3(0, 1.4, 0));
     this.auraDur = duration;
     this.auraT = duration;
+    // Two staggered ground rings — the crisp, readable part of the buff.
+    this.auraRings.forEach((r, i) => {
+      r.mat.emissiveColor = tint;
+      r.mesh.position = position.add(new Vector3(0, 0.06, 0));
+      r.mesh.scaling.set(0.7, 1, 0.7);
+      r.mat.alpha = 0;
+      r.mesh.setEnabled(true);
+      r.delay = i * 0.34;
+      r.t = RING_DUR;
+    });
   }
 
   /** Move a playing aura with its caster (called per frame while the buff clip runs). */
@@ -171,8 +216,8 @@ export class SpellFx {
       new Vector3(-0.45, 0, -0.45),
       new Vector3(0.45, 0, 0.45),
     );
-    ps.minSize = 0.22;
-    ps.maxSize = 0.7;
+    ps.minSize = 0.1;
+    ps.maxSize = 0.34;
     ps.addSizeGradient(0, 0.5); // thin at the ground…
     ps.addSizeGradient(0.4, 1); // …swelling as it climbs…
     ps.addSizeGradient(1, 0.15); // …thinning out at the top
@@ -194,8 +239,8 @@ export class SpellFx {
     const ps = new ParticleSystem("fxAuraSparks", 400, this.scene);
     ps.particleTexture = this.dot;
     ps.createCylinderEmitter(0.9, 2.4, 0.6, 0.35);
-    ps.minSize = 0.1;
-    ps.maxSize = 0.3;
+    ps.minSize = 0.06;
+    ps.maxSize = 0.16;
     ps.minLifeTime = 0.6;
     ps.maxLifeTime = 1.2;
     ps.minEmitPower = 0.8;
