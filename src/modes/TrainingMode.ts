@@ -15,7 +15,7 @@ import { LIGHTING_PRESETS } from "../world/lighting";
 import { loadEnvironment, type PropPlacement } from "../world/props";
 import { loadModels, prefetchModels, hasContainer } from "../core/AssetService";
 import { LoadingOverlay } from "../ui/LoadingOverlay";
-import { projectToScreen } from "../world/project";
+import { clampToScreen, projectToScreen } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
@@ -2440,11 +2440,13 @@ export abstract class ArenaCombatMode extends GameMode {
         this.captions.splice(i, 1);
         continue;
       }
-      const p = projectToScreen(this.scene, c.anchor());
-      if (!p.visible) {
+      const raw = projectToScreen(this.scene, c.anchor());
+      if (!raw.visible) {
         c.el.style.opacity = "0";
         continue;
       }
+      // Clamped with room for the full rise, so a caption on a caster at the screen edge stays legible.
+      const p = clampToScreen(this.scene, raw, CAPTION_RISE + 12);
       c.el.style.left = `${p.x}px`;
       c.el.style.top = `${p.y - k * CAPTION_RISE}px`;
       // Quick fade-in, long hold, short fade-out.
@@ -2453,8 +2455,12 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   protected popText(world: Vector3, text: string, color: string, big = false): void {
-    const p = projectToScreen(this.scene, world);
-    if (p.visible) floatingText(p.x, p.y, text, color, big);
+    const raw = projectToScreen(this.scene, world);
+    // Clamped inside the view: an actor at (or just past) the edge — knocked back, walking out of
+    // frame — must still show its damage/heal number instead of popping it off-screen.
+    if (!raw.visible) return;
+    const p = clampToScreen(this.scene, raw, big ? 40 : 32);
+    floatingText(p.x, p.y, text, color, big);
   }
 
   private refreshHud(): void {

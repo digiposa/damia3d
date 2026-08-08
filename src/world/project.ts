@@ -28,3 +28,18 @@ export function projectToScreen(scene: Scene, world: Vector3): ScreenPoint {
   );
   return { x: p.x, y: p.y, visible: p.z >= 0 && p.z <= 1 };
 }
+
+/**
+ * Pull a projected point back inside the render canvas, keeping `margin` CSS px of breathing room.
+ *
+ * {@link projectToScreen}'s `visible` only means "in front of the camera" — a point can be in front
+ * and still land outside the viewport (an enemy knocked toward the horizon, a caster at the screen
+ * edge). Combat feedback anchored there would be silently lost off-screen, so clamp it: better a
+ * number pinned to the edge than no number at all.
+ */
+export function clampToScreen(scene: Scene, p: ScreenPoint, margin = 28): ScreenPoint {
+  const rect = scene.getEngine().getRenderingCanvasClientRect();
+  if (!rect) return p;
+  const clamp = (v: number, max: number): number => Math.min(Math.max(v, margin), Math.max(margin, max - margin));
+  return { x: clamp(p.x, rect.width), y: clamp(p.y, rect.height), visible: p.visible };
+}
