@@ -106,7 +106,7 @@ import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { PartySelect } from "../ui/PartySelect";
 import { TimingSight } from "../ui/TimingSight";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
-import { floatingText, skillCaption } from "../ui/FloatingText";
+import { floatingText, skillCaptionEl, CAPTION_LIFE, CAPTION_RISE } from "../ui/FloatingText";
 import { CombatLog } from "../ui/CombatLog";
 
 /** How close a melee attacker must be to land a combo hit on an enemy. */
@@ -266,6 +266,8 @@ export abstract class ArenaCombatMode extends GameMode {
   protected spellFx?: SpellFx;
   /** Running action log (bottom-left) — the "what just happened" companion to skill captions. */
   protected combatLog?: CombatLog;
+  /** Live skill captions: each stays pinned over its (moving) caster while it rises and fades. */
+  private captions: { el: HTMLDivElement; anchor: () => Vector3; t: number }[] = [];
   /** Enemy currently wearing a buff aura (Power Up) — the aura follows it until it fades/dies. */
   private auraSource?: Enemy;
   private hud!: PartyPanel;
@@ -919,6 +921,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
+    if (this.captions.length) this.updateCaptions(dt);
     if (this.attackAnimT > 0) this.attackAnimT = Math.max(0, this.attackAnimT - dt);
 
     // Attack is the ⚔ button / click / Space (the timed combo). The other ATB actions
@@ -1142,7 +1145,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (targets.length === 0) return false;
     m.avatar.strike(); // throw motion
     this.announceSkill(
-      m.position.add(new Vector3(0, 2.6, 0)),
+      () => m.position.add(new Vector3(0, 2.6, 0)),
       m.avatar.bearer.name,
       t(stock.def.nameKey),
       ELEMENT_COLOR[atk.element],
@@ -1358,7 +1361,7 @@ export abstract class ArenaCombatMode extends GameMode {
     caster.mp = Math.max(0, caster.mp - spell.mp);
     caster.strike();
     this.announceSkill(
-      caster.position.add(new Vector3(0, 2.6, 0)),
+      () => caster.position.add(new Vector3(0, 2.6, 0)),
       caster.bearer.name,
       spell.name,
       ELEMENT_COLOR[spell.element] ?? "#c8a6ff",
@@ -1827,7 +1830,7 @@ export abstract class ArenaCombatMode extends GameMode {
             ? ELEMENT_COLOR[action.element ?? "Non-Elemental"]
             : TEXT.perfect;
       // Above the head plate — the damage/heal numbers already own the head height.
-      this.announceSkill(enemy.headPosition.add(new Vector3(0, 0.85, 0)), enemy.def.name, action.name, color);
+      this.announceSkill(() => enemy.headPosition.add(new Vector3(0, 0.85, 0)), enemy.def.name, action.name, color);
     }
     if (action.kind === "heal") {
       enemy.heal(action.amount);
@@ -2363,11 +2366,37 @@ export abstract class ArenaCombatMode extends GameMode {
     return p;
   }
 
-  /** Announce an ability: its NAME over the caster, plus one line in the log ("who — what"). */
-  protected announceSkill(world: Vector3, who: string, skill: string, color: string): void {
-    const p = projectToScreen(this.scene, world);
-    if (p.visible) skillCaption(p.x, p.y, skill, color);
+  /**
+   * Announce an ability: its NAME over the caster, plus one line in the log ("who — what").
+   * `anchor` is re-evaluated every frame, so the caption tracks a caster that walks (or a camera
+   * that pans) instead of being stranded at the screen position it was born at.
+   */
+  protected announceSkill(anchor: () => Vector3, who: string, skill: string, color: string): void {
+    this.captions.push({ el: skillCaptionEl(skill, color), anchor, t: 0 });
     this.combatLog?.push(`${who} — ${skill}`, color);
+  }
+
+  /** Re-pin every live caption to its caster, then rise + fade it over {@link CAPTION_LIFE}. */
+  private updateCaptions(dt: number): void {
+    for (let i = this.captions.length - 1; i >= 0; i--) {
+      const c = this.captions[i];
+      c.t += dt;
+      const k = c.t / CAPTION_LIFE;
+      if (k >= 1) {
+        c.el.remove();
+        this.captions.splice(i, 1);
+        continue;
+      }
+      const p = projectToScreen(this.scene, c.anchor());
+      if (!p.visible) {
+        c.el.style.opacity = "0";
+        continue;
+      }
+      c.el.style.left = `${p.x}px`;
+      c.el.style.top = `${p.y - k * CAPTION_RISE}px`;
+      // Quick fade-in, long hold, short fade-out.
+      c.el.style.opacity = `${k < 0.12 ? k / 0.12 : k > 0.78 ? (1 - k) / 0.22 : 1}`;
+    }
   }
 
   protected popText(world: Vector3, text: string, color: string, big = false): void {
@@ -2482,6 +2511,8 @@ export abstract class ArenaCombatMode extends GameMode {
     this.mashMeter.dispose();
     this.spellFx?.dispose();
     this.combatLog?.dispose();
+    for (const c of this.captions) c.el.remove();
+    this.captions = [];
     this.spaceOverlay.remove();
   }
 }

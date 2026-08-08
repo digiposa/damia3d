@@ -46,18 +46,27 @@ export function floatingText(
   window.setTimeout(() => el.remove(), big ? 950 : 800);
 }
 
+/** How long a skill caption lives, in seconds (the caller drives its rise/fade). */
+export const CAPTION_LIFE = 1.25;
+/** How far a caption climbs over its life, in screen pixels. */
+export const CAPTION_RISE = 42;
+
 /**
  * The NAME of an ability, over whoever is using it (Power Up, Burn Out, an Addition, a spell…).
  * Deliberately styled as a *label* — small letter-spaced caps on a dark chip — so it never reads as
- * a damage number, and drifts up slowly enough to be read without covering the fight.
+ * a damage number.
+ *
+ * Returns the element WITHOUT animating it: unlike a damage number (a one-off at a point in space),
+ * a caption has to stay pinned over its caster while they move — so the caller re-projects the
+ * anchor every frame and drives the rise/fade itself (see `updateCaptions` in the arena mode).
  */
-export function skillCaption(x: number, y: number, text: string, color = "#ffe08a"): void {
+export function skillCaptionEl(text: string, color = "#ffe08a"): HTMLDivElement {
   const el = document.createElement("div");
   el.textContent = text.toUpperCase();
   Object.assign(el.style, {
     position: "fixed",
-    left: `${x}px`,
-    top: `${y}px`,
+    left: "0",
+    top: "0",
     transform: "translate(-50%, -50%)",
     font: "800 11px/1 ui-monospace, monospace",
     letterSpacing: "0.12em",
@@ -74,16 +83,5 @@ export function skillCaption(x: number, y: number, text: string, color = "#ffe08
     willChange: "transform, opacity",
   } satisfies Partial<CSSStyleDeclaration>);
   document.body.appendChild(el);
-
-  const anim = el.animate(
-    [
-      { transform: "translate(-50%, -50%) scale(0.8)", opacity: 0, offset: 0 },
-      { transform: "translate(-50%, -62%) scale(1)", opacity: 1, offset: 0.16 },
-      { transform: "translate(-50%, -95%) scale(1)", opacity: 1, offset: 0.66 },
-      { transform: "translate(-50%, -130%) scale(1)", opacity: 0, offset: 1 },
-    ],
-    { duration: 1250, easing: "ease-out", fill: "forwards" },
-  );
-  anim.onfinish = () => el.remove();
-  window.setTimeout(() => el.remove(), 1350);
+  return el;
 }
