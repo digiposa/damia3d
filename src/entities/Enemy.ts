@@ -25,7 +25,7 @@ const THROW_RANGE = 10;
 /** Max distance a caster lobs a spell item from (a spell needs no melee — it just needs a target). */
 const SPELL_RANGE = 12;
 /** Seconds between the Commander's Burn Out casts — a cooldown spell, like the player's Burn Out. */
-const BURNOUT_COOLDOWN = 10;
+const BURNOUT_COOLDOWN = 20;
 /** Playback speed of a spell-cast clip. Attacks are sped up (1.2) for punch, but a cast reads
  *  better at natural speed — and it keeps the release timing below honest. */
 const CAST_SPEED = 1;
