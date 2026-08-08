@@ -213,19 +213,6 @@ const TEXT = {
   exp: "#bfe8ff", // pale cyan — EXP gained
 };
 
-/**
- * Cut one damage total into `parts` blows that still add up to it (remainder on the earliest hits).
- * Used by multi-hit attacks: showing two numbers instead of one is presentation, NOT a nerf — the
- * total is exactly what the single-number version dealt.
- */
-function splitDamage(total: number, parts: number): number[] {
-  if (parts <= 1) return [total];
-  const base = Math.floor(total / parts);
-  const out = new Array<number>(parts).fill(base);
-  for (let i = 0, rest = total - base * parts; rest > 0; i++, rest--) out[i]++;
-  return out;
-}
-
 /** One-line effect tag for a spell row. */
 function spellDetail(s: DragoonSpell): string {
   if (s.multiplier !== undefined) {
@@ -1951,20 +1938,15 @@ export abstract class ArenaCombatMode extends GameMode {
         }),
       );
     } else if (magical) {
-      // A cast spell goes off when the gesture completes, not on the wind-up frame.
-      this.scheduleHit(enemy, enemy.castReleaseDelay, () => {
+      // A cast spell goes off when the gesture is over, not on the wind-up frame.
+      this.scheduleHit(enemy, enemy.attackImpactDelay("magical", action.name), () => {
         this.spellFx?.burst(action.element ?? "Non-Elemental", this.player.position, 1);
         applyHit(dmg);
       });
     } else {
-      // Melee: each blow lands on the contact frame of the swing, not the instant the AI picks the
-      // action. A two-hit attack (Slash Twice) lands TWICE — two numbers at two moments — splitting
-      // the same total, so the timing change costs nothing in balance.
-      const delays = enemy.meleeImpactDelays(action.name);
-      const parts = splitDamage(dmg, delays.length);
-      delays.forEach((d, i) => {
-        if (parts[i] > 0) this.scheduleHit(enemy, d, () => applyHit(parts[i]));
-      });
+      // Melee: the total lands ONCE, when the swing is done. A multi-hit move (Slash Twice) is still
+      // a single number — splitting it into partials mid-flourish is harder to read, not easier.
+      this.scheduleHit(enemy, enemy.attackImpactDelay("physical", action.name), () => applyHit(dmg));
     }
   }
 
