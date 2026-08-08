@@ -528,6 +528,19 @@ export class Enemy {
     const dist = to.length();
     if (dist > 1e-3) this.root.rotation.y = Math.atan2(to.x, to.z);
 
+    // Self-buffs are NOT attacks: they must fire the instant their trigger is met, wherever the
+    // enemy is. (Before this, the Commander chased the player across the arena at 49% HP and only
+    // powered up once he was in melee — the buff was stuck behind the attack-range gate.)
+    if (this.attackCooldown <= 0) {
+      const self = this.selfAction();
+      if (self) {
+        this.attackCooldown = ATTACK_INTERVAL;
+        this.setMoving(false);
+        if (this.anims.powerUp) this.playOneShot(this.anims.powerUp);
+        return self;
+      }
+    }
+
     if (dist > ATTACK_RANGE * this.scale) {
       // Out of melee range: throw a dagger if the enemy can, then keep closing in between throws.
       const ranged = this.rangedAttack();
@@ -578,16 +591,20 @@ export class Enemy {
    *    powers him up (Slash Twice replaces Sword Slash, Burn Out 1.2× → 1.5×) and heals 30% max HP.
    *  - Burn Out is a cooldown spell (like the player's): cast whenever its 10 s recharge is ready.
    *  - Otherwise the auto attack: Sword Slash (1×), or Slash Twice (2×) once powered. */
-  private commanderAction(): EnemyAction {
+  /** Range-independent actions (self-buffs / heals): checked before the melee gate. */
+  private selfAction(): EnemyAction | null {
+    if (this.def.behavior !== "commander") return null;
     const max = this.def.stats.maxHp;
-
     // Power Up + HP recover, together, the first time he's below 50% (single use).
     if (!this.poweredUp && this.hp < 0.5 * max) {
       this.poweredUp = true;
       this.markPowered();
       return { kind: "heal", name: "Power Up", amount: Math.max(1, Math.floor(0.3 * max)) };
     }
+    return null;
+  }
 
+  private commanderAction(): EnemyAction {
     // Burn Out (Fire magic; 1.5× once powered) whenever its recharge is ready.
     if (this.burnOutCooldown <= 0) {
       this.burnOutCooldown = BURNOUT_COOLDOWN;
