@@ -38,7 +38,15 @@ const STATUS_NONE = Color3.Black();
  *  thrown attack (dagger/knife) the mode should deliver as a flying projectile from a distance. */
 export type EnemyAction =
   | { kind: "physical"; name: string; multiplier: number; ranged?: boolean }
-  | { kind: "magical"; name: string; multiplier: number; element?: Element }
+  | {
+      kind: "magical";
+      name: string;
+      multiplier: number;
+      element?: Element;
+      /** Delivered as a thrown item lobbed at the target (like the player's attack items): the spell
+       *  triggers where the flask lands, not instantly on the caster's turn. */
+      lobbed?: boolean;
+    }
   | { kind: "heal"; name: string; amount: number };
 
 /** Per-frame context the AI needs for conditional behaviour. */
@@ -427,6 +435,10 @@ export class Enemy {
   takeDamage(amount: number): void {
     // Immortal targets (the training dummy) clamp at 1 HP so they never die.
     this.hp = Math.max(this.def.immortal ? 1 : 0, this.hp - amount);
+    // A self-buff trigger just fired (the Commander crossing 50% HP): fill the ATB so the reaction
+    // is IMMEDIATE. Otherwise he'd stand there for up to a full gauge (3.75 s) before powering up,
+    // which reads as him ignoring the threshold.
+    if (this.selfActionPending()) this.gauge.reset();
   }
 
   heal(amount: number): void {
@@ -579,6 +591,12 @@ export class Enemy {
     return a ? ((a.to - a.from) / 60) * 0.5 : 0.4; // clip plays at speed 1.0, Babylon 60 fps
   }
 
+  /** Seconds into the cast clip when the item leaves the hand (arm forward ≈ mid-clip). */
+  get castReleaseDelay(): number {
+    const a = this.anims.cast;
+    return a ? ((a.to - a.from) / 60) * 0.5 : 0.35;
+  }
+
   private chooseAction(_ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction();
     // Melee: the first non-thrown attack (a thrown one is reserved for range).
@@ -591,12 +609,17 @@ export class Enemy {
    *    powers him up (Slash Twice replaces Sword Slash, Burn Out 1.2× → 1.5×) and heals 30% max HP.
    *  - Burn Out is a cooldown spell (like the player's): cast whenever its 10 s recharge is ready.
    *  - Otherwise the auto attack: Sword Slash (1×), or Slash Twice (2×) once powered. */
+  /** True when a range-independent self action is available RIGHT NOW (drives the instant ATB fill
+   *  in {@link takeDamage}). Pure predicate — no side effects, unlike {@link selfAction}. */
+  private selfActionPending(): boolean {
+    return this.def.behavior === "commander" && !this.poweredUp && this.hp < 0.5 * this.def.stats.maxHp;
+  }
+
   /** Range-independent actions (self-buffs / heals): checked before the melee gate. */
   private selfAction(): EnemyAction | null {
-    if (this.def.behavior !== "commander") return null;
     const max = this.def.stats.maxHp;
     // Power Up + HP recover, together, the first time he's below 50% (single use).
-    if (!this.poweredUp && this.hp < 0.5 * max) {
+    if (this.selfActionPending()) {
       this.poweredUp = true;
       this.markPowered();
       return { kind: "heal", name: "Power Up", amount: Math.max(1, Math.floor(0.3 * max)) };
@@ -608,7 +631,9 @@ export class Enemy {
     // Burn Out (Fire magic; 1.5× once powered) whenever its recharge is ready.
     if (this.burnOutCooldown <= 0) {
       this.burnOutCooldown = BURNOUT_COOLDOWN;
-      return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2, element: "Fire" };
+      // Burn Out is the SAME thing the player throws: an attack item. He lobs the flask at the
+      // target and the Fire spell goes off on impact.
+      return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2, element: "Fire", lobbed: true };
     }
 
     return this.poweredUp

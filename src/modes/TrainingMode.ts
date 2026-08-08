@@ -1,4 +1,5 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import "@babylonjs/core/Meshes/meshBuilder";
 // Side-effect import: scene.pick / createPickingRay need Ray registered, else
 // every click throws "Ray needs to be imported before" and click-to-move dies.
@@ -129,6 +130,10 @@ const ACQUIRE_RANGE = 20;
 
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
+/** Thrown attack items travel slower than an arrow and hang in the air — you can see them coming. */
+const ITEM_LOB_SPEED = 9;
+/** Peak height of a lobbed item's arc, in world units. */
+const ITEM_LOB_ARC = 2.2;
 /** Joystick magnitude (0–1) at/above which movement is a run rather than a walk. */
 const RUN_THRESHOLD = 0.65;
 /** Desktop mouse-wheel zoom bounds for the orthographic iso view (higher = closer). */
@@ -1683,16 +1688,15 @@ export abstract class ArenaCombatMode extends GameMode {
       const to = target.position.add(new Vector3(0, 1.2, 0));
       // Hold the arrow until the "loose" frame of the draw→shoot clip (see ARROW_RELEASE_DELAY).
       this.arrows.push(
-        new Arrow(
-          this.scene,
+        new Arrow(this.scene, {
           from,
           to,
-          ARROW_SPEED,
-          () => {
+          speed: ARROW_SPEED,
+          onHit: () => {
             if (target.alive) this.landDamage(target, dmg, true);
           },
-          ARROW_RELEASE_DELAY,
-        ),
+          delay: ARROW_RELEASE_DELAY,
+        }),
       );
       return;
     }
@@ -1884,10 +1888,44 @@ export abstract class ArenaCombatMode extends GameMode {
       const torso = (): Vector3 => this.player.position.add(new Vector3(0, 1.0, 0));
       // Release in sync with the throw (arm fully forward ≈ mid-clip); home on the player so the
       // dagger reaches them even if they move — the hit always connects (turn-based, no live dodge).
-      const projectile = /stone|rock/i.test(action.name) ? "stone" : "arrow"; // Goblin lobs a rock
-      this.arrows.push(new Arrow(this.scene, from, torso(), ARROW_SPEED, applyHit, enemy.throwReleaseDelay, torso, projectile));
+      const projectile = /stone|rock/i.test(action.name) ? "stone" : "arrow"; // Goblin throws a rock
+      this.arrows.push(
+        new Arrow(this.scene, {
+          from,
+          to: torso(),
+          speed: ARROW_SPEED,
+          onHit: applyHit,
+          delay: enemy.throwReleaseDelay,
+          follow: torso,
+          kind: projectile,
+        }),
+      );
+    } else if (magical && action.lobbed) {
+      // Thrown attack item (the Commander's Burn Out): a flask arcs over to the target and the spell
+      // goes off where it lands — same delivery as the player's own attack items.
+      const element = action.element ?? "Non-Elemental";
+      const fwd = this.player.position.subtract(enemy.position);
+      fwd.y = 0;
+      if (fwd.lengthSquared() > 1e-4) fwd.normalize();
+      const from = enemy.handPosition.add(fwd.scale(0.35));
+      const feet = (): Vector3 => this.player.position.clone();
+      this.arrows.push(
+        new Arrow(this.scene, {
+          from,
+          to: feet(),
+          speed: ITEM_LOB_SPEED,
+          onHit: () => {
+            this.spellFx?.burst(element, this.player.position, 1);
+            applyHit();
+          },
+          delay: enemy.castReleaseDelay,
+          follow: feet,
+          kind: "flask",
+          arc: ITEM_LOB_ARC,
+          color: Color3.FromHexString(ELEMENT_COLOR[element]),
+        }),
+      );
     } else {
-      // Enemy spells burst with the same elemental VFX as the player's casts (Commander's Burn Out).
       if (magical) this.spellFx?.burst(action.element ?? "Non-Elemental", this.player.position, 1);
       applyHit();
     }
@@ -2032,9 +2070,15 @@ export abstract class ArenaCombatMode extends GameMode {
       const from = attacker.position.add(new Vector3(0, 1.3, 0));
       const to = target.position.add(new Vector3(0, 1.2, 0));
       this.arrows.push(
-        new Arrow(this.scene, from, to, ARROW_SPEED, () => {
-          if (target.alive) this.landDamage(target, dmg, attacker === this.player);
-        }, ARROW_RELEASE_DELAY),
+        new Arrow(this.scene, {
+          from,
+          to,
+          speed: ARROW_SPEED,
+          onHit: () => {
+            if (target.alive) this.landDamage(target, dmg, attacker === this.player);
+          },
+          delay: ARROW_RELEASE_DELAY,
+        }),
       );
       return;
     }
