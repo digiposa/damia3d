@@ -213,6 +213,19 @@ const TEXT = {
   exp: "#bfe8ff", // pale cyan — EXP gained
 };
 
+/**
+ * Cut one damage total into `parts` blows that still add up to it (remainder on the earliest hits).
+ * Used by multi-hit attacks: showing two numbers instead of one is presentation, NOT a nerf — the
+ * total is exactly what the single-number version dealt.
+ */
+function splitDamage(total: number, parts: number): number[] {
+  if (parts <= 1) return [total];
+  const base = Math.floor(total / parts);
+  const out = new Array<number>(parts).fill(base);
+  for (let i = 0, rest = total - base * parts; rest > 0; i++, rest--) out[i]++;
+  return out;
+}
+
 /** One-line effect tag for a spell row. */
 function spellDetail(s: DragoonSpell): string {
   if (s.multiplier !== undefined) {
@@ -346,6 +359,8 @@ export abstract class ArenaCombatMode extends GameMode {
 
   protected enemies: Enemy[] = [];
   private arrows: Arrow[] = [];
+  /** Melee blows in flight: damage waiting for the contact frame of its attacker's swing. */
+  private pendingHits: { t: number; by: Enemy; apply: () => void }[] = [];
   /** Countdown keeping the party in combat stance briefly after enemies leave range (anti-flicker). */
   private combatLinger = 0;
   /** Current combat-stance state, for detecting the enter/leave edge (float-text tag). */
@@ -934,6 +949,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
+    if (this.pendingHits.length) this.updatePendingHits(dt);
     if (this.captions.length) this.updateCaptions(dt);
     if (this.attackAnimT > 0) this.attackAnimT = Math.max(0, this.attackAnimT - dt);
 
@@ -1869,9 +1885,13 @@ export abstract class ArenaCombatMode extends GameMode {
     let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
     if (this.player.damageHalved) dmg = Math.floor(dmg * 0.5);
 
-    const applyHit = (): void => {
-      this.player.hp = Math.max(0, this.player.hp - dmg);
-      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${dmg}`, TEXT.damage);
+    // Damage lands LATER than this call (contact frame / projectile arrival), so read the victim at
+    // that moment: `this.player` is the currently controlled avatar and control can change meanwhile.
+    const victim = this.player;
+    const applyHit = (amount: number): void => {
+      if (this.player !== victim) return; // downed / switched out mid-swing — the blow misses them
+      this.player.hp = Math.max(0, this.player.hp - amount);
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${amount}`, TEXT.damage);
       if (this.player.hp === 0) {
         const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)
@@ -1898,7 +1918,7 @@ export abstract class ArenaCombatMode extends GameMode {
           from,
           to: torso(),
           speed: ARROW_SPEED,
-          onHit: applyHit,
+          onHit: () => applyHit(dmg),
           delay: enemy.throwReleaseDelay,
           follow: torso,
           kind: projectile,
@@ -1921,7 +1941,7 @@ export abstract class ArenaCombatMode extends GameMode {
           onHit: () => {
             // The SAME spell the player throws — the Burn Out flame column — at its un-mashed power.
             this.spellFx?.burst(element, this.player.position, ITEM_BURST_MIN_POWER);
-            applyHit();
+            applyHit(dmg);
           },
           delay: enemy.castReleaseDelay,
           follow: feet,
@@ -1930,9 +1950,45 @@ export abstract class ArenaCombatMode extends GameMode {
           color: Color3.FromHexString(ELEMENT_COLOR[element]),
         }),
       );
+    } else if (magical) {
+      // A cast spell goes off when the gesture completes, not on the wind-up frame.
+      this.scheduleHit(enemy, enemy.castReleaseDelay, () => {
+        this.spellFx?.burst(action.element ?? "Non-Elemental", this.player.position, 1);
+        applyHit(dmg);
+      });
     } else {
-      if (magical) this.spellFx?.burst(action.element ?? "Non-Elemental", this.player.position, 1);
-      applyHit();
+      // Melee: each blow lands on the contact frame of the swing, not the instant the AI picks the
+      // action. A two-hit attack (Slash Twice) lands TWICE — two numbers at two moments — splitting
+      // the same total, so the timing change costs nothing in balance.
+      const delays = enemy.meleeImpactDelays(action.name);
+      const parts = splitDamage(dmg, delays.length);
+      delays.forEach((d, i) => {
+        if (parts[i] > 0) this.scheduleHit(enemy, d, () => applyHit(parts[i]));
+      });
+    }
+  }
+
+  /** Queue `apply` to run in `delay` seconds, unless `by` dies first (a kill cancels the swing). */
+  private scheduleHit(by: Enemy, delay: number, apply: () => void): void {
+    if (delay <= 0) {
+      apply();
+      return;
+    }
+    this.pendingHits.push({ t: delay, by, apply });
+  }
+
+  /** Land the blows whose contact frame has come; drop those whose attacker was killed mid-swing. */
+  private updatePendingHits(dt: number): void {
+    for (let i = this.pendingHits.length - 1; i >= 0; i--) {
+      const h = this.pendingHits[i];
+      if (!h.by.alive) {
+        this.pendingHits.splice(i, 1); // cut down before contact — the blow never lands
+        continue;
+      }
+      h.t -= dt;
+      if (h.t > 0) continue;
+      this.pendingHits.splice(i, 1);
+      h.apply();
     }
   }
 
@@ -2550,6 +2606,7 @@ export abstract class ArenaCombatMode extends GameMode {
     window.removeEventListener("keydown", this.onKeyDown);
     for (const a of this.arrows) a.dispose();
     this.arrows = [];
+    this.pendingHits = [];
     for (const e of this.enemies) e.dispose();
     this.enemies = [];
     for (const m of this.party) m.dispose();

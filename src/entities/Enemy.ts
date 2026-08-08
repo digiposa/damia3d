@@ -31,6 +31,12 @@ const BURNOUT_COOLDOWN = 20;
 const CAST_SPEED = 1;
 /** Where in the cast clip the item actually leaves the hand (arm forward). */
 const CAST_RELEASE_FRACTION = 0.35;
+/** Playback speed of a melee swing — sped up a touch for punch. */
+const ATTACK_SPEED = 1.2;
+/** Where in a single swing the blade CONNECTS: past the wind-up, at the bottom of the arc. */
+const IMPACT_FRACTION = 0.45;
+/** The two contact moments of a two-hit clip (Slash Twice = swing, recover, swing again). */
+const IMPACT_FRACTIONS_TWICE = [0.3, 0.72];
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
 const WEAPON_SCALE = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
@@ -369,7 +375,7 @@ export class Enemy {
 
   /** Play a one-shot animation (attack/throw/power-up), flagging `attacking` until it ends so the
    *  enemy holds position and doesn't cut the motion with idle/walk. */
-  private playOneShot(group?: AnimationGroup, speed = 1.2): void {
+  private playOneShot(group?: AnimationGroup, speed = ATTACK_SPEED): void {
     if (!group) return;
     this.attacking = true;
     this.currentAnim?.stop();
@@ -608,6 +614,21 @@ export class Enemy {
   get castReleaseDelay(): number {
     const a = this.anims.cast;
     return a ? (((a.to - a.from) / 60) * CAST_RELEASE_FRACTION) / CAST_SPEED : 0.3;
+  }
+
+  /**
+   * Seconds (REAL time) into the melee clip at which each blow LANDS, for the attack named `name`.
+   *
+   * Damage used to be applied the instant the AI picked its action, i.e. on the wind-up frame — the
+   * number popped before the sword had moved. These offsets let the mode land it on contact instead.
+   * A two-hit attack (Slash Twice) returns two moments, one per swing of its clip.
+   */
+  meleeImpactDelays(name = ""): number[] {
+    const twice = /twice|multi/i.test(name);
+    const clip = (twice && this.anims.slashTwice) || this.anims.attack;
+    if (!clip) return twice ? [0, 0.25] : [0]; // no clip (procedural placeholder): land at once
+    const dur = (clip.to - clip.from) / 60 / ATTACK_SPEED;
+    return (twice ? IMPACT_FRACTIONS_TWICE : [IMPACT_FRACTION]).map((f) => dur * f);
   }
 
   private chooseAction(_ctx: EnemyContext): EnemyAction {
