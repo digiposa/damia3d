@@ -270,6 +270,10 @@ export abstract class ArenaCombatMode extends GameMode {
   private captions: { el: HTMLDivElement; anchor: () => Vector3; t: number }[] = [];
   /** Enemy currently wearing a buff aura (Power Up) — the aura follows it until it fades/dies. */
   private auraSource?: Enemy;
+  /** The party's SHARED wallet. Gold belongs to the group, not to whoever landed the killing blow:
+   *  it must survive switching control (Tab) and rebuilding the party (add/kick a member), so it
+   *  lives on the mode — never on a Player instance, which is recreated on every rebuild. */
+  protected gold = 0;
   private hud!: PartyPanel;
   /**
    * GLB decor layout (Quaternius Fantasy Props). Empty for now — the ringside crates/barrels/racks
@@ -1765,7 +1769,7 @@ export abstract class ArenaCombatMode extends GameMode {
     } else {
       this.player.gainExp(xp);
     }
-    this.player.gold += target.def.goldReward;
+    this.gold += target.def.goldReward;
     this.popText(target.headPosition, `+${xp} EXP`, TEXT.exp);
     this.onEnemyKilled(target); // after XP: Survival checks for a level-up to offer reward cards
     // Only cancel the player's combo if it's the one that just died (an ally kill
@@ -2107,7 +2111,7 @@ export abstract class ArenaCombatMode extends GameMode {
    *  Party-composition tab are mode-scoped (see {@link menuRoster} / {@link allowPartyEditing}). */
   menuData(): ModeMenuData {
     return {
-      gold: this.player.gold,
+      gold: this.gold,
       characters: {
         controlledId: this.player.bearer.id,
         list: this.menuRoster().map((b) => ({

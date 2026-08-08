@@ -107,8 +107,6 @@ export class Player {
   }
   /** Magic points (placeholder — uses items/SP in LoD; tune later). */
   mp = 0;
-  /** Gold carried (awarded from defeated enemies). */
-  gold = 0;
 
   /** Equipped item per slot. */
   readonly equipment: Record<EquipSlot, EquipDef | undefined>;
