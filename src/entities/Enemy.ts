@@ -14,6 +14,7 @@ import { ELEMENT_COLOR, type Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
 import { tuneImportedMetal, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import { instantiateModel, hasContainer } from "../core/AssetService";
+import { AtbGauge, atbFillTime } from "../combat/AtbGauge";
 
 /** Movement speed (world units / second) while chasing. */
 const SPEED = 3.2;
@@ -21,8 +22,6 @@ const SPEED = 3.2;
 const ATTACK_RANGE = 1.7;
 /** Max distance a ranged attacker throws a dagger/knife (beyond melee, it closes in between throws). */
 const THROW_RANGE = 10;
-/** Seconds between the enemy's attacks. */
-const ATTACK_INTERVAL = 1.4;
 /** Seconds between the Commander's Burn Out casts — a cooldown spell, like the player's Burn Out. */
 const BURNOUT_COOLDOWN = 10;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
@@ -60,7 +59,9 @@ export class Enemy {
   hp: number;
 
   private scale: number;
-  private attackCooldown = 0;
+  /** Shared ATB gauge — the SAME system the party uses, sized from this enemy's Speed
+   *  (`atbFillTime` = 150 / SPD). An enemy may only act when it is full, and acting spends it. */
+  readonly gauge: AtbGauge;
   private poweredUp = false;
   /** Commander only: seconds until Burn Out is ready again (counts down in {@link aiUpdate}). */
   private burnOutCooldown = 0;
@@ -100,6 +101,7 @@ export class Enemy {
     this.def = def;
     this.hp = def.stats.maxHp;
     this.scale = def.scale ?? 1;
+    this.gauge = new AtbGauge(atbFillTime(def.spd));
 
     this.root = new TransformNode(`enemy:${def.id}`, scene);
     this.root.position = spawn.clone();
@@ -498,22 +500,20 @@ export class Enemy {
   }
 
   /**
-   * Chase the target and, when in range and off cooldown, return the action to
-   * perform this turn (or null when just moving / waiting).
+   * Chase the target and, when its ATB gauge is full (and it is in range), return the action to
+   * perform (or null when just moving / charging). Enemies run on the SAME {@link AtbGauge} as the
+   * party, sized from their Speed — so cadence comes from the stat, not a flat interval.
    */
   aiUpdate(dt: number, targetPos: Vector3, ctx: EnemyContext): EnemyAction | null {
     // Dying: playing out the death animation — no chase, no attacks.
     if (this.dead) return null;
     // The training dummy just stands there: no chasing, no attacks.
     if (this.def.behavior === "dummy") return null;
-    this.burnOutCooldown = Math.max(0, this.burnOutCooldown - dt); // Commander spell recharge (thaws even stunned)
-    // Stunned: frozen — no chase, no attack (cooldown still thaws).
-    if (this.stunned) {
-      this.attackCooldown = Math.max(0, this.attackCooldown - dt);
-      return null;
-    }
+    this.burnOutCooldown = Math.max(0, this.burnOutCooldown - dt); // spell recharge: thaws even stunned
+    // Stunned: frozen — no chase, no acting, and the ATB does NOT charge (that's what a stun is).
+    if (this.stunned) return null;
 
-    this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.gauge.tick(dt); // combat-scaled dt, like the party's gauges
 
     // Mid-attack (sword swing or dagger throw): stay planted and let the one-shot animation play out,
     // still turning to face the target — no sliding toward the player during the wind-up/throw.
@@ -531,10 +531,10 @@ export class Enemy {
     // Self-buffs are NOT attacks: they must fire the instant their trigger is met, wherever the
     // enemy is. (Before this, the Commander chased the player across the arena at 49% HP and only
     // powered up once he was in melee — the buff was stuck behind the attack-range gate.)
-    if (this.attackCooldown <= 0) {
+    if (this.gauge.isReady) {
       const self = this.selfAction();
       if (self) {
-        this.attackCooldown = ATTACK_INTERVAL;
+        this.gauge.spend();
         this.setMoving(false);
         if (this.anims.powerUp) this.playOneShot(this.anims.powerUp);
         return self;
@@ -544,8 +544,8 @@ export class Enemy {
     if (dist > ATTACK_RANGE * this.scale) {
       // Out of melee range: throw a dagger if the enemy can, then keep closing in between throws.
       const ranged = this.rangedAttack();
-      if (ranged && this.anims.throw && dist <= THROW_RANGE * this.scale && this.attackCooldown <= 0) {
-        this.attackCooldown = ATTACK_INTERVAL;
+      if (ranged && this.anims.throw && dist <= THROW_RANGE * this.scale && this.gauge.isReady) {
+        this.gauge.spend();
         this.setMoving(false);
         this.playThrow();
         return { kind: "physical", name: ranged.name, multiplier: ranged.multiplier, ranged: true };
@@ -555,8 +555,8 @@ export class Enemy {
       return null;
     }
     this.setMoving(false);
-    if (this.attackCooldown > 0) return null;
-    this.attackCooldown = ATTACK_INTERVAL;
+    if (!this.gauge.isReady) return null;
+    this.gauge.spend();
     // Decide the action first (it may flip the Commander into its powered-up stance), then match the
     // animation to it: the Power-Up instant plays its own clip; Slash Twice / Multi pick theirs.
     const wasPowered = this.poweredUp;

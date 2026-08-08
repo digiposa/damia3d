@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { atbFillTime } from "../combat/AtbGauge";
 import { COMMANDER_SELES, COMMANDER_MARSHLAND, KNIGHT_OF_SANDORA_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK } from "./enemies";
 
 describe("Commander — Seles boss", () => {
@@ -113,5 +114,20 @@ describe("Assassin Cock — Forest minor enemy", () => {
     expect(ASSASSIN_COCK.attacks.map((a) => a.name)).toEqual(["Talon Kick", "Cry"]);
     expect(ASSASSIN_COCK.attacks[0]).toMatchObject({ kind: "physical", multiplier: 2 });
     expect(ASSASSIN_COCK.attacks[1]).toMatchObject({ kind: "magical", element: "Non-Elemental" });
+  });
+});
+
+describe("Enemy ATB cadence", () => {
+  // Enemies run on the party's gauge (fill = 150 / SPD), so Speed — not a flat interval — decides
+  // how often a mob acts. These lock the foundation: same formula for both sides of the fight.
+  it("derives each enemy's fill time from its Speed", () => {
+    expect(atbFillTime(COMMANDER_SELES.spd)).toBeCloseTo(3.75, 5); // SPD 40
+    expect(atbFillTime(BERSERK_MOUSE.spd)).toBeCloseTo(3.0, 5); // SPD 50 = the reference
+    expect(atbFillTime(TRENT.spd)).toBeCloseTo(5.0, 5); // SPD 30 — the sluggish treant
+    expect(atbFillTime(ASSASSIN_COCK.spd)).toBeCloseTo(3.0, 5); // SPD 50
+  });
+
+  it("makes a faster enemy act more often than a slower one", () => {
+    expect(atbFillTime(ASSASSIN_COCK.spd)).toBeLessThan(atbFillTime(TRENT.spd));
   });
 });

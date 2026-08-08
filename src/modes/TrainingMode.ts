@@ -1820,7 +1820,7 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Apply an enemy's chosen action: damage the player, or self-heal. */
   private resolveEnemyAction(enemy: Enemy, action: EnemyAction): void {
     // Name the action — but only when it's NOTABLE (a spell, a buff/heal, a signature strike).
-    // Basic auto-attacks fire every ATTACK_INTERVAL, so captioning those would just be noise.
+    // Basic auto-attacks fire on every ATB tick, so captioning those would just be noise.
     const notable = action.kind !== "physical" || /twice|multi|power|stunning|throw/i.test(action.name);
     if (notable) {
       const color =
