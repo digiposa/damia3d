@@ -26,6 +26,11 @@ const THROW_RANGE = 10;
 const SPELL_RANGE = 12;
 /** Seconds between the Commander's Burn Out casts — a cooldown spell, like the player's Burn Out. */
 const BURNOUT_COOLDOWN = 10;
+/** Playback speed of a spell-cast clip. Attacks are sped up (1.2) for punch, but a cast reads
+ *  better at natural speed — and it keeps the release timing below honest. */
+const CAST_SPEED = 1;
+/** Where in the cast clip the item actually leaves the hand (arm forward). */
+const CAST_RELEASE_FRACTION = 0.35;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
 const WEAPON_SCALE = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
@@ -563,7 +568,7 @@ export class Enemy {
         if (flying) {
           this.gauge.spend();
           this.setMoving(false);
-          if (flying.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack);
+          if (flying.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED);
           else this.playThrow();
           return flying;
         }
@@ -580,7 +585,7 @@ export class Enemy {
     const wasPowered = this.poweredUp;
     const action = this.chooseAction(ctx);
     if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
-    else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack); // spell cast
+    else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED); // spell cast
     else this.playAttack(action.name);
     return action;
   }
@@ -597,10 +602,12 @@ export class Enemy {
     return a ? ((a.to - a.from) / 60) * 0.5 : 0.4; // clip plays at speed 1.0, Babylon 60 fps
   }
 
-  /** Seconds into the cast clip when the item leaves the hand (arm forward ≈ mid-clip). */
+  /** Seconds (REAL time) into the cast clip when the item leaves the hand. Divided by the playback
+   *  speed: the clip is played faster than authored, so the release moment comes sooner — getting
+   *  this wrong makes the projectile pop out after the throw gesture is over. */
   get castReleaseDelay(): number {
     const a = this.anims.cast;
-    return a ? ((a.to - a.from) / 60) * 0.5 : 0.35;
+    return a ? (((a.to - a.from) / 60) * CAST_RELEASE_FRACTION) / CAST_SPEED : 0.3;
   }
 
   private chooseAction(_ctx: EnemyContext): EnemyAction {

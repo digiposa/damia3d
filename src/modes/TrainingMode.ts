@@ -130,6 +130,10 @@ const ACQUIRE_RANGE = 20;
 
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
+/** VFX power of an attack item at the BOTTOM of its mash range (one QTE step). The player's Burn Out
+ *  scales from here up to ~1.9 on a perfect mash; an enemy's cast has no QTE, so it lands at this
+ *  floor — same spell, same flame column, just the un-mashed version. */
+const ITEM_BURST_MIN_POWER = 0.9;
 /** Thrown attack items travel slower than an arrow and hang in the air — you can see them coming. */
 const ITEM_LOB_SPEED = 9;
 /** Peak height of a lobbed item's arc, in world units. */
@@ -1232,7 +1236,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.mash = undefined;
     this.mashMeter.close();
     // Eruption on each target, its size scaled by how hard the QTE was mashed (100→268%).
-    const power = 0.9 + ((s.pct - ITEM_MULTIPLIER_MIN) / (ITEM_MULTIPLIER_MAX - ITEM_MULTIPLIER_MIN)) * 1.0;
+    const power = ITEM_BURST_MIN_POWER + ((s.pct - ITEM_MULTIPLIER_MIN) / (ITEM_MULTIPLIER_MAX - ITEM_MULTIPLIER_MIN)) * 1.0;
     for (const foe of s.targets) {
       if (!foe.alive) continue;
       this.spellFx?.burst(s.element, foe.position, power);
@@ -1915,7 +1919,8 @@ export abstract class ArenaCombatMode extends GameMode {
           to: feet(),
           speed: ITEM_LOB_SPEED,
           onHit: () => {
-            this.spellFx?.burst(element, this.player.position, 1);
+            // The SAME spell the player throws — the Burn Out flame column — at its un-mashed power.
+            this.spellFx?.burst(element, this.player.position, ITEM_BURST_MIN_POWER);
             applyHit();
           },
           delay: enemy.castReleaseDelay,
