@@ -22,6 +22,8 @@ const SPEED = 3.2;
 const ATTACK_RANGE = 1.7;
 /** Max distance a ranged attacker throws a dagger/knife (beyond melee, it closes in between throws). */
 const THROW_RANGE = 10;
+/** Max distance a caster lobs a spell item from (a spell needs no melee — it just needs a target). */
+const SPELL_RANGE = 12;
 /** Seconds between the Commander's Burn Out casts — a cooldown spell, like the player's Burn Out. */
 const BURNOUT_COOLDOWN = 10;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
@@ -554,13 +556,17 @@ export class Enemy {
     }
 
     if (dist > ATTACK_RANGE * this.scale) {
-      // Out of melee range: throw a dagger if the enemy can, then keep closing in between throws.
-      const ranged = this.rangedAttack();
-      if (ranged && this.anims.throw && dist <= THROW_RANGE * this.scale && this.gauge.isReady) {
-        this.gauge.spend();
-        this.setMoving(false);
-        this.playThrow();
-        return { kind: "physical", name: ranged.name, multiplier: ranged.multiplier, ranged: true };
+      // Out of melee range: anything that FLIES can still be delivered from here — a thrown weapon,
+      // or a lobbed spell item. Only when nothing is available does it keep closing in.
+      if (this.gauge.isReady) {
+        const flying = this.flyingAction(dist);
+        if (flying) {
+          this.gauge.spend();
+          this.setMoving(false);
+          if (flying.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack);
+          else this.playThrow();
+          return flying;
+        }
       }
       this.root.position.addInPlace(to.normalize().scale(Math.min(SPEED * dt, dist)));
       this.setMoving(true);
@@ -627,14 +633,34 @@ export class Enemy {
     return null;
   }
 
-  private commanderAction(): EnemyAction {
-    // Burn Out (Fire magic; 1.5× once powered) whenever its recharge is ready.
-    if (this.burnOutCooldown <= 0) {
-      this.burnOutCooldown = BURNOUT_COOLDOWN;
-      // Burn Out is the SAME thing the player throws: an attack item. He lobs the flask at the
-      // target and the Fire spell goes off on impact.
-      return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2, element: "Fire", lobbed: true };
+  /**
+   * An action deliverable from a DISTANCE (checked before closing to melee): a ready cooldown spell
+   * first, then a thrown weapon. Consumes the spell's cooldown when it picks it.
+   */
+  private flyingAction(dist: number): EnemyAction | null {
+    if (dist <= SPELL_RANGE * this.scale) {
+      const spell = this.burnOutAction();
+      if (spell) return spell;
     }
+    const ranged = this.rangedAttack();
+    if (ranged && this.anims.throw && dist <= THROW_RANGE * this.scale) {
+      return { kind: "physical", name: ranged.name, multiplier: ranged.multiplier, ranged: true };
+    }
+    return null;
+  }
+
+  /** Burn Out if its recharge is up (and consume it): the SAME attack item the player throws — a
+   *  flask lobbed at the target, the Fire spell going off on impact. 1.5× once powered up. */
+  private burnOutAction(): EnemyAction | null {
+    if (this.def.behavior !== "commander" || this.burnOutCooldown > 0) return null;
+    this.burnOutCooldown = BURNOUT_COOLDOWN;
+    return { kind: "magical", name: "Burn Out", multiplier: this.poweredUp ? 1.5 : 1.2, element: "Fire", lobbed: true };
+  }
+
+  private commanderAction(): EnemyAction {
+    // Point-blank he can still lob it; otherwise he swings.
+    const spell = this.burnOutAction();
+    if (spell) return spell;
 
     return this.poweredUp
       ? { kind: "physical", name: "Slash Twice", multiplier: 2 }
