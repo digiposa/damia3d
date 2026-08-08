@@ -89,8 +89,10 @@ const EYE_FRAMES: Partial<Record<Element, string[]>> & { Fire: string[] } = {
   Fire: iconFrames("eye_fire"),
   Wind: iconFrames("eye_wind"),
   Light: iconFrames("eye_light"),
-  Thunder: iconFrames("eye_thunder"),
-  Darkness: iconFrames("eye_darkness"),
+  // NOTE: the two sheet slots are swapped relative to their filenames — the art named "darkness" is
+  // the Thunder eye and vice versa. Mapped by what the sprite actually SHOWS, not by its name.
+  Thunder: iconFrames("eye_darkness"),
+  Darkness: iconFrames("eye_thunder"),
   Water: iconFrames("eye_water"),
   Earth: iconFrames("eye_earth"),
 };
@@ -104,7 +106,8 @@ import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { PartySelect } from "../ui/PartySelect";
 import { TimingSight } from "../ui/TimingSight";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
-import { floatingText } from "../ui/FloatingText";
+import { floatingText, skillCaption } from "../ui/FloatingText";
+import { CombatLog } from "../ui/CombatLog";
 
 /** How close a melee attacker must be to land a combo hit on an enemy. */
 const PLAYER_REACH = 2.3;
@@ -261,6 +264,8 @@ export abstract class ArenaCombatMode extends GameMode {
   protected camera!: IsoCamera;
   protected atmosphere?: Atmosphere;
   protected spellFx?: SpellFx;
+  /** Running action log (bottom-left) — the "what just happened" companion to skill captions. */
+  protected combatLog?: CombatLog;
   /** Enemy currently wearing a buff aura (Power Up) — the aura follows it until it fades/dies. */
   private auraSource?: Enemy;
   private hud!: PartyPanel;
@@ -456,6 +461,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
     this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.trainingArena);
     this.spellFx = new SpellFx(this.scene);
+    this.combatLog = new CombatLog();
     this.refreshShadowCasters();
     void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
     // Loading gate: pause behind a full-screen overlay until every required model (party bodies,
@@ -1135,7 +1141,12 @@ export abstract class ArenaCombatMode extends GameMode {
           ].filter((e): e is Enemy => !!e);
     if (targets.length === 0) return false;
     m.avatar.strike(); // throw motion
-    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t(stock.def.nameKey), ELEMENT_COLOR[atk.element]);
+    this.announceSkill(
+      m.position.add(new Vector3(0, 2.6, 0)),
+      m.avatar.bearer.name,
+      t(stock.def.nameKey),
+      ELEMENT_COLOR[atk.element],
+    );
     // Item magic (LoD): damage scales with the user's MAT/level, the target's MDF and the item's BID.
     const field = fieldMultiplier(this.dragoonSpace, atk.element);
     const mat = m.avatar.baseMat;
@@ -1346,7 +1357,12 @@ export abstract class ArenaCombatMode extends GameMode {
   private castSpell(caster: Player, spell: DragoonSpell, primaryEnemy: Enemy | undefined, allies: Player[]): void {
     caster.mp = Math.max(0, caster.mp - spell.mp);
     caster.strike();
-    this.popText(caster.position.add(new Vector3(0, 2.6, 0)), spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
+    this.announceSkill(
+      caster.position.add(new Vector3(0, 2.6, 0)),
+      caster.bearer.name,
+      spell.name,
+      ELEMENT_COLOR[spell.element] ?? "#c8a6ff",
+    );
 
     // Foe target set (used for damage, status and instant-death alike).
     const foes =
@@ -1800,6 +1816,19 @@ export abstract class ArenaCombatMode extends GameMode {
 
   /** Apply an enemy's chosen action: damage the player, or self-heal. */
   private resolveEnemyAction(enemy: Enemy, action: EnemyAction): void {
+    // Name the action — but only when it's NOTABLE (a spell, a buff/heal, a signature strike).
+    // Basic auto-attacks fire every ATTACK_INTERVAL, so captioning those would just be noise.
+    const notable = action.kind !== "physical" || /twice|multi|power|stunning|throw/i.test(action.name);
+    if (notable) {
+      const color =
+        action.kind === "heal"
+          ? TEXT.dragoon
+          : action.kind === "magical"
+            ? ELEMENT_COLOR[action.element ?? "Non-Elemental"]
+            : TEXT.perfect;
+      // Above the head plate — the damage/heal numbers already own the head height.
+      this.announceSkill(enemy.headPosition.add(new Vector3(0, 0.85, 0)), enemy.def.name, action.name, color);
+    }
     if (action.kind === "heal") {
       enemy.heal(action.amount);
       this.popText(enemy.headPosition, `+${action.amount}`, TEXT.hp);
@@ -2334,6 +2363,13 @@ export abstract class ArenaCombatMode extends GameMode {
     return p;
   }
 
+  /** Announce an ability: its NAME over the caster, plus one line in the log ("who — what"). */
+  protected announceSkill(world: Vector3, who: string, skill: string, color: string): void {
+    const p = projectToScreen(this.scene, world);
+    if (p.visible) skillCaption(p.x, p.y, skill, color);
+    this.combatLog?.push(`${who} — ${skill}`, color);
+  }
+
   protected popText(world: Vector3, text: string, color: string, big = false): void {
     const p = projectToScreen(this.scene, world);
     if (p.visible) floatingText(p.x, p.y, text, color, big);
@@ -2445,6 +2481,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.itemMenu.dispose();
     this.mashMeter.dispose();
     this.spellFx?.dispose();
+    this.combatLog?.dispose();
     this.spaceOverlay.remove();
   }
 }

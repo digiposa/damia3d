@@ -45,3 +45,45 @@ export function floatingText(
   // Safety net if the animation is interrupted (tab blur, etc.).
   window.setTimeout(() => el.remove(), big ? 950 : 800);
 }
+
+/**
+ * The NAME of an ability, over whoever is using it (Power Up, Burn Out, an Addition, a spell…).
+ * Deliberately styled as a *label* — small letter-spaced caps on a dark chip — so it never reads as
+ * a damage number, and drifts up slowly enough to be read without covering the fight.
+ */
+export function skillCaption(x: number, y: number, text: string, color = "#ffe08a"): void {
+  const el = document.createElement("div");
+  el.textContent = text.toUpperCase();
+  Object.assign(el.style, {
+    position: "fixed",
+    left: `${x}px`,
+    top: `${y}px`,
+    transform: "translate(-50%, -50%)",
+    font: "800 11px/1 ui-monospace, monospace",
+    letterSpacing: "0.12em",
+    color,
+    background: "rgba(8,10,16,0.72)",
+    border: `1px solid ${color}`,
+    borderRadius: "6px",
+    padding: "3px 7px",
+    whiteSpace: "nowrap",
+    textShadow: "0 1px 2px rgba(0,0,0,0.9)",
+    pointerEvents: "none",
+    userSelect: "none",
+    zIndex: "13", // under damage numbers (14) — the number is the payload, this is the context
+    willChange: "transform, opacity",
+  } satisfies Partial<CSSStyleDeclaration>);
+  document.body.appendChild(el);
+
+  const anim = el.animate(
+    [
+      { transform: "translate(-50%, -50%) scale(0.8)", opacity: 0, offset: 0 },
+      { transform: "translate(-50%, -62%) scale(1)", opacity: 1, offset: 0.16 },
+      { transform: "translate(-50%, -95%) scale(1)", opacity: 1, offset: 0.66 },
+      { transform: "translate(-50%, -130%) scale(1)", opacity: 0, offset: 1 },
+    ],
+    { duration: 1250, easing: "ease-out", fill: "forwards" },
+  );
+  anim.onfinish = () => el.remove();
+  window.setTimeout(() => el.remove(), 1350);
+}
