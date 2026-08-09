@@ -144,8 +144,9 @@ is the baseline**; Shana adds the 10th (death). Upload names follow `Character__
 | 10 | `death` | ✅ slot ready (`deathAnim`, separate grafted GLB à la `shana_death`) | one per character (collapse fitting the silhouette) |
 | 11 | per-Addition hits | planned (the pipeline's end-goal phase) | 1 clip per Addition hit — blueSea archetype first, **Damia pilot** |
 | 12 | `cast` (magic/attack items) | enemies have the slot; Player TODO | spell-throw gesture |
-| 13 | `hurt` (hit reaction) | Player TODO | small stagger |
-| 14 | Dragoon-form set | ❌ `damia_dragoon.glb` has ZERO clips today | fly-idle, D'Attack, cast, transform — its own mini-set |
+| 13 | `guard` (`Char__Guard.fbx`) | ❌ **missing — needed**; the action exists (`startGuard`, damage halved) but only the translucent shield sphere shows, the character stays in its combat idle | braced stance, held for the whole `GUARD_DURATION`, so it must **loop** cleanly |
+| 14 | `hurt` (hit reaction) | Player TODO | small stagger |
+| 15 | Dragoon-form set | ❌ `damia_dragoon.glb` has ZERO clips today | fly-idle, D'Attack, cast, transform — its own mini-set |
 
 ### Roster status (measured on the shipped GLBs)
 

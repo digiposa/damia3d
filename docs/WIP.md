@@ -42,6 +42,11 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
   d'Additions précises (table « Counterattack Opportunities » du wiki, ex. Dart Volcano press 2) ;
   v1 possible = contre probabiliste quand le joueur touche/rate une Addition vs un mob qui contre.
   Concerne déjà Berserk Mouse + Trent (et la plupart des mobs Forest).
+- **Animation de garde manquante — à générer.** L'action existe et fonctionne (`startGuard` :
+  soin 10% PV max, dégâts divisés par deux, déplacement bloqué) mais visuellement il n'y a que la
+  sphère de bouclier translucide : le perso reste dans son idle de combat. Il faut un clip `guard`
+  (`Char__Guard.fbx`), en **boucle** puisqu'il tient toute la durée de la garde. Voir le tier 2 de
+  `docs/pipeline/character-assets.md`.
 - **Rework du système de statuts/buffs/debuffs** général (les statuts Dragoon actuels sont
   ad-hoc ; il en faut un vrai, alimenté aussi par objets/attaques/équipement).
 - Équipement qui donne du SP quand on est touché (Knight Helm, etc.) — pas encore branché.
