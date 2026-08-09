@@ -26,12 +26,19 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
-- **Knight of Sandora (Black Castle) — volontairement non touché pour l'instant.** Trouvailles de la
-  review à reprendre plus tard : HP JP = **200** (déduit du soin JAP 60 = 30% du max ; on est à 180 US) ;
-  autres stats JP inconnues ; son **HP Recovery** canon (soigne 30% du max) n'est PAS implémenté — le
-  commentaire de la def dit « self-heals » à tort (le soin 30% dans Enemy.ts est celui du script du
-  Commander). La version Seles, elle, est validée : stats JP conformes, IA distance (slash mêlée /
-  dague à distance) actée, fuite d'escouade non implémentée par choix.
+- **Knight of Sandora — review d'IA demandée (à faire).** État constaté :
+  - **Black Castle : sélection d'attaque fausse.** Le canon commute sur les **PV** (> 50% → Throw
+    Knife 1× ; ≤ 50% → Sword Slash 2×), notre IA « basic » commute sur la **distance** (mêlée →
+    Sword Slash, portée → Throw Knife). Résultat : au corps à corps il tape 2× dès le plein régime.
+  - **Black Castle : `HP recovers` canon absent** (soigne 30% du max, à n'importe quel PV) — le
+    commentaire de la def dit « self-heals » à tort ; le soin 30% dans `Enemy.ts` est celui du
+    script du Commander. C'est le même mécanisme que `selfAction()`, mais **répétable** (le Power Up
+    du Commander est à usage unique) : il faut lever cette contrainte pour lui.
+  - HP JP = **200** (déduit du soin JAP 60 = 30% du max ; on est à 180 US) ; autres stats JP inconnues.
+  - **Seles : `~Do nothing` canon non implémenté** — nos ennemis agissent à chaque jauge pleine.
+  - **Seles : `Ah, ahhhh!`** (le chevalier quitte le combat quand un autre ennemi de la formation
+    tombe, en donnant quand même EXP/gold/objet) — non implémenté, acté.
+  - Reste conforme côté Seles : stats JP, 0 contre-attaque, Sword Slash 1× / Throw Dagger 0,5×.
 - **Review cohérence des attaques des mobs Forest** (une fois les 4 en place : Berserk Mouse, Trent,
   Goblin, Assassin Cock) : recroiser chaque moveset avec le wiki (noms, multiplicateurs, seuils HP,
   physique vs magie) et vérifier la cohérence de l'ensemble avant de figer.
