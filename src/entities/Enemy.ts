@@ -26,6 +26,15 @@ const THROW_RANGE = 10;
 const SPELL_RANGE = 12;
 /** Seconds between the Commander's Burn Out casts — a cooldown spell, like the player's Burn Out. */
 const BURNOUT_COOLDOWN = 20;
+/**
+ * Seconds between two thrown weapons (Throw Dagger / Throw Knife / Throw Stone).
+ *
+ * Without it a thrower NEVER closes in: the throw is checked before the chase, so every time its
+ * gauge fills out of melee range it stops and throws again — the Knight of Sandora just plinked
+ * daggers from afar forever. On a recharge, most gauge fills find nothing to throw and it has to
+ * walk into sword range, which is where the canon puts it ("runs up to Dart and slashes him").
+ */
+const THROW_COOLDOWN = 10;
 /** Playback speed of a spell-cast clip. Attacks are sped up (1.2) for punch, but a cast reads
  *  better at natural speed — and it keeps the release timing below honest. */
 const CAST_SPEED = 1;
@@ -82,6 +91,8 @@ export class Enemy {
   private poweredUp = false;
   /** Commander only: seconds until Burn Out is ready again (counts down in {@link aiUpdate}). */
   private burnOutCooldown = 0;
+  /** Seconds until the thrown weapon is available again (counts down in {@link aiUpdate}). */
+  private throwCooldown = 0;
   private bodyMat: StandardMaterial;
 
   /** Resolves once the optional rigged model has loaded (or immediately if there's none). */
@@ -531,6 +542,7 @@ export class Enemy {
     // The training dummy just stands there: no chasing, no attacks.
     if (this.def.behavior === "dummy") return null;
     this.burnOutCooldown = Math.max(0, this.burnOutCooldown - dt); // spell recharge: thaws even stunned
+    this.throwCooldown = Math.max(0, this.throwCooldown - dt); // idem for the thrown weapon
     // Stunned: frozen — no chase, no acting, and the ATB does NOT charge (that's what a stun is).
     if (this.stunned) return null;
 
@@ -662,7 +674,8 @@ export class Enemy {
 
   /**
    * An action deliverable from a DISTANCE (checked before closing to melee): a ready cooldown spell
-   * first, then a thrown weapon. Consumes the spell's cooldown when it picks it.
+   * first, then a thrown weapon. BOTH are on a recharge, consumed here when picked — that recharge
+   * is what forces a thrower to eventually stop plinking and walk into melee.
    */
   private flyingAction(dist: number): EnemyAction | null {
     if (dist <= SPELL_RANGE * this.scale) {
@@ -670,7 +683,8 @@ export class Enemy {
       if (spell) return spell;
     }
     const ranged = this.rangedAttack();
-    if (ranged && this.anims.throw && dist <= THROW_RANGE * this.scale) {
+    if (ranged && this.anims.throw && this.throwCooldown <= 0 && dist <= THROW_RANGE * this.scale) {
+      this.throwCooldown = THROW_COOLDOWN;
       return { kind: "physical", name: ranged.name, multiplier: ranged.multiplier, ranged: true };
     }
     return null;

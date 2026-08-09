@@ -26,7 +26,15 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
-- **Knight of Sandora — review d'IA demandée (à faire).** État constaté :
+- **Knight of Sandora — review d'IA : variante Seles TRAITÉE, Black Castle en attente.**
+  Fait côté Seles : l'arme de jet passe sur un **cooldown de 10 s** (`THROW_COOLDOWN`) — sans lui le
+  chevalier ne venait jamais au corps à corps, il relançait une dague à chaque jauge pleine hors de
+  portée. Écartés sur décision du proprio : **`~Do nothing`** et **`Ah, ahhhh!`** (fuite d'escouade).
+  Le compteur `knightsAlive` de `EnemyContext` reste donc calculé mais inutilisé — à supprimer si on
+  ne revient pas sur la fuite. Reste conforme : stats JP (HP 4), 0 contre-attaque, Sword Slash 1× /
+  Throw Dagger 0,5×, épée main droite, clips Idle/Walking/Slash/Throw/Death.
+
+  Variante **Black Castle** (mise de côté, ne pas traiter pour l'instant) :
   - **Black Castle : sélection d'attaque fausse.** Le canon commute sur les **PV** (> 50% → Throw
     Knife 1× ; ≤ 50% → Sword Slash 2×), notre IA « basic » commute sur la **distance** (mêlée →
     Sword Slash, portée → Throw Knife). Résultat : au corps à corps il tape 2× dès le plein régime.
@@ -35,10 +43,6 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
     script du Commander. C'est le même mécanisme que `selfAction()`, mais **répétable** (le Power Up
     du Commander est à usage unique) : il faut lever cette contrainte pour lui.
   - HP JP = **200** (déduit du soin JAP 60 = 30% du max ; on est à 180 US) ; autres stats JP inconnues.
-  - **Seles : `~Do nothing` canon non implémenté** — nos ennemis agissent à chaque jauge pleine.
-  - **Seles : `Ah, ahhhh!`** (le chevalier quitte le combat quand un autre ennemi de la formation
-    tombe, en donnant quand même EXP/gold/objet) — non implémenté, acté.
-  - Reste conforme côté Seles : stats JP, 0 contre-attaque, Sword Slash 1× / Throw Dagger 0,5×.
 - **Review cohérence des attaques des mobs Forest** (une fois les 4 en place : Berserk Mouse, Trent,
   Goblin, Assassin Cock) : recroiser chaque moveset avec le wiki (noms, multiplicateurs, seuils HP,
   physique vs magie) et vérifier la cohérence de l'ensemble avant de figer.
