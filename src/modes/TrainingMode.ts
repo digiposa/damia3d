@@ -15,7 +15,7 @@ import { LIGHTING_PRESETS } from "../world/lighting";
 import { loadEnvironment, type PropPlacement } from "../world/props";
 import { loadModels, prefetchModels, hasContainer } from "../core/AssetService";
 import { LoadingOverlay } from "../ui/LoadingOverlay";
-import { clampToScreen, projectToScreen } from "../world/project";
+import { clampToScreen, projectToScreen, type ScreenPoint } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
@@ -1748,7 +1748,9 @@ export abstract class ArenaCombatMode extends GameMode {
     // the more the screen kicks — but only the controlled member's hits shake the camera.
     const frac = dmg / Math.max(1, target.def.stats.maxHp);
     const big = frac >= 0.18 || dmg >= 120;
-    this.popText(target.headPosition, `${dmg}`, TEXT.damage, big);
+    // Leaned toward the striker, so the successive hits of one Addition fan out instead of stacking
+    // (head height on both ends, so the lean reads horizontally — see the note in resolveEnemyAction).
+    this.popText(target.headPosition, `${dmg}`, TEXT.damage, big, this.player.position.add(new Vector3(0, 2.2, 0)));
     // Camera shake, hit recoil and (on heavy hits) a freeze-frame — only for YOUR hits.
     if (fromControlled) {
       this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
@@ -1878,7 +1880,10 @@ export abstract class ArenaCombatMode extends GameMode {
     const applyHit = (amount: number): void => {
       if (this.player !== victim) return; // downed / switched out mid-swing — the blow misses them
       this.player.hp = Math.max(0, this.player.hp - amount);
-      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${amount}`, TEXT.damage);
+      // Leaned toward the attacker: with two enemies striking at once you see WHICH one hit you.
+      // Aimed at the enemy's HEAD, not its feet: from a head-height anchor, feet project almost
+      // straight down, which would make the lean vertical — and vertical tells you nothing.
+      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${amount}`, TEXT.damage, false, enemy.headPosition);
       if (this.player.hp === 0) {
         const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)
@@ -2492,13 +2497,28 @@ export abstract class ArenaCombatMode extends GameMode {
     }
   }
 
-  protected popText(world: Vector3, text: string, color: string, big = false): void {
+  /**
+   * Pop a number over a world point. `from` is the world position of whatever caused it (the
+   * attacker): the number then leans that way, which both tells you where the hit came from and
+   * keeps two simultaneous hits from landing on the exact same pixel.
+   */
+  protected popText(world: Vector3, text: string, color: string, big = false, from?: Vector3): void {
     const raw = projectToScreen(this.scene, world);
     // Clamped inside the view: an actor at (or just past) the edge — knocked back, walking out of
     // frame — must still show its damage/heal number instead of popping it off-screen.
     if (!raw.visible) return;
     const p = clampToScreen(this.scene, raw, big ? 40 : 32);
-    floatingText(p.x, p.y, text, color, big);
+    floatingText(p.x, p.y, text, color, big, from && this.screenDirection(raw, from));
+  }
+
+  /** Unit screen vector from a projected anchor toward `from`, or undefined if it can't be read. */
+  private screenDirection(anchor: ScreenPoint, from: Vector3): { x: number; y: number } | undefined {
+    const s = projectToScreen(this.scene, from);
+    if (!s.visible) return undefined;
+    const dx = s.x - anchor.x;
+    const dy = s.y - anchor.y;
+    const len = Math.hypot(dx, dy);
+    return len < 1 ? undefined : { x: dx / len, y: dy / len };
   }
 
   private refreshHud(): void {

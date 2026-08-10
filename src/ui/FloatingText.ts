@@ -1,7 +1,76 @@
+/** Horizontal step between two numbers that would otherwise land on top of each other. */
+const SPREAD = 30;
+/** Centre-to-centre distance below which two numbers are considered stacked. */
+const MIN_GAP = 26;
+/** How far a number leans toward whoever caused it, in screen px. */
+const LEAN = 22;
+/** How far a number climbs over its life — matches the keyframes below (135% of ~20px type). */
+const RISE = 27;
+/** Keep the fan inside the window: numbers pushed sideways must not leave the view. */
+const EDGE = 24;
+
+/** A number currently on screen, for the anti-overlap pass. */
+export interface LiveNumber {
+  x: number;
+  y: number;
+  born: number;
+  life: number;
+}
+const live: LiveNumber[] = [];
+
+/**
+ * Find a spot near (x, y) that no number in `live` already occupies.
+ *
+ * Two enemies striking on the same frame anchor their numbers on the SAME world point, so without
+ * this they are superimposed to the pixel — and with equal damage you simply cannot tell there were
+ * two hits. `bias` (a unit screen vector toward whoever dealt the hit) gives the first candidate a
+ * lean, so a number also tells you *where it came from*; the fan then guarantees separation even
+ * when both attackers happen to be in the same direction.
+ *
+ * Pure on purpose (`now` and `viewportWidth` passed in, no globals) so the geometry is testable.
+ */
+export function fanOut(
+  x: number,
+  y: number,
+  live: readonly LiveNumber[],
+  now: number,
+  viewportWidth: number,
+  bias?: { x: number; y: number },
+): { x: number; y: number } {
+  const clear = (px: number, py: number): boolean =>
+    live.every((l) => {
+      if (now - l.born > l.life) return true; // already gone from the screen
+      const ly = l.y - RISE * Math.min(1, (now - l.born) / l.life); // where it has risen to by now
+      return Math.hypot(px - l.x, py - ly) >= MIN_GAP;
+    });
+
+  const inView = (px: number): number => Math.min(Math.max(px, EDGE), Math.max(EDGE, viewportWidth - EDGE));
+  const bx = inView(bias ? x + bias.x * LEAN : x);
+  const by = bias ? y + bias.y * LEAN : y;
+  // The leaned spot first, then a widening horizontal fan, then a second row above it.
+  for (const dy of [0, -MIN_GAP]) {
+    for (const dx of [0, SPREAD, -SPREAD, 2 * SPREAD, -2 * SPREAD, 3 * SPREAD, -3 * SPREAD]) {
+      const px = inView(bx + dx);
+      if (clear(px, by + dy)) return { x: px, y: by + dy };
+    }
+  }
+  return { x: bx, y: by }; // too crowded to separate: accept the overlap rather than fling it away
+}
+
+/** {@link fanOut} against the numbers actually on screen, pruning the expired ones first. */
+function placeClear(x: number, y: number, bias?: { x: number; y: number }): { x: number; y: number } {
+  const now = performance.now();
+  for (let i = live.length - 1; i >= 0; i--) if (now - live[i].born > live[i].life) live.splice(i, 1);
+  return fanOut(x, y, live, now, window.innerWidth, bias);
+}
+
 /**
  * Spawn a transient damage/heal number at canvas CSS coordinates that pops in, floats up and fades,
  * then removes itself. Plain DOM + the Web Animations API, no pooling — these are cheap and
  * short-lived. `big` gives a punchier pop and larger type (for heavy hits / crits).
+ *
+ * `bias` is an optional unit screen vector pointing at whatever caused the number (the attacker):
+ * the number leans that way, and is nudged clear of any number already on screen.
  */
 export function floatingText(
   x: number,
@@ -9,13 +78,18 @@ export function floatingText(
   text: string,
   color = "#ffd86b",
   big = false,
+  bias?: { x: number; y: number },
 ): void {
+  const life = big ? 900 : 750;
+  const at = placeClear(x, y, bias);
+  live.push({ x: at.x, y: at.y, born: performance.now(), life });
+
   const el = document.createElement("div");
   el.textContent = text;
   Object.assign(el.style, {
     position: "fixed",
-    left: `${x}px`,
-    top: `${y}px`,
+    left: `${at.x}px`,
+    top: `${at.y}px`,
     transform: "translate(-50%, -50%)",
     font: `900 ${big ? 30 : 20}px/1 system-ui, sans-serif`,
     color,
@@ -39,11 +113,11 @@ export function floatingText(
       { transform: "translate(-50%, -95%) scale(1)", opacity: 1, offset: 0.34 },
       { transform: "translate(-50%, -185%) scale(1)", opacity: 0, offset: 1 },
     ],
-    { duration: big ? 900 : 750, easing: "ease-out", fill: "forwards" },
+    { duration: life, easing: "ease-out", fill: "forwards" },
   );
   anim.onfinish = () => el.remove();
   // Safety net if the animation is interrupted (tab blur, etc.).
-  window.setTimeout(() => el.remove(), big ? 950 : 800);
+  window.setTimeout(() => el.remove(), life + 50);
 }
 
 /** How long a skill caption lives, in seconds (the caller drives its rise/fade). */
