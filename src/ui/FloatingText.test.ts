@@ -47,6 +47,18 @@ describe("fanOut", () => {
     expect(fromRight.x).toBeGreaterThan(260);
   });
 
+  it("keeps a whole pack's numbers over their victim, not over the pack", () => {
+    // Five attackers bunched on one side: every bias points the same way. The numbers must still
+    // fan out around the target — otherwise they drift onto the attackers and read as THEIR damage.
+    const live: LiveNumber[] = [];
+    for (let i = 0; i < 5; i++) {
+      const p = fanOut(260, 300, live, 0, W, { x: 0.9, y: -0.44 });
+      expect(Math.abs(p.x - 260)).toBeLessThanOrEqual(90);
+      expect(Math.abs(p.y - 300)).toBeLessThanOrEqual(26);
+      live.push(at(p.x, p.y));
+    }
+  });
+
   it("never places a number outside the viewport", () => {
     const live: LiveNumber[] = [];
     for (let i = 0; i < 8; i++) {

@@ -23,9 +23,13 @@ const live: LiveNumber[] = [];
  *
  * Two enemies striking on the same frame anchor their numbers on the SAME world point, so without
  * this they are superimposed to the pixel — and with equal damage you simply cannot tell there were
- * two hits. `bias` (a unit screen vector toward whoever dealt the hit) gives the first candidate a
- * lean, so a number also tells you *where it came from*; the fan then guarantees separation even
- * when both attackers happen to be in the same direction.
+ * two hits.
+ *
+ * The candidate slots stay **centred on (x, y)**: a number must read as belonging to the actor it
+ * is anchored on, so it never wanders far enough to look like someone else's. `bias` (a unit screen
+ * vector toward whoever dealt the hit) only decides which free slot is *preferred* — with attackers
+ * on either side, each number takes the slot on its own side; with a whole pack bunched up on one
+ * side, the numbers still fan out over their victim instead of migrating onto the pack.
  *
  * Pure on purpose (`now` and `viewportWidth` passed in, no globals) so the geometry is testable.
  */
@@ -45,16 +49,20 @@ export function fanOut(
     });
 
   const inView = (px: number): number => Math.min(Math.max(px, EDGE), Math.max(EDGE, viewportWidth - EDGE));
-  const bx = inView(bias ? x + bias.x * LEAN : x);
-  const by = bias ? y + bias.y * LEAN : y;
-  // The leaned spot first, then a widening horizontal fan, then a second row above it.
+  // Where the number would ideally sit if nothing else were on screen: leaning toward its source.
+  const idealX = bias ? x + bias.x * LEAN : x;
+  const idealY = bias ? y + bias.y * LEAN : y;
+
+  const slots: { x: number; y: number }[] = [];
   for (const dy of [0, -MIN_GAP]) {
     for (const dx of [0, SPREAD, -SPREAD, 2 * SPREAD, -2 * SPREAD, 3 * SPREAD, -3 * SPREAD]) {
-      const px = inView(bx + dx);
-      if (clear(px, by + dy)) return { x: px, y: by + dy };
+      slots.push({ x: inView(x + dx), y: y + dy });
     }
   }
-  return { x: bx, y: by }; // too crowded to separate: accept the overlap rather than fling it away
+  // Closest to the ideal first. Sort is stable, so with no bias the order stays centre-out.
+  slots.sort((a, b) => Math.hypot(a.x - idealX, a.y - idealY) - Math.hypot(b.x - idealX, b.y - idealY));
+  for (const s of slots) if (clear(s.x, s.y)) return s;
+  return slots[0]; // too crowded to separate: accept the overlap rather than fling it away
 }
 
 /** {@link fanOut} against the numbers actually on screen, pruning the expired ones first. */
