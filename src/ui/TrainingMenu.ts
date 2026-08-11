@@ -30,6 +30,7 @@ export interface TrainingCallbacks {
   onSetDragoonLevel: (level: number) => void;
   /** Spawns may resolve async (first-time model download) — the button shows a pending state. */
   onSpawnDummy: () => void | Promise<void>;
+  onSpawnSparringDummy: () => void | Promise<void>;
   onSpawnKnight: () => void | Promise<void>;
   onSpawnCommander: () => void | Promise<void>;
   onSpawnBerserkMouse: () => void | Promise<void>;
@@ -239,6 +240,7 @@ export class TrainingMenu {
     box.append(
       locationGroup(t("spawn.locTest"), [
         spawnButton(t("spawn.dummy"), ELEMENT_COLOR["Non-Elemental"], this.cb.onSpawnDummy),
+        spawnButton(t("spawn.sparringDummy"), ELEMENT_COLOR["Non-Elemental"], this.cb.onSpawnSparringDummy),
       ]),
       locationGroup(t("spawn.locSeles"), [
         spawnButton(t("spawn.knight"), ELEMENT_COLOR.Fire, this.cb.onSpawnKnight),

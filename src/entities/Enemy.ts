@@ -55,7 +55,14 @@ const STATUS_NONE = Color3.Black();
 /** A resolved enemy action for the mode to apply against the player (or itself). `ranged` marks a
  *  thrown attack (dagger/knife) the mode should deliver as a flying projectile from a distance. */
 export type EnemyAction =
-  | { kind: "physical"; name: string; multiplier: number; ranged?: boolean }
+  | {
+      kind: "physical";
+      name: string;
+      multiplier: number;
+      ranged?: boolean;
+      /** Non-canon test hook: deal exactly this fraction of the target's max HP, formula bypassed. */
+      hpFraction?: number;
+    }
   | {
       kind: "magical";
       name: string;
@@ -646,7 +653,9 @@ export class Enemy {
     if (this.def.behavior === "commander") return this.commanderAction();
     // Melee: the first non-thrown attack (a thrown one is reserved for range).
     const a = this.def.attacks.find((x) => !/throw/i.test(x.name)) ?? this.def.attacks[0];
-    return { kind: a.kind, name: a.name, multiplier: a.multiplier };
+    return a.kind === "magical"
+      ? { kind: "magical", name: a.name, multiplier: a.multiplier, element: a.element }
+      : { kind: "physical", name: a.name, multiplier: a.multiplier, hpFraction: a.hpFraction };
   }
 
   /** The Seles Commander's "if → then" script (house rules):

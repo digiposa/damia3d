@@ -13,6 +13,12 @@ export interface EnemyAttack {
   kind: "physical" | "magical";
   multiplier: number;
   element?: Element;
+  /**
+   * Test-tool escape hatch: deal exactly this fraction of the TARGET's max HP and skip the damage
+   * formula entirely — no stats, no element, no guard, no gear. Non-canon; it exists so a practice
+   * target can hit for a known, repeatable number (see {@link SPARRING_DUMMY}).
+   */
+  hpFraction?: number;
 }
 
 /** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script; "dummy" never acts. */
@@ -89,6 +95,32 @@ export const TRAINING_DUMMY: EnemyDef = {
   behavior: "dummy",
   immortal: true,
   bodyColor: [0.72, 0.58, 0.32],
+};
+
+/**
+ * Sparring Dummy — a non-canon practice target that HITS BACK, in the spirit of the PS1 game's
+ * special training foes. It chases and strikes like any melee enemy, but its blow always lands for
+ * exactly **10% of the target's max HP** — no stats, no element, no guard, no gear reduction. A
+ * fixed, repeatable number is the whole point: it makes combat feedback (floating damage numbers,
+ * their fan-out, hit reactions) measurable instead of guessed at.
+ *
+ * Immortal like the inert {@link TRAINING_DUMMY}, and fast (SPD 100 → a blow every 1.5 s) so that
+ * spawning two or three easily produces the simultaneous hits worth testing.
+ */
+export const SPARRING_DUMMY: EnemyDef = {
+  id: "sparring_dummy",
+  name: "Sparring Dummy",
+  element: "Non-Elemental",
+  stats: { maxHp: 999999, at: 0, df: 50, mat: 0, mdf: 50 },
+  spd: 100,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: false,
+  attacks: [{ name: "Calibrated Blow", kind: "physical", multiplier: 0, hpFraction: 0.1 }],
+  expReward: 0,
+  goldReward: 0,
+  immortal: true,
+  bodyColor: [0.74, 0.36, 0.28],
 };
 
 /**

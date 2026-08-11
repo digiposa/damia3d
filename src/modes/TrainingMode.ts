@@ -28,7 +28,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -507,6 +507,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSetLevel: (lv) => this.setLevel(lv),
         onSetDragoonLevel: (dlv) => this.setDragoonLevel(dlv),
         onSpawnDummy: () => this.spawnDummy(),
+        onSpawnSparringDummy: () => this.spawnSparringDummy(),
         onSpawnKnight: () => this.spawnKnight(),
         onSpawnCommander: () => this.spawnCommander(),
         onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
@@ -1873,6 +1874,10 @@ export abstract class ArenaCombatMode extends GameMode {
     // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…), then Rose/Blossom Storm.
     let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
     if (this.player.damageHalved) dmg = Math.floor(dmg * 0.5);
+    // Test tool (Sparring Dummy): a flat share of max HP, every single blow. Deliberately placed
+    // AFTER the formula so it overrides everything — guard, element, gear — and stays predictable.
+    // Rounded, not floored: at LV1 Damia has 18 HP, and 10% should read as 2 rather than 1.
+    if (!magical && action.hpFraction) dmg = Math.max(1, Math.round(action.hpFraction * this.player.maxHp));
 
     // Damage lands LATER than this call (contact frame / projectile arrival), so read the victim at
     // that moment: `this.player` is the currently controlled avatar and control can change meanwhile.
@@ -2400,6 +2405,12 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Spawn a non-canon training dummy: an immortal, inert damage-test target. */
   private spawnDummy(): void {
     this.addEnemy(new Enemy(this.scene, TRAINING_DUMMY, this.ringPosition(4)));
+  }
+
+  /** Spawn a sparring dummy: immortal like the inert one, but it chases and hits for a flat 10% of
+   *  your max HP — a known, repeatable number to calibrate combat feedback against. */
+  private spawnSparringDummy(): void {
+    this.addEnemy(new Enemy(this.scene, SPARRING_DUMMY, this.ringPosition(4)));
   }
 
   /** Make sure an enemy's models are in this scene's container cache before constructing it, so
