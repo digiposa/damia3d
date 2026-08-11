@@ -104,15 +104,15 @@ export const TRAINING_DUMMY: EnemyDef = {
  * fixed, repeatable number is the whole point: it makes combat feedback (floating damage numbers,
  * their fan-out, hit reactions) measurable instead of guessed at.
  *
- * Immortal like the inert {@link TRAINING_DUMMY}, and fast (SPD 100 → a blow every 1.5 s) so that
- * spawning two or three easily produces the simultaneous hits worth testing.
+ * Immortal like the inert {@link TRAINING_DUMMY}, at the roster's baseline pace (SPD 50 → a blow
+ * every 3 s), so what you observe matches the cadence of a real fight.
  */
 export const SPARRING_DUMMY: EnemyDef = {
   id: "sparring_dummy",
   name: "Sparring Dummy",
   element: "Non-Elemental",
   stats: { maxHp: 999999, at: 0, df: 50, mat: 0, mdf: 50 },
-  spd: 100,
+  spd: 50,
   aAv: 0,
   mAv: 0,
   countersAdditions: false,
