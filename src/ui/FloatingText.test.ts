@@ -1,78 +1,77 @@
 import { describe, it, expect } from "vitest";
-import { fanOut, type LiveNumber } from "./FloatingText";
+import { launch } from "./FloatingText";
 
-/** A number that spawned right now at (x, y) and is still fully on screen. */
-const at = (x: number, y: number, born = 0, life = 750): LiveNumber => ({ x, y, born, life });
+/** Where a number sits, relative to its anchor, `t` seconds into its own flight. */
+const at = (v: { vx: number; vy: number }, t: number): { x: number; y: number } => ({
+  x: v.vx * t,
+  y: v.vy * t + 0.5 * 320 * t * t, // GRAVITY
+});
 
-const W = 520; // a phone-width viewport
-const gap = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
-  Math.hypot(a.x - b.x, a.y - b.y);
+/** Where the `index`-th number of a burst is `wall` seconds after the burst started — i.e. with its
+ *  stream delay taken off. Before its turn it has not been released yet. */
+const atWall = (index: number, wall: number): { x: number; y: number } | null => {
+  const v = launch(index);
+  const t = wall - v.delayMs / 1000;
+  return t <= 0 ? null : at(v, t);
+};
 
-describe("fanOut", () => {
-  it("leaves a lone number where it was asked for", () => {
-    expect(fanOut(260, 300, [], 0, W)).toEqual({ x: 260, y: 300 });
+const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+
+describe("launch", () => {
+  it("throws consecutive numbers to opposite sides", () => {
+    expect(Math.sign(launch(0).vx)).toBe(-Math.sign(launch(1).vx));
+    expect(Math.sign(launch(2).vx)).toBe(-Math.sign(launch(3).vx));
   });
 
-  it("separates two hits landing on the same point in the same frame", () => {
-    const first = fanOut(260, 300, [], 0, W);
-    const second = fanOut(260, 300, [at(first.x, first.y)], 0, W);
-    // The bug: both used to land on the exact same pixel, so only one number was ever readable.
-    expect(gap(first, second)).toBeGreaterThanOrEqual(26);
+  it("opens the burst on the attacker's side", () => {
+    expect(launch(0, { x: -1, y: 0 }).vx).toBeLessThan(0);
+    expect(launch(0, { x: 1, y: 0 }).vx).toBeGreaterThan(0);
   });
 
-  it("keeps separating as more hits pile onto the same point", () => {
-    const live: LiveNumber[] = [];
-    const placed = [];
+  it("throws each further pair wider, so a big burst fans out", () => {
+    expect(Math.abs(launch(2).vx)).toBeGreaterThan(Math.abs(launch(0).vx));
+    expect(Math.abs(launch(4).vx)).toBeGreaterThan(Math.abs(launch(2).vx));
+  });
+
+  it("streams a burst instead of releasing it all at once", () => {
+    // WoW's trick: simultaneous hits are held back a few dozen ms each, so they read as a spray.
+    expect(launch(0).delayMs).toBe(0);
+    for (let i = 1; i < 6; i++) expect(launch(i).delayMs).toBeGreaterThan(launch(i - 1).delayMs);
+  });
+
+  it("never lets two numbers of a burst coincide", () => {
+    // The case that used to show as a block of identical numbers over the victim. They start from
+    // the same anchor, so they ARE close early on — what must never happen is one hiding another.
     for (let i = 0; i < 5; i++) {
-      const p = fanOut(260, 300, live, 0, W);
-      placed.push(p);
-      live.push(at(p.x, p.y));
-    }
-    for (let i = 0; i < placed.length; i++) {
-      for (let j = i + 1; j < placed.length; j++) {
-        expect(gap(placed[i], placed[j])).toBeGreaterThanOrEqual(26);
+      for (let j = i + 1; j < 5; j++) {
+        for (let wall = 0.1; wall <= 1; wall += 0.05) {
+          const a = atWall(i, wall);
+          const b = atWall(j, wall);
+          if (!a || !b) continue; // one of them has not been released yet
+          expect(dist(a, b)).toBeGreaterThan(10);
+        }
       }
     }
   });
 
-  it("ignores numbers whose animation is already over", () => {
-    const stale = at(260, 300, 0, 750);
-    expect(fanOut(260, 300, [stale], 900, W)).toEqual({ x: 260, y: 300 });
-  });
-
-  it("leans toward the source, so a hit says where it came from", () => {
-    const fromLeft = fanOut(260, 300, [], 0, W, { x: -1, y: 0 });
-    const fromRight = fanOut(260, 300, [], 0, W, { x: 1, y: 0 });
-    expect(fromLeft.x).toBeLessThan(260);
-    expect(fromRight.x).toBeGreaterThan(260);
-  });
-
-  it("keeps a whole pack's numbers over their victim, not over the pack", () => {
-    // Five attackers bunched on one side: every bias points the same way. The numbers must still
-    // fan out around the target — otherwise they drift onto the attackers and read as THEIR damage.
-    const live: LiveNumber[] = [];
+  it("keeps pulling a burst apart as it flies", () => {
+    // This is what carries the legibility: separation comes from movement, not from spawn placement.
     for (let i = 0; i < 5; i++) {
-      const p = fanOut(260, 300, live, 0, W, { x: 0.9, y: -0.44 });
-      expect(Math.abs(p.x - 260)).toBeLessThanOrEqual(90);
-      expect(Math.abs(p.y - 300)).toBeLessThanOrEqual(26);
-      live.push(at(p.x, p.y));
+      for (let j = i + 1; j < 5; j++) {
+        const early = dist(atWall(i, 0.35)!, atWall(j, 0.35)!);
+        const late = dist(atWall(i, 0.9)!, atWall(j, 0.9)!);
+        expect(late).toBeGreaterThan(early);
+      }
     }
   });
 
-  it("never places a number outside the viewport", () => {
-    const live: LiveNumber[] = [];
-    for (let i = 0; i < 8; i++) {
-      const p = fanOut(W - 10, 300, live, 0, W); // anchored hard against the right edge
-      expect(p.x).toBeGreaterThanOrEqual(0);
-      expect(p.x).toBeLessThanOrEqual(W);
-      live.push(at(p.x, p.y));
-    }
-  });
-
-  it("gives up gracefully rather than flinging a number away when the area is saturated", () => {
-    const live: LiveNumber[] = [];
-    for (let dy of [0, -26]) for (let k = -3; k <= 3; k++) live.push(at(260 + k * 30, 300 + dy));
-    const p = fanOut(260, 300, live, 0, W);
-    expect(gap(p, { x: 260, y: 300 })).toBeLessThan(30);
+  it("arcs: rises, tops out, then eases back down", () => {
+    const v = launch(0);
+    const rise = at(v, 0.3).y;
+    const top = at(v, 0.58).y; // apex ≈ LAUNCH_Y / GRAVITY
+    const fall = at(v, 0.9).y;
+    expect(top).toBeLessThan(rise); // screen y grows downward: lower value = higher up
+    expect(fall).toBeGreaterThan(top);
+    expect(fall).toBeLessThan(0); // still above where it started when it fades out
   });
 });

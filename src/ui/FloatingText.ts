@@ -1,84 +1,80 @@
-/** Horizontal step between two numbers that would otherwise land on top of each other. */
-const SPREAD = 30;
-/** Centre-to-centre distance below which two numbers are considered stacked. */
-const MIN_GAP = 26;
-/** How far a number leans toward whoever caused it, in screen px. */
-const LEAN = 22;
-/** How far a number climbs over its life — matches the keyframes below (135% of ~20px type). */
-const RISE = 27;
-/** Keep the fan inside the window: numbers pushed sideways must not leave the view. */
-const EDGE = 24;
+/**
+ * Damage/heal numbers, thrown out of the point of impact like Diablo's and streamed like WoW's.
+ *
+ * A number is LAUNCHED, not placed: it gets its own initial velocity and arcs out under gravity.
+ * That is what keeps a burst readable — several hits landing on the same victim in the same frame
+ * share one anchor, so any static placement scheme just packs them into a block. Motion separates
+ * them instead: sides alternate, the arc widens as the burst grows, and each number is held back a
+ * few dozen milliseconds so they emerge as a spray rather than appearing all at once.
+ */
 
-/** A number currently on screen, for the anti-overlap pass. */
-export interface LiveNumber {
-  x: number;
-  y: number;
-  born: number;
-  life: number;
-}
-const live: LiveNumber[] = [];
+/** Sideways launch speed of the first pair, px/s. */
+const LAUNCH_X = 80;
+/** Extra sideways speed for each further pair, so a big burst spreads wider. */
+const LAUNCH_X_STEP = 60;
+/** Upward launch speed, px/s (screen y grows downward, so this is applied negative). */
+const LAUNCH_Y = 180;
+/** How much flatter each further pair leaves, px/s — it separates numbers thrown the same way. */
+const LAUNCH_Y_STEP = 30;
+/** Downward pull, px/s² — what bends the flight into an arc instead of a straight rise. */
+const GRAVITY = 320;
+/** Delay between two numbers of the same burst: the WoW-style stream. */
+const STAGGER_MS = 65;
+/** How many distinct trajectories exist before they start being reused. */
+const TRAJECTORIES = 8;
+/** Keyframes sampled along the parabola — enough for the curve to read as a curve. */
+const STEPS = 10;
+
+/** When each trajectory frees up: a number in flight owns its path until it has faded. */
+const busyUntil: number[] = [];
 
 /**
- * Find a spot near (x, y) that no number in `live` already occupies.
+ * Initial velocity and stream delay for the `index`-th number of a burst.
  *
- * Two enemies striking on the same frame anchor their numbers on the SAME world point, so without
- * this they are superimposed to the pixel — and with equal damage you simply cannot tell there were
- * two hits.
+ * Sides alternate so consecutive hits fly apart, and each further pair leaves faster and flatter, so
+ * a five-hit burst opens into a fan instead of overlapping. `bias` (a unit screen vector toward
+ * whoever dealt the hit) only chooses which side the burst opens on — the number still belongs to,
+ * and stays over, the actor it is anchored on.
  *
- * The candidate slots stay **centred on (x, y)**: a number must read as belonging to the actor it
- * is anchored on, so it never wanders far enough to look like someone else's. `bias` (a unit screen
- * vector toward whoever dealt the hit) only decides which free slot is *preferred* — with attackers
- * on either side, each number takes the slot on its own side; with a whole pack bunched up on one
- * side, the numbers still fan out over their victim instead of migrating onto the pack.
- *
- * Pure on purpose (`now` and `viewportWidth` passed in, no globals) so the geometry is testable.
+ * Pure so the geometry is testable.
  */
-export function fanOut(
-  x: number,
-  y: number,
-  live: readonly LiveNumber[],
-  now: number,
-  viewportWidth: number,
-  bias?: { x: number; y: number },
-): { x: number; y: number } {
-  const clear = (px: number, py: number): boolean =>
-    live.every((l) => {
-      if (now - l.born > l.life) return true; // already gone from the screen
-      const ly = l.y - RISE * Math.min(1, (now - l.born) / l.life); // where it has risen to by now
-      return Math.hypot(px - l.x, py - ly) >= MIN_GAP;
-    });
+export function launch(index: number, bias?: { x: number; y: number }): { vx: number; vy: number; delayMs: number } {
+  const startLeft = bias ? bias.x < 0 : false;
+  const side = (index % 2 === 0) === startLeft ? -1 : 1;
+  const tier = Math.floor(index / 2);
+  return {
+    vx: side * (LAUNCH_X + tier * LAUNCH_X_STEP),
+    vy: -Math.max(90, LAUNCH_Y - tier * LAUNCH_Y_STEP), // wider pairs leave flatter, so same-side numbers ride different heights
+    delayMs: index * STAGGER_MS,
+  };
+}
 
-  const inView = (px: number): number => Math.min(Math.max(px, EDGE), Math.max(EDGE, viewportWidth - EDGE));
-  // Where the number would ideally sit if nothing else were on screen: leaning toward its source.
-  const idealX = bias ? x + bias.x * LEAN : x;
-  const idealY = bias ? y + bias.y * LEAN : y;
-
-  const slots: { x: number; y: number }[] = [];
-  for (const dy of [0, -MIN_GAP]) {
-    for (const dx of [0, SPREAD, -SPREAD, 2 * SPREAD, -2 * SPREAD, 3 * SPREAD, -3 * SPREAD]) {
-      slots.push({ x: inView(x + dx), y: y + dy });
+/**
+ * Claim a free trajectory for a number about to fly, and hold it until that number has faded.
+ *
+ * The rule that matters: two numbers that can be on screen together must never share a path. A
+ * plain "restart the burst after a quiet gap" counter got this wrong — two hits a fifth of a second
+ * apart both restarted at 0, so they flew the identical arc a few pixels apart for their whole life.
+ * Reserving instead means the lowest free path is always reused, so an isolated hit stays central
+ * while a burst opens up.
+ */
+function claimTrajectory(now: number, holdMs: number): number {
+  for (let i = 0; i < TRAJECTORIES; i++) {
+    if ((busyUntil[i] ?? 0) <= now) {
+      busyUntil[i] = now + holdMs;
+      return i;
     }
   }
-  // Closest to the ideal first. Sort is stable, so with no bias the order stays centre-out.
-  slots.sort((a, b) => Math.hypot(a.x - idealX, a.y - idealY) - Math.hypot(b.x - idealX, b.y - idealY));
-  for (const s of slots) if (clear(s.x, s.y)) return s;
-  return slots[0]; // too crowded to separate: accept the overlap rather than fling it away
-}
-
-/** {@link fanOut} against the numbers actually on screen, pruning the expired ones first. */
-function placeClear(x: number, y: number, bias?: { x: number; y: number }): { x: number; y: number } {
-  const now = performance.now();
-  for (let i = live.length - 1; i >= 0; i--) if (now - live[i].born > live[i].life) live.splice(i, 1);
-  return fanOut(x, y, live, now, window.innerWidth, bias);
+  return TRAJECTORIES - 1; // saturated: reuse the outermost rather than fling one further out
 }
 
 /**
- * Spawn a transient damage/heal number at canvas CSS coordinates that pops in, floats up and fades,
- * then removes itself. Plain DOM + the Web Animations API, no pooling — these are cheap and
- * short-lived. `big` gives a punchier pop and larger type (for heavy hits / crits).
+ * Spawn a transient damage/heal number at canvas CSS coordinates: it is thrown out of the anchor
+ * along an arc, then fades and removes itself. Plain DOM + the Web Animations API, no pooling —
+ * these are cheap and short-lived. `big` gives a punchier pop and larger type (for heavy hits).
  *
  * `bias` is an optional unit screen vector pointing at whatever caused the number (the attacker):
- * the number leans that way, and is nudged clear of any number already on screen.
+ * it decides which side the burst opens on.
  */
 export function floatingText(
   x: number,
@@ -88,16 +84,18 @@ export function floatingText(
   big = false,
   bias?: { x: number; y: number },
 ): void {
-  const life = big ? 900 : 750;
-  const at = placeClear(x, y, bias);
-  live.push({ x: at.x, y: at.y, born: performance.now(), life });
+  const life = big ? 1050 : 900;
+  const now = performance.now();
+  // Hold the path for the whole flight (its stream delay included) so nothing follows it meanwhile.
+  const index = claimTrajectory(now, life + TRAJECTORIES * STAGGER_MS);
+  const { vx, vy, delayMs } = launch(index, bias);
 
   const el = document.createElement("div");
   el.textContent = text;
   Object.assign(el.style, {
     position: "fixed",
-    left: `${at.x}px`,
-    top: `${at.y}px`,
+    left: `${x}px`,
+    top: `${y}px`,
     transform: "translate(-50%, -50%)",
     font: `900 ${big ? 30 : 20}px/1 system-ui, sans-serif`,
     color,
@@ -107,25 +105,34 @@ export function floatingText(
     pointerEvents: "none",
     userSelect: "none",
     zIndex: "14",
-    opacity: "1",
+    opacity: "0", // held until its turn in the stream
     willChange: "transform, opacity",
   } satisfies Partial<CSSStyleDeclaration>);
   document.body.appendChild(el);
 
-  // Pop in (overshoot), then float up and fade. WAAPI gives a real multi-stage curve.
+  // Sample the ballistic path: constant sideways drift, gravity bending the rise into an arc.
   const peak = big ? 1.35 : 1.15;
-  const anim = el.animate(
-    [
-      { transform: "translate(-50%, -50%) scale(0.4)", opacity: 1, offset: 0 },
-      { transform: `translate(-50%, -72%) scale(${peak})`, opacity: 1, offset: 0.18 },
-      { transform: "translate(-50%, -95%) scale(1)", opacity: 1, offset: 0.34 },
-      { transform: "translate(-50%, -185%) scale(1)", opacity: 0, offset: 1 },
-    ],
-    { duration: life, easing: "ease-out", fill: "forwards" },
-  );
+  const seconds = life / 1000;
+  const frames = [];
+  for (let i = 0; i <= STEPS; i++) {
+    const k = i / STEPS;
+    const t = k * seconds;
+    const dx = vx * t;
+    const dy = vy * t + 0.5 * GRAVITY * t * t;
+    // Pop in with an overshoot over the first tenth, then hold size; fade over the last third.
+    const scale = k === 0 ? 0.4 : k <= 0.1 ? peak : 1;
+    const opacity = k < 0.65 ? 1 : Math.max(0, (1 - k) / 0.35);
+    frames.push({
+      transform: `translate(calc(-50% + ${dx.toFixed(1)}px), calc(-50% + ${dy.toFixed(1)}px)) scale(${scale})`,
+      opacity,
+      offset: k,
+    });
+  }
+
+  const anim = el.animate(frames, { duration: life, delay: delayMs, easing: "linear", fill: "forwards" });
   anim.onfinish = () => el.remove();
   // Safety net if the animation is interrupted (tab blur, etc.).
-  window.setTimeout(() => el.remove(), life + 50);
+  window.setTimeout(() => el.remove(), delayMs + life + 50);
 }
 
 /** How long a skill caption lives, in seconds (the caller drives its rise/fade). */
