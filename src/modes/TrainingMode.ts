@@ -199,6 +199,13 @@ const ELEMENT_COLOR: Record<Element, string> = {
   "Non-Elemental": "#bdbdc8",
 };
 
+/**
+ * Height (world units) at which a floating number is thrown from a character: mid-torso, i.e. where
+ * a blow actually lands. Numbers arc UPWARD from there, so they end up readable around head height
+ * — launching them from above the head instead left the whole spray detached from the body.
+ */
+const BODY_ANCHOR_Y = 1.2;
+
 /** Floating combat-text palette — one colour per feedback type (tweak here only). */
 const TEXT = {
   damage: "#ffcf5c", // OR — all damage (dealt to enemies or taken by the player)
@@ -1081,7 +1088,7 @@ export abstract class ArenaCombatMode extends GameMode {
   private doGuard(m: PartyMember): boolean {
     if (m.avatar.guardActive) return false;
     const heal = m.avatar.startGuard();
-    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, TEXT.hp);
+    this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${heal}`, TEXT.hp);
     return true;
   }
 
@@ -1277,7 +1284,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const a = m.avatar;
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
-      if (healed > 0) this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, TEXT.hp);
+      if (healed > 0) this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${healed}`, TEXT.hp);
     }
     if (stock.def.spRestore) {
       a.gainSp(stock.def.spRestore);
@@ -1435,14 +1442,14 @@ export abstract class ArenaCombatMode extends GameMode {
     for (const a of healTargets) {
       if (a.hp === 0 && spell.revive !== undefined) {
         a.hp = Math.max(1, Math.floor(a.maxHp * spell.revive));
-        this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.hp}`, TEXT.hp);
+        this.popText(a.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${a.hp}`, TEXT.hp);
       } else if (a.hp > 0) {
         const amount = spell.allyHealFull ? a.maxHp : spell.heal ? Math.floor(a.maxHp * spell.heal) : 0;
         if (spell.drainHeal) {
           const share = Math.floor(totalDamage / Math.max(1, healTargets.length));
-          if (share > 0) this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(share)}`, TEXT.hp);
+          if (share > 0) this.popText(a.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${a.heal(share)}`, TEXT.hp);
         } else if (amount > 0) {
-          this.popText(a.position.add(new Vector3(0, 2.2, 0)), `+${a.heal(amount)}`, TEXT.hp);
+          this.popText(a.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${a.heal(amount)}`, TEXT.hp);
         }
       }
       // cure has no effect yet — allies can't be afflicted in the sandbox.
@@ -1463,7 +1470,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (!stock) return false;
     const healed = m.avatar.heal(Math.floor(m.avatar.maxHp * stock.def.healFraction));
     stock.count -= 1;
-    this.popText(m.position.add(new Vector3(0, 2.2, 0)), `+${healed}`, TEXT.hp);
+    this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${healed}`, TEXT.hp);
     return true;
   }
 
@@ -1751,7 +1758,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const big = frac >= 0.18 || dmg >= 120;
     // Leaned toward the striker, so the successive hits of one Addition fan out instead of stacking
     // (head height on both ends, so the lean reads horizontally — see the note in resolveEnemyAction).
-    this.popText(target.headPosition, `${dmg}`, TEXT.damage, big, this.player.position.add(new Vector3(0, 2.2, 0)));
+    this.popText(target.bodyPosition, `${dmg}`, TEXT.damage, big, this.player.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)));
     // Camera shake, hit recoil and (on heavy hits) a freeze-frame — only for YOUR hits.
     if (fromControlled) {
       this.camera.shake(Math.min(0.5, 0.07 + frac * 0.7));
@@ -1888,7 +1895,7 @@ export abstract class ArenaCombatMode extends GameMode {
       // Leaned toward the attacker: with two enemies striking at once you see WHICH one hit you.
       // Aimed at the enemy's HEAD, not its feet: from a head-height anchor, feet project almost
       // straight down, which would make the lean vertical — and vertical tells you nothing.
-      this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), `${amount}`, TEXT.damage, false, enemy.headPosition);
+      this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `${amount}`, TEXT.damage, false, enemy.bodyPosition);
       if (this.player.hp === 0) {
         const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)
@@ -2083,7 +2090,7 @@ export abstract class ArenaCombatMode extends GameMode {
       case "guard": {
         if (avatar.guardActive) return false;
         const heal = avatar.startGuard();
-        this.popText(member.position.add(new Vector3(0, 2.2, 0)), `+${heal}`, TEXT.hp);
+        this.popText(member.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${heal}`, TEXT.hp);
         return true;
       }
       case "transform":

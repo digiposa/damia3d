@@ -450,6 +450,11 @@ export class Enemy {
     return this.position.add(new Vector3(0, 2.4 * this.scale, 0));
   }
 
+  /** Mid-torso: where a blow lands, and where its floating number is thrown from. */
+  get bodyPosition(): Vector3 {
+    return this.position.add(new Vector3(0, 1.2 * this.scale, 0));
+  }
+
   /** Approx. throwing-hand height (projectile origin for thrown daggers). */
   get handPosition(): Vector3 {
     return this.position.add(new Vector3(0, 1.3 * this.scale, 0));
