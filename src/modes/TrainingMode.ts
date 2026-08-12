@@ -11,6 +11,7 @@ import { IsoCamera } from "../world/IsoCamera";
 import { createArena, clampToArena } from "../world/Arena";
 import { Atmosphere } from "../world/atmosphere";
 import { SpellFx } from "../world/SpellFx";
+import { TargetMarker } from "../world/TargetMarker";
 import { LIGHTING_PRESETS } from "../world/lighting";
 import { loadEnvironment, type PropPlacement } from "../world/props";
 import { loadModels, prefetchModels, hasContainer } from "../core/AssetService";
@@ -125,6 +126,8 @@ const ARROW_RELEASE_DELAY = 0.9;
  *  1.2× strike playback ≈ 1.4s). She's free to move again while the ATB gauge refills. */
 const ATTACK_ROOT_TIME = 1.4;
 
+/** Touch slop when tapping an enemy to aim at it: a fingertip is nowhere near pixel-accurate. */
+const TAP_TARGET_RADIUS = 52;
 /** Pressing Attack with nobody in reach locks onto the nearest enemy within this radius and walks over. */
 const ACQUIRE_RANGE = 20;
 
@@ -380,6 +383,14 @@ export abstract class ArenaCombatMode extends GameMode {
   // Click-to-move intent (desktop).
   private moveTarget?: Vector3;
   private attackTarget?: Enemy;
+  /**
+   * The enemy you are AIMING at, shown by {@link marker}. Distinct from {@link attackTarget}, which
+   * is a navigation intent ("walk over there and strike"): the lock persists between actions, so at
+   * any moment you can see who your next blow will land on. Auto-acquires the nearest enemy, and
+   * re-acquires when its target dies, so there is never a dead moment with nothing selected.
+   */
+  private locked?: Enemy;
+  private marker?: TargetMarker;
   private pendingAttack = false;
 
   private canvas?: HTMLCanvasElement;
@@ -485,6 +496,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
     this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.trainingArena);
     this.spellFx = new SpellFx(this.scene);
+    this.marker = new TargetMarker(this.scene);
     this.combatLog = new CombatLog();
     this.refreshShadowCasters();
     void this.loadDecor(); // GLB props (no-op until src/assets/models/ + the decor list are filled)
@@ -947,10 +959,11 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.pendingHits.length) this.updatePendingHits(dt);
     if (this.captions.length) this.updateCaptions(dt);
     if (this.attackAnimT > 0) this.attackAnimT = Math.max(0, this.attackAnimT - dt);
+    this.updateLock(dt);
 
     // Attack is the ⚔ button / click / Space (the timed combo). The other ATB actions
     // are the left-column buttons (or G/R/T/F keys); each is gated by the ATB gauge.
-    if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget);
+    if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget ?? this.locked);
     if (this.guardPressed()) this.playerAct("guard");
     if (this.input.wasPressed("Item") || this.input.wasPressed("KeyR")) this.playerAct("item");
     if (this.input.wasPressed("Magic") || this.input.wasPressed("KeyF")) this.playerAct("magic");
@@ -1164,7 +1177,7 @@ export abstract class ArenaCombatMode extends GameMode {
       atk.target === "allEnemies"
         ? this.enemies.filter((e) => e.alive)
         : [
-            this.attackTarget && this.attackTarget.alive ? this.attackTarget : this.nearestEnemy(ACQUIRE_RANGE),
+            this.aimedEnemy(),
           ].filter((e): e is Enemy => !!e);
     if (targets.length === 0) return false;
     m.avatar.strike(); // throw motion
@@ -1368,7 +1381,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const spell = p.spells.find((s) => s.id === id);
     if (!spell || !this.runner.gauge.isReady || spell.mp > p.mp) return;
     const primary =
-      this.attackTarget && this.attackTarget.alive ? this.attackTarget : this.nearestEnemy(ACQUIRE_RANGE);
+      this.aimedEnemy();
     if (primary) this.player.face(primary.position.subtract(this.player.position));
     this.castSpell(p, spell, primary, this.party.map((m) => m.avatar));
     this.runner.gauge.spend(); // a cast costs the ATB action…
@@ -1484,23 +1497,88 @@ export abstract class ArenaCombatMode extends GameMode {
     }
   }
 
+  // --- Target lock ----------------------------------------------------------
+
+  /** Keep the aim lock valid and the ring under it. Re-acquires the nearest enemy when the lock is
+   *  empty or its target has fallen, so a fight never leaves you with nothing selected. */
+  private updateLock(dt: number): void {
+    if (this.locked && (!this.locked.alive || !this.enemies.includes(this.locked))) this.locked = undefined;
+    if (!this.locked) {
+      const next = this.nearestEnemy(ACQUIRE_RANGE);
+      if (next) this.lockOn(next, false); // auto-acquired: no pulse, you did not ask for it
+    }
+    if (this.locked) this.marker?.follow(this.locked.position, this.locked.def.scale ?? 1);
+    else this.marker?.hide();
+    this.marker?.update(dt);
+  }
+
+  /** Who a targeted action (spell, thrown item) should resolve against: the locked enemy, else the
+   *  navigation target, else the nearest — so every command agrees with the ring on screen. */
+  private aimedEnemy(): Enemy | undefined {
+    if (this.locked?.alive) return this.locked;
+    if (this.attackTarget?.alive) return this.attackTarget;
+    return this.nearestEnemy(ACQUIRE_RANGE);
+  }
+
+  /** Aim at `enemy`. `deliberate` marks a player choice (tap/click), which pulses the ring. */
+  private lockOn(enemy: Enemy, deliberate = true): void {
+    const changed = this.locked !== enemy;
+    this.locked = enemy;
+    if (changed && deliberate) this.marker?.flash();
+  }
+
+  /**
+   * The living enemy whose body is nearest `(x, y)` on screen, within `radius` CSS px.
+   *
+   * Touch needs this: a ray test against the mesh demands pixel accuracy that a fingertip does not
+   * have, especially on a small enemy or one standing behind the player. Picking by screen proximity
+   * to the body instead makes tapping a target actually work on a phone.
+   */
+  private enemyNearScreen(x: number, y: number, radius: number): Enemy | undefined {
+    let best: Enemy | undefined;
+    let bestDist = radius;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const p = projectToScreen(this.scene, e.bodyPosition);
+      if (!p.visible) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = e;
+      }
+    }
+    return best;
+  }
+
   // --- Navigation (desktop click-to-move) ----------------------------------
 
   private onPointerDown = (e: PointerEvent): void => {
     // Branch on the ACTUAL pointer (not device capability): touch taps = attack and use the
     // joystick to move; mouse/pen = Diablo-style click-to-move / click-to-attack. This keeps
     // click-to-move working on touch-capable laptops (maxTouchPoints > 0) driven by a mouse.
-    if (e.pointerType === "touch") {
-      this.input.pressVirtual("Space"); // tap = attack / timing press
-      return;
-    }
-    // While an Addition is running, any click is the timing-sight press.
+    // While an Addition is running, ANY press is the timing-sight press — on both platforms. The
+    // combo's rhythm outranks targeting; you re-aim between combos, not during one.
     if (this.runner.active) {
       this.input.pressVirtual("Space");
       return;
     }
+    if (e.pointerType === "touch") {
+      // Tapping an enemy aims at it and goes for it; tapping anywhere else strikes whoever is
+      // locked. Generous radius — a fingertip cannot hit a Berserk Mouse by the pixel.
+      const tapped = this.enemyNearScreen(e.offsetX, e.offsetY, TAP_TARGET_RADIUS);
+      if (tapped) {
+        this.lockOn(tapped);
+        this.attackTarget = tapped;
+        this.moveTarget = undefined;
+        this.pendingAttack = true;
+        return;
+      }
+      this.input.pressVirtual("Space"); // tap = attack the locked enemy
+      return;
+    }
     const picked = this.scene.pick(e.offsetX, e.offsetY)?.pickedMesh?.metadata;
     if (picked instanceof Enemy && this.enemies.includes(picked)) {
+      this.lockOn(picked);
       this.attackTarget = picked;
       this.moveTarget = undefined;
       this.pendingAttack = true;
@@ -2646,6 +2724,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.itemMenu.dispose();
     this.mashMeter.dispose();
     this.spellFx?.dispose();
+    this.marker?.dispose();
     this.combatLog?.dispose();
     for (const c of this.captions) c.el.remove();
     this.captions = [];
