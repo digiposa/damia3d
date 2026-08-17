@@ -4,6 +4,10 @@ Faithful canon reference for each character, transcribed from the **Legend of Dr
 Wiki Project** (not the Fandom wiki). One file per character; bearers that share a Dragoon
 class share these values (e.g. Dart = Zieg for Red-Eye).
 
+> ⚠️ Ces pages décrivent la version **US/PAL**. Le projet vise le **JP**. Quand les deux
+> divergent, [`ps1-jp-measurements.md`](./ps1-jp-measurements.md) — des relevés faits
+> manette en main sur la PS1 japonaise — **prime sur tout ce qui suit**.
+
 Purpose: a single stored source so we don't re-fetch pages. Not all of it is wired into
 gameplay yet — much of it (Dragoon forms, spells) feeds the upcoming **Dragoon system
 rework** (see `../../DESIGN_NOTES.md`). The base stat tables here are the canon the live

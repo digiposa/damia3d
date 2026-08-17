@@ -295,7 +295,10 @@ export const TRENT: EnemyDef = {
   countersAdditions: true,
   attacks: [
     { name: "Trunk Slap", kind: "physical", multiplier: 1.5 }, // >25% HP — the active attack
-    { name: "Pellet", kind: "magical", multiplier: 1.5, element: "Earth" }, // ≤50% HP — inactive under basic AI (v1)
+    // ≤50% HP — inactive under basic AI (v1). Multiplier 1, NOT the wikis' 1.5: measured on the JP
+    // PS1 (MAT 3 vs Dart's MDF 9 → 5 damage). floor(3²×5/9) = 5 exactly, while ×1.5 cannot produce
+    // 5 at all — the reachable values are 1, 3, 4, 6, 7, 9… See docs/canon/ps1-jp-measurements.md.
+    { name: "Pellet", kind: "magical", multiplier: 1, element: "Earth" },
   ],
   expReward: 4,
   goldReward: 3, // JP (EU/US: 9)

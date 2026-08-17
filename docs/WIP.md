@@ -43,6 +43,11 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
     script du Commander. C'est le même mécanisme que `selfAction()`, mais **répétable** (le Power Up
     du Commander est à usage unique) : il faut lever cette contrainte pour lui.
   - HP JP = **200** (déduit du soin JAP 60 = 30% du max ; on est à 180 US) ; autres stats JP inconnues.
+- **Burn Out du Commander — écart non expliqué avec la PS1 JP.** Mesuré 4 avant Power Up et 6 après
+  (Dart LV1, MDF 6) ; on sort 7 et 9. Aucune des six structures de formule essayées ne reproduit les
+  deux valeurs avec des stats entières, et ses MDF (comme ceux du Knight of Sandora) sont douteux.
+  **Pour débloquer** : mesurer le même sort contre un Dart d'un autre niveau — deux points sur une
+  même courbe. Détail complet dans `docs/canon/ps1-jp-measurements.md`.
 - **Review cohérence des attaques des mobs Forest** (une fois les 4 en place : Berserk Mouse, Trent,
   Goblin, Assassin Cock) : recroiser chaque moveset avec le wiki (noms, multiplicateurs, seuils HP,
   physique vs magie) et vérifier la cohérence de l'ensemble avant de figer.
