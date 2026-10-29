@@ -768,11 +768,20 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
     // (a branch starts ON the main track, so only its far end is open).
     const head = trail[0];
     const last = trail[trail.length - 1];
+    // Extension points every half unit, so the taper below has rows to work with.
+    const extend = (from: Sample, dir: number, len: number): { p: Vector3; t: Vector3 }[] =>
+      Array.from({ length: Math.ceil(len / 0.5) }, (_, k) => ({ p: from.p.add(from.t.scale(dir * 0.5 * (k + 1))), t: from.t }));
     const pts = [
-      ...(ti === 0 ? [{ p: head.p.subtract(head.t.scale(6)), t: head.t }] : []),
+      ...(ti === 0 ? extend(head, -1, 6).reverse() : []),
       ...trail,
-      { p: last.p.add(last.t.scale(ti === 0 ? 2 : head.w < 2 ? 0.6 : 4)), t: last.t }, // a footpath stops at its chest
+      ...extend(last, 1, ti === 0 ? 2 : head.w < 2 ? 1 : 5), // a footpath ends just past its chest
     ];
+    // Open ends taper off (the main track's start, every branch's far end) so a trail peters out
+    // into the grass instead of stopping on a square edge. The main track's far end disappears
+    // under the fork's branches, and a branch's start under the track it leaves.
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) total += Vector3.Distance(pts[i - 1].p, pts[i].p);
+    const TAPER = ti === 0 ? 6 : head.w < 2 ? 1.5 : 5;
     const y = 0.02 - 0.002 * ti; // overlapping trails at a junction must not z-fight
     let along = 0;
     let run = 0; // samples in the current unbroken stretch (the dirt stops at a ravine)
@@ -788,7 +797,10 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
       const nz = t.x;
       // Branches are narrower; a footpath's dirt never runs wider than its walkable corridor.
       const base = ti === 0 ? DIRT_HALF : Math.min(DIRT_HALF * 0.8, trail[0].w * 0.75);
-      const half = base * (0.92 + 0.16 * Math.sin(along * 0.7 + rand()));
+      const fromStart = ti === 0 ? along / TAPER : 1;
+      const toEnd = ti === 0 ? 1 : (total - along) / TAPER;
+      const taper = Math.sqrt(Math.max(0, Math.min(1, fromStart, toEnd))); // rounded, not pointed
+      const half = base * taper * (0.92 + (0.16 + 0.3 * (1 - taper)) * Math.sin(along * 0.7 + rand() * 3));
       const first = positions.length / 3;
       for (let c = 0; c <= COLS; c++) {
         const f = c / COLS;
