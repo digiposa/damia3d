@@ -77,10 +77,22 @@ export class IsoCamera {
     this.applyTarget();
   }
 
-  /** Set the live camera target = followed base + current (decaying, random) shake offset. */
+  /**
+   * How far (world units, along the ground "into the screen") the view leads ahead of the followed
+   * point. A positive value sits the player in the lower part of the frame with more of the scene
+   * BEHIND them — the PS1 battle composition, fighters low and the arena wall as a backdrop.
+   */
+  framing = 0;
+
+  /** Set the live camera target = followed base + framing lead + current (decaying) shake offset. */
   private applyTarget(): void {
     if (!this.base) return;
     this.camera.target.copyFrom(this.base);
+    if (this.framing) {
+      const f = this.groundForward;
+      this.camera.target.x += f.x * this.framing;
+      this.camera.target.z += f.z * this.framing;
+    }
     if (this.shakeT > 0 && this.shakeDur > 0) {
       const k = this.shakeMag * (this.shakeT / this.shakeDur); // linear decay to 0
       this.camera.target.x += (Math.random() * 2 - 1) * k;

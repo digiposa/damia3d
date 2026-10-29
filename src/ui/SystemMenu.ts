@@ -1,4 +1,4 @@
-import { settings } from "../core/settings";
+import { settings, RETRO_LEVELS } from "../core/settings";
 import { hasTouch } from "../core/device";
 import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
 import type {
@@ -551,6 +551,16 @@ export class SystemMenu {
         this.render();
       }, (v) => `${v}×`),
     );
+
+    // Retro (PS1) rendering: off / soft / the real thing. Applied live by the game loop.
+    box.append(divider(), label(t("config.retro")));
+    box.append(
+      choiceRow([...RETRO_LEVELS], settings.retroLines, (v) => {
+        settings.retroLines = v;
+        this.render();
+      }, (v) => t(v === 0 ? "config.retro.off" : v >= 400 ? "config.retro.soft" : "config.retro.ps1")),
+    );
+    box.append(hint(t("config.retro.note")));
     return box;
   }
 }

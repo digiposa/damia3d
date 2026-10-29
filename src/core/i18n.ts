@@ -95,6 +95,11 @@ const en: Dict = {
   "config.combatSpeed": "Combat speed",
   "config.combatSpeed.note": "Movement speed is unaffected.",
   "config.zoom": "Camera zoom",
+  "config.retro": "PS1 rendering",
+  "config.retro.off": "Off",
+  "config.retro.soft": "Soft",
+  "config.retro.ps1": "PS1",
+  "config.retro.note": "Low-resolution, dithered rendering like the original console. Also lighter to run on phones.",
   "config.language": "Language",
 
   // Character menu
@@ -321,6 +326,11 @@ const fr: Dict = {
   "config.combatSpeed": "Vitesse de combat",
   "config.combatSpeed.note": "La vitesse de déplacement n'est pas affectée.",
   "config.zoom": "Zoom caméra",
+  "config.retro": "Rendu PS1",
+  "config.retro.off": "Aucun",
+  "config.retro.soft": "Doux",
+  "config.retro.ps1": "PS1",
+  "config.retro.note": "Rendu basse résolution et tramé comme sur la console d'origine. Plus léger aussi sur téléphone.",
   "config.language": "Langue",
 
   "char.title": "Personnage",

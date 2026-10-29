@@ -482,8 +482,8 @@ export abstract class ArenaCombatMode extends GameMode {
 
   enter(): void {
     this.items = this.initialItems();
-    createArena(this.scene);
-    // The sand floor catches the characters' cast shadows.
+    const arenaMeshes = createArena(this.scene);
+    // The flagstones catch the characters' cast shadows.
     const floor = this.scene.getMeshByName("arenaFloor");
     if (floor) floor.receiveShadows = true;
 
@@ -491,10 +491,13 @@ export abstract class ArenaCombatMode extends GameMode {
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
+    // Fighters low in the frame, the arena's back wall and its torches behind them as a backdrop.
+    this.camera.framing = 3;
     // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
-    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.trainingArena);
+    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.lohanArena);
+    this.atmosphere.excludeFromFill(arenaMeshes); // the arena brings its own dim fill + torches
     this.spellFx = new SpellFx(this.scene);
     this.marker = new TargetMarker(this.scene);
     this.combatLog = new CombatLog();

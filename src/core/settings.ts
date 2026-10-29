@@ -16,7 +16,16 @@ export interface GameSettings {
   combatSpeed: number;
   /** Camera zoom: higher = closer. The iso view height is divided by this. */
   cameraZoom: number;
+  /**
+   * Retro (PS1) rendering: the 3D scene is drawn at this many horizontal lines and blown up with
+   * hard pixel edges, then dithered down to 15-bit colour like the console did. 0 = off (native
+   * resolution, smooth). The HUD is DOM and stays sharp whatever this is.
+   */
+  retroLines: number;
 }
+
+/** The retro presets offered in Options: off, a softer "CRT-era" look, and the real thing. */
+export const RETRO_LEVELS = [0, 420, 280] as const;
 
 export const settings: GameSettings = {
   soundEnabled: true,
@@ -24,4 +33,5 @@ export const settings: GameSettings = {
   sfxVolume: 0.8,
   combatSpeed: 1,
   cameraZoom: 1.25,
+  retroLines: 280,
 };

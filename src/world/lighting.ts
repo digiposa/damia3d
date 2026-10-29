@@ -30,6 +30,29 @@ export interface LightingPreset {
  * starting points for future zones — tune them when those zones actually exist.
  */
 export const LIGHTING_PRESETS = {
+  /**
+   * The Lohan Hero Competition ring, after the PS1 battle screen: near-black above, a dim warm fill,
+   * and a low amber key — the torches (point lights in Arena.ts) do the real lighting. Sepia all
+   * through: brown fog, brown backdrop, no blue anywhere.
+   */
+  lohanArena: {
+    clearColor: [0.022, 0.014, 0.01],
+    // Fill + key for the FIGHTERS; the arena set has its own dimmer fill (Arena.ts) so its torches
+    // can pool. The sun also reaches the floor — that is what casts the fighters' shadows on it.
+    ambientIntensity: 0.75,
+    ambientGround: [0.22, 0.14, 0.08],
+    sunIntensity: 0.32,
+    sunColor: [1.0, 0.72, 0.52],
+    // Keep this direction: the shadow map's projection origin (Atmosphere) is placed for it.
+    sunDirection: [-0.5, -1, -0.4],
+    exposure: 1.08,
+    contrast: 1.3,
+    vignetteWeight: 1.8,
+    bloomWeight: 0.45,
+    fogStart: 38,
+    fogEnd: 90,
+    fogColor: [0.04, 0.026, 0.018],
+  },
   /** Training arena — the dark-fantasy palette but clearly lit and readable (more fill, softer
    *  vignette/fog, less crushed shadows) so you can see the fight and the decor. */
   trainingArena: {

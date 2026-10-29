@@ -14,6 +14,8 @@ import { MainMenu, type ModeId } from "../ui/MainMenu";
 import { SystemMenu } from "../ui/SystemMenu";
 import { TechOverlay } from "../ui/TechOverlay";
 import { Button } from "../ui/Button";
+import { applyRetroResolution } from "../world/retro";
+import { settings } from "./settings";
 
 /**
  * Top-level application: owns the Babylon engine and the mode manager, runs the
@@ -30,6 +32,8 @@ export class Game implements GameHost {
   private system: SystemMenu;
   private systemBtn: Button;
   private paused = false;
+  /** Last retro setting applied to the backbuffer, to notice an Options change. */
+  private retroLines = settings.retroLines;
 
   constructor(canvas: HTMLCanvasElement) {
     // 4th arg (adaptToDeviceRatio) keeps rendering crisp on high-DPI phones/tablets.
@@ -65,7 +69,13 @@ export class Game implements GameHost {
       },
     });
 
-    const resize = () => this.engine.resize();
+    // Retro (PS1) resolution: the backbuffer size depends on the window height, so re-derive it on
+    // every resize — and once now, before the first frame.
+    applyRetroResolution(this.engine);
+    const resize = () => {
+      this.engine.resize();
+      applyRetroResolution(this.engine);
+    };
     window.addEventListener("resize", resize);
     window.addEventListener("orientationchange", resize);
     window.addEventListener("keydown", (e) => this.handleHotkeys(e));
@@ -75,6 +85,11 @@ export class Game implements GameHost {
     this.openMainMenu();
 
     this.engine.runRenderLoop(() => {
+      // Options can flip the retro setting at any time; follow it (no-op when unchanged).
+      if (settings.retroLines !== this.retroLines) {
+        this.retroLines = settings.retroLines;
+        applyRetroResolution(this.engine);
+      }
       const dt = this.engine.getDeltaTime() / 1000;
       if (!this.paused) this.modes.update(dt);
       this.input.endFrame();

@@ -16,6 +16,7 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { type LightingPreset, lerpPreset } from "./lighting";
+import { RetroPass, retroEnabled } from "./retro";
 
 /**
  * A soft round particle sprite (radial white → transparent) painted on a canvas — the shared
@@ -54,6 +55,8 @@ export class Atmosphere {
   private readonly ambient: HemisphericLight;
   private readonly sun: DirectionalLight;
   private readonly pipeline: DefaultRenderingPipeline;
+  /** PS1 15-bit dither, always last in the chain (pass-through when the retro setting is off). */
+  private readonly retro: RetroPass;
   private readonly sparks: ParticleSystem;
   private current: LightingPreset;
   private transitionObs?: Observer<Scene>;
@@ -85,7 +88,9 @@ export class Atmosphere {
     // HDR pipeline (float buffers → tone mapping + bloom look right). The look-shaping values
     // (exposure/contrast/vignette weight/bloom weight) come from the preset; the rest are fixed.
     this.pipeline = new DefaultRenderingPipeline("mood", true, scene, [camera]);
-    this.pipeline.fxaaEnabled = true; // smooth the hard low-poly edges under ortho
+    // Smooth the hard low-poly edges under ortho — but NOT in retro mode, whose whole point is the
+    // console's raw, aliased pixel edges.
+    this.pipeline.fxaaEnabled = !retroEnabled();
     const ip = this.pipeline.imageProcessing;
     ip.toneMappingEnabled = true;
     ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; // filmic highlight roll-off
@@ -109,12 +114,29 @@ export class Atmosphere {
     this.shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     this.shadows.setDarkness(0.25);
 
+    // Created after every pipeline toggle above, so it lands at the end of the chain.
+    this.retro = new RetroPass(camera);
+    let retroWas = retroEnabled();
+    scene.onBeforeRenderObservable.add(() => {
+      const now = retroEnabled();
+      if (now === retroWas) return;
+      retroWas = now;
+      this.pipeline.fxaaEnabled = !now; // rebuilds the pipeline, re-attaching its passes…
+      this.retro.moveToEnd(camera); // …so put the dither back behind them
+    });
+
     this.dot = softDotTexture(scene);
     this.sparks = this.buildSparks(scene);
     this.spawnDust(scene);
 
     this.current = preset;
     this.applyPreset(preset);
+  }
+
+  /** Keep the world fill light off `meshes` (a set that brings its own, dimmer fill). The sun
+   *  still reaches them, so they keep receiving the characters' shadows. */
+  excludeFromFill(meshes: AbstractMesh[]): void {
+    this.ambient.excludedMeshes.push(...meshes);
   }
 
   /** Snap all lighting/mood to a preset (lights, backdrop, fog and post-process). */
