@@ -2740,7 +2740,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
 /** The Training sandbox: the shared arena-combat core plus the debug spawn/level/DPS tools. */
 export class TrainingMode extends ArenaCombatMode {
-  readonly name = "Training";
+  readonly name: string = "Training";
 
   /** Entry character picker (same flow as Survival): start solo with a chosen bearer, then grow or
    *  shrink the party from the System menu's Party tab ("+" to add, ✖ to kick). */

@@ -58,20 +58,20 @@ export const LIGHTING_PRESETS = {
    * green-tinted fill and fog, soft vignette. WIP: to tune against PS1 reference screens.
    */
   forestDay: {
-    clearColor: [0.06, 0.09, 0.06],
-    ambientIntensity: 0.8,
-    ambientGround: [0.16, 0.2, 0.1],
-    sunIntensity: 1.05,
-    sunColor: [1.0, 0.9, 0.68],
+    clearColor: [0.09, 0.06, 0.04],
+    ambientIntensity: 0.72,
+    ambientGround: [0.2, 0.15, 0.08],
+    sunIntensity: 1.15,
+    sunColor: [1.0, 0.8, 0.58], // golden hour: the reference screens are all warm, rose-orange light
     // Keep this direction: the shadow map's projection origin (Atmosphere) is placed for it.
     sunDirection: [-0.5, -1, -0.4],
-    exposure: 1.1,
-    contrast: 1.22,
-    vignetteWeight: 1.6,
+    exposure: 1.2,
+    contrast: 1.28,
+    vignetteWeight: 2.0, // corners fall into deep foliage shade, as on the PS1 backdrops
     bloomWeight: 0.35,
     fogStart: 36,
-    fogEnd: 80,
-    fogColor: [0.1, 0.14, 0.09],
+    fogEnd: 85,
+    fogColor: [0.14, 0.1, 0.07],
   },
   /** Training arena — the dark-fantasy palette but clearly lit and readable (more fill, softer
    *  vignette/fog, less crushed shadows) so you can see the fight and the decor. */

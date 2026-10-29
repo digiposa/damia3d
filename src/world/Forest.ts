@@ -6,6 +6,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
@@ -58,7 +59,7 @@ const TRACK: { u: number; v: number; w: number }[] = [
 ];
 
 /** Half-width of the beaten dirt itself (the walkable corridor is wider: grass on both sides). */
-const DIRT_HALF = 1.45;
+const DIRT_HALF = 2.3; // the reference track is broad: a cart road, not a footpath
 
 /** World position of the local track coordinates (u along the screen's up, v sideways). */
 export function forestPoint(u: number, v: number): Vector3 {
@@ -174,7 +175,7 @@ export function forestWorld(scene: Scene): World {
   const trees = buildVegetation(scene, root, rand);
   buildCart(scene, root);
   buildFallenLog(scene, root);
-  shadeGround(ground, trees);
+  shadeGround([ground, track], trees);
   buildSunShafts(scene, root, rand);
   buildPollen(scene);
 
@@ -213,14 +214,14 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
     for (let y = 0; y < h; y += 4)
       for (let x = 0; x < w; x += 4) {
         const k = 0.82 + rand() * 0.3;
-        ctx.fillStyle = rgb(52 * k, 74 * k, 30 * k);
+        ctx.fillStyle = rgb(76 * k, 82 * k, 38 * k); // olive, warm — never a cold lawn green
         ctx.fillRect(x, y, 4, 4);
       }
     for (let i = 0; i < 900; i++) {
       const x = (rand() * w) | 0;
       const y = (rand() * h) | 0;
       const k = 0.7 + rand() * 0.7;
-      ctx.fillStyle = rgb(70 * k, 100 * k, 38 * k);
+      ctx.fillStyle = rgb(108 * k, 108 * k, 46 * k);
       ctx.fillRect(x, y, 1, 2 + ((rand() * 3) | 0));
     }
     for (let i = 0; i < 90; i++) {
@@ -250,29 +251,31 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
  * a darker floor deep in the wood and under each tree. (Trees don't cast real shadows — the shadow
  * map is kept tight on the fighters, where it matters.)
  */
-function shadeGround(ground: Mesh, trees: { x: number; z: number; r: number }[]): void {
-  const pos = ground.getVerticesData(VertexBuffer.PositionKind);
-  if (!pos) return;
-  const colors = new Float32Array((pos.length / 3) * 4);
-  for (let i = 0, c = 0; i < pos.length; i += 3, c += 4) {
-    const x = pos[i] + GROUND_CENTRE.x;
-    const z = pos[i + 2] + GROUND_CENTRE.z;
-    // Dapple: two slanted sine fields → irregular blobs of sun, 0 (shade) … 1 (sunlit).
-    const n = Math.sin(x * 0.37 + Math.sin(z * 0.23) * 1.7) * Math.cos(z * 0.31 - Math.sin(x * 0.19) * 1.3);
-    const sun = Math.min(1, Math.max(0, n * 1.6 + 0.35));
-    const d = nearestOnTrack(x, z).d;
-    const deep = Math.min(1, Math.max(0, (d - 7) / 14)); // the wood darkens away from the track
-    let k = (0.62 + 0.38 * sun) * (1 - 0.45 * deep);
-    for (const t of trees) {
-      const td = Math.hypot(x - t.x, z - t.z);
-      if (td < t.r) k *= 0.72 + 0.28 * (td / t.r);
+function shadeGround(meshes: Mesh[], trees: { x: number; z: number; r: number }[]): void {
+  for (const mesh of meshes) {
+    const pos = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!pos) continue;
+    const colors = new Float32Array((pos.length / 3) * 4);
+    for (let i = 0, c = 0; i < pos.length; i += 3, c += 4) {
+      const x = pos[i] + mesh.position.x;
+      const z = pos[i + 2] + mesh.position.z;
+      // Dapple: two slanted sine fields → irregular, fairly crisp blobs of sun (0 shade … 1 lit).
+      const n = Math.sin(x * 0.37 + Math.sin(z * 0.23) * 1.7) * Math.cos(z * 0.31 - Math.sin(x * 0.19) * 1.3);
+      const sun = Math.min(1, Math.max(0, n * 2.6 + 0.3));
+      const d = nearestOnTrack(x, z).d;
+      const deep = Math.min(1, Math.max(0, (d - 7) / 14)); // the wood darkens away from the track
+      let k = (0.58 + 0.5 * sun) * (1 - 0.5 * deep);
+      for (const t of trees) {
+        const td = Math.hypot(x - t.x, z - t.z);
+        if (td < t.r) k *= 0.7 + 0.3 * (td / t.r);
+      }
+      colors[c] = k;
+      colors[c + 1] = k * 0.97;
+      colors[c + 2] = k * 0.9;
+      colors[c + 3] = 1;
     }
-    colors[c] = k;
-    colors[c + 1] = k;
-    colors[c + 2] = k * 0.94;
-    colors[c + 3] = 1;
+    mesh.setVerticesData(VertexBuffer.ColorKind, colors, false, 4);
   }
-  ground.setVerticesData(VertexBuffer.ColorKind, colors, false, 4);
 }
 
 // --- The track -------------------------------------------------------------------
@@ -291,17 +294,17 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
         const edge = Math.min(x - left, right - x);
         const rut = Math.abs(x - w * 0.33) < 2.5 || Math.abs(x - w * 0.67) < 2.5; // cart wheel ruts
         let k = 0.86 + rand() * 0.22;
-        if (rut) k *= 0.8;
+        if (rut) k *= 0.9;
         if (edge < 3) k *= 0.88;
-        ctx.fillStyle = rgb(112 * k, 86 * k, 58 * k);
+        ctx.fillStyle = rgb(178 * k, 120 * k, 92 * k); // terracotta / salmon earth of the PS1 screens
         ctx.fillRect(x, y, 1, 1);
       }
       if (rand() < 0.35) {
-        ctx.fillStyle = rgb(150, 136, 116);
+        ctx.fillStyle = rgb(206, 150, 116);
         ctx.fillRect(left + 3 + ((rand() * (right - left - 6)) | 0), y, 1, 1); // pebble
       }
       if (rand() < 0.25) {
-        ctx.fillStyle = rgb(66, 92, 36);
+        ctx.fillStyle = rgb(118, 74, 52); // darker clod
         ctx.fillRect(left + 4 + ((rand() * (right - left - 8)) | 0), y, 1, 2); // grass tuft in the middle strip
       }
     }
@@ -321,17 +324,25 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
     ...SAMPLES,
     { p: last.p.add(last.t.scale(6)), t: last.t },
   ];
+  // Several columns across (not just two edges), so the sun dapple in the vertex colours can fall
+  // across the dirt too — the bright patches on the track are half the reference shot's light.
+  const COLS = 6;
   for (let i = 0; i < pts.length; i++) {
     const { p, t } = pts[i];
     if (i > 0) along += Vector3.Distance(pts[i - 1].p, p);
     const nx = -t.z;
     const nz = t.x;
     const half = DIRT_HALF * (0.92 + 0.16 * Math.sin(along * 0.7 + rand()));
-    positions.push(p.x + nx * half, 0.02, p.z + nz * half, p.x - nx * half, 0.02, p.z - nz * half);
-    uvs.push(0, along / 4, 1, along / 4);
+    for (let c = 0; c <= COLS; c++) {
+      const f = c / COLS;
+      const o = half * (1 - 2 * f);
+      positions.push(p.x + nx * o, 0.02, p.z + nz * o);
+      uvs.push(f, along / 4);
+    }
     if (i > 0) {
-      const a = (i - 1) * 2;
-      indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+      const a = (i - 1) * (COLS + 1);
+      const b = i * (COLS + 1);
+      for (let c = 0; c < COLS; c++) indices.push(a + c, b + c, a + c + 1, a + c + 1, b + c, b + c + 1);
     }
   }
   const normals: number[] = [];
@@ -373,6 +384,37 @@ function jitter(mesh: Mesh, amount: number, rand: () => number): void {
   mesh.updateVerticesData(VertexBuffer.PositionKind, pos);
 }
 
+/**
+ * Vertex colours graded by height within the part: shaded underside → sunlit top. That is the read
+ * of every bush and crown on the reference screens — dark olive bellies, warm yellow-lit caps.
+ * Every part of a merged source needs colours (MergeMeshes keeps only shared vertex kinds), so bark
+ * gets a flat `lo = hi`.
+ */
+function gradeColors(mesh: Mesh, lo: [number, number, number], hi: [number, number, number]): void {
+  const pos = mesh.getVerticesData(VertexBuffer.PositionKind);
+  if (!pos) return;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 1; i < pos.length; i += 3) {
+    minY = Math.min(minY, pos[i]);
+    maxY = Math.max(maxY, pos[i]);
+  }
+  const span = maxY - minY || 1;
+  const c = new Float32Array((pos.length / 3) * 4);
+  for (let i = 0, j = 0; i < pos.length; i += 3, j += 4) {
+    const t = Math.pow((pos[i + 1] - minY) / span, 1.4);
+    c[j] = lo[0] + (hi[0] - lo[0]) * t;
+    c[j + 1] = lo[1] + (hi[1] - lo[1]) * t;
+    c[j + 2] = lo[2] + (hi[2] - lo[2]) * t;
+    c[j + 3] = 1;
+  }
+  mesh.setVerticesData(VertexBuffer.ColorKind, c, false, 4);
+}
+
+const LEAF_SHADE: [number, number, number] = [0.26, 0.27, 0.2];
+const LEAF_SUN: [number, number, number] = [1.4, 1.28, 0.74];
+const PLAIN: [number, number, number] = [1, 1, 1];
+
 /** Merge parts into one mesh (one sub-mesh per material), flat-shaded, hidden: a source for instances. */
 function mergeSource(name: string, parts: Mesh[], flat = true): Mesh {
   const merged = Mesh.MergeMeshes(parts, true, true, undefined, false, true);
@@ -400,13 +442,13 @@ function barkTexture(scene: Scene, rand: () => number): DynamicTexture {
   return pixelTexture("forestBarkTex", scene, 32, 64, (ctx, w, h) => {
     for (let x = 0; x < w; x++) {
       const k = 0.75 + rand() * 0.4;
-      ctx.fillStyle = rgb(78 * k, 58 * k, 40 * k);
+      ctx.fillStyle = rgb(96 * k, 82 * k, 66 * k); // grey-brown, gnarled
       ctx.fillRect(x, 0, 1, h);
     }
     for (let i = 0; i < 60; i++) {
       const x = (rand() * w) | 0;
       const y = (rand() * h) | 0;
-      ctx.fillStyle = rgb(38, 28, 20); // deep furrows
+      ctx.fillStyle = rgb(44, 34, 26); // deep furrows
       ctx.fillRect(x, y, 1, 4 + ((rand() * 10) | 0));
     }
     for (let i = 0; i < 40; i++) {
@@ -417,14 +459,19 @@ function barkTexture(scene: Scene, rand: () => number): DynamicTexture {
 }
 
 function leafTexture(scene: Scene, rand: () => number): DynamicTexture {
-  return pixelTexture("forestLeafTex", scene, 32, 32, (ctx, w, h) => {
-    for (let y = 0; y < h; y += 2)
-      for (let x = 0; x < w; x += 2) {
-        const k = 0.65 + rand() * 0.55;
-        ctx.fillStyle = rgb(56 * k, 92 * k, 34 * k);
-        ctx.fillRect(x, y, 2, 2);
+  // Fine 1-px speckle of olive tones: at canopy scale it must read as foliage, not as a checker.
+  // The sunlit/shaded read comes from the vertex grading ({@link gradeColors}), not from here.
+  const tex = pixelTexture("forestLeafTex", scene, 64, 64, (ctx, w, h) => {
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const k = 0.78 + rand() * 0.34;
+        const lit = rand() < 0.12;
+        ctx.fillStyle = lit ? rgb(150 * k, 150 * k, 70 * k) : rgb(112 * k, 124 * k, 58 * k);
+        ctx.fillRect(x, y, 1, 1);
       }
   });
+  tex.uScale = tex.vScale = 3;
+  return tex;
 }
 
 /** A fern frond card: alpha-tested leaflets on a central rib. */
@@ -440,7 +487,7 @@ function fernTexture(scene: Scene, rand: () => number): DynamicTexture {
         const y = h - 1 + Math.sin(ang) * s;
         const leaf = Math.max(1, Math.round((1 - s / len) * 4));
         const k = 0.75 + rand() * 0.4;
-        ctx.fillStyle = rgb(74 * k, 118 * k, 42 * k);
+        ctx.fillStyle = rgb(92 * k, 116 * k, 46 * k);
         ctx.fillRect((x - leaf) | 0, y | 0, leaf * 2, 1);
       }
     }
@@ -462,6 +509,7 @@ function treeSource(i: number, scene: Scene, bark: StandardMaterial, leaves: Sta
   );
   trunk.position.y = height / 2;
   jitter(trunk, 0.18, rand);
+  gradeColors(trunk, [0.7, 0.66, 0.6], PLAIN);
   trunk.material = bark;
   parts.push(trunk);
   for (let k = 0; k < 4; k++) {
@@ -472,16 +520,20 @@ function treeSource(i: number, scene: Scene, bark: StandardMaterial, leaves: Sta
     root.position.set(Math.cos(a) * r * 1.1, 0.35, Math.sin(a) * r * 1.1);
     root.rotation.y = -a;
     root.material = bark;
+    gradeColors(root, [0.6, 0.56, 0.5], PLAIN);
     parts.push(root);
   }
-  const blobs = 4 + ((rand() * 3) | 0);
+  // Many small lumps rather than a few big ones: seen from above (as the iso camera does) a crown
+  // should read like the reference's cauliflower clumps — each lump lit on top, dark underneath.
+  const blobs = 10 + ((rand() * 5) | 0);
   for (let k = 0; k < blobs; k++) {
-    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.8 + rand() * 1.2, subdivisions: 1 }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.0 + rand() * 0.6, subdivisions: 2 }, scene);
     const a = rand() * Math.PI * 2;
-    const d = k === 0 ? 0 : 1.3 + rand() * 1.4;
-    b.position.set(Math.cos(a) * d, height - 0.6 + rand() * 1.8, Math.sin(a) * d);
-    b.scaling.y = 0.7;
-    jitter(b, 0.6, rand);
+    const d = k === 0 ? 0 : Math.sqrt(rand()) * 2.8;
+    b.position.set(Math.cos(a) * d, height - 0.4 + (1 - d / 2.8) * 1.4 + rand() * 0.6, Math.sin(a) * d);
+    b.scaling.y = 0.8;
+    jitter(b, 0.22, rand);
+    gradeColors(b, LEAF_SHADE, LEAF_SUN);
     b.material = leaves;
     parts.push(b);
   }
@@ -493,21 +545,28 @@ function saplingSource(scene: Scene, bark: StandardMaterial, leaves: StandardMat
   const trunk = MeshBuilder.CreateCylinder("sapTrunk", { height: 1.6, diameterTop: 0.08, diameterBottom: 0.16, tessellation: 5 }, scene);
   trunk.position.y = 0.8;
   trunk.material = bark;
+  gradeColors(trunk, PLAIN, PLAIN);
   const crown = MeshBuilder.CreateIcoSphere("sapCrown", { radius: 0.75, subdivisions: 1 }, scene);
   crown.position.y = 1.75;
   crown.scaling.y = 0.85;
   jitter(crown, 0.3, rand);
+  gradeColors(crown, LEAF_SHADE, LEAF_SUN);
   crown.material = leaves;
   return mergeSource("forestSapling", [trunk, crown]);
 }
 
 function bushSource(scene: Scene, leaves: StandardMaterial, rand: () => number): Mesh {
+  // A clump of small lumps (not three big ones): the rounded, bubbly bushes of the reference shots.
   const parts: Mesh[] = [];
-  for (let k = 0; k < 3; k++) {
-    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: 0.55 + rand() * 0.25, subdivisions: 1 }, scene);
-    b.position.set((k - 1) * 0.55, 0.35 + rand() * 0.15, (rand() - 0.5) * 0.5);
-    b.scaling.y = 0.75;
-    jitter(b, 0.22, rand);
+  for (let k = 0; k < 7; k++) {
+    const r = 0.32 + rand() * 0.22;
+    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 2 }, scene);
+    const a = rand() * Math.PI * 2;
+    const d = k === 0 ? 0 : 0.35 + rand() * 0.4;
+    b.position.set(Math.cos(a) * d, r * 0.8 + (k === 0 ? 0.25 : rand() * 0.15), Math.sin(a) * d);
+    b.scaling.y = 0.85;
+    jitter(b, 0.1, rand);
+    gradeColors(b, LEAF_SHADE, LEAF_SUN);
     b.material = leaves;
     parts.push(b);
   }
@@ -596,11 +655,14 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       } else if (edge > -0.6) {
         // Low growth: a clump of ferns, a bush, or a mossy rock — never more than knee-high.
         const what = rand();
-        if (what < 0.5) {
+        if (what < 0.35) {
           for (let k = 0; k < 3; k++)
             place(fern, root, x + (rand() - 0.5) * 2, z + (rand() - 0.5) * 2, 0.8 + rand() * 0.6, rand() * Math.PI);
-        } else if (what < 0.82) {
-          if (edge > 0.3) place(bush, root, x, z, 0.8 + rand() * 0.6, rot);
+        } else if (what < 0.85) {
+          // Big rounded clumps where they hide nothing (the reference screens are packed with them),
+          // knee-high ones right at the verge.
+          if (edge > 0.6 && !occludesTrack(x, z, 2, 1.8)) place(bush, root, x, z, 1.4 + rand() * 0.9, rot);
+          else if (edge > 0.3) place(bush, root, x, z, 0.7 + rand() * 0.4, rot);
         } else if (edge > 0.2) {
           const s = 0.6 + rand() * 0.8;
           place(rock, root, x, z, s, rot);
@@ -623,7 +685,7 @@ function buildCart(scene: Scene, root: TransformNode): void {
   node.position.copyFrom(at);
   node.rotation.y = Math.atan2(FWD.x, FWD.z) + 0.25;
   const wood = matte("cartWoodMat", scene, undefined, new Color3(0.42, 0.28, 0.17));
-  const cloth = matte("cartClothMat", scene, undefined, new Color3(0.78, 0.72, 0.58));
+  const cloth = matte("cartClothMat", scene, undefined, new Color3(0.6, 0.52, 0.4));
   const body = MeshBuilder.CreateBox("cartBody", { width: 1.6, height: 0.7, depth: 2.6 }, scene);
   body.position.y = 0.85;
   body.material = wood;
@@ -669,8 +731,8 @@ function buildFallenLog(scene: Scene, root: TransformNode): void {
 
 /**
  * Shafts of sunlight slanting down through gaps in the canopy, along the sun's own direction.
- * Each is a long additive card turned to face the camera as far as its axis allows. Lit by
- * diffuse (not emissive), so the glow layer leaves them alone — a glowing shaft becomes a slab.
+ * Each is a long additive card turned to face the camera as far as its axis allows. Unlit, so its
+ * colour is emissive — and it is kept out of the glow layer, where a shaft would bloom into a slab.
  */
 function buildSunShafts(scene: Scene, root: TransformNode, rand: () => number): void {
   const tex = new DynamicTexture("forestShaftTex", { width: 32, height: 128 }, scene, false);
@@ -691,13 +753,13 @@ function buildSunShafts(scene: Scene, root: TransformNode, rand: () => number): 
   const mat = new StandardMaterial("forestShaftMat", scene);
   mat.diffuseTexture = tex;
   mat.useAlphaFromDiffuseTexture = true;
-  mat.diffuseColor = new Color3(1.0, 0.93, 0.7);
-  mat.emissiveColor = Color3.Black();
+  mat.diffuseColor = Color3.Black();
+  mat.emissiveColor = new Color3(1.0, 0.8, 0.55); // late-afternoon gold
   mat.specularColor = Color3.Black();
   mat.disableLighting = true;
   mat.backFaceCulling = false;
   mat.alphaMode = Constants.ALPHA_ADD;
-  mat.alpha = 0.22;
+  mat.alpha = 0.3;
   mat.fogEnabled = false;
 
   const axis = new Vector3(0.5, 1, 0.4).normalize(); // towards the sun (opposite its light direction)
@@ -733,7 +795,14 @@ function buildSunShafts(scene: Scene, root: TransformNode, rand: () => number): 
   // A slow breathing of the light, as leaves move across the gap.
   const phase = shafts.map(() => rand() * Math.PI * 2);
   let time = 0;
+  let glowChecked = false;
   scene.onBeforeRenderObservable.add(() => {
+    if (!glowChecked) {
+      // The mode's glow layer is created after the world: exclude the shafts on the first frame.
+      glowChecked = true;
+      for (const layer of scene.effectLayers)
+        if (layer instanceof GlowLayer) for (const m of shafts) layer.addExcludedMesh(m);
+    }
     time += scene.getEngine().getDeltaTime() / 1000;
     shafts.forEach((m, i) => {
       m.visibility = 0.65 + 0.35 * (0.5 + 0.5 * Math.sin(time * 0.35 + phase[i]));
