@@ -21,7 +21,7 @@ export interface World {
   shadowReceivers: AbstractMesh[];
   /** Meshes that bring their own fill light and must not get the world's (see Atmosphere). */
   ownFill: AbstractMesh[];
-  /** Per-frame upkeep around the controlled character (e.g. see-through trees), if any. */
+  /** Per-frame upkeep around the controlled character (e.g. animated props), if any. */
   update?(focus: Vector3, dt: number): void;
 }
 

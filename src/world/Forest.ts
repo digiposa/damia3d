@@ -237,10 +237,13 @@ function nearestOnTrack(x: number, z: number): { d: number; w: number; px: numbe
 /** Solid things standing in (or at the edge of) the walkable corridor. */
 const obstacles: { x: number; z: number; r: number }[] = [];
 
-/** How far from the trails you can wander (the wood is dressed a little further than this). */
-const WANDER = 20;
 /** Half-width of a fallen trunk's walkable top. */
 const LOG_HALF = 0.45;
+/** How far off the trails the open, tree-free grass stays walkable. */
+const OPEN_REACH = 9;
+/** The maze's stretch (u): hedged trails, nothing walkable between them. */
+const MAZE_U0 = 66;
+const MAZE_U1 = 100;
 
 /** Spatial hash of the obstacles (4-unit cells), built once the set is dressed. */
 const CELL = 4;
@@ -256,35 +259,127 @@ function indexObstacles(): void {
 }
 
 /**
- * Keep a ground position walkable (mutates `p`): anywhere on the forest floor that is not a trunk,
- * rock or prop, not down a ravine (except along a fallen-tree bridge) nor over the cliff, and not
- * too deep into the wood away from every trail.
+ * Where you may walk, as a grid over the local (u, v) frame: the trails, plus the flat open grass
+ * around them that no tree stands over — not under a crown, and not where a crown would hide you
+ * from the camera. The wood itself is scenery.
+ */
+const MASK_RES = 0.5;
+const MASK_U0 = -20;
+const MASK_V0 = -45;
+const MASK_NU = Math.ceil((170 - MASK_U0) / MASK_RES);
+const MASK_NV = Math.ceil((45 - MASK_V0) / MASK_RES);
+/** 0 blocked · 1 open grass · 2 trail (kept walkable whatever stands near). */
+const mask = new Uint8Array(MASK_NU * MASK_NV);
+
+/** A tree's hold on the ground: the circle under its crown, and the band its crown covers on screen. */
+interface Canopy {
+  x: number;
+  z: number;
+  /** Radius of ground under the crown. */
+  under: number;
+  /** Crown cover on screen, in local up-screen offsets from the foot, and its half-width. */
+  coverFrom: number;
+  coverTo: number;
+  coverHalf: number;
+}
+const canopies: Canopy[] = [];
+
+function maskIndex(u: number, v: number): number {
+  const i = Math.floor((u - MASK_U0) / MASK_RES);
+  const j = Math.floor((v - MASK_V0) / MASK_RES);
+  if (i < 0 || j < 0 || i >= MASK_NU || j >= MASK_NV) return -1;
+  return j * MASK_NU + i;
+}
+
+function walkable(u: number, v: number): boolean {
+  const k = maskIndex(u, v);
+  return k >= 0 && mask[k] > 0;
+}
+
+/** Fill the walk mask once the set is dressed (trails, open grass, minus what the trees hold). */
+function buildMask(): void {
+  mask.fill(0);
+  for (let j = 0; j < MASK_NV; j++)
+    for (let i = 0; i < MASK_NU; i++) {
+      const u = MASK_U0 + (i + 0.5) * MASK_RES;
+      const v = MASK_V0 + (j + 0.5) * MASK_RES;
+      if (inVoid(u, v, 0.3)) continue;
+      const { x, z } = forestPoint(u, v);
+      const n = nearestOnTrack(x, z);
+      // In the maze only the trails themselves are walkable: its hedges are the walls.
+      const reach = u > MAZE_U0 && u < MAZE_U1 ? 0 : OPEN_REACH;
+      if (n.d <= n.w) mask[j * MASK_NU + i] = 2;
+      else if (n.d <= n.w + reach) mask[j * MASK_NU + i] = 1;
+    }
+  const clear = (u: number, v: number): void => {
+    const k = maskIndex(u, v);
+    if (k >= 0 && mask[k] === 1) mask[k] = 0;
+  };
+  for (const c of canopies) {
+    const { u: cu, v: cv } = toUV(c.x, c.z);
+    // Under the crown.
+    for (let u = cu - c.under; u <= cu + c.under; u += MASK_RES)
+      for (let v = cv - c.under; v <= cv + c.under; v += MASK_RES)
+        if ((u - cu) ** 2 + (v - cv) ** 2 <= c.under ** 2) clear(u, v);
+    // Where the crown would hide you (up the screen from the foot).
+    for (let u = cu + c.coverFrom; u <= cu + c.coverTo; u += MASK_RES)
+      for (let v = cv - c.coverHalf; v <= cv + c.coverHalf; v += MASK_RES) clear(u, v);
+  }
+}
+
+/**
+ * Keep a ground position walkable (mutates `p`): on a trail or the open grass beside it (see the
+ * walk mask), across a ravine only along a fallen trunk, never over the cliff, never through a
+ * trunk, rock or prop.
  */
 export function clampToForest(p: Vector3, margin = 0.4): void {
-  // Too far into the wood: back towards the nearest trail.
-  const n = nearestOnTrack(p.x, p.z);
-  const max = WANDER + n.w - margin;
-  if (n.d > max) {
-    const k = max / n.d;
-    p.x = n.px + (p.x - n.px) * k;
-    p.z = n.pz + (p.z - n.pz) * k;
-  }
-
-  // Ravines: on a bridge you stay on the trunk; anywhere else you are held at the nearer lip.
   let { u, v } = toUV(p.x, p.z);
+  let onBridge = false;
+  // Ravines: on a bridge you stay on the trunk; anywhere else you are held at the nearer lip.
   for (const r of RAVINES) {
     const c = ravineC(r, v);
     const h = ravineH(r, v) + margin;
     if (Math.abs(u - c) >= h) continue;
     if (Math.abs(v - r.bridgeV) < LOG_HALF + 0.35) {
       v = Math.min(r.bridgeV + LOG_HALF, Math.max(r.bridgeV - LOG_HALF, v));
+      onBridge = true;
     } else {
       u = u < c ? c - h : c + h;
     }
   }
-  // The cliff edge.
   const edge = cliffE(u) - margin;
   if (v > edge) v = edge;
+
+  // Off the walkable ground: step back onto the nearest walkable cell.
+  if (!onBridge && !walkable(u, v)) {
+    let best: { u: number; v: number; d: number } | null = null;
+    const ci = Math.floor((u - MASK_U0) / MASK_RES);
+    const cj = Math.floor((v - MASK_V0) / MASK_RES);
+    for (let ring = 1; ring <= 8 && !best; ring++)
+      for (let dj = -ring; dj <= ring; dj++)
+        for (let di = -ring; di <= ring; di++) {
+          if (Math.max(Math.abs(di), Math.abs(dj)) !== ring) continue;
+          const i = ci + di;
+          const j = cj + dj;
+          if (i < 0 || j < 0 || i >= MASK_NU || j >= MASK_NV || !mask[j * MASK_NU + i]) continue;
+          // Nearest point of that cell (just inside it).
+          const u0 = MASK_U0 + i * MASK_RES;
+          const v0 = MASK_V0 + j * MASK_RES;
+          const nu = Math.min(u0 + MASK_RES * 0.98, Math.max(u0 + MASK_RES * 0.02, u));
+          const nv = Math.min(v0 + MASK_RES * 0.98, Math.max(v0 + MASK_RES * 0.02, v));
+          const d = (nu - u) ** 2 + (nv - v) ** 2;
+          if (!best || d < best.d) best = { u: nu, v: nv, d };
+        }
+    if (best) {
+      u = best.u;
+      v = best.v;
+    } else {
+      // Lost far off (shouldn't happen): back to the nearest trail.
+      const at = forestPoint(u, v);
+      const n = nearestOnTrack(at.x, at.z);
+      ({ u, v } = toUV(n.px, n.pz));
+    }
+  }
   const back = forestPoint(u, v);
   p.x = back.x;
   p.z = back.z;
@@ -309,93 +404,18 @@ export function clampToForest(p: Vector3, margin = 0.4): void {
     }
 }
 
-/** A tall thing that may stand between the camera and someone walking behind it. */
-interface Occluder {
-  inst: InstancedMesh;
-  src: Mesh;
-  x: number;
-  z: number;
-  height: number;
-  crown: number;
-}
-const occluders: Occluder[] = [];
-
-/** Radius (ground units) of the clear "bubble" kept around the player through the foliage. */
-const BUBBLE = 2.4;
-
-/** Does an occluder cover the player, or the bubble of ground around them, on screen? */
-function hides(o: Occluder, px: number, pz: number): boolean {
-  const dx = px - o.x;
-  const dz = pz - o.z;
-  const up = dx * FWD.x + dz * FWD.z; // > 0: the player is above the tree's foot on screen
-  // (the player's own height — ~2 — counts too: a head can be hidden while the feet show)
-  if (up < -BUBBLE || up > o.height * TAN_BETA + o.crown + 2 + BUBBLE) return false;
-  return Math.abs(dx * SIDE.x + dz * SIDE.z) < o.crown + BUBBLE;
-}
-
-/**
- * See-through trees: any tree that covers the player — or a small bubble of ground around them —
- * is swapped for a translucent copy that fades in, and back once the player has moved on. The wood
- * can then be as dense as the reference screens and still never hide the fight. (Instances can't fade one by
- * one, so the fade runs on a plain clone of the source — mesh visibility — cloned on demand, pooled.)
- */
-class TreeFader {
-  private ghosts = new Map<Occluder, { mesh: Mesh; out: boolean }>();
-  private pool = new Map<Mesh, Mesh[]>();
-
-  update(focus: Vector3, dt: number): void {
-    // Who hides the player right now (only trees near enough can).
-    for (const o of occluders) {
-      if (Math.abs(o.x - focus.x) + Math.abs(o.z - focus.z) > 40) continue;
-      const hiding = hides(o, focus.x, focus.z);
-      const g = this.ghosts.get(o);
-      if (hiding && !g) this.ghosts.set(o, { mesh: this.take(o), out: false });
-      else if (hiding && g) g.out = false;
-      else if (!hiding && g) g.out = true;
-    }
-    const k = Math.min(1, dt * 6);
-    for (const [o, g] of this.ghosts) {
-      const target = g.out ? 1 : 0.1;
-      g.mesh.visibility += (target - g.mesh.visibility) * k;
-      if (g.out && g.mesh.visibility > 0.97) {
-        o.inst.setEnabled(true);
-        g.mesh.setEnabled(false);
-        this.pool.get(o.src)!.push(g.mesh);
-        this.ghosts.delete(o);
-      }
-    }
-  }
-
-  private take(o: Occluder): Mesh {
-    let list = this.pool.get(o.src);
-    if (!list) this.pool.set(o.src, (list = []));
-    let mesh = list.pop();
-    if (!mesh) {
-      mesh = o.src.clone(`${o.src.name}Ghost`, null, true)!;
-      mesh.isPickable = false;
-    }
-    mesh.position.copyFrom(o.inst.position);
-    mesh.rotation.copyFrom(o.inst.rotation);
-    mesh.scaling.copyFrom(o.inst.scaling);
-    mesh.visibility = 1;
-    mesh.setEnabled(true);
-    o.inst.setEnabled(false);
-    return mesh;
-  }
-}
-
 /**
  * Would something `height` tall with a crown `crown` wide, standing at (x, z), hide any part of
  * a trail from the iso camera? It does if the trail lies "above" it on screen within the reach of
  * its silhouette: up-screen distance ≤ height·tan(β), sideways within the crown. `minUp` ignores
- * the nearer part of that reach — for a tree, only its crown (not its trunk) must stay off trails.
+ * the nearer part of that reach — for a tree, only its crown (not its thin trunk) must stay off.
  */
 function occludesTrack(x: number, z: number, height: number, crown: number, minUp = -Infinity): boolean {
   const reach = height * TAN_BETA + crown;
   for (const s of ALL_SAMPLES) {
     const dx = s.p.x - x;
     const dz = s.p.z - z;
-    const up = dx * FWD.x + dz * FWD.z; // > 0: the track is above the object on screen
+    const up = dx * FWD.x + dz * FWD.z; // > 0: the trail is above the object on screen
     if (up < Math.max(-s.w, minUp - s.w) || up > reach + s.w) continue;
     const side = Math.abs(dx * SIDE.x + dz * SIDE.z);
     if (side < crown + s.w) return true;
@@ -417,7 +437,7 @@ export interface ForestWorld extends World {
 
 export function forestWorld(scene: Scene): ForestWorld {
   obstacles.length = 0;
-  occluders.length = 0;
+  canopies.length = 0;
   const root = new TransformNode("forest", scene); // decor
   const fixed = new TransformNode("forestFixed", scene); // floor, track, rock walls, sea
   const rand = mulberry32(0x0f0e57); // fixed seed: the same forest every visit
@@ -441,7 +461,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   buildPollen(scene);
 
   indexObstacles();
-  const fader = new TreeFader();
+  buildMask();
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
     if (!m.name.startsWith("forestChestLid")) m.freezeWorldMatrix();
@@ -452,9 +472,8 @@ export function forestWorld(scene: Scene): ForestWorld {
     framing: 2.5,
     shadowReceivers: [...floors, track],
     ownFill: [],
-    update: (focus, dt) => {
-      fader.update(focus, dt);
-      for (const c of chests.values()) c.tick(scene.getEngine().getDeltaTime() / 1000);
+    update: (_focus, dt) => {
+      for (const c of chests.values()) c.tick(dt);
     },
     chests: new Map([...chests].map(([id, c]) => [id, c.at])),
     openChest: (id) => chests.get(id)?.open(),
@@ -1230,33 +1249,41 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       const open = (lu > ravineC(r0, lv) + ravineH(r0, lv) && lu < 64) || lu > 124;
       const meadow = lu > 124; // the last stretch: open grassland, a few trees
       // The maze is the opposite: wood packed tight between its trails.
-      const dense = lu > 66 && lu < 100;
+      const dense = lu > MAZE_U0 && lu < MAZE_U1;
       const edge = near.d - near.w; // < 0: inside the walkable corridor
       if (near.d > REACH + near.w) continue;
       const rot = rand() * Math.PI * 2;
       const roll = rand();
 
-      if (dense && edge > 1.4 && roll < 0.8) {
+      // Trees never hide a trail: a crown may not cover one on screen (a thin trunk may cross it).
+      // The open grass they leave is walkable; what they stand over or hide is not (see buildMask).
+      if (dense && edge > 1.4 && roll < 0.85 && !occludesTrack(x, z, 5, 2.8, 2.4 * TAN_BETA - 2.8)) {
         // The maze: low, broad groves packed between the trails — the hedges of the labyrinth
-        // (the reference shows round clumps of trees from above). Solid.
+        // (the reference shows round clumps of trees from above).
         const s = 0.85 + rand() * 0.35;
-        const inst = place(grove, root, x, z, s, rot);
+        place(grove, root, x, z, s, rot);
         shade.push({ x, z, r: 3 * s });
         obstacles.push({ x, z, r: 1.7 * s });
-        occluders.push({ inst, src: grove, x, z, height: 5 * s, crown: 2.8 * s });
-      } else if (edge > 0.9 && roll < (meadow ? 0.03 : open ? 0.18 : dense ? 0.1 : 0.32)) {
-        // Tall trees grow anywhere off the trails: the ones in the way fade (see TreeFader).
+        canopies.push({ x, z, under: 2.6 * s, coverFrom: 2.4 * s * TAN_BETA - 2.8 * s, coverTo: 5 * s * TAN_BETA + 2.8 * s + 2, coverHalf: 2.8 * s + 0.6 });
+      } else if (dense && edge > 0.9) {
+        // Maze hedges: big low clumps, packed — they wall the trails in (knee-to-waist high: at
+        // most they hide your feet, never you).
+        const s = 1.5 + rand() * 0.6;
+        place(bush, root, x, z, s, rot);
+        for (let k = 0; k < 2; k++) place(bush, root, x + (rand() - 0.5) * 2.2, z + (rand() - 0.5) * 2.2, s * (0.7 + rand() * 0.3), rand() * 6);
+      } else if (edge > 0.9 && roll < (meadow ? 0.15 : open ? 0.4 : 0.85) && !occludesTrack(x, z, 15, 4.4, 9 * TAN_BETA - 4.4)) {
         const s = 0.85 + rand() * 0.4;
         const src = trees[(rand() * trees.length) | 0];
-        const inst = place(src, root, x, z, s, rot);
+        const height = ((src.metadata?.height as number) ?? 13) * s;
+        place(src, root, x, z, s, rot);
         shade.push({ x, z, r: 3.2 * s });
         obstacles.push({ x, z, r: 0.75 * s }); // every trunk is solid
-        occluders.push({ inst, src, x, z, height: ((src.metadata?.height as number) ?? 11) * s + 1.5 * s, crown: 4.4 * s });
+        canopies.push({ x, z, under: 3.2 * s, coverFrom: (height - 3.5 * s) * TAN_BETA - 4.4 * s, coverTo: (height + 1.5 * s) * TAN_BETA + 4.4 * s + 2, coverHalf: 4.4 * s + 0.6 });
       } else if (edge > 0.4 && roll < 0.5 && !occludesTrack(x, z, 2.2, 1)) {
         const s = 0.8 + rand() * 0.5;
-        const inst = place(sapling, root, x, z, s, rot);
+        place(sapling, root, x, z, s, rot);
         obstacles.push({ x, z, r: 0.2 * s });
-        occluders.push({ inst, src: sapling, x, z, height: 2.3 * s, crown: 0.9 * s });
+        canopies.push({ x, z, under: 0.9 * s, coverFrom: 0.8 * TAN_BETA, coverTo: 2.4 * s * TAN_BETA + 2, coverHalf: 0.9 * s + 0.4 });
       } else if (edge > -0.6) {
         // Low growth: a clump of ferns, a bush, or a mossy rock — never more than knee-high.
         const what = rand();
@@ -1269,7 +1296,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
           if (edge > 0.6 && !occludesTrack(x, z, 2, 1.8)) {
             const s = 1.4 + rand() * 0.9;
             place(bush, root, x, z, s, rot);
-            obstacles.push({ x, z, r: 0.5 * s }); // a big clump is in the way; small ones you push through
+            canopies.push({ x, z, under: 0.65 * s, coverFrom: 0, coverTo: 0, coverHalf: 0 }); // a big clump is in the way
           }
           else if (edge > 0.3) place(bush, root, x, z, 0.7 + rand() * 0.4, rot);
         } else if (edge > 0.2) {
