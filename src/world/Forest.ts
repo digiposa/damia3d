@@ -26,8 +26,8 @@ import type { World } from "./World";
  * tree and a cliff top looking out over the sunset. Built entirely in code, like the Lohan arena:
  * no model, no image file.
  *
- * One continuous map, cut into {@link FOREST_ZONES}: the Story mode plays it either whole (one
- * seamless walk) or zone by zone like the console's separate screens — same geometry either way.
+ * One continuous map: the five areas of the console's Forest ({@link FOREST_ZONES}) follow each
+ * other along a single seamless track.
  *
  * The camera never rotates, so the set is dressed FOR it:
  *  - the track runs "up the screen" (towards -x/+z), the way the PS1 field screens scroll;
@@ -97,14 +97,14 @@ const BRANCHES: Knot[][] = [
   [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: 5.5, w: 3.2 }, { u: 150, v: 9, w: 3.0 }], // → the Prairie
 ];
 
-/** A stretch of the Forest: one PS1 screen when the map is played split. */
+/** A stretch of the Forest: one of the console's screens, here an area of the seamless map. */
 export interface ForestZone {
   id: string;
   u0: number;
   u1: number;
 }
 
-/** The screens of the Forest, in walking order (u ranges along the track). */
+/** The areas of the Forest, in walking order (u ranges along the track). */
 export const FOREST_ZONES: ForestZone[] = [
   { id: "merchant", u0: -9, u1: 36 }, // the merchant's path
   { id: "ravine", u0: 36, u1: 65 }, // the first fallen tree, the sea in the distance
@@ -193,8 +193,6 @@ function sampleTrack(knots: Knot[]): Sample[] {
 
 /** Every trail: the main track first, then the branches. */
 const TRAILS = [TRACK, ...BRANCHES].map(sampleTrack);
-/** The main track. */
-const SAMPLES = TRAILS[0];
 /** All trail samples together (for the occlusion test). */
 const ALL_SAMPLES = TRAILS.flat();
 
@@ -220,19 +218,8 @@ function nearestOnTrack(x: number, z: number): { d: number; w: number; px: numbe
 /** Solid things standing in (or at the edge of) the walkable corridor. */
 const obstacles: { x: number; z: number; r: number }[] = [];
 
-/** When the map is played split, the current screen's u range (null: the whole map). */
-let bounds: ForestZone | null = null;
-
 /** Keep a ground position on the track corridor and out of trunks, rocks and the cart. */
 export function clampToForest(p: Vector3, margin = 0.4): void {
-  if (bounds) {
-    // Split play: stay on this screen (the mode turns reaching an end into a screen change).
-    const { u } = toUV(p.x, p.z);
-    const lo = bounds.u0 + margin;
-    const hi = bounds.u1 - margin;
-    if (u < lo) p.addInPlace(FWD.scale(lo - u));
-    else if (u > hi) p.addInPlace(FWD.scale(hi - u));
-  }
   const n = nearestOnTrack(p.x, p.z);
   const max = n.w - margin;
   if (n.d > max) {
@@ -272,40 +259,11 @@ function occludesTrack(x: number, z: number, height: number, crown: number): boo
 
 // --- Build ---------------------------------------------------------------------
 
-/** The Forest as a combat world, plus what the Story mode needs to play it split into screens. */
-export interface ForestWorld extends World {
-  /** Show only one screen's decor and keep everyone on it (index into {@link FOREST_ZONES}), or
-   *  null for the whole map. */
-  setZone(index: number | null): void;
-}
-
-/** Where the track crosses `u` (for spawns and screen entries). */
-export function trackPointAt(u: number): Vector3 {
-  let best = SAMPLES[0];
-  let bestD = Infinity;
-  for (const s of SAMPLES) {
-    const d = Math.abs(toUV(s.p.x, s.p.z).u - u);
-    if (d < bestD) {
-      bestD = d;
-      best = s;
-    }
-  }
-  return best.p.clone();
-}
-
-/** Local u of a world position (how far along the wood it is). */
-export function forestU(p: Vector3): number {
-  return toUV(p.x, p.z).u;
-}
-
-/** Decor this far past a screen's ends still shows on that screen (fills what the camera sees). */
-const ZONE_MARGIN = 16;
-
-export function forestWorld(scene: Scene): ForestWorld {
+/** The Forest as a combat world. */
+export function forestWorld(scene: Scene): World {
   obstacles.length = 0;
-  bounds = null;
-  const root = new TransformNode("forest", scene); // decor, shown per screen
-  const fixed = new TransformNode("forestFixed", scene); // floor, track, rock walls, sky: always on
+  const root = new TransformNode("forest", scene); // decor
+  const fixed = new TransformNode("forestFixed", scene); // floor, track, rock walls, sea
   const rand = mulberry32(0x0f0e57); // fixed seed: the same forest every visit
 
   const floors = buildTerrain(scene, fixed, rand);
@@ -324,25 +282,14 @@ export function forestWorld(scene: Scene): ForestWorld {
 
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
-    m.computeWorldMatrix(true);
     m.freezeWorldMatrix();
   }
-  // Which screens each piece of decor belongs to (by where it stands along the wood).
-  const decor = root.getChildMeshes().map((m) => {
-    const u = forestU(m.getAbsolutePosition());
-    return { m, zones: FOREST_ZONES.map((z) => u > z.u0 - ZONE_MARGIN && u < z.u1 + ZONE_MARGIN) };
-  });
-
   return {
     clamp: clampToForest,
     preset: LIGHTING_PRESETS.forestDay,
     framing: 2.5,
     shadowReceivers: [...floors, track],
     ownFill: [],
-    setZone(index) {
-      bounds = index === null ? null : FOREST_ZONES[index];
-      for (const d of decor) d.m.setEnabled(index === null || d.zones[index]);
-    },
   };
 }
 
