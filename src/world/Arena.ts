@@ -93,6 +93,7 @@ export function createArena(scene: Scene): AbstractMesh[] {
   buildTorches(scene, root, lit, walls);
   buildBanners(scene, root, rand);
   buildBells(scene, root);
+  buildGroundMist(scene, root);
 
   const meshes = root.getChildMeshes();
   // Decor must never swallow clicks — picking is for enemies and the ground ray.
@@ -516,6 +517,9 @@ function buildTorches(scene: Scene, root: TransformNode, lit: AbstractMesh[], wa
     heart.parent = flame;
 
     buildEmbers(scene, flame.position.clone(), emberTex, `torchEmbers${k}`);
+    buildSmoke(scene, flame.position.clone(), emberTex, `torchSmoke${k}`);
+    // Dust hanging in the torch's light, a little out from the wall where the glow is.
+    buildLitDust(scene, new Vector3(wx + inX * 1.6, TORCH_HEIGHT - 0.6, wz + inZ * 1.6), emberTex, `torchDust${k}`);
 
     // The real light, out in front of the wall so it rakes across the floor.
     const light = new PointLight(`torchLight${k}`, new Vector3(wx + inX * 1.2, TORCH_HEIGHT + 0.3, wz + inZ * 1.4), scene);
@@ -582,6 +586,144 @@ function buildEmbers(scene: Scene, at: Vector3, tex: DynamicTexture, name: strin
   ps.maxEmitPower = 0.8;
   ps.updateSpeed = 0.02;
   ps.start();
+}
+
+/**
+ * Smoke curling off a torch: soft, dark, alpha-blended puffs that swell and thin out as they
+ * climb into the black above the palisade. Not additive — smoke darkens what is behind it.
+ */
+function buildSmoke(scene: Scene, at: Vector3, tex: DynamicTexture, name: string): void {
+  const ps = new ParticleSystem(name, 22, scene);
+  ps.particleTexture = tex;
+  ps.emitter = at.add(new Vector3(0, 0.55, 0));
+  ps.minEmitBox = new Vector3(-0.08, 0, -0.08);
+  ps.maxEmitBox = new Vector3(0.08, 0.05, 0.08);
+  ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+  // Lit from below by its own flame at birth, cooling to grey-brown as it rises.
+  ps.addColorGradient(0, new Color4(0.42, 0.24, 0.12, 0));
+  ps.addColorGradient(0.15, new Color4(0.32, 0.21, 0.14, 0.55));
+  ps.addColorGradient(0.6, new Color4(0.17, 0.13, 0.11, 0.35));
+  ps.addColorGradient(1, new Color4(0.1, 0.08, 0.07, 0));
+  ps.addSizeGradient(0, 0.35);
+  ps.addSizeGradient(1, 2.2);
+  ps.minLifeTime = 2.4;
+  ps.maxLifeTime = 3.8;
+  ps.emitRate = 5;
+  ps.gravity = new Vector3(0, 0.22, 0);
+  ps.direction1 = new Vector3(-0.12, 0.5, -0.12);
+  ps.direction2 = new Vector3(0.12, 0.8, 0.12);
+  ps.minEmitPower = 0.25;
+  ps.maxEmitPower = 0.45;
+  ps.minAngularSpeed = -0.6;
+  ps.maxAngularSpeed = 0.6;
+  ps.minInitialRotation = 0;
+  ps.maxInitialRotation = Math.PI * 2;
+  ps.updateSpeed = 0.016;
+  ps.preWarmCycles = 120; // already smoking when the fight starts
+  ps.start();
+}
+
+/**
+ * Dust motes drifting through a torch's light — tiny warm specks, additive so they only show
+ * where the glow would catch them. Slow, aimless, long-lived: the air of a closed hall.
+ */
+function buildLitDust(scene: Scene, centre: Vector3, tex: DynamicTexture, name: string): void {
+  const ps = new ParticleSystem(name, 40, scene);
+  ps.particleTexture = tex;
+  ps.emitter = centre;
+  ps.minEmitBox = new Vector3(-1.4, -1.2, -1.4);
+  ps.maxEmitBox = new Vector3(1.4, 1.4, 1.4);
+  ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+  ps.addColorGradient(0, new Color4(1.0, 0.7, 0.38, 0));
+  ps.addColorGradient(0.25, new Color4(1.0, 0.74, 0.42, 0.85));
+  ps.addColorGradient(0.75, new Color4(0.95, 0.62, 0.34, 0.7));
+  ps.addColorGradient(1, new Color4(0.8, 0.5, 0.25, 0));
+  ps.minSize = 0.05;
+  ps.maxSize = 0.1;
+  ps.minLifeTime = 4;
+  ps.maxLifeTime = 7;
+  ps.emitRate = 7;
+  ps.gravity = new Vector3(0, 0.015, 0);
+  ps.direction1 = new Vector3(-0.12, -0.04, -0.12);
+  ps.direction2 = new Vector3(0.12, 0.08, 0.12);
+  ps.minEmitPower = 0.05;
+  ps.maxEmitPower = 0.15;
+  ps.updateSpeed = 0.016;
+  ps.preWarmCycles = 200;
+  ps.start();
+}
+
+/**
+ * A low, slow haze over the flagstones, ankle-deep: two flat layers of soft cloud lying on the
+ * floor, each drifting its own way so the pattern never repeats visibly.
+ *
+ * Flat, not camera-facing sprites: big billboards that low cut into the floor, and the depth test
+ * draws that cut as hard horizontal lines across the ring. Lying flat, the fighters simply stand
+ * in it.
+ */
+function buildGroundMist(scene: Scene, root: TransformNode): void {
+  const layers: { tex: Texture; du: number; dv: number }[] = [];
+  [
+    { y: 0.12, scale: 1.6, du: 0.006, dv: 0.0025, alpha: 0.36, seed: 0x5e7a },
+    { y: 0.32, scale: 2.4, du: -0.0035, dv: 0.005, alpha: 0.27, seed: 0x91c3 },
+  ].forEach((l, i) => {
+    const tex = mistTexture(scene, `mistTex${i}`, l.seed);
+    tex.uScale = l.scale;
+    tex.vScale = l.scale;
+    const mat = new StandardMaterial(`mistMat${i}`, scene);
+    // LIT, not emissive: the haze takes the room's light (warm near the torches, dim elsewhere),
+    // and stays out of the bloom glow layer, which feeds on emissive colour.
+    mat.diffuseColor = new Color3(0.8, 0.66, 0.55);
+    mat.emissiveColor = new Color3(0.16, 0.12, 0.1); // a touch of self-light so it reads in the dark
+    mat.specularColor = Color3.Black();
+    mat.opacityTexture = tex;
+    mat.alpha = l.alpha;
+    mat.backFaceCulling = false;
+    const disc = MeshBuilder.CreateDisc(`groundMist${i}`, { radius: WALL_RADIUS, tessellation: 40 }, scene);
+    disc.rotation.x = Math.PI / 2;
+    disc.position.y = l.y;
+    disc.material = mat;
+    disc.parent = root;
+    layers.push({ tex, du: l.du, dv: l.dv });
+  });
+
+  scene.onBeforeRenderObservable.add(() => {
+    const dt = scene.getEngine().getDeltaTime() / 1000;
+    for (const l of layers) {
+      l.tex.uOffset = (l.tex.uOffset + l.du * dt) % 1;
+      l.tex.vOffset = (l.tex.vOffset + l.dv * dt) % 1;
+    }
+  });
+}
+
+/** Soft white cloud blobs on transparent, seamlessly tileable (each blob drawn at its wrapped
+ *  copies too). Only its alpha is used, as the mist's opacity. */
+function mistTexture(scene: Scene, name: string, seed: number): DynamicTexture {
+  const SIZE = 128;
+  const tex = new DynamicTexture(name, { width: SIZE, height: SIZE }, scene, false);
+  tex.wrapU = Texture.WRAP_ADDRESSMODE;
+  tex.wrapV = Texture.WRAP_ADDRESSMODE;
+  tex.hasAlpha = true;
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  const rand = mulberry32(seed);
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * SIZE;
+    const y = rand() * SIZE;
+    const r = 14 + rand() * 30;
+    const a = 0.15 + rand() * 0.25;
+    for (const dx of [-SIZE, 0, SIZE]) {
+      for (const dy of [-SIZE, 0, SIZE]) {
+        const g = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r);
+        g.addColorStop(0, `rgba(255,255,255,${a})`);
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
+      }
+    }
+  }
+  tex.update(false);
+  return tex;
 }
 
 // --- Banners & bells -----------------------------------------------------------------
