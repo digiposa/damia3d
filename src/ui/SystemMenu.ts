@@ -561,6 +561,16 @@ export class SystemMenu {
       }, (v) => t(v === 0 ? "config.retro.off" : v >= 400 ? "config.retro.soft" : "config.retro.ps1")),
     );
     box.append(hint(t("config.retro.note")));
+
+    // Camera style (maps that define per-zone angles, e.g. the Forest; the arena stays iso).
+    box.append(divider(), label(t("config.camera")));
+    box.append(
+      choiceRow([0, 1], settings.cameraStyle, (v) => {
+        settings.cameraStyle = v;
+        this.render();
+      }, (v) => t(v === 0 ? "config.camera.iso" : "config.camera.cinema")),
+    );
+    box.append(hint(t("config.camera.note")));
     return box;
   }
 }

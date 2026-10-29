@@ -7,7 +7,7 @@ import { defaultPartyBearers, bearerModelNames } from "../data/bearers";
 import { hasTouch } from "./device";
 import type { GameHost, SystemSection } from "./menu";
 import { TrainingMode } from "../modes/TrainingMode";
-import { StoryMode } from "../modes/StoryMode";
+import { StoryMode, StorySplitMode } from "../modes/StoryMode";
 import { SurvivalMode } from "../modes/SurvivalMode";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
 import { MainMenu, type ModeId } from "../ui/MainMenu";
@@ -125,6 +125,9 @@ export class Game implements GameHost {
         break;
       case "Story":
         this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
+        break;
+      case "StorySplit":
+        this.modes.switchTo((s, i, h) => new StorySplitMode(s, i, h));
         break;
       case "Survival":
         this.modes.switchTo((s, i, h) => new SurvivalMode(s, i, h));

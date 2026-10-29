@@ -690,7 +690,7 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   /** A small formation offset for party slot `i` around a base point. */
-  private formationOffset(i: number): Vector3 {
+  protected formationOffset(i: number): Vector3 {
     const offs = [new Vector3(0, 0, 0), new Vector3(-2.5, 0, -1.5), new Vector3(2.5, 0, -1.5)];
     return offs[i] ?? new Vector3(0, 0, 0);
   }
@@ -1656,7 +1656,7 @@ export abstract class ArenaCombatMode extends GameMode {
     }
   }
 
-  private clearNav(): void {
+  protected clearNav(): void {
     this.moveTarget = undefined;
     this.attackTarget = undefined;
     this.pendingAttack = false;
@@ -2285,7 +2285,7 @@ export abstract class ArenaCombatMode extends GameMode {
     return best;
   }
 
-  private removeEnemy(enemy: Enemy): void {
+  protected removeEnemy(enemy: Enemy): void {
     const i = this.enemies.indexOf(enemy);
     if (i < 0) return; // already gone (e.g. the mode was torn down before the death linger fired)
     this.enemies.splice(i, 1);

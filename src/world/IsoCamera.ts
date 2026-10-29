@@ -11,6 +11,8 @@ const VIEW_HEIGHT = 16;
 /** True isometric tilt: ~54.74° from vertical. */
 const ISO_BETA = Math.atan(Math.SQRT2);
 const ISO_ALPHA = -Math.PI / 4;
+/** The standard iso tilt, for callers that set {@link IsoCamera.tilt}. */
+export const ISO_TILT = ISO_BETA;
 
 /**
  * Orthographic camera locked to an isometric angle. It does not orbit on user
@@ -83,6 +85,20 @@ export class IsoCamera {
    * BEHIND them — the PS1 battle composition, fighters low and the arena wall as a backdrop.
    */
   framing = 0;
+
+  /**
+   * Wanted tilt (camera beta, radians from vertical); the camera eases toward it in
+   * {@link tickTilt}. Iso by default; a map can lower it per zone (the "cinema" camera style).
+   * Only the tilt moves — the heading stays, so the ground basis used by movement is unchanged.
+   */
+  tilt = ISO_BETA;
+
+  /** Ease the live tilt toward {@link tilt}; call once per frame. */
+  tickTilt(dt: number): void {
+    const b = this.camera.beta;
+    if (Math.abs(this.tilt - b) < 1e-4) return;
+    this.camera.beta = b + (this.tilt - b) * Math.min(1, dt * 1.6);
+  }
 
   /** Set the live camera target = followed base + framing lead + current (decaying) shake offset. */
   private applyTarget(): void {

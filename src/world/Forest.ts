@@ -21,9 +21,13 @@ import { mulberry32, pixelTexture, rgb } from "./paint";
 import type { World } from "./World";
 
 /**
- * The Forest east of Seles — submap 624, "Path Merchant": a worn cart track winding up through
- * giant trunks, ferns and shafts of sunlight coming down through the canopy. Built entirely in
- * code, like the Lohan arena: no model, no image file.
+ * The Forest east of Seles, after the PS1 screens: the merchant's cart track (624) winding up
+ * through bushes, trunks and shafts of sunlight, the deeper wood, then a ravine crossed on a fallen
+ * tree and a cliff top looking out over the sunset. Built entirely in code, like the Lohan arena:
+ * no model, no image file.
+ *
+ * One continuous map, cut into {@link FOREST_ZONES}: the Story mode plays it either whole (one
+ * seamless walk) or zone by zone like the console's separate screens — same geometry either way.
  *
  * The camera never rotates, so the set is dressed FOR it:
  *  - the track runs "up the screen" (towards -x/+z), the way the PS1 field screens scroll;
@@ -44,19 +48,106 @@ const SIDE = new Vector3(Math.SQRT1_2, 0, Math.SQRT1_2);
 /** Iso camera tilt: a point `h` high shows `h·tan(β)` ground units further up the screen. */
 const TAN_BETA = Math.SQRT2;
 
-/** Track control points (u, v) and the walkable half-width there (clearings are wider). */
-const TRACK: { u: number; v: number; w: number }[] = [
+type Knot = { u: number; v: number; w: number };
+
+/**
+ * The main track, start to end: control points (u, v) and the walkable half-width there (clearings
+ * are wider, the fallen-tree bridges narrow). It ends at the fork; {@link BRANCHES} carry on.
+ */
+const TRACK: Knot[] = [
+  // 1 — the merchant's cart track (624)
   { u: -9, v: 0.5, w: 3.4 },
   { u: 0, v: 0, w: 3.8 },
   { u: 8, v: 2.6, w: 3.6 },
   { u: 16, v: 0.8, w: 6.2 }, // clearing — first encounter
   { u: 24, v: -2.8, w: 3.6 },
   { u: 32, v: -2.2, w: 4.0 },
-  { u: 40, v: 1.6, w: 6.4 }, // clearing
-  { u: 48, v: 3.2, w: 3.6 },
-  { u: 56, v: 0.4, w: 4.2 },
-  { u: 64, v: -1.2, w: 3.4 },
+  // 2 — the first ravine: a fallen tree across it, the cliff and the sea on the right
+  { u: 40, v: -0.6, w: 3.4 },
+  { u: 44.8, v: -0.4, w: 1.0 }, // onto the trunk…
+  { u: 48, v: -0.3, w: 0.7 },
+  { u: 51.4, v: -0.2, w: 1.0 }, // …and off it
+  { u: 55, v: 0.6, w: 3.2 },
+  { u: 60, v: 1.2, w: 4.6 }, // cliff-top clearing
+  // 3 — the maze: crossing trails in dense wood ({@link BRANCHES} are its dead ends)
+  { u: 68, v: -1, w: 3.2 },
+  { u: 73, v: -4, w: 3.4 },
+  { u: 79, v: -2, w: 3.2 },
+  { u: 85, v: 3, w: 3.6 },
+  { u: 91, v: 1, w: 3.2 },
+  { u: 97, v: -2, w: 3.4 },
+  // 4 — the gorge: the second fallen tree ("leave Shana alone")
+  { u: 103, v: -0.4, w: 3.4 },
+  { u: 108.6, v: 0.2, w: 1.0 },
+  { u: 112, v: 0.2, w: 0.7 },
+  { u: 115.4, v: 0.3, w: 1.0 },
+  { u: 119, v: 0.5, w: 3.2 },
+  // 5 — the last stretch: open, grassy, forking towards Hellena and the Prairie
+  { u: 126, v: -0.5, w: 3.6 },
+  { u: 133, v: 0.4, w: 4.6 },
 ];
+
+/** Side trails: the maze's dead ends, and the two roads out at the fork. Each starts on the main track. */
+const BRANCHES: Knot[][] = [
+  [{ u: 73, v: -4, w: 3.0 }, { u: 76, v: -10, w: 2.8 }, { u: 80, v: -13, w: 3.2 }],
+  [{ u: 85, v: 3, w: 3.0 }, { u: 86, v: 9, w: 2.8 }, { u: 82, v: 14, w: 3.2 }],
+  [{ u: 91, v: 1, w: 3.0 }, { u: 94, v: -7, w: 2.8 }, { u: 99, v: -11, w: 3.2 }],
+  [{ u: 79, v: -2, w: 2.8 }, { u: 82, v: 2.5, w: 2.6 }], // a short cut between two trails
+  [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: -4.5, w: 3.2 }, { u: 150, v: -8, w: 3.0 }], // → Hellena
+  [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: 5.5, w: 3.2 }, { u: 150, v: 9, w: 3.0 }], // → the Prairie
+];
+
+/** A stretch of the Forest: one PS1 screen when the map is played split. */
+export interface ForestZone {
+  id: string;
+  u0: number;
+  u1: number;
+}
+
+/** The screens of the Forest, in walking order (u ranges along the track). */
+export const FOREST_ZONES: ForestZone[] = [
+  { id: "merchant", u0: -9, u1: 36 }, // the merchant's path
+  { id: "ravine", u0: 36, u1: 65 }, // the first fallen tree, the sea in the distance
+  { id: "maze", u0: 65, u1: 100 },
+  { id: "gorge", u0: 100, u1: 122 }, // the second fallen tree
+  { id: "fork", u0: 122, u1: 150 }, // the roads to Hellena and the Prairie
+];
+
+// --- Ravines and cliff (in the local u, v frame) --------------------------------------
+
+/** A ravine cutting across the whole wood: centre line u = c + amp·sin(0.15·v), half-width ≈ h. */
+interface Ravine {
+  c: number;
+  amp: number;
+  h: number;
+  /** v where the track crosses it (on a fallen trunk). */
+  bridgeV: number;
+}
+const RAVINES: Ravine[] = [
+  { c: 48, amp: 1.5, h: 2.8, bridgeV: -0.3 },
+  { c: 112, amp: 1.2, h: 2.6, bridgeV: 0.2 },
+];
+const ravineC = (r: Ravine, v: number): number => r.c + r.amp * Math.sin(0.15 * v);
+const ravineH = (r: Ravine, v: number): number => r.h + 0.6 * Math.sin(0.3 * v + r.c);
+/**
+ * The cliff edge (v) on the first ravine's screen: past it the ground drops away to the sea. Away
+ * from that screen the edge swings off the map (no cliff).
+ */
+const cliffE = (u: number): number =>
+  6.8 + 1.2 * Math.sin(0.4 * u) + 1.2 * Math.max(0, 42 - u) ** 2 + 1.2 * Math.max(0, u - 64) ** 2;
+/** Depth of the ravine floors. */
+const RAVINE_DEPTH = 16;
+
+/** Local (u, v) of a world ground point. */
+function toUV(x: number, z: number): { u: number; v: number } {
+  return { u: x * FWD.x + z * FWD.z, v: x * SIDE.x + z * SIDE.z };
+}
+
+/** No ground here: inside a ravine, or over the cliff edge. */
+function inVoid(u: number, v: number, margin = 0): boolean {
+  for (const r of RAVINES) if (Math.abs(u - ravineC(r, v)) < ravineH(r, v) + margin) return true;
+  return v > cliffE(u) - margin;
+}
 
 /** Half-width of the beaten dirt itself (the walkable corridor is wider: grass on both sides). */
 const DIRT_HALF = 2.3; // the reference track is broad: a cart road, not a footpath
@@ -74,9 +165,9 @@ interface Sample {
   t: Vector3;
 }
 
-/** The track as a dense polyline (Catmull-Rom through {@link TRACK}, ~1 unit steps). */
-function sampleTrack(): Sample[] {
-  const pts = TRACK.map((k) => ({ p: forestPoint(k.u, k.v), w: k.w }));
+/** A trail as a dense polyline (Catmull-Rom through its knots, ~1 unit steps). */
+function sampleTrack(knots: Knot[]): Sample[] {
+  const pts = knots.map((k) => ({ p: forestPoint(k.u, k.v), w: k.w }));
   const out: Sample[] = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[Math.max(0, i - 1)].p;
@@ -100,14 +191,20 @@ function sampleTrack(): Sample[] {
   return out;
 }
 
-const SAMPLES = sampleTrack();
+/** Every trail: the main track first, then the branches. */
+const TRAILS = [TRACK, ...BRANCHES].map(sampleTrack);
+/** The main track. */
+const SAMPLES = TRAILS[0];
+/** All trail samples together (for the occlusion test). */
+const ALL_SAMPLES = TRAILS.flat();
 
-/** Nearest point of the track to `(x, z)`: distance, interpolated half-width, and the point. */
+/** Nearest point of any trail to `(x, z)`: distance, interpolated half-width, and the point. */
 function nearestOnTrack(x: number, z: number): { d: number; w: number; px: number; pz: number } {
   let best = { d: Infinity, w: 0, px: 0, pz: 0 };
-  for (let i = 0; i < SAMPLES.length - 1; i++) {
-    const a = SAMPLES[i];
-    const b = SAMPLES[i + 1];
+  for (const trail of TRAILS)
+  for (let i = 0; i < trail.length - 1; i++) {
+    const a = trail[i];
+    const b = trail[i + 1];
     const abx = b.p.x - a.p.x;
     const abz = b.p.z - a.p.z;
     const len2 = abx * abx + abz * abz || 1;
@@ -123,8 +220,19 @@ function nearestOnTrack(x: number, z: number): { d: number; w: number; px: numbe
 /** Solid things standing in (or at the edge of) the walkable corridor. */
 const obstacles: { x: number; z: number; r: number }[] = [];
 
+/** When the map is played split, the current screen's u range (null: the whole map). */
+let bounds: ForestZone | null = null;
+
 /** Keep a ground position on the track corridor and out of trunks, rocks and the cart. */
 export function clampToForest(p: Vector3, margin = 0.4): void {
+  if (bounds) {
+    // Split play: stay on this screen (the mode turns reaching an end into a screen change).
+    const { u } = toUV(p.x, p.z);
+    const lo = bounds.u0 + margin;
+    const hi = bounds.u1 - margin;
+    if (u < lo) p.addInPlace(FWD.scale(lo - u));
+    else if (u > hi) p.addInPlace(FWD.scale(hi - u));
+  }
   const n = nearestOnTrack(p.x, p.z);
   const max = n.w - margin;
   if (n.d > max) {
@@ -151,7 +259,7 @@ export function clampToForest(p: Vector3, margin = 0.4): void {
  */
 function occludesTrack(x: number, z: number, height: number, crown: number): boolean {
   const reach = height * TAN_BETA + crown;
-  for (const s of SAMPLES) {
+  for (const s of ALL_SAMPLES) {
     const dx = s.p.x - x;
     const dz = s.p.z - z;
     const up = dx * FWD.x + dz * FWD.z; // > 0: the track is above the object on screen
@@ -164,31 +272,77 @@ function occludesTrack(x: number, z: number, height: number, crown: number): boo
 
 // --- Build ---------------------------------------------------------------------
 
-/** Submap 624 of the Forest, as a combat world. */
-export function forestWorld(scene: Scene): World {
+/** The Forest as a combat world, plus what the Story mode needs to play it split into screens. */
+export interface ForestWorld extends World {
+  /** Show only one screen's decor and keep everyone on it (index into {@link FOREST_ZONES}), or
+   *  null for the whole map. */
+  setZone(index: number | null): void;
+}
+
+/** Where the track crosses `u` (for spawns and screen entries). */
+export function trackPointAt(u: number): Vector3 {
+  let best = SAMPLES[0];
+  let bestD = Infinity;
+  for (const s of SAMPLES) {
+    const d = Math.abs(toUV(s.p.x, s.p.z).u - u);
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
+  }
+  return best.p.clone();
+}
+
+/** Local u of a world position (how far along the wood it is). */
+export function forestU(p: Vector3): number {
+  return toUV(p.x, p.z).u;
+}
+
+/** Decor this far past a screen's ends still shows on that screen (fills what the camera sees). */
+const ZONE_MARGIN = 16;
+
+export function forestWorld(scene: Scene): ForestWorld {
   obstacles.length = 0;
-  const root = new TransformNode("forest", scene);
+  bounds = null;
+  const root = new TransformNode("forest", scene); // decor, shown per screen
+  const fixed = new TransformNode("forestFixed", scene); // floor, track, rock walls, sky: always on
   const rand = mulberry32(0x0f0e57); // fixed seed: the same forest every visit
 
-  const ground = buildGround(scene, root, rand);
-  const track = buildTrack(scene, root, rand);
+  const floors = buildTerrain(scene, fixed, rand);
+  const track = buildTrack(scene, fixed, rand);
   const trees = buildVegetation(scene, root, rand);
   buildCart(scene, root);
   buildFallenLog(scene, root);
-  shadeGround([ground, track], trees);
+  RAVINES.forEach((r, k) => buildBridge(scene, root, r, k));
+  buildGorgeVines(scene, root, rand);
+  buildSignpost(scene, root);
+  buildDeadTree(scene, root);
+  shadeGround([...floors, track], trees);
   buildSunShafts(scene, root, rand);
+  buildSky(scene, fixed);
   buildPollen(scene);
 
-  for (const m of root.getChildMeshes()) {
+  for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
+    m.computeWorldMatrix(true);
     m.freezeWorldMatrix();
   }
+  // Which screens each piece of decor belongs to (by where it stands along the wood).
+  const decor = root.getChildMeshes().map((m) => {
+    const u = forestU(m.getAbsolutePosition());
+    return { m, zones: FOREST_ZONES.map((z) => u > z.u0 - ZONE_MARGIN && u < z.u1 + ZONE_MARGIN) };
+  });
+
   return {
     clamp: clampToForest,
     preset: LIGHTING_PRESETS.forestDay,
     framing: 2.5,
-    shadowReceivers: [ground, track],
+    shadowReceivers: [...floors, track],
     ownFill: [],
+    setZone(index) {
+      bounds = index === null ? null : FOREST_ZONES[index];
+      for (const d of decor) d.m.setEnabled(index === null || d.zones[index]);
+    },
   };
 }
 
@@ -203,12 +357,65 @@ function matte(name: string, scene: Scene, tex?: Texture, color?: Color3): Stand
 
 // --- Ground ----------------------------------------------------------------------
 
-/** Centre and size of the forest floor (it reaches well past what the camera can see). */
-const GROUND_CENTRE = forestPoint(27, 0);
-const GROUND_SIZE = 150;
-const GROUND_SUBDIV = 75;
+/** Extent of the terrain in the local frame (well past what the camera can see). */
+const U_MIN = -45;
+const U_MAX = 175;
+const V_MIN = -60;
+const V_MAX = 60;
 
-function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mesh {
+/**
+ * A grid mesh from a vertex function, rows along v and columns along u. Triangles are wound so
+ * the face points towards `facing`.
+ */
+function gridMesh(
+  name: string,
+  scene: Scene,
+  rows: number,
+  cols: number,
+  at: (i: number, j: number) => { x: number; y: number; z: number; tu: number; tv: number },
+  facing: Vector3,
+): Mesh {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= rows; i++)
+    for (let j = 0; j <= cols; j++) {
+      const p = at(i, j);
+      positions.push(p.x, p.y, p.z);
+      uvs.push(p.tu, p.tv);
+    }
+  for (let i = 0; i < rows; i++)
+    for (let j = 0; j < cols; j++) {
+      const a = i * (cols + 1) + j;
+      const b = a + cols + 1;
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  let normals: number[] = [];
+  VertexData.ComputeNormals(positions, indices, normals);
+  // Wrong way round? Flip every triangle (and the normals with it).
+  let dot = 0;
+  for (let k = 0; k < normals.length; k += 3) dot += normals[k] * facing.x + normals[k + 1] * facing.y + normals[k + 2] * facing.z;
+  if (dot < 0) {
+    for (let k = 0; k < indices.length; k += 3) [indices[k + 1], indices[k + 2]] = [indices[k + 2], indices[k + 1]];
+    normals = normals.map((n) => -n);
+  }
+  const vd = new VertexData();
+  vd.positions = positions;
+  vd.indices = indices;
+  vd.uvs = uvs;
+  vd.normals = normals;
+  const mesh = new Mesh(name, scene);
+  vd.applyToMesh(mesh, true);
+  return mesh;
+}
+
+/**
+ * The ground: the wood's floor up to the ravine, the floor beyond it up to the cliff edge, the
+ * ravine's bottom, and its sandstone walls. The grids are laid out per row so the ravine's edges
+ * are exact, smooth curves — no staircase where a regular grid would cut them. Past the cliff edge
+ * the far floor's vertices fold onto the edge line (zero-area triangles): nothing there but sky.
+ */
+function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): Mesh[] {
   const tex = pixelTexture("forestGrassTex", scene, 128, 128, (ctx, w, h) => {
     // Moss and short grass: a mottled base, then blades, then the odd flower and twig.
     for (let y = 0; y < h; y += 4)
@@ -233,17 +440,110 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
       ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1, 1); // tiny flowers
     }
   });
-  tex.uScale = tex.vScale = GROUND_SIZE / 6;
+  const grass = matte("forestFloorMat", scene, tex);
 
-  const ground = MeshBuilder.CreateGround(
-    "forestFloor",
-    { width: GROUND_SIZE, height: GROUND_SIZE, subdivisions: GROUND_SUBDIV, updatable: true },
-    scene,
-  );
-  ground.position.copyFrom(GROUND_CENTRE);
-  ground.material = matte("forestFloorMat", scene, tex);
-  ground.parent = root;
-  return ground;
+  const rows = V_MAX - V_MIN;
+  const rowV = (i: number): number => V_MIN + i;
+  const ground = (u: number, v: number, y: number) => {
+    const p = forestPoint(u, v);
+    return { x: p.x, y, z: p.z, tu: u / 6, tv: v / 6 };
+  };
+
+  // Floors between the ravines: start → first near lip, far lip → next near lip, … → end. Past the
+  // cliff edge the vertices fold onto the edge line.
+  const floors: Mesh[] = [];
+  const edges: ((v: number) => number)[] = [
+    () => U_MIN,
+    ...RAVINES.flatMap((r) => [(v: number) => ravineC(r, v) - ravineH(r, v), (v: number) => ravineC(r, v) + ravineH(r, v)]),
+    () => U_MAX,
+  ];
+  for (let f = 0; f + 1 < edges.length; f += 2) {
+    const from = edges[f];
+    const to = edges[f + 1];
+    const cols = 60;
+    floors.push(
+      gridMesh(`forestFloor${f / 2}`, scene, rows, cols, (i, j) => {
+        const v = rowV(i);
+        const u = from(v) + (to(v) - from(v)) * (j / cols);
+        return ground(u, Math.min(v, cliffE(u)), 0);
+      }, Vector3.Up()),
+    );
+  }
+  // Ravine floors, folded the same way where a ravine opens over the cliff.
+  RAVINES.forEach((r, k) => {
+    floors.push(
+      gridMesh(`forestRavineFloor${k}`, scene, rows, 4, (i, j) => {
+        const v = rowV(i);
+        const u = ravineC(r, v) - ravineH(r, v) + 2 * ravineH(r, v) * (j / 4);
+        return ground(u, Math.min(v, cliffE(u) + 2), -RAVINE_DEPTH);
+      }, Vector3.Up()),
+    );
+  });
+  for (const m of floors) {
+    m.material = grass;
+    m.parent = parent;
+  }
+
+  // Walls: layered red sandstone, the strata of the cliff screens.
+  const strata = pixelTexture("forestStrataTex", scene, 64, 128, (ctx, w, h) => {
+    // Wavy sediment bands, each its own shade of red-orange sandstone, edges eroded column by
+    // column so they read as rock layers rather than courses of brick.
+    const bands: { y: number; k: number }[] = [];
+    for (let y = 0; y < h; y += 4 + ((rand() * 10) | 0)) bands.push({ y, k: 0.68 + rand() * 0.45 });
+    const phase = rand() * 6;
+    for (let x = 0; x < w; x++) {
+      const wave = Math.sin((x / w) * Math.PI * 2 + phase) * 2;
+      for (let y = 0; y < h; y++) {
+        const yy = y + wave + (rand() < 0.15 ? 1 : 0);
+        let k = bands[0].k;
+        for (const b of bands) if (b.y <= yy) k = b.k;
+        const n = 0.92 + rand() * 0.14;
+        ctx.fillStyle = rgb(168 * k * n, 100 * k * n, 68 * k * n);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    for (let i = 0; i < 18; i++) {
+      ctx.fillStyle = rgb(92, 52, 36); // a few fissures
+      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1, 2 + ((rand() * 5) | 0));
+    }
+  });
+  const stone = matte("forestStrataMat", scene, strata);
+  const wall = (name: string, r: Ravine, side: 1 | -1, facing: Vector3): Mesh => {
+    const m = gridMesh(name, scene, rows, 1, (i, j) => {
+      const v = rowV(i);
+      const u = ravineC(r, v) + side * ravineH(r, v);
+      const p = forestPoint(u, Math.min(v, cliffE(u) + 2));
+      return { x: p.x, y: j === 0 ? 0.02 : -RAVINE_DEPTH, z: p.z, tu: v / 4, tv: j === 0 ? 0 : RAVINE_DEPTH / 8 };
+    }, facing);
+    // Darker the deeper it goes: the gorge's depth is in this gradient.
+    const pos = m.getVerticesData(VertexBuffer.PositionKind)!;
+    const col: number[] = [];
+    for (let q = 1; q < pos.length; q += 3) {
+      const t = Math.max(0, -pos[q] / RAVINE_DEPTH);
+      const k = 1 - 0.85 * Math.sqrt(t);
+      col.push(k, k * 0.95, k * 0.92, 1);
+    }
+    m.setVerticesData(VertexBuffer.ColorKind, col);
+    m.material = stone;
+    m.parent = parent;
+    return m;
+  };
+  // The cliff face down to the sea: a steep slope rather than a sheer drop, so the iso camera (which
+  // looks straight along the edge) actually sees its strata.
+  const cliffCols = 70;
+  const cliff = gridMesh("forestCliffFace", scene, 1, cliffCols, (i, j) => {
+    const u = 40 + (66 - 40) * (j / cliffCols);
+    const e = cliffE(u);
+    const p = forestPoint(u, i === 0 ? e : e + 9);
+    return { x: p.x, y: i === 0 ? 0.02 : -26, z: p.z, tu: u / 4, tv: i === 0 ? 0 : 3.4 };
+  }, new Vector3(SIDE.x, 1, SIDE.z));
+  cliff.material = stone;
+  cliff.parent = parent;
+  RAVINES.forEach((r, k) => {
+    wall(`forestRavineFarWall${k}`, r, 1, FWD.scale(-1)); // faces the camera: the one you see
+    wall(`forestRavineNearWall${k}`, r, -1, FWD);
+  });
+  return floors;
 }
 
 /**
@@ -265,13 +565,18 @@ function shadeGround(meshes: Mesh[], trees: { x: number; z: number; r: number }[
       const d = nearestOnTrack(x, z).d;
       const deep = Math.min(1, Math.max(0, (d - 7) / 14)); // the wood darkens away from the track
       let k = (0.58 + 0.5 * sun) * (1 - 0.5 * deep);
+      const lu = toUV(x, z).u;
+      if ((lu > 50 && lu < 64) || lu > 122) k = Math.min(1.15, k * 1.25 + 0.12); // open sky: brighter
+      if (pos[i + 1] < -1) k = 0.18; // the ravine's bottom, in deep shade
       for (const t of trees) {
         const td = Math.hypot(x - t.x, z - t.z);
         if (td < t.r) k *= 0.7 + 0.3 * (td / t.r);
       }
-      colors[c] = k;
-      colors[c + 1] = k * 0.97;
-      colors[c + 2] = k * 0.9;
+      // Past the ravine the ground dries out under the open sky: warmer, more golden.
+      const dry = Math.min(1, Math.max(0, (toUV(x, z).u - 74) / 10));
+      colors[c] = k * (1 + 0.18 * dry);
+      colors[c + 1] = k * (0.97 + 0.02 * dry);
+      colors[c + 2] = k * (0.9 - 0.15 * dry);
       colors[c + 3] = 1;
     }
     mesh.setVerticesData(VertexBuffer.ColorKind, colors, false, 4);
@@ -315,36 +620,48 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
-  let along = 0;
-  // Extend the dirt a little past both ends so it runs into the dark rather than stopping short.
-  const first = SAMPLES[0];
-  const last = SAMPLES[SAMPLES.length - 1];
-  const pts = [
-    { p: first.p.subtract(first.t.scale(6)), t: first.t },
-    ...SAMPLES,
-    { p: last.p.add(last.t.scale(6)), t: last.t },
-  ];
   // Several columns across (not just two edges), so the sun dapple in the vertex colours can fall
   // across the dirt too — the bright patches on the track are half the reference shot's light.
   const COLS = 6;
-  for (let i = 0; i < pts.length; i++) {
-    const { p, t } = pts[i];
-    if (i > 0) along += Vector3.Distance(pts[i - 1].p, p);
-    const nx = -t.z;
-    const nz = t.x;
-    const half = DIRT_HALF * (0.92 + 0.16 * Math.sin(along * 0.7 + rand()));
-    for (let c = 0; c <= COLS; c++) {
-      const f = c / COLS;
-      const o = half * (1 - 2 * f);
-      positions.push(p.x + nx * o, 0.02, p.z + nz * o);
-      uvs.push(f, along / 4);
+  TRAILS.forEach((trail, ti) => {
+    // Extend the dirt past the open ends so it runs off into the wood rather than stopping short
+    // (a branch starts ON the main track, so only its far end is open).
+    const head = trail[0];
+    const last = trail[trail.length - 1];
+    const pts = [
+      ...(ti === 0 ? [{ p: head.p.subtract(head.t.scale(6)), t: head.t }] : []),
+      ...trail,
+      { p: last.p.add(last.t.scale(ti === 0 ? 2 : 4)), t: last.t },
+    ];
+    const y = 0.02 - 0.002 * ti; // overlapping trails at a junction must not z-fight
+    let along = 0;
+    let run = 0; // samples in the current unbroken stretch (the dirt stops at a ravine)
+    for (let i = 0; i < pts.length; i++) {
+      const { p, t } = pts[i];
+      if (i > 0) along += Vector3.Distance(pts[i - 1].p, p);
+      const uv = toUV(p.x, p.z);
+      if (inVoid(uv.u, uv.v, 0.6)) {
+        run = 0;
+        continue;
+      }
+      const nx = -t.z;
+      const nz = t.x;
+      const half = DIRT_HALF * (ti === 0 ? 1 : 0.8) * (0.92 + 0.16 * Math.sin(along * 0.7 + rand()));
+      const first = positions.length / 3;
+      for (let c = 0; c <= COLS; c++) {
+        const f = c / COLS;
+        const o = half * (1 - 2 * f);
+        positions.push(p.x + nx * o, y, p.z + nz * o);
+        uvs.push(f, along / 4);
+      }
+      if (run > 0) {
+        const a = first - (COLS + 1);
+        const b = first;
+        for (let c = 0; c < COLS; c++) indices.push(a + c, b + c, a + c + 1, a + c + 1, b + c, b + c + 1);
+      }
+      run++;
     }
-    if (i > 0) {
-      const a = (i - 1) * (COLS + 1);
-      const b = i * (COLS + 1);
-      for (let c = 0; c < COLS; c++) indices.push(a + c, b + c, a + c + 1, a + c + 1, b + c, b + c + 1);
-    }
-  }
+  });
   const normals: number[] = [];
   VertexData.ComputeNormals(positions, indices, normals);
   const vd = new VertexData();
@@ -634,18 +951,25 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
   const shade: { x: number; z: number; r: number }[] = [];
   const STEP = 3.1;
   const REACH = 24; // how far from the track the wood is dressed
-  const half = GROUND_SIZE / 2;
-  for (let gx = -half; gx < half; gx += STEP)
-    for (let gz = -half; gz < half; gz += STEP) {
-      const x = GROUND_CENTRE.x + gx + (rand() - 0.5) * STEP * 0.9;
-      const z = GROUND_CENTRE.z + gz + (rand() - 0.5) * STEP * 0.9;
+  for (let gu = -30; gu < 166; gu += STEP)
+    for (let gv = -40; gv < 40; gv += STEP) {
+      const lu = gu + (rand() - 0.5) * STEP * 0.9;
+      const lv = gv + (rand() - 0.5) * STEP * 0.9;
+      if (inVoid(lu, lv, 0.9)) continue; // nothing grows in thin air
+      const { x, z } = forestPoint(lu, lv);
       const near = nearestOnTrack(x, z);
+      // Open ground — scattered trees, more rock and grass: the cliff top past the first ravine,
+      // and the last stretch before the fork (the reference screens).
+      const r0 = RAVINES[0];
+      const open = (lu > ravineC(r0, lv) + ravineH(r0, lv) && lu < 64) || lu > 124;
+      // The maze is the opposite: wood packed tight between its trails.
+      const dense = lu > 66 && lu < 100;
       const edge = near.d - near.w; // < 0: inside the walkable corridor
       if (near.d > REACH + near.w) continue;
       const rot = rand() * Math.PI * 2;
       const roll = rand();
 
-      if (edge > 0.9 && roll < 0.78 && !occludesTrack(x, z, 13, 3.4)) {
+      if (edge > 0.9 && roll < (open ? 0.22 : dense ? 0.95 : 0.78) && !occludesTrack(x, z, 13, 3.4)) {
         const s = 0.85 + rand() * 0.4;
         place(trees[(rand() * trees.length) | 0], root, x, z, s, rot);
         shade.push({ x, z, r: 3.2 * s });
@@ -658,7 +982,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
         if (what < 0.35) {
           for (let k = 0; k < 3; k++)
             place(fern, root, x + (rand() - 0.5) * 2, z + (rand() - 0.5) * 2, 0.8 + rand() * 0.6, rand() * Math.PI);
-        } else if (what < 0.85) {
+        } else if (what < (open ? 0.6 : 0.85)) {
           // Big rounded clumps where they hide nothing (the reference screens are packed with them),
           // knee-high ones right at the verge.
           if (edge > 0.6 && !occludesTrack(x, z, 2, 1.8)) place(bush, root, x, z, 1.4 + rand() * 0.9, rot);
@@ -727,6 +1051,190 @@ function buildFallenLog(scene: Scene, root: TransformNode): void {
   obstacles.push({ x: at.x, z: at.z, r: 1.2 });
 }
 
+/**
+ * The fallen tree bridging the ravine — the walkway of the cliff screen. Its top sits flush with
+ * the ground (the walkable plane is y = 0), roots torn up on the near lip, a stub of crown beyond.
+ */
+function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number): void {
+  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial | null;
+  const v = r.bridgeV;
+  const from = ravineC(r, v) - ravineH(r, v) - 2.2;
+  const to = ravineC(r, v) + ravineH(r, v) + 2.6;
+  const mid = forestPoint((from + to) / 2, v);
+  const log = MeshBuilder.CreateCylinder(
+    `forestBridgeLog${k}`,
+    { height: to - from, diameterTop: 0.95, diameterBottom: 1.35, tessellation: 9, subdivisions: 6 },
+    scene,
+  );
+  log.rotation.x = Math.PI / 2; // axis along the track…
+  log.rotation.y = Math.atan2(FWD.x, FWD.z); // …pointing up the screen
+  log.position.set(mid.x, -0.5, mid.z);
+  if (bark) log.material = bark;
+  log.parent = root;
+
+  // Torn-up roots splayed either side of the near end (you walk over the trunk's foot itself).
+  for (const side of [-1, 1]) {
+    const at = forestPoint(from + 0.3, v + side * 1.2);
+    const roots = MeshBuilder.CreateIcoSphere(`forestBridgeRoots${k}_${side}`, { radius: 0.9, subdivisions: 1 }, scene);
+    roots.scaling.set(0.6, 1.2, 1);
+    roots.rotation.y = Math.atan2(FWD.x, FWD.z);
+    roots.position.set(at.x, 0.35, at.z);
+    if (bark) roots.material = bark;
+    roots.parent = root;
+  }
+
+  // A few snapped branches sticking up off the trunk.
+  for (const [f, side, len] of [[0.35, 1, 1.6], [0.55, -1, 1.2], [0.8, 1, 1.9]] as const) {
+    const at = forestPoint(from + (to - from) * f, v + side * 0.35);
+    const br = MeshBuilder.CreateCylinder(`forestBridgeBranch${k}_${f}`, { height: len, diameterTop: 0.05, diameterBottom: 0.18, tessellation: 5 }, scene);
+    br.position.set(at.x, 0.1 + len * 0.35, at.z);
+    br.rotation.set(0.2, Math.atan2(SIDE.x, SIDE.z), side * 0.7);
+    if (bark) br.material = bark;
+    br.parent = root;
+  }
+}
+
+/** The bare, gnarled tree leaning out over the cliff edge (the cliff screen's silhouette). */
+function buildDeadTree(scene: Scene, root: TransformNode): void {
+  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial | null;
+  const u = 58;
+  const base = forestPoint(u, cliffE(u) - 1.4);
+  const node = new TransformNode("forestDeadTree", scene);
+  node.parent = root;
+  node.position.copyFrom(base);
+  node.rotation.y = Math.atan2(SIDE.x, SIDE.z); // lean towards the drop
+  const seg = (name: string, len: number, d0: number, d1: number, pos: Vector3, rx: number, rz: number): void => {
+    const m = MeshBuilder.CreateCylinder(name, { height: len, diameterBottom: d0, diameterTop: d1, tessellation: 6 }, scene);
+    m.setPivotPoint(new Vector3(0, -len / 2, 0));
+    m.position.copyFrom(pos).addInPlace(new Vector3(0, len / 2, 0));
+    m.rotation.set(rx, 0, rz);
+    if (bark) m.material = bark;
+    m.parent = node;
+  };
+  seg("deadTrunk", 4.2, 0.75, 0.4, Vector3.Zero(), 0.55, 0.12);
+  seg("deadLimb1", 3.2, 0.35, 0.08, new Vector3(0, 3.0, 1.9), 1.1, -0.3);
+  seg("deadLimb2", 2.4, 0.28, 0.06, new Vector3(0, 2.6, 1.6), 0.2, 0.7);
+  seg("deadLimb3", 2.0, 0.22, 0.05, new Vector3(0, 3.3, 2.0), -0.4, -0.6);
+  obstacles.push({ x: base.x, z: base.z, r: 0.7 });
+}
+
+/** Ivy and hanging vines down the gorge's far wall (the second ravine's reference screen). */
+function buildGorgeVines(scene: Scene, root: TransformNode, rand: () => number): void {
+  const r = RAVINES[1];
+  const mat = matte("forestVineMat", scene, undefined, new Color3(0.26, 0.36, 0.14));
+  mat.backFaceCulling = false;
+  for (let v = -20; v < 20; v += 0.9 + rand() * 1.6) {
+    const len = 3 + rand() * 9;
+    const u = ravineC(r, v) + ravineH(r, v) - 0.08;
+    const at = forestPoint(u, v);
+    const vine = MeshBuilder.CreatePlane(`forestVine${v.toFixed(1)}`, { width: 0.18 + rand() * 0.3, height: len }, scene);
+    vine.position.set(at.x, -len / 2 + 0.1, at.z);
+    vine.rotation.y = Math.atan2(FWD.x, FWD.z);
+    vine.material = mat;
+    vine.parent = root;
+  }
+}
+
+/** The fork's signpost: one board towards Hellena, one towards the Prairie. */
+function buildSignpost(scene: Scene, root: TransformNode): void {
+  const at = forestPoint(136.5, 0.4);
+  const wood = scene.getMaterialByName("cartWoodMat") as StandardMaterial | null;
+  const post = MeshBuilder.CreateBox("forestSignPost", { width: 0.16, height: 2.2, depth: 0.16 }, scene);
+  post.position.set(at.x, 1.1, at.z);
+  post.material = wood;
+  post.parent = root;
+  for (const [dv, y] of [[-1, 1.85], [1, 1.5]] as const) {
+    const dir = forestPoint(6, dv * 5).normalize(); // along the branch it names
+    const board = MeshBuilder.CreateBox(`forestSign${dv}`, { width: 1.1, height: 0.26, depth: 0.06 }, scene);
+    board.position.set(at.x + dir.x * 0.5, y, at.z + dir.z * 0.5);
+    board.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI / 2;
+    board.material = wood;
+    board.parent = root;
+  }
+  obstacles.push({ x: at.x, z: at.z, r: 0.35 });
+}
+
+/**
+ * The sea below the cliff, seen over the first ravine's edge. The iso camera looks down too steeply
+ * to ever see a horizon, so the "view out to sea" is the water itself, far below: lavender-blue
+ * catching the sunset, a band of sun glitter, slow swell. It lies under the whole map, so only
+ * lines of sight that drop over the edge reach it — solid ground hides it everywhere else.
+ */
+function buildSky(scene: Scene, parent: TransformNode): void {
+  const rand = mulberry32(0x5ea);
+  const tex = pixelTexture("forestSeaTex", scene, 64, 64, (ctx, w, h) => {
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const k = 0.9 + rand() * 0.15;
+        ctx.fillStyle = rgb(126 * k, 116 * k, 140 * k);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    for (let i = 0; i < 140; i++) {
+      // Swell crests: short pale dashes.
+      // (texture x runs up the screen once laid on the map, so a crest — sideways on screen — is
+      // a short vertical run here)
+      ctx.fillStyle = rand() < 0.5 ? rgb(184, 166, 186) : rgb(96, 88, 118);
+      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1, 3 + ((rand() * 5) | 0));
+    }
+  });
+  // Sun glitter: a warm streak across the water, in its own (additive) layer over the swell.
+  const glitter = pixelTexture("forestGlitterTex", scene, 64, 64, (ctx, w, h) => {
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 160; i++) {
+      const x = (rand() * w) | 0;
+      const y = (rand() * h) | 0;
+      ctx.fillStyle = rand() < 0.6 ? rgb(255, 196, 130) : rgb(255, 236, 200);
+      ctx.fillRect(x, y, 1, 2 + ((rand() * 3) | 0));
+    }
+  });
+  const mat = new StandardMaterial("forestSeaMat", scene);
+  mat.emissiveTexture = tex;
+  mat.diffuseColor = Color3.Black();
+  mat.specularColor = Color3.Black();
+  mat.disableLighting = true;
+  mat.fogEnabled = false;
+  const SEA_Y = -26;
+  const centre = forestPoint(100, 60);
+  const sea = MeshBuilder.CreateGround("forestSea", { width: 160, height: 120 }, scene);
+  sea.rotation.y = Math.atan2(FWD.x, FWD.z) - Math.PI / 2; // width along u, depth along v
+  sea.position.set(centre.x, SEA_Y, centre.z);
+  sea.material = mat;
+  sea.parent = parent;
+  tex.uScale = 40;
+  tex.vScale = 30;
+
+  const gmat = new StandardMaterial("forestGlitterMat", scene);
+  gmat.emissiveTexture = glitter;
+  gmat.diffuseColor = Color3.Black();
+  gmat.specularColor = Color3.Black();
+  gmat.disableLighting = true;
+  gmat.fogEnabled = false;
+  gmat.alphaMode = Constants.ALPHA_ADD;
+  gmat.alpha = 0.8;
+  const glint = MeshBuilder.CreateGround("forestGlitter", { width: 160, height: 120 }, scene);
+  glint.rotation.y = sea.rotation.y;
+  glint.position.set(centre.x, SEA_Y + 0.05, centre.z);
+  glint.material = gmat;
+  glint.parent = parent;
+  glitter.uScale = 30;
+  glitter.vScale = 22;
+
+  // Emissive, so keep both out of the mode's glow layer (created after the world: first frame),
+  // then let the swell drift and the glitter shimmer.
+  let t = 0;
+  let excluded = false;
+  scene.onBeforeRenderObservable.add(() => {
+    if (!excluded) {
+      excluded = true;
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint]) layer.addExcludedMesh(m);
+    }
+    t += scene.getEngine().getDeltaTime() / 1000;
+    tex.vOffset = t * 0.01;
+    glitter.vOffset = Math.floor(t * 3) * 0.37; // jumps, like light flickering on water
+  });
+}
+
 // --- Light -----------------------------------------------------------------------------
 
 /**
@@ -768,8 +1276,9 @@ function buildSunShafts(scene: Scene, root: TransformNode, rand: () => number): 
   const across = Vector3.Cross(axis, normal).normalize();
 
   const shafts: Mesh[] = [];
-  for (let u = -4; u < 66; u += 5 + rand() * 4) {
+  for (let u = -4; u < 150; u += 5 + rand() * 4) {
     const v = (rand() - 0.5) * 9;
+    if (inVoid(u, v, 1)) continue;
     const base = forestPoint(u, v);
     const width = 1.2 + rand() * 1.8;
     const len = 18;

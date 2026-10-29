@@ -22,6 +22,12 @@ export interface GameSettings {
    * resolution, smooth). The HUD is DOM and stays sharp whatever this is.
    */
   retroLines: number;
+  /**
+   * Camera style in maps that support it: 0 = fixed iso everywhere (combat-first), 1 = "cinema",
+   * where the map sets its own tilt per zone like the PS1's per-screen angles (e.g. lower at a cliff
+   * so the sky shows). Arena modes ignore it.
+   */
+  cameraStyle: number;
 }
 
 /** The retro presets offered in Options: off, a softer "CRT-era" look, and the real thing. */
@@ -34,4 +40,5 @@ export const settings: GameSettings = {
   combatSpeed: 1,
   cameraZoom: 1.25,
   retroLines: 0, // off by default: the PS1 MOOD lives in the arena and lighting, not in pixels
+  cameraStyle: 0,
 };
