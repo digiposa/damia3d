@@ -12,6 +12,7 @@ import { Vector3, Vector4 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
 import { softDotTexture } from "./atmosphere";
+import { mulberry32, pixelTexture, rgb } from "./paint";
 
 /**
  * The battle ring of the Lohan Hero Competition, rebuilt after the PS1 battle screen: not an open
@@ -112,38 +113,6 @@ export function createArena(scene: Scene): AbstractMesh[] {
 }
 
 // --- Shared helpers ---------------------------------------------------------
-
-/** Small deterministic PRNG, so the hand-"painted" textures come out identical every time. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** A PS1-sized canvas texture: nearest sampling, no mipmaps — texels stay crisp blocks. */
-function pixelTexture(
-  name: string,
-  scene: Scene,
-  w: number,
-  h: number,
-  paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
-): DynamicTexture {
-  const tex = new DynamicTexture(name, { width: w, height: h }, scene, false, Texture.NEAREST_SAMPLINGMODE);
-  // DynamicTexture defaults to CLAMP; these tile (floor slabs repeat across the ring).
-  tex.wrapU = Texture.WRAP_ADDRESSMODE;
-  tex.wrapV = Texture.WRAP_ADDRESSMODE;
-  // Babylon's ICanvasRenderingContext type misses a few methods; in the browser it IS a 2D context.
-  paint(tex.getContext() as CanvasRenderingContext2D, w, h);
-  tex.update(false);
-  return tex;
-}
-
-const rgb = (r: number, g: number, b: number): string => `rgb(${r | 0},${g | 0},${b | 0})`;
 
 /** Lit, low-spec material for the torch-lit set (several point lights reach it). */
 function setMaterial(name: string, scene: Scene, tex?: Texture, color?: Color3): StandardMaterial {

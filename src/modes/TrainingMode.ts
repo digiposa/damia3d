@@ -8,11 +8,10 @@ import "@babylonjs/core/Culling/ray";
 import { GameMode } from "../core/GameMode";
 import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
-import { createArena, clampToArena } from "../world/Arena";
+import { arenaWorld, type World } from "../world/World";
 import { Atmosphere } from "../world/atmosphere";
 import { SpellFx } from "../world/SpellFx";
 import { TargetMarker } from "../world/TargetMarker";
-import { LIGHTING_PRESETS } from "../world/lighting";
 import { loadEnvironment, type PropPlacement } from "../world/props";
 import { loadModels, prefetchModels, hasContainer } from "../core/AssetService";
 import { LoadingOverlay } from "../ui/LoadingOverlay";
@@ -282,6 +281,8 @@ export abstract class ArenaCombatMode extends GameMode {
 
   protected camera!: IsoCamera;
   protected atmosphere?: Atmosphere;
+  /** Where the fight happens — built first thing in {@link enter}. */
+  protected world!: World;
   protected spellFx?: SpellFx;
   /** Running action log (bottom-left) — the "what just happened" companion to skill captions. */
   protected combatLog?: CombatLog;
@@ -480,24 +481,26 @@ export abstract class ArenaCombatMode extends GameMode {
     return startingItems();
   }
 
+  /** The place this mode fights in. The Lohan arena by default; Story maps override. */
+  protected createWorld(): World {
+    return arenaWorld(this.scene);
+  }
+
   enter(): void {
     this.items = this.initialItems();
-    const arenaMeshes = createArena(this.scene);
-    // The flagstones catch the characters' cast shadows.
-    const floor = this.scene.getMeshByName("arenaFloor");
-    if (floor) floor.receiveShadows = true;
+    this.world = this.createWorld();
+    for (const m of this.world.shadowReceivers) m.receiveShadows = true;
 
     this.partyBearers = this.pickParty();
     this.gambitIds = this.partyBearers.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
-    // Fighters low in the frame, the arena's back wall and its torches behind them as a backdrop.
-    this.camera.framing = 3;
+    this.camera.framing = this.world.framing;
     // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.
-    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, LIGHTING_PRESETS.lohanArena);
-    this.atmosphere.excludeFromFill(arenaMeshes); // the arena brings its own dim fill + torches
+    this.atmosphere = new Atmosphere(this.scene, this.camera.camera, this.world.preset);
+    this.atmosphere.excludeFromFill(this.world.ownFill); // e.g. the arena's own dim fill + torches
     this.spellFx = new SpellFx(this.scene);
     this.marker = new TargetMarker(this.scene);
     this.combatLog = new CombatLog();
@@ -946,7 +949,7 @@ export abstract class ArenaCombatMode extends GameMode {
       } else {
         this.navigate(dt, running); // click-to-move: run unless Alt (walk) is held
       }
-      clampToArena(this.player.position); // the wall is a hard boundary
+      this.world.clamp(this.player.position); // the wall is a hard boundary
     }
     this.camera.follow(this.player.position);
     this.camera.tickShake(dt);
@@ -1667,7 +1670,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (t < 0) return undefined;
     const p = ray.origin.add(ray.direction.scale(t));
     p.y = 0;
-    clampToArena(p); // clicks beyond the wall walk to the arena edge
+    this.world.clamp(p); // clicks beyond the wall walk to the arena edge
     return p;
   }
 
@@ -1917,7 +1920,7 @@ export abstract class ArenaCombatMode extends GameMode {
       enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
       const action = enemy.aiUpdate(cdt, this.player.position, ctx);
       enemy.tickKnockback(cdt); // hit recoil, applied on top of the AI move
-      clampToArena(enemy.position);
+      this.world.clamp(enemy.position);
       enemy.syncHud(this.scene);
       if (action) this.resolveEnemyAction(enemy, action);
     }
@@ -2143,7 +2146,7 @@ export abstract class ArenaCombatMode extends GameMode {
         member.avatar.face(decision.target.position.subtract(member.position));
       }
     }
-    clampToArena(member.position);
+    this.world.clamp(member.position);
     const dx = member.position.x - bx;
     const dz = member.position.z - bz;
     member.avatar.animate(dt, dx * dx + dz * dz > 1e-6);
@@ -2557,7 +2560,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const angle = Math.random() * Math.PI * 2;
     const r = radius + Math.random() * 2;
     const p = this.player.position.add(new Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r));
-    clampToArena(p);
+    this.world.clamp(p);
     return p;
   }
 
