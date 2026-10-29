@@ -33,5 +33,5 @@ export const settings: GameSettings = {
   sfxVolume: 0.8,
   combatSpeed: 1,
   cameraZoom: 1.25,
-  retroLines: 280,
+  retroLines: 0, // off by default: the PS1 MOOD lives in the arena and lighting, not in pixels
 };
