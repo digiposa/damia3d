@@ -96,6 +96,10 @@ const BRANCHES: Knot[][] = [
   [{ u: 79, v: -2, w: 2.8 }, { u: 82, v: 2.5, w: 2.6 }], // a short cut between two trails
   [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: -4.5, w: 3.2 }, { u: 150, v: -8, w: 3.0 }], // → Hellena
   [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: 5.5, w: 3.2 }, { u: 150, v: 9, w: 3.0 }], // → the Prairie
+  // Footpaths to the chests off the main track (the wiki's "upper path" by the merchant, and the
+  // one hidden in the trees past the first bridge) — narrow, but always walkable.
+  [{ u: 10, v: 1.6, w: 1.6 }, { u: 10.6, v: -4, w: 1.5 }, { u: 11, v: -7.4, w: 2.2 }],
+  [{ u: 56, v: 0.8, w: 1.6 }, { u: 56.6, v: -4, w: 1.5 }, { u: 57, v: -6.9, w: 2.2 }],
 ];
 
 /** A stretch of the Forest: one of the console's screens, here an area of the seamless map. */
@@ -240,7 +244,7 @@ const obstacles: { x: number; z: number; r: number }[] = [];
 /** Half-width of a fallen trunk's walkable top. */
 const LOG_HALF = 0.45;
 /** How far off the trails the open, tree-free grass stays walkable. */
-const OPEN_REACH = 9;
+const OPEN_REACH = 12;
 /** The maze's stretch (u): hedged trails, nothing walkable between them. */
 const MAZE_U0 = 66;
 const MAZE_U1 = 100;
@@ -307,7 +311,7 @@ function buildMask(): void {
       const { x, z } = forestPoint(u, v);
       const n = nearestOnTrack(x, z);
       // In the maze only the trails themselves are walkable: its hedges are the walls.
-      const reach = u > MAZE_U0 && u < MAZE_U1 ? 0 : OPEN_REACH;
+      const reach = u > MAZE_U0 && u < MAZE_U1 ? 0.6 : OPEN_REACH;
       if (n.d <= n.w) mask[j * MASK_NU + i] = 2;
       else if (n.d <= n.w + reach) mask[j * MASK_NU + i] = 1;
     }
@@ -767,7 +771,7 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
     const pts = [
       ...(ti === 0 ? [{ p: head.p.subtract(head.t.scale(6)), t: head.t }] : []),
       ...trail,
-      { p: last.p.add(last.t.scale(ti === 0 ? 2 : 4)), t: last.t },
+      { p: last.p.add(last.t.scale(ti === 0 ? 2 : head.w < 2 ? 0.6 : 4)), t: last.t }, // a footpath stops at its chest
     ];
     const y = 0.02 - 0.002 * ti; // overlapping trails at a junction must not z-fight
     let along = 0;
@@ -782,7 +786,9 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
       }
       const nx = -t.z;
       const nz = t.x;
-      const half = DIRT_HALF * (ti === 0 ? 1 : 0.8) * (0.92 + 0.16 * Math.sin(along * 0.7 + rand()));
+      // Branches are narrower; a footpath's dirt never runs wider than its walkable corridor.
+      const base = ti === 0 ? DIRT_HALF : Math.min(DIRT_HALF * 0.8, trail[0].w * 0.75);
+      const half = base * (0.92 + 0.16 * Math.sin(along * 0.7 + rand()));
       const first = positions.length / 3;
       for (let c = 0; c <= COLS; c++) {
         const f = c / COLS;
@@ -1264,7 +1270,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
         place(grove, root, x, z, s, rot);
         shade.push({ x, z, r: 3 * s });
         obstacles.push({ x, z, r: 1.7 * s });
-        canopies.push({ x, z, under: 2.6 * s, coverFrom: 2.4 * s * TAN_BETA - 2.8 * s, coverTo: 5 * s * TAN_BETA + 2.8 * s + 2, coverHalf: 2.8 * s + 0.6 });
+        canopies.push({ x, z, under: 2 * s, coverFrom: 2.4 * s * TAN_BETA - 2 * s, coverTo: 5 * s * TAN_BETA + 2 * s + 1, coverHalf: 2 * s });
       } else if (dense && edge > 0.9) {
         // Maze hedges: big low clumps, packed — they wall the trails in (knee-to-waist high: at
         // most they hide your feet, never you).
@@ -1278,12 +1284,13 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
         place(src, root, x, z, s, rot);
         shade.push({ x, z, r: 3.2 * s });
         obstacles.push({ x, z, r: 0.75 * s }); // every trunk is solid
-        canopies.push({ x, z, under: 3.2 * s, coverFrom: (height - 3.5 * s) * TAN_BETA - 4.4 * s, coverTo: (height + 1.5 * s) * TAN_BETA + 4.4 * s + 2, coverHalf: 4.4 * s + 0.6 });
+        // You may walk right up to the trunk; only where the crown would truly hide you is off-limits.
+        canopies.push({ x, z, under: 1.3 * s, coverFrom: (height - 2.5 * s) * TAN_BETA - 3 * s, coverTo: (height + 1 * s) * TAN_BETA + 3 * s + 1, coverHalf: 3 * s });
       } else if (edge > 0.4 && roll < 0.5 && !occludesTrack(x, z, 2.2, 1)) {
         const s = 0.8 + rand() * 0.5;
         place(sapling, root, x, z, s, rot);
         obstacles.push({ x, z, r: 0.2 * s });
-        canopies.push({ x, z, under: 0.9 * s, coverFrom: 0.8 * TAN_BETA, coverTo: 2.4 * s * TAN_BETA + 2, coverHalf: 0.9 * s + 0.4 });
+        canopies.push({ x, z, under: 0.5 * s, coverFrom: 1.2 * TAN_BETA, coverTo: 2.4 * s * TAN_BETA + 1, coverHalf: 0.7 * s });
       } else if (edge > -0.6) {
         // Low growth: a clump of ferns, a bush, or a mossy rock — never more than knee-high.
         const what = rand();
