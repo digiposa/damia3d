@@ -114,6 +114,24 @@ export const FOREST_ZONES: ForestZone[] = [
   { id: "fork", u0: 122, u1: 150 }, // the roads to Hellena and the Prairie
 ];
 
+/** The Forest's four chests (wiki: Healing Potion on the merchant's upper path, Charm Potion behind
+ *  the trees past the first bridge, 20 G and Burn Out at the maze's right and left lower edges). */
+export const FOREST_CHESTS: { id: string; u: number; v: number }[] = [
+  { id: "healingPotion", u: 11, v: -8.5 },
+  { id: "charmPotion", u: 57, v: -8 },
+  { id: "gold20", u: 82.6, v: 14.8 },
+  { id: "burnOut", u: 80.6, v: -13.8 },
+];
+
+/** Where the travelling merchant stands, by his cart (submap 624). */
+export const MERCHANT_SPOT = { u: 6, v: -3.4 };
+
+/** Where Dart's "leave Shana alone" memory plays, just past the gorge (scene to come). */
+export const SHANA_SCENE_SPOT = { u: 118, v: 0.5 };
+
+/** Spots the vegetation must leave clear (chests, the merchant). */
+const CLEARINGS = [...FOREST_CHESTS, MERCHANT_SPOT].map((c) => forestPoint(c.u, c.v));
+
 // --- Ravines and cliff (in the local u, v frame) --------------------------------------
 
 /** A ravine cutting across the whole wood: centre line u = c + amp·sin(0.15·v), half-width ≈ h. */
@@ -302,19 +320,23 @@ interface Occluder {
 }
 const occluders: Occluder[] = [];
 
-/** Does an occluder hide a figure standing at (px, pz) from the iso camera? */
+/** Radius (ground units) of the clear "bubble" kept around the player through the foliage. */
+const BUBBLE = 2.4;
+
+/** Does an occluder cover the player, or the bubble of ground around them, on screen? */
 function hides(o: Occluder, px: number, pz: number): boolean {
   const dx = px - o.x;
   const dz = pz - o.z;
-  const up = dx * FWD.x + dz * FWD.z; // > 0: the figure is above the tree's foot on screen
-  // (the figure's own height — ~2 — counts: its head can be hidden while its feet show)
-  if (up < -1.2 || up > o.height * TAN_BETA + o.crown + 2) return false;
-  return Math.abs(dx * SIDE.x + dz * SIDE.z) < o.crown + 0.8;
+  const up = dx * FWD.x + dz * FWD.z; // > 0: the player is above the tree's foot on screen
+  // (the player's own height — ~2 — counts too: a head can be hidden while the feet show)
+  if (up < -BUBBLE || up > o.height * TAN_BETA + o.crown + 2 + BUBBLE) return false;
+  return Math.abs(dx * SIDE.x + dz * SIDE.z) < o.crown + BUBBLE;
 }
 
 /**
- * See-through trees: when one stands between the camera and the player, it is swapped for a
- * translucent copy that fades in, and back once the player is clear. (Instances can't fade one by
+ * See-through trees: any tree that covers the player — or a small bubble of ground around them —
+ * is swapped for a translucent copy that fades in, and back once the player has moved on. The wood
+ * can then be as dense as the reference screens and still never hide the fight. (Instances can't fade one by
  * one, so the fade runs on a plain clone of the source — mesh visibility — cloned on demand, pooled.)
  */
 class TreeFader {
@@ -333,7 +355,7 @@ class TreeFader {
     }
     const k = Math.min(1, dt * 6);
     for (const [o, g] of this.ghosts) {
-      const target = g.out ? 1 : 0.18;
+      const target = g.out ? 1 : 0.1;
       g.mesh.visibility += (target - g.mesh.visibility) * k;
       if (g.out && g.mesh.visibility > 0.97) {
         o.inst.setEnabled(true);
@@ -364,16 +386,17 @@ class TreeFader {
 
 /**
  * Would something `height` tall with a crown `crown` wide, standing at (x, z), hide any part of
- * the walkable track from the iso camera? It does if the track lies "above" it on screen within
- * the reach of its silhouette: up-screen distance ≤ height·tan(β), sideways within the crown.
+ * a trail from the iso camera? It does if the trail lies "above" it on screen within the reach of
+ * its silhouette: up-screen distance ≤ height·tan(β), sideways within the crown. `minUp` ignores
+ * the nearer part of that reach — for a tree, only its crown (not its trunk) must stay off trails.
  */
-function occludesTrack(x: number, z: number, height: number, crown: number): boolean {
+function occludesTrack(x: number, z: number, height: number, crown: number, minUp = -Infinity): boolean {
   const reach = height * TAN_BETA + crown;
   for (const s of ALL_SAMPLES) {
     const dx = s.p.x - x;
     const dz = s.p.z - z;
     const up = dx * FWD.x + dz * FWD.z; // > 0: the track is above the object on screen
-    if (up < -s.w || up > reach + s.w) continue;
+    if (up < Math.max(-s.w, minUp - s.w) || up > reach + s.w) continue;
     const side = Math.abs(dx * SIDE.x + dz * SIDE.z);
     if (side < crown + s.w) return true;
   }
@@ -382,8 +405,17 @@ function occludesTrack(x: number, z: number, height: number, crown: number): boo
 
 // --- Build ---------------------------------------------------------------------
 
-/** The Forest as a combat world. */
-export function forestWorld(scene: Scene): World {
+/** The Forest as a combat world, plus its interactive bits for the Story mode. */
+export interface ForestWorld extends World {
+  /** World position of each chest, by id. */
+  chests: Map<string, Vector3>;
+  /** Swing a chest's lid open (once). */
+  openChest(id: string): void;
+  /** The merchant's head height point, to anchor his speech bubble. */
+  merchantHead: Vector3;
+}
+
+export function forestWorld(scene: Scene): ForestWorld {
   obstacles.length = 0;
   occluders.length = 0;
   const root = new TransformNode("forest", scene); // decor
@@ -395,10 +427,14 @@ export function forestWorld(scene: Scene): World {
   const trees = buildVegetation(scene, root, rand);
   buildCart(scene, root);
   buildFallenLog(scene, root);
-  RAVINES.forEach((r, k) => buildBridge(scene, root, r, k));
+  RAVINES.forEach((r, k) => buildBridge(scene, root, r, k, rand));
   buildGorgeVines(scene, root, rand);
   buildSignpost(scene, root);
-  buildDeadTree(scene, root);
+  const chests = buildChests(scene, root);
+  const merchantHead = buildMerchant(scene, root);
+  buildDeadTree(scene, root, rand);
+  buildCliffRim(scene, root, rand);
+  buildMeadow(scene, root, rand);
   shadeGround([...floors, track], trees);
   buildSunShafts(scene, root, rand);
   buildSky(scene, fixed);
@@ -408,7 +444,7 @@ export function forestWorld(scene: Scene): World {
   const fader = new TreeFader();
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
-    m.freezeWorldMatrix();
+    if (!m.name.startsWith("forestChestLid")) m.freezeWorldMatrix();
   }
   return {
     clamp: clampToForest,
@@ -416,7 +452,13 @@ export function forestWorld(scene: Scene): World {
     framing: 2.5,
     shadowReceivers: [...floors, track],
     ownFill: [],
-    update: (focus, dt) => fader.update(focus, dt),
+    update: (focus, dt) => {
+      fader.update(focus, dt);
+      for (const c of chests.values()) c.tick(scene.getEngine().getDeltaTime() / 1000);
+    },
+    chests: new Map([...chests].map(([id, c]) => [id, c.at])),
+    openChest: (id) => chests.get(id)?.open(),
+    merchantHead,
   };
 }
 
@@ -640,7 +682,8 @@ function shadeGround(meshes: Mesh[], trees: { x: number; z: number; r: number }[
       const deep = Math.min(1, Math.max(0, (d - 7) / 14)); // the wood darkens away from the track
       let k = (0.58 + 0.5 * sun) * (1 - 0.5 * deep);
       const lu = toUV(x, z).u;
-      if ((lu > 50 && lu < 64) || lu > 122) k = Math.min(1.15, k * 1.25 + 0.12); // open sky: brighter
+      if (lu > 50 && lu < 64) k = Math.min(1.15, k * 1.25 + 0.12); // open sky: brighter
+      if (lu > 122) k = Math.min(1.3, k * 1.35 + 0.25 * Math.min(1, (lu - 122) / 6)); // the meadow, in full sun
       if (pos[i + 1] < -1) k = 0.18; // the ravine's bottom, in deep shade
       for (const t of trees) {
         const td = Math.hypot(x - t.x, z - t.z);
@@ -812,6 +855,7 @@ function mergeSource(name: string, parts: Mesh[], flat = true): Mesh {
   if (!merged) throw new Error(`forest: could not merge ${name}`);
   merged.name = name;
   if (flat) merged.convertToFlatShadedMesh();
+  else merged.createNormals(true); // jittered parts: recompute so the shading follows the lumps
   merged.setEnabled(false);
   return merged;
 }
@@ -888,49 +932,132 @@ function fernTexture(scene: Scene, rand: () => number): DynamicTexture {
   return tex;
 }
 
-/** A tall tree: tapered, slightly bent trunk with root flares, crown of jittered blobs. */
-function treeSource(i: number, scene: Scene, bark: StandardMaterial, leaves: StandardMaterial, rand: () => number): Mesh {
-  const height = 9 + rand() * 4;
-  const r = 0.55 + rand() * 0.25;
-  const parts: Mesh[] = [];
-  const trunk = MeshBuilder.CreateCylinder(
-    `t${i}trunk`,
-    { height, diameterTop: r * 0.9, diameterBottom: r * 2, tessellation: 7, subdivisions: 4 },
+/** Stretch a part's UVs (tubes come out with v in 0…1 over their whole length). */
+function scaleUV(mesh: Mesh, su: number, sv: number): void {
+  const uv = mesh.getVerticesData(VertexBuffer.UVKind);
+  if (!uv) return;
+  for (let i = 0; i < uv.length; i += 2) {
+    uv[i] *= su;
+    uv[i + 1] *= sv;
+  }
+  mesh.setVerticesData(VertexBuffer.UVKind, uv);
+}
+
+/** A bent, tapering limb along `path`, radius `r0` → `r1` with knotty bulges. */
+function limb(name: string, scene: Scene, path: Vector3[], r0: number, r1: number, rand: () => number): Mesh {
+  const knot = rand() * 10;
+  const tube = MeshBuilder.CreateTube(
+    name,
+    {
+      path,
+      tessellation: 8,
+      cap: Mesh.CAP_START,
+      radiusFunction: (i, d) => {
+        const t = i / (path.length - 1);
+        return (r0 + (r1 - r0) * t) * (1 + 0.14 * Math.sin(d * 2.3 + knot));
+      },
+    },
     scene,
   );
-  trunk.position.y = height / 2;
-  jitter(trunk, 0.18, rand);
-  gradeColors(trunk, [0.7, 0.66, 0.6], PLAIN);
-  trunk.material = bark;
-  parts.push(trunk);
-  for (let k = 0; k < 4; k++) {
-    const root = MeshBuilder.CreateCylinder(`t${i}root${k}`, { height: 2.2, diameterTop: 0.1, diameterBottom: r * 0.9, tessellation: 5 }, scene);
-    const a = (k / 4) * Math.PI * 2 + rand() * 0.8;
-    root.rotation.set(0, -a, 0);
-    root.rotation.z = 1.05; // splayed out along the ground
-    root.position.set(Math.cos(a) * r * 1.1, 0.35, Math.sin(a) * r * 1.1);
-    root.rotation.y = -a;
-    root.material = bark;
-    gradeColors(root, [0.6, 0.56, 0.5], PLAIN);
-    parts.push(root);
+  let len = 0;
+  for (let k = 1; k < path.length; k++) len += Vector3.Distance(path[k - 1], path[k]);
+  scaleUV(tube, 2, len / 3);
+  return tube;
+}
+
+/**
+ * A big forest tree, after the reference screens: a thick, gnarled trunk that bends as it rises,
+ * roots gripping the ground, two heavy limbs, and a high, lumpy crown — high enough that the iso
+ * camera sees the trunks, which is what makes the wood read as a wood.
+ */
+function treeSource(i: number, scene: Scene, bark: StandardMaterial, leaves: StandardMaterial, rand: () => number): Mesh {
+  const height = 12 + rand() * 3;
+  const r = 0.5 + rand() * 0.2;
+  const parts: Mesh[] = [];
+  const barkPart = (m: Mesh, lo: number): Mesh => {
+    gradeColors(m, [lo, lo * 0.95, lo * 0.9], PLAIN);
+    m.material = bark;
+    parts.push(m);
+    return m;
+  };
+
+  // Trunk: a wandering spine, thick at the foot.
+  const spine: Vector3[] = [];
+  let x = 0;
+  let z = 0;
+  for (let k = 0; k <= 6; k++) {
+    spine.push(new Vector3(x, (height * 0.82 * k) / 6, z));
+    x += (rand() - 0.5) * 0.7;
+    z += (rand() - 0.5) * 0.7;
   }
-  // Many small lumps rather than a few big ones: seen from above (as the iso camera does) a crown
-  // should read like the reference's cauliflower clumps — each lump lit on top, dark underneath.
-  const blobs = 10 + ((rand() * 5) | 0);
-  for (let k = 0; k < blobs; k++) {
-    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.0 + rand() * 0.6, subdivisions: 2 }, scene);
+  barkPart(limb(`t${i}trunk`, scene, spine, r * 1.9, r * 0.75, rand), 0.62);
+
+  // Roots: flaring out and diving into the ground.
+  const roots = 5;
+  for (let k = 0; k < roots; k++) {
+    const a = (k / roots) * Math.PI * 2 + rand() * 0.6;
+    const out = 1.6 + rand() * 1.2;
+    const path = [0, 0.35, 0.7, 1].map(
+      (t) => new Vector3(Math.cos(a) * (r * 0.8 + out * t), 0.9 * (1 - t) * (1 - t) - 0.15 * t, Math.sin(a) * (r * 0.8 + out * t)),
+    );
+    barkPart(limb(`t${i}root${k}`, scene, path, r * 0.55, 0.06, rand), 0.55);
+  }
+
+  // Two heavy limbs leaving the trunk, each ending in its own clump of leaves.
+  const ends: Vector3[] = [];
+  for (let k = 0; k < 2; k++) {
+    const from = spine[4 + k];
     const a = rand() * Math.PI * 2;
-    const d = k === 0 ? 0 : Math.sqrt(rand()) * 2.8;
-    b.position.set(Math.cos(a) * d, height - 0.4 + (1 - d / 2.8) * 1.4 + rand() * 0.6, Math.sin(a) * d);
-    b.scaling.y = 0.8;
-    jitter(b, 0.22, rand);
+    const reach = 2.2 + rand() * 1.2;
+    const path = [0, 0.5, 1].map((t) => new Vector3(from.x + Math.cos(a) * reach * t, from.y + 1.6 * t + 0.6 * t * t, from.z + Math.sin(a) * reach * t));
+    barkPart(limb(`t${i}limb${k}`, scene, path, r * 0.45, 0.1, rand), 0.68);
+    ends.push(path[2]);
+  }
+
+  // Crown: lumps around the top and the limb ends — each lit on top, dark underneath.
+  const top = spine[6];
+  const centres = [top, top, top, ...ends];
+  const blobs = 9 + ((rand() * 3) | 0);
+  for (let k = 0; k < blobs; k++) {
+    const c = centres[k % centres.length];
+    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.2 + rand() * 0.7, subdivisions: 2, flat: false }, scene);
+    const a = rand() * Math.PI * 2;
+    const d = rand() * 1.8;
+    b.position.set(c.x + Math.cos(a) * d, c.y + 0.6 + rand() * 1.2, c.z + Math.sin(a) * d);
+    b.scaling.y = 0.78;
+    jitter(b, 0.25, rand);
     gradeColors(b, LEAF_SHADE, LEAF_SUN);
     b.material = leaves;
     parts.push(b);
   }
-  const tree = mergeSource(`forestTree${i}`, parts);
-  tree.metadata = { height };
+  const tree = mergeSource(`forestTree${i}`, parts, false); // smooth: the reference foliage is soft
+  tree.metadata = { height: height + 1 };
   return tree;
+}
+
+/** A low, broad clump of trees (the maze's hedges): short twisted trunks under one wide crown. */
+function groveSource(scene: Scene, bark: StandardMaterial, leaves: StandardMaterial, rand: () => number): Mesh {
+  const parts: Mesh[] = [];
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + rand();
+    const path = [0, 0.5, 1].map((t) => new Vector3(Math.cos(a) * (0.6 + t * 0.6), t * 2.6, Math.sin(a) * (0.6 + t * 0.6)));
+    const trunk = limb(`groveTrunk${k}`, scene, path, 0.32, 0.14, rand);
+    gradeColors(trunk, [0.6, 0.57, 0.52], PLAIN);
+    trunk.material = bark;
+    parts.push(trunk);
+  }
+  for (let k = 0; k < 9; k++) {
+    const a = rand() * Math.PI * 2;
+    const d = Math.sqrt(rand()) * 1.9;
+    const b = MeshBuilder.CreateIcoSphere(`groveLeaf${k}`, { radius: 1.0 + rand() * 0.5, subdivisions: 2, flat: false }, scene);
+    b.position.set(Math.cos(a) * d, 3 + (1 - d / 1.9) * 0.9 + rand() * 0.4, Math.sin(a) * d);
+    b.scaling.y = 0.8;
+    jitter(b, 0.2, rand);
+    gradeColors(b, LEAF_SHADE, LEAF_SUN);
+    b.material = leaves;
+    parts.push(b);
+  }
+  return mergeSource("forestGrove", parts, false);
 }
 
 /** A sapling: thin trunk, small crown — short enough to stand nearer the camera. */
@@ -953,7 +1080,7 @@ function bushSource(scene: Scene, leaves: StandardMaterial, rand: () => number):
   const parts: Mesh[] = [];
   for (let k = 0; k < 7; k++) {
     const r = 0.32 + rand() * 0.22;
-    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 2 }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 2, flat: false }, scene);
     const a = rand() * Math.PI * 2;
     const d = k === 0 ? 0 : 0.35 + rand() * 0.4;
     b.position.set(Math.cos(a) * d, r * 0.8 + (k === 0 ? 0.25 : rand() * 0.15), Math.sin(a) * d);
@@ -963,7 +1090,7 @@ function bushSource(scene: Scene, leaves: StandardMaterial, rand: () => number):
     b.material = leaves;
     parts.push(b);
   }
-  return mergeSource("forestBush", parts);
+  return mergeSource("forestBush", parts, false);
 }
 
 function rockSource(scene: Scene, rand: () => number): Mesh {
@@ -1001,6 +1128,64 @@ function fernSource(scene: Scene, rand: () => number): Mesh {
   return fern;
 }
 
+/** Crossed alpha-tested cards (three planes at 60°) carrying a painted plant. */
+function cardSource(name: string, scene: Scene, tex: Texture, w: number, h: number): Mesh {
+  const mat = matte(`${name}Mat`, scene, tex);
+  mat.backFaceCulling = false;
+  const parts: Mesh[] = [];
+  for (let k = 0; k < 3; k++) {
+    const card = MeshBuilder.CreatePlane(`${name}${k}`, { width: w, height: h }, scene);
+    card.position.y = h / 2 - 0.02;
+    card.rotation.y = (k / 3) * Math.PI;
+    card.material = mat;
+    parts.push(card);
+  }
+  const src = mergeSource(name, parts, false);
+  normalsUp(src);
+  return src;
+}
+
+/** Tall grass: a tuft of blades fanning up from the ground, olive to straw at the tips. */
+function grassSource(scene: Scene, rand: () => number): Mesh {
+  const tex = pixelTexture("forestGrassTuftTex", scene, 32, 32, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    for (let b = 0; b < 16; b++) {
+      const x0 = w / 2 + (rand() - 0.5) * 12;
+      const lean = (rand() - 0.5) * 0.8;
+      const len = 14 + rand() * 17;
+      for (let s = 0; s < len; s++) {
+        const t = s / len;
+        ctx.fillStyle = rgb(70 + 90 * t, 92 + 70 * t, 34 + 30 * t);
+        ctx.fillRect((x0 + lean * s) | 0, h - 1 - s, 1, 1);
+      }
+    }
+  });
+  tex.hasAlpha = true;
+  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  return cardSource("forestGrass", scene, tex, 1.0, 0.9);
+}
+
+/** White wild flowers on thin stems (the last reference screen is dotted with them). */
+function flowerSource(scene: Scene, rand: () => number): Mesh {
+  const tex = pixelTexture("forestFlowerTex", scene, 32, 32, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    for (let f = 0; f < 6; f++) {
+      const x = 4 + ((rand() * (w - 8)) | 0);
+      const top = 6 + ((rand() * 14) | 0);
+      ctx.fillStyle = rgb(74, 104, 40);
+      ctx.fillRect(x, top, 1, h - top); // stem
+      ctx.fillRect(x - 2, top + 8 + ((rand() * 4) | 0), 2, 1); // a leaf
+      ctx.fillStyle = rgb(236, 232, 214);
+      ctx.fillRect(x - 1, top - 1, 3, 3); // petals
+      ctx.fillStyle = rgb(226, 190, 70);
+      ctx.fillRect(x, top, 1, 1); // heart
+    }
+  });
+  tex.hasAlpha = true;
+  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  return cardSource("forestFlowers", scene, tex, 0.9, 0.75);
+}
+
 /** Place an instance of `src`, frozen in place. */
 function place(src: Mesh, root: TransformNode, x: number, z: number, scale: number, rotY: number): InstancedMesh {
   const inst = src.createInstance(`${src.name}_${x.toFixed(1)}_${z.toFixed(1)}`);
@@ -1021,9 +1206,12 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
   const leaves = matte("forestLeafMat", scene, leafTexture(scene, rand));
   const trees = [0, 1, 2, 3].map((i) => treeSource(i, scene, bark, leaves, rand));
   const sapling = saplingSource(scene, bark, leaves, rand);
+  const grove = groveSource(scene, bark, leaves, rand);
   const bush = bushSource(scene, leaves, rand);
   const rock = rockSource(scene, rand);
   const fern = fernSource(scene, rand);
+  grassSource(scene, rand); // used by the meadow and the cliff rim (looked up by name)
+  flowerSource(scene, rand);
 
   const shade: { x: number; z: number; r: number }[] = [];
   const STEP = 3.1;
@@ -1034,11 +1222,13 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       const lv = gv + (rand() - 0.5) * STEP * 0.9;
       if (inVoid(lu, lv, 0.9)) continue; // nothing grows in thin air
       const { x, z } = forestPoint(lu, lv);
+      if (CLEARINGS.some((c) => Math.hypot(c.x - x, c.z - z) < 3.2)) continue; // keep chests/NPCs free
       const near = nearestOnTrack(x, z);
       // Open ground — scattered trees, more rock and grass: the cliff top past the first ravine,
       // and the last stretch before the fork (the reference screens).
       const r0 = RAVINES[0];
       const open = (lu > ravineC(r0, lv) + ravineH(r0, lv) && lu < 64) || lu > 124;
+      const meadow = lu > 124; // the last stretch: open grassland, a few trees
       // The maze is the opposite: wood packed tight between its trails.
       const dense = lu > 66 && lu < 100;
       const edge = near.d - near.w; // < 0: inside the walkable corridor
@@ -1046,7 +1236,16 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       const rot = rand() * Math.PI * 2;
       const roll = rand();
 
-      if (edge > 0.9 && roll < (open ? 0.22 : dense ? 0.95 : 0.78) && !occludesTrack(x, z, 13, 3.4)) {
+      if (dense && edge > 1.4 && roll < 0.8) {
+        // The maze: low, broad groves packed between the trails — the hedges of the labyrinth
+        // (the reference shows round clumps of trees from above). Solid.
+        const s = 0.85 + rand() * 0.35;
+        const inst = place(grove, root, x, z, s, rot);
+        shade.push({ x, z, r: 3 * s });
+        obstacles.push({ x, z, r: 1.7 * s });
+        occluders.push({ inst, src: grove, x, z, height: 5 * s, crown: 2.8 * s });
+      } else if (edge > 0.9 && roll < (meadow ? 0.03 : open ? 0.18 : dense ? 0.1 : 0.32)) {
+        // Tall trees grow anywhere off the trails: the ones in the way fade (see TreeFader).
         const s = 0.85 + rand() * 0.4;
         const src = trees[(rand() * trees.length) | 0];
         const inst = place(src, root, x, z, s, rot);
@@ -1141,84 +1340,230 @@ function buildFallenLog(scene: Scene, root: TransformNode): void {
  * The fallen tree bridging the ravine — the walkway of the cliff screen. Its top sits flush with
  * the ground (the walkable plane is y = 0), roots torn up on the near lip, a stub of crown beyond.
  */
-function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number): void {
-  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial | null;
+function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number, rand: () => number): void {
+  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial;
+  const leaves = scene.getMaterialByName("forestLeafMat") as StandardMaterial;
   const v = r.bridgeV;
-  const from = ravineC(r, v) - ravineH(r, v) - 2.2;
-  const to = ravineC(r, v) + ravineH(r, v) + 2.6;
-  const mid = forestPoint((from + to) / 2, v);
-  const log = MeshBuilder.CreateCylinder(
-    `forestBridgeLog${k}`,
-    { height: to - from, diameterTop: 0.95, diameterBottom: 1.35, tessellation: 9, subdivisions: 6 },
-    scene,
-  );
-  log.rotation.x = Math.PI / 2; // axis along the track…
-  log.rotation.y = Math.atan2(FWD.x, FWD.z); // …pointing up the screen
-  log.position.set(mid.x, -0.5, mid.z);
-  if (bark) log.material = bark;
+  const from = ravineC(r, v) - ravineH(r, v) - 2.4;
+  const to = ravineC(r, v) + ravineH(r, v) + 3;
+
+  // The trunk: a thick, slightly wandering tube, its top flush with the ground (y = 0 is where
+  // feet go), sagging a touch over the void. Its foot (near end) is the wide end.
+  const path: Vector3[] = [];
+  for (let t = 0; t <= 1.0001; t += 0.125) {
+    const p = forestPoint(from + (to - from) * t, v + Math.sin(t * 5 + k) * 0.12);
+    const radius = 0.75 - 0.2 * t;
+    path.push(new Vector3(p.x, 0.08 - radius - 0.12 * Math.sin(Math.PI * t), p.z));
+  }
+  const log = limb(`forestBridgeLog${k}`, scene, path, 0.75, 0.55, rand);
+  log.material = bark;
   log.parent = root;
 
-  // Torn-up roots splayed either side of the near end (you walk over the trunk's foot itself).
-  for (const side of [-1, 1]) {
-    const at = forestPoint(from + 0.3, v + side * 1.2);
-    const roots = MeshBuilder.CreateIcoSphere(`forestBridgeRoots${k}_${side}`, { radius: 0.9, subdivisions: 1 }, scene);
-    roots.scaling.set(0.6, 1.2, 1);
-    roots.rotation.y = Math.atan2(FWD.x, FWD.z);
-    roots.position.set(at.x, 0.35, at.z);
-    if (bark) roots.material = bark;
-    roots.parent = root;
+  // Moss along its back: a strip of small soft lumps (and what tells you this is the way across).
+  for (let t = 0.08; t < 0.95; t += 0.07 + rand() * 0.08) {
+    const p = path[Math.round(t * (path.length - 1))];
+    const side = (rand() - 0.5) * 0.9;
+    const at = forestPoint(from + (to - from) * t, v + side);
+    const m = MeshBuilder.CreateIcoSphere(`forestBridgeMoss${k}_${t.toFixed(2)}`, { radius: 0.18 + rand() * 0.18, subdivisions: 1 }, scene);
+    m.scaling.y = 0.4;
+    m.position.set(at.x, p.y + 0.62 - Math.abs(side) * 0.5, at.z);
+    m.material = leaves;
+    m.parent = root;
   }
 
-  // A few snapped branches sticking up off the trunk.
-  for (const [f, side, len] of [[0.35, 1, 1.6], [0.55, -1, 1.2], [0.8, 1, 1.9]] as const) {
-    const at = forestPoint(from + (to - from) * f, v + side * 0.35);
-    const br = MeshBuilder.CreateCylinder(`forestBridgeBranch${k}_${f}`, { height: len, diameterTop: 0.05, diameterBottom: 0.18, tessellation: 5 }, scene);
-    br.position.set(at.x, 0.1 + len * 0.35, at.z);
-    br.rotation.set(0.2, Math.atan2(SIDE.x, SIDE.z), side * 0.7);
-    if (bark) br.material = bark;
+  // Torn-up roots at the foot, sticking out round the trunk's end.
+  const foot = forestPoint(from - 0.3, v);
+  for (let q = 0; q < 5; q++) {
+    const a = (q / 5) * Math.PI * 2 + rand();
+    const dir = SIDE.scale(Math.cos(a));
+    const pts = [0, 1].map((t) => new Vector3(foot.x + dir.x * (1.1 + 0.6 * t) - FWD.x * 0.4 * t, 0.5 + Math.sin(a) * (1.1 + 0.6 * t), foot.z + dir.z * (1.1 + 0.6 * t) - FWD.z * 0.4 * t));
+    const stub = limb(`forestBridgeRoot${k}_${q}`, scene, pts, 0.16, 0.04, rand);
+    stub.material = bark;
+    stub.parent = root;
+  }
+
+  // Snapped-off branches sticking out sideways (reads across the screen, so the trunk reads as lying).
+  for (const [f, side, len] of [[0.3, 1, 1.8], [0.5, -1, 1.4], [0.72, 1, 2.2], [0.86, -1, 1.6]] as const) {
+    const p = path[Math.round(f * (path.length - 1))];
+    const dir = SIDE.scale(side);
+    const pts = [0, 0.5, 1].map((t) => new Vector3(p.x + dir.x * len * t, p.y + 0.4 + 0.8 * t, p.z + dir.z * len * t));
+    const br = limb(`forestBridgeBranch${k}_${f}`, scene, pts, 0.14, 0.03, rand);
+    br.material = bark;
     br.parent = root;
   }
 }
 
 /** The bare, gnarled tree leaning out over the cliff edge (the cliff screen's silhouette). */
-function buildDeadTree(scene: Scene, root: TransformNode): void {
-  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial | null;
+function buildDeadTree(scene: Scene, root: TransformNode, rand: () => number): void {
+  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial;
   const u = 58;
-  const base = forestPoint(u, cliffE(u) - 1.4);
-  const node = new TransformNode("forestDeadTree", scene);
-  node.parent = root;
-  node.position.copyFrom(base);
-  node.rotation.y = Math.atan2(SIDE.x, SIDE.z); // lean towards the drop
-  const seg = (name: string, len: number, d0: number, d1: number, pos: Vector3, rx: number, rz: number): void => {
-    const m = MeshBuilder.CreateCylinder(name, { height: len, diameterBottom: d0, diameterTop: d1, tessellation: 6 }, scene);
-    m.setPivotPoint(new Vector3(0, -len / 2, 0));
-    m.position.copyFrom(pos).addInPlace(new Vector3(0, len / 2, 0));
-    m.rotation.set(rx, 0, rz);
-    if (bark) m.material = bark;
-    m.parent = node;
-  };
-  seg("deadTrunk", 4.2, 0.75, 0.4, Vector3.Zero(), 0.55, 0.12);
-  seg("deadLimb1", 3.2, 0.35, 0.08, new Vector3(0, 3.0, 1.9), 1.1, -0.3);
-  seg("deadLimb2", 2.4, 0.28, 0.06, new Vector3(0, 2.6, 1.6), 0.2, 0.7);
-  seg("deadLimb3", 2.0, 0.22, 0.05, new Vector3(0, 3.3, 2.0), -0.4, -0.6);
-  obstacles.push({ x: base.x, z: base.z, r: 0.7 });
+  const base = forestPoint(u, cliffE(u) - 1.2);
+  const out = SIDE; // towards the drop
+  const along = (t: number, lean: number, rise: number): Vector3 =>
+    new Vector3(base.x + out.x * lean * t, rise * t, base.z + out.z * lean * t);
+  const trunk = [0, 0.33, 0.66, 1].map((t) => along(t, 2.6 * t, 4.2));
+  const parts = [limb("deadTrunk", scene, trunk, 0.4, 0.16, rand)];
+  for (const [from, a, len, rise] of [[2, 0.6, 3.2, 1.2], [3, -0.7, 2.4, 1.6], [2, -1.4, 1.8, 0.4]] as const) {
+    const p0 = trunk[from];
+    const dir = new Vector3(Math.cos(a) * out.x - Math.sin(a) * out.z, 0, Math.sin(a) * out.x + Math.cos(a) * out.z);
+    const pts = [0, 0.5, 1].map((t) => new Vector3(p0.x + dir.x * len * t, p0.y + rise * t + 0.3 * Math.sin(t * 3), p0.z + dir.z * len * t));
+    parts.push(limb(`deadLimb${from}${a}`, scene, pts, 0.16, 0.03, rand));
+  }
+  for (const m of parts) {
+    m.material = bark;
+    m.parent = root;
+  }
+  obstacles.push({ x: base.x, z: base.z, r: 0.5 });
 }
 
-/** Ivy and hanging vines down the gorge's far wall (the second ravine's reference screen). */
+/** The cliff's lip: grass tufts, ferns and rocks along the edge, so it reads as a brink, not a cut. */
+function buildCliffRim(scene: Scene, root: TransformNode, rand: () => number): void {
+  const fern = scene.getMeshByName("forestFern") as Mesh | null;
+  const rock = scene.getMeshByName("forestRock") as Mesh | null;
+  const grass = scene.getMeshByName("forestGrass") as Mesh | null;
+  for (let u = 42; u < 64; u += 0.7 + rand() * 0.9) {
+    const v = cliffE(u) - 0.3 - rand() * 0.6;
+    const { x, z } = forestPoint(u, v);
+    const pick = rand();
+    if (pick < 0.45 && grass) place(grass, root, x, z, 0.8 + rand() * 0.5, rand() * Math.PI);
+    else if (pick < 0.75 && fern) place(fern, root, x, z, 0.7 + rand() * 0.4, rand() * Math.PI);
+    else if (rock) {
+      const s = 0.5 + rand() * 0.6;
+      place(rock, root, x, z, s, rand() * Math.PI);
+      obstacles.push({ x, z, r: 0.7 * s });
+    }
+  }
+}
+
+/** Ivy spilling over the gorge's far lip and trailing down its wall (the second ravine's screen). */
 function buildGorgeVines(scene: Scene, root: TransformNode, rand: () => number): void {
   const r = RAVINES[1];
-  const mat = matte("forestVineMat", scene, undefined, new Color3(0.26, 0.36, 0.14));
+  // A curtain of leaves on an alpha-tested card: dense at the top, trailing off in strands.
+  const tex = pixelTexture("forestIvyTex", scene, 32, 64, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    for (let strand = 0; strand < 7; strand++) {
+      let x = 2 + rand() * (w - 4);
+      const len = h * (0.35 + rand() * 0.65);
+      for (let y = 0; y < len; y += 1) {
+        x += (rand() - 0.5) * 1.2;
+        const thick = Math.max(1, Math.round((1 - y / len) * 4 + rand() * 2));
+        const k = 0.7 + rand() * 0.6;
+        ctx.fillStyle = k > 1.15 ? rgb(150, 150, 70) : rgb(66 * k, 92 * k, 36 * k);
+        ctx.fillRect((x - thick / 2) | 0, y, thick, 1);
+      }
+    }
+  });
+  tex.hasAlpha = true;
+  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  const mat = matte("forestIvyMat", scene, tex);
   mat.backFaceCulling = false;
-  for (let v = -20; v < 20; v += 0.9 + rand() * 1.6) {
-    const len = 3 + rand() * 9;
-    const u = ravineC(r, v) + ravineH(r, v) - 0.08;
-    const at = forestPoint(u, v);
-    const vine = MeshBuilder.CreatePlane(`forestVine${v.toFixed(1)}`, { width: 0.18 + rand() * 0.3, height: len }, scene);
-    vine.position.set(at.x, -len / 2 + 0.1, at.z);
-    vine.rotation.y = Math.atan2(FWD.x, FWD.z);
-    vine.material = mat;
-    vine.parent = root;
+  for (let v = -18; v < 18; v += 0.8 + rand() * 1.4) {
+    const u = ravineC(r, v) + ravineH(r, v);
+    const lip = forestPoint(u, v);
+    const w = 1 + rand() * 1.4;
+    const h = rand() < 0.4 ? 4 + rand() * 7 : 1.5 + rand() * 2;
+    const card = MeshBuilder.CreatePlane(`forestIvy${v.toFixed(1)}`, { width: w, height: h }, scene);
+    card.rotation.y = Math.atan2(FWD.x, FWD.z); // flat on the wall, facing the camera
+    card.position.set(lip.x - FWD.x * 0.06, 0.25 - h / 2, lip.z - FWD.z * 0.06);
+    card.material = mat;
+    card.parent = root;
   }
+}
+
+/**
+ * Tall grass and white wild flowers: the open ground of the cliff top and the last stretch to the
+ * fork (the fifth reference screen), and a sprinkling in the wood's clearings.
+ */
+function buildMeadow(scene: Scene, root: TransformNode, rand: () => number): void {
+  const grass = scene.getMeshByName("forestGrass") as Mesh;
+  const flowers = scene.getMeshByName("forestFlowers") as Mesh;
+  for (let u = -8; u < 162; u += 0.9) {
+    const open = (u > 50 && u < 64) || u > 120;
+    const tries = u > 120 ? 9 : open ? 4 : 1;
+    for (let k = 0; k < tries; k++) {
+      const v = (rand() - 0.5) * 34;
+      if (inVoid(u, v, 0.6)) continue;
+      const { x, z } = forestPoint(u + rand() * 0.9, v);
+      if (nearestOnTrack(x, z).d < DIRT_HALF + 0.2) continue; // not on the beaten dirt
+      if (!open && rand() < 0.6) continue;
+      if (rand() < (open ? 0.35 : 0.15)) place(flowers, root, x, z, 0.7 + rand() * 0.5, rand() * Math.PI);
+      else place(grass, root, x, z, 0.7 + rand() * 0.7, rand() * Math.PI);
+    }
+  }
+}
+
+/** A wooden chest with iron bands; its lid swings open when looted. */
+function buildChests(scene: Scene, root: TransformNode): Map<string, { at: Vector3; open(): void; tick(dt: number): void }> {
+  const wood = matte("forestChestWoodMat", scene, undefined, new Color3(0.5, 0.31, 0.17));
+  const iron = matte("forestChestIronMat", scene, undefined, new Color3(0.34, 0.3, 0.26));
+  const out = new Map<string, { at: Vector3; open(): void; tick(dt: number): void }>();
+  for (const c of FOREST_CHESTS) {
+    const at = forestPoint(c.u, c.v);
+    const node = new TransformNode(`forestChest_${c.id}`, scene);
+    node.parent = root;
+    node.position.copyFrom(at);
+    node.rotation.y = Math.atan2(-FWD.x, -FWD.z); // front faces the camera
+    const body = MeshBuilder.CreateBox(`forestChestBody_${c.id}`, { width: 1.0, height: 0.55, depth: 0.65 }, scene);
+    body.position.y = 0.28;
+    body.material = wood;
+    body.parent = node;
+    for (const x of [-0.36, 0.36]) {
+      const band = MeshBuilder.CreateBox(`forestChestBand_${c.id}${x}`, { width: 0.08, height: 0.57, depth: 0.67 }, scene);
+      band.position.set(x, 0.28, 0);
+      band.material = iron;
+      band.parent = node;
+    }
+    // Lid on a hinge along the back edge.
+    const hinge = new TransformNode(`forestChestHinge_${c.id}`, scene);
+    hinge.parent = node;
+    hinge.position.set(0, 0.55, -0.32);
+    const lid = MeshBuilder.CreateCylinder(`forestChestLid_${c.id}`, { height: 1.0, diameter: 0.64, tessellation: 10, arc: 0.5 }, scene);
+    lid.rotation.set(0, 0, Math.PI / 2);
+    lid.position.set(0, 0, 0.32);
+    lid.material = wood;
+    lid.parent = hinge;
+    obstacles.push({ x: at.x, z: at.z, r: 0.6 });
+    let opening = false;
+    out.set(c.id, {
+      at,
+      open: () => {
+        opening = true;
+      },
+      tick: (dt) => {
+        if (opening && hinge.rotation.x > -1.9) hinge.rotation.x = Math.max(-1.9, hinge.rotation.x - dt * 5);
+      },
+    });
+  }
+  return out;
+}
+
+/**
+ * The travelling merchant, by his cart: a stocky figure in a long coat, wide-brimmed hat and a
+ * pack on his back. Returns the point above his head (for his speech bubble).
+ */
+function buildMerchant(scene: Scene, root: TransformNode): Vector3 {
+  const at = forestPoint(MERCHANT_SPOT.u, MERCHANT_SPOT.v);
+  const node = new TransformNode("forestMerchant", scene);
+  node.parent = root;
+  node.position.copyFrom(at);
+  node.rotation.y = Math.atan2(SIDE.x, SIDE.z) + 0.6; // facing the track
+  const coat = matte("merchantCoatMat", scene, undefined, new Color3(0.36, 0.42, 0.22));
+  const skin = matte("merchantSkinMat", scene, undefined, new Color3(0.86, 0.66, 0.5));
+  const hatMat = matte("merchantHatMat", scene, undefined, new Color3(0.42, 0.3, 0.18));
+  const pack = matte("merchantPackMat", scene, undefined, new Color3(0.55, 0.42, 0.26));
+  const part = (m: Mesh, mat: StandardMaterial, x: number, y: number, z: number): Mesh => {
+    m.position.set(x, y, z);
+    m.material = mat;
+    m.parent = node;
+    return m;
+  };
+  part(MeshBuilder.CreateCylinder("merchantCoat", { height: 1.15, diameterTop: 0.5, diameterBottom: 0.85, tessellation: 10 }, scene), coat, 0, 0.58, 0);
+  part(MeshBuilder.CreateSphere("merchantHead", { diameter: 0.4, segments: 8 }, scene), skin, 0, 1.38, 0);
+  part(MeshBuilder.CreateCylinder("merchantBrim", { height: 0.05, diameter: 0.85, tessellation: 14 }, scene), hatMat, 0, 1.56, 0);
+  part(MeshBuilder.CreateCylinder("merchantCrown", { height: 0.3, diameterTop: 0.28, diameterBottom: 0.42, tessellation: 10 }, scene), hatMat, 0, 1.72, 0);
+  part(MeshBuilder.CreateBox("merchantPack", { width: 0.55, height: 0.7, depth: 0.35 }, scene), pack, 0, 0.95, -0.38);
+  obstacles.push({ x: at.x, z: at.z, r: 0.5 });
+  return new Vector3(at.x, 2.1, at.z);
 }
 
 /** The fork's signpost: one board towards Hellena, one towards the Prairie. */
