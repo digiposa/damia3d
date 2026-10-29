@@ -89,7 +89,7 @@ export function createArena(scene: Scene): AbstractMesh[] {
 
   lit.push(buildFloor(scene, root, rand));
   const walls = buildPalisade(scene, root, rand);
-  lit.push(...walls, ...buildGate(scene, root));
+  lit.push(...buildGate(scene, root));
   buildTorches(scene, root, lit, walls);
   buildBanners(scene, root, rand);
   buildBells(scene, root);
@@ -328,7 +328,6 @@ function palisadeTexture(scene: Scene, rand: () => number): DynamicTexture {
 function buildPalisade(scene: Scene, root: TransformNode, rand: () => number): AbstractMesh[] {
   const tex = palisadeTexture(scene, rand);
   const wall = setMaterial("arenaWallMat", scene, tex);
-  wall.maxSimultaneousLights = 12; // + the four wall-wash lights
   const capMat = setMaterial("arenaCapMat", scene, undefined, WOOD_DARK);
   const postTex = pixelTexture("arenaPostTex", scene, 16, 64, (ctx, w, h) => {
     ctx.fillStyle = rgb(52, 32, 22);
@@ -342,7 +341,6 @@ function buildPalisade(scene: Scene, root: TransformNode, rand: () => number): A
     ctx.fillRect(0, 44, w, 3);
   });
   const postMat = setMaterial("arenaPostMat", scene, postTex);
-  postMat.maxSimultaneousLights = 12;
 
   const lit: AbstractMesh[] = [];
   const step = (Math.PI * 2) / SEGMENTS;
@@ -527,6 +525,9 @@ function buildTorches(scene: Scene, root: TransformNode, lit: AbstractMesh[], wa
     light.intensity = 1.1;
     // Torches light the SET only. Characters keep the global sun + fill (and their material's light
     // budget): this is also how the console did it — environment lighting baked, actors lit flat.
+    // NOT the palisade: it takes the wall-wash lights below instead. No material may see more than
+    // 8 lights — a 12-light shader exceeded desktop (Windows/ANGLE) GPU limits and the walls
+    // rendered black, while phones coped.
     light.includedOnlyMeshes = lit;
 
     // The pool of light on the wall around the torch — the big orange bloom of the reference shot.
@@ -535,8 +536,8 @@ function buildTorches(scene: Scene, root: TransformNode, lit: AbstractMesh[], wa
     const wash = new PointLight(`torchWash${k}`, new Vector3(wx + inX * 0.55, TORCH_HEIGHT + 0.35, wz + inZ * 0.55), scene);
     wash.diffuse = new Color3(1.0, 0.52, 0.2);
     wash.specular = Color3.Black();
-    wash.range = 3.4;
-    wash.intensity = 2.4;
+    wash.range = 5;
+    wash.intensity = 2.0;
     wash.includedOnlyMeshes = walls;
 
     torches.push({ flame, light, wash, phase: k * 2.17 });
@@ -553,7 +554,7 @@ function buildTorches(scene: Scene, root: TransformNode, lit: AbstractMesh[], wa
       tc.flame.scaling.x = w;
       tc.flame.scaling.z = w;
       tc.light.intensity = 1.1 + 0.2 * f;
-      tc.wash.intensity = 2.4 + 0.45 * f;
+      tc.wash.intensity = 2.0 + 0.4 * f;
     }
   });
 }
