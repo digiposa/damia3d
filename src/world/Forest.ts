@@ -725,50 +725,43 @@ function shadeGround(meshes: Mesh[], trees: { x: number; z: number; r: number }[
 
 // --- The track -------------------------------------------------------------------
 
-/** The beaten cart track: a ribbon of dirt along the path, ragged at the edges (alpha-tested). */
-function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh {
-  const tex = pixelTexture("forestTrackTex", scene, 64, 64, (ctx, w, h) => {
-    ctx.clearRect(0, 0, w, h);
-    let left = 6;
-    let right = w - 6;
-    for (let y = 0; y < h; y++) {
-      // Edges wander a pixel at a time — grass nibbling at the dirt.
-      left = Math.min(14, Math.max(2, left + ((rand() * 3) | 0) - 1));
-      right = Math.max(w - 14, Math.min(w - 2, right + ((rand() * 3) | 0) - 1));
-      for (let x = left; x < right; x++) {
-        const edge = Math.min(x - left, right - x);
-        const rut = Math.abs(x - w * 0.33) < 2.5 || Math.abs(x - w * 0.67) < 2.5; // cart wheel ruts
-        let k = 0.86 + rand() * 0.22;
-        if (rut) k *= 0.9;
-        if (edge < 3) k *= 0.88;
-        ctx.fillStyle = rgb(178 * k, 120 * k, 92 * k); // terracotta / salmon earth of the PS1 screens
-        ctx.fillRect(x, y, 1, 1);
-      }
-      if (rand() < 0.35) {
-        ctx.fillStyle = rgb(206, 150, 116);
-        ctx.fillRect(left + 3 + ((rand() * (right - left - 6)) | 0), y, 1, 1); // pebble
-      }
-      if (rand() < 0.25) {
-        ctx.fillStyle = rgb(118, 74, 52); // darker clod
-        ctx.fillRect(left + 4 + ((rand() * (right - left - 8)) | 0), y, 1, 2); // grass tuft in the middle strip
-      }
-    }
-  });
-  tex.hasAlpha = true;
-  tex.wrapU = Texture.CLAMP_ADDRESSMODE;
+/** Extent and resolution of the painted dirt layer (local u, v; pixels per unit). */
+const DIRT_U0 = -18;
+const DIRT_U1 = 158;
+const DIRT_V0 = -20;
+const DIRT_V1 = 20;
+const DIRT_PPU = 10;
 
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-  // Several columns across (not just two edges), so the sun dapple in the vertex colours can fall
-  // across the dirt too — the bright patches on the track are half the reference shot's light.
-  const COLS = 6;
+/**
+ * The beaten earth of every trail, painted as ONE texture over the whole map rather than a ribbon
+ * per trail: each trail stamps discs of dirt along its length into a shared mask, so where trails
+ * meet they simply merge — one rounded junction with one ragged edge, instead of overlapping
+ * strips with crossing borders. The cart ruts follow the main track. The layer is a flat mesh just
+ * above the floor, alpha-tested on the painted mask (crisp pixel edges, like the rest of the set).
+ */
+function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh {
+  const W = (DIRT_U1 - DIRT_U0) * DIRT_PPU;
+  const H = (DIRT_V1 - DIRT_V0) * DIRT_PPU;
+  // Texture pixel of a local point (canvas rows run from v = DIRT_V1 down: the texture is flipped).
+  const px = (u: number): number => (u - DIRT_U0) * DIRT_PPU;
+  const py = (v: number): number => (DIRT_V1 - v) * DIRT_PPU;
+
+  const mask = document.createElement("canvas");
+  mask.width = W;
+  mask.height = H;
+  const m = mask.getContext("2d")!;
+  m.fillStyle = "#fff";
+  const ruts = document.createElement("canvas");
+  ruts.width = W;
+  ruts.height = H;
+  const r = ruts.getContext("2d")!;
+  r.strokeStyle = "#fff";
+  r.lineCap = "round";
+
   TRAILS.forEach((trail, ti) => {
-    // Extend the dirt past the open ends so it runs off into the wood rather than stopping short
-    // (a branch starts ON the main track, so only its far end is open).
     const head = trail[0];
     const last = trail[trail.length - 1];
-    // Extension points every half unit, so the taper below has rows to work with.
+    // Extension points every half unit past the open ends, so the taper has room.
     const extend = (from: Sample, dir: number, len: number): { p: Vector3; t: Vector3 }[] =>
       Array.from({ length: Math.ceil(len / 0.5) }, (_, k) => ({ p: from.p.add(from.t.scale(dir * 0.5 * (k + 1))), t: from.t }));
     const pts = [
@@ -776,57 +769,119 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
       ...trail,
       ...extend(last, 1, ti === 0 ? 2 : head.w < 2 ? 1 : 5), // a footpath ends just past its chest
     ];
-    // Open ends taper off (the main track's start, every branch's far end) so a trail peters out
-    // into the grass instead of stopping on a square edge. The main track's far end disappears
-    // under the fork's branches, and a branch's start under the track it leaves.
+    // Open ends taper off (the main track's start, every branch's far end), so a trail peters out
+    // into the grass. The main track's far end vanishes into the fork, a branch's start into the
+    // track it leaves.
     let total = 0;
     for (let i = 1; i < pts.length; i++) total += Vector3.Distance(pts[i - 1].p, pts[i].p);
     const TAPER = ti === 0 ? 6 : head.w < 2 ? 1.5 : 5;
-    const y = 0.02 - 0.002 * ti; // overlapping trails at a junction must not z-fight
+    // Branches are narrower; a footpath's dirt never runs wider than its walkable corridor.
+    const base = ti === 0 ? DIRT_HALF : Math.min(DIRT_HALF * 0.8, head.w * 0.75);
     let along = 0;
-    let run = 0; // samples in the current unbroken stretch (the dirt stops at a ravine)
-    for (let i = 0; i < pts.length; i++) {
-      const { p, t } = pts[i];
-      if (i > 0) along += Vector3.Distance(pts[i - 1].p, p);
-      const uv = toUV(p.x, p.z);
-      if (inVoid(uv.u, uv.v, 0.6)) {
-        run = 0;
-        continue;
+    let rutL: { u: number; v: number }[] = [];
+    let rutR: { u: number; v: number }[] = [];
+    const flushRuts = (): void => {
+      for (const line of [rutL, rutR]) {
+        if (line.length < 2) continue;
+        r.lineWidth = 0.32 * DIRT_PPU;
+        r.beginPath();
+        r.moveTo(px(line[0].u), py(line[0].v));
+        for (const q of line) r.lineTo(px(q.u), py(q.v));
+        r.stroke();
       }
-      const nx = -t.z;
-      const nz = t.x;
-      // Branches are narrower; a footpath's dirt never runs wider than its walkable corridor.
-      const base = ti === 0 ? DIRT_HALF : Math.min(DIRT_HALF * 0.8, trail[0].w * 0.75);
-      const fromStart = ti === 0 ? along / TAPER : 1;
-      const toEnd = ti === 0 ? 1 : (total - along) / TAPER;
-      const taper = Math.sqrt(Math.max(0, Math.min(1, fromStart, toEnd))); // rounded, not pointed
-      const half = base * taper * (0.92 + (0.16 + 0.3 * (1 - taper)) * Math.sin(along * 0.7 + rand() * 3));
-      const first = positions.length / 3;
-      for (let c = 0; c <= COLS; c++) {
-        const f = c / COLS;
-        const o = half * (1 - 2 * f);
-        positions.push(p.x + nx * o, y, p.z + nz * o);
-        uvs.push(f, along / 4);
+      rutL = [];
+      rutR = [];
+    };
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1].p;
+      const b = pts[i].p;
+      const seg = Vector3.Distance(a, b);
+      const steps = Math.max(1, Math.ceil(seg / 0.2));
+      for (let k = 0; k < steps; k++) {
+        const f = k / steps;
+        const p = Vector3.Lerp(a, b, f);
+        const d = along + seg * f;
+        const fromStart = ti === 0 ? d / TAPER : 1;
+        const toEnd = ti === 0 ? 1 : (total - d) / TAPER;
+        const taper = Math.sqrt(Math.max(0, Math.min(1, fromStart, toEnd))); // rounded, not pointed
+        const half = base * taper * (0.92 + (0.16 + 0.3 * (1 - taper)) * Math.sin(d * 0.7 + rand() * 3));
+        if (half <= 0.05) continue;
+        const { u, v } = toUV(p.x, p.z);
+        m.beginPath();
+        m.arc(px(u), py(v), half * DIRT_PPU, 0, Math.PI * 2);
+        m.fill();
+        // Ruts: two wheel tracks along the main track, where it is at full width.
+        if (ti === 0 && taper > 0.9 && !inVoid(u, v, 0.8)) {
+          const t = pts[i].t;
+          const off = half * 0.36;
+          // Sideways (in u, v) of the track's direction.
+          const nu = -(t.x * SIDE.x + t.z * SIDE.z);
+          const nv = t.x * FWD.x + t.z * FWD.z;
+          if (k % 2 === 0) {
+            rutL.push({ u: u + nu * off, v: v + nv * off });
+            rutR.push({ u: u - nu * off, v: v - nv * off });
+          }
+        } else if (ti === 0) {
+          flushRuts();
+        }
       }
-      if (run > 0) {
-        const a = first - (COLS + 1);
-        const b = first;
-        for (let c = 0; c < COLS; c++) indices.push(a + c, b + c, a + c + 1, a + c + 1, b + c, b + c + 1);
-      }
-      run++;
+      along += seg;
     }
+    flushRuts();
   });
-  const normals: number[] = [];
-  VertexData.ComputeNormals(positions, indices, normals);
-  const vd = new VertexData();
-  vd.positions = positions;
-  vd.indices = indices;
-  vd.uvs = uvs;
-  vd.normals = normals.map((_, i) => (i % 3 === 1 ? 1 : 0)); // flat ground: straight up
-  const mesh = new Mesh("forestTrack", scene);
-  vd.applyToMesh(mesh);
+
+  // Colour it: terracotta earth, darker at the ragged rim and in the ruts, a few pebbles and clods.
+  const maskPx = m.getImageData(0, 0, W, H).data;
+  const rutPx = r.getImageData(0, 0, W, H).data;
+  const tex = new DynamicTexture("forestTrackTex", { width: W, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
+  tex.hasAlpha = true;
+  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  const img = ctx.createImageData(W, H);
+  const out = img.data;
+  const inside = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < W && y < H && maskPx[(y * W + x) * 4] > 127;
+  for (let y = 0; y < H; y++) {
+    const v = DIRT_V1 - (y + 0.5) / DIRT_PPU;
+    for (let x = 0; x < W; x++) {
+      const o = (y * W + x) * 4;
+      if (maskPx[o] <= 127) continue;
+      const u = DIRT_U0 + (x + 0.5) / DIRT_PPU;
+      if (inVoid(u, v, 0.15)) continue; // never over a ravine or the cliff
+      // Grass nibbling at the edge: rim pixels drop out at random, the next ring darkens.
+      const rim = !inside(x - 2, y) || !inside(x + 2, y) || !inside(x, y - 2) || !inside(x, y + 2);
+      if (rim && rand() < 0.35) continue;
+      let k = 0.86 + rand() * 0.22;
+      if (rim) k *= 0.88;
+      if (rutPx[o] > 127) k *= 0.86;
+      let cr = 178 * k;
+      let cg = 120 * k;
+      let cb = 92 * k;
+      const speck = rand();
+      if (speck < 0.012) [cr, cg, cb] = [206, 150, 116]; // pebble
+      else if (speck < 0.02) [cr, cg, cb] = [118, 74, 52]; // clod
+      out[o] = cr;
+      out[o + 1] = cg;
+      out[o + 2] = cb;
+      out[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.update();
+
+  const mesh = gridMesh(
+    "forestTrack",
+    scene,
+    DIRT_V1 - DIRT_V0,
+    DIRT_U1 - DIRT_U0,
+    (i, j) => {
+      const u = DIRT_U0 + j;
+      const v = DIRT_V0 + i;
+      const p = forestPoint(u, v);
+      return { x: p.x, y: 0.02, z: p.z, tu: (u - DIRT_U0) / (DIRT_U1 - DIRT_U0), tv: (v - DIRT_V0) / (DIRT_V1 - DIRT_V0) };
+    },
+    Vector3.Up(),
+  );
   const mat = matte("forestTrackMat", scene, tex);
-  mat.backFaceCulling = false;
   mat.zOffset = -2; // sit on the floor without z-fighting
   mesh.material = mat;
   mesh.parent = root;
