@@ -56,6 +56,9 @@ type Knot = { u: number; v: number; w: number };
  * are wider, the fallen-tree bridges narrow). It ends at the fork; {@link BRANCHES} carry on.
  */
 const TRACK: Knot[] = [
+  // (the road in from Seles, running on out of sight behind the camera — not walkable that far)
+  { u: -34, v: 2.5, w: 3.4 },
+  { u: -20, v: 1.2, w: 3.4 },
   // 1 — the merchant's cart track (624)
   { u: -9, v: 0.5, w: 3.4 },
   { u: 0, v: 0, w: 3.8 },
@@ -94,8 +97,9 @@ const BRANCHES: Knot[][] = [
   [{ u: 85, v: 3, w: 3.0 }, { u: 86, v: 9, w: 2.8 }, { u: 82, v: 14, w: 3.2 }],
   [{ u: 91, v: 1, w: 3.0 }, { u: 94, v: -7, w: 2.8 }, { u: 99, v: -11, w: 3.2 }],
   [{ u: 79, v: -2, w: 2.8 }, { u: 82, v: 2.5, w: 2.6 }], // a short cut between two trails
-  [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: -4.5, w: 3.2 }, { u: 150, v: -8, w: 3.0 }], // → Hellena
-  [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: 5.5, w: 3.2 }, { u: 150, v: 9, w: 3.0 }], // → the Prairie
+  // The two roads out, running on past the end of the map until they leave the screen.
+  [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: -4.5, w: 3.2 }, { u: 150, v: -8, w: 3.0 }, { u: 162, v: -10, w: 3.0 }, { u: 178, v: -11, w: 3.0 }], // → Hellena
+  [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: 5.5, w: 3.2 }, { u: 150, v: 9, w: 3.0 }, { u: 162, v: 11, w: 3.0 }, { u: 178, v: 12, w: 3.0 }], // → the Prairie
   // Footpaths to the chests off the main track (the wiki's "upper path" by the merchant, and the
   // one hidden in the trees past the first bridge) — narrow, but always walkable.
   [{ u: 10, v: 1.6, w: 1.6 }, { u: 10.6, v: -4, w: 1.5 }, { u: 11, v: -7.4, w: 2.2 }],
@@ -262,6 +266,11 @@ function indexObstacles(): void {
   }
 }
 
+/** The walkable stretch of the map (u): the roads in and out run on past these ends, out of
+ *  reach — that is where the transitions to Seles / Hellena / the Prairie will go. */
+export const MAP_START_U = -12;
+export const MAP_END_U = 152;
+
 /**
  * Where you may walk, as a grid over the local (u, v) frame: the trails, plus the flat open grass
  * around them that no tree stands over — not under a crown, and not where a crown would hide you
@@ -307,7 +316,7 @@ function buildMask(): void {
     for (let i = 0; i < MASK_NU; i++) {
       const u = MASK_U0 + (i + 0.5) * MASK_RES;
       const v = MASK_V0 + (j + 0.5) * MASK_RES;
-      if (inVoid(u, v, 0.3)) continue;
+      if (inVoid(u, v, 0.3) || u < MAP_START_U || u > MAP_END_U) continue;
       const { x, z } = forestPoint(u, v);
       const n = nearestOnTrack(x, z);
       // In the maze only the trails themselves are walkable: its hedges are the walls.
@@ -497,8 +506,8 @@ function matte(name: string, scene: Scene, tex?: Texture, color?: Color3): Stand
 // --- Ground ----------------------------------------------------------------------
 
 /** Extent of the terrain in the local frame (well past what the camera can see). */
-const U_MIN = -45;
-const U_MAX = 175;
+const U_MIN = -50;
+const U_MAX = 200;
 const V_MIN = -60;
 const V_MAX = 60;
 
@@ -726,8 +735,8 @@ function shadeGround(meshes: Mesh[], trees: { x: number; z: number; r: number }[
 // --- The track -------------------------------------------------------------------
 
 /** Extent and resolution of the painted dirt layer (local u, v; pixels per unit). */
-const DIRT_U0 = -18;
-const DIRT_U1 = 158;
+const DIRT_U0 = -42;
+const DIRT_U1 = 186;
 const DIRT_V0 = -20;
 const DIRT_V1 = 20;
 const DIRT_PPU = 10;
@@ -1308,7 +1317,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
   const shade: { x: number; z: number; r: number }[] = [];
   const STEP = 3.1;
   const REACH = 24; // how far from the track the wood is dressed
-  for (let gu = -30; gu < 166; gu += STEP)
+  for (let gu = -48; gu < 196; gu += STEP)
     for (let gv = -40; gv < 40; gv += STEP) {
       const lu = gu + (rand() - 0.5) * STEP * 0.9;
       const lv = gv + (rand() - 0.5) * STEP * 0.9;
@@ -1578,7 +1587,7 @@ function buildGorgeVines(scene: Scene, root: TransformNode, rand: () => number):
 function buildMeadow(scene: Scene, root: TransformNode, rand: () => number): void {
   const grass = scene.getMeshByName("forestGrass") as Mesh;
   const flowers = scene.getMeshByName("forestFlowers") as Mesh;
-  for (let u = -8; u < 162; u += 0.9) {
+  for (let u = -30; u < 185; u += 0.9) {
     const open = (u > 50 && u < 64) || u > 120;
     const tries = u > 120 ? 9 : open ? 4 : 1;
     for (let k = 0; k < tries; k++) {
