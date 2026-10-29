@@ -519,7 +519,8 @@ function buildTorches(scene: Scene, root: TransformNode, lit: AbstractMesh[], wa
     buildEmbers(scene, flame.position.clone(), emberTex, `torchEmbers${k}`);
     buildSmoke(scene, flame.position.clone(), emberTex, `torchSmoke${k}`);
     // Dust hanging in the torch's light, a little out from the wall where the glow is.
-    buildLitDust(scene, new Vector3(wx + inX * 1.6, TORCH_HEIGHT - 0.6, wz + inZ * 1.6), emberTex, `torchDust${k}`);
+    // Kept at flame height and above: lower down they read as embers falling to the floor.
+    buildLitDust(scene, new Vector3(wx + inX * 1.2, TORCH_HEIGHT + 0.5, wz + inZ * 1.2), emberTex, `torchDust${k}`);
 
     // The real light, out in front of the wall so it rakes across the floor.
     const light = new PointLight(`torchLight${k}`, new Vector3(wx + inX * 1.2, TORCH_HEIGHT + 0.3, wz + inZ * 1.4), scene);
@@ -631,8 +632,8 @@ function buildLitDust(scene: Scene, centre: Vector3, tex: DynamicTexture, name: 
   const ps = new ParticleSystem(name, 40, scene);
   ps.particleTexture = tex;
   ps.emitter = centre;
-  ps.minEmitBox = new Vector3(-1.4, -1.2, -1.4);
-  ps.maxEmitBox = new Vector3(1.4, 1.4, 1.4);
+  ps.minEmitBox = new Vector3(-1.1, -0.5, -1.1);
+  ps.maxEmitBox = new Vector3(1.1, 1.5, 1.1);
   ps.blendMode = ParticleSystem.BLENDMODE_ADD;
   ps.addColorGradient(0, new Color4(1.0, 0.7, 0.38, 0));
   ps.addColorGradient(0.25, new Color4(1.0, 0.74, 0.42, 0.85));
@@ -643,8 +644,8 @@ function buildLitDust(scene: Scene, centre: Vector3, tex: DynamicTexture, name: 
   ps.minLifeTime = 4;
   ps.maxLifeTime = 7;
   ps.emitRate = 7;
-  ps.gravity = new Vector3(0, 0.015, 0);
-  ps.direction1 = new Vector3(-0.12, -0.04, -0.12);
+  ps.gravity = new Vector3(0, 0.05, 0); // heat lifts them: never sinking toward the floor
+  ps.direction1 = new Vector3(-0.12, 0, -0.12);
   ps.direction2 = new Vector3(0.12, 0.08, 0.12);
   ps.minEmitPower = 0.05;
   ps.maxEmitPower = 0.15;
