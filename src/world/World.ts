@@ -21,6 +21,8 @@ export interface World {
   shadowReceivers: AbstractMesh[];
   /** Meshes that bring their own fill light and must not get the world's (see Atmosphere). */
   ownFill: AbstractMesh[];
+  /** Per-frame upkeep around the controlled character (e.g. see-through trees), if any. */
+  update?(focus: Vector3, dt: number): void;
 }
 
 /** The Lohan Hero Competition ring (Training, Survival). */

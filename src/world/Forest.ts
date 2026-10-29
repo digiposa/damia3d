@@ -14,6 +14,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/core/Meshes/instancedMesh";
+import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 
 import { softDotTexture } from "./atmosphere";
 import { LIGHTING_PRESETS } from "./lighting";
@@ -218,24 +219,146 @@ function nearestOnTrack(x: number, z: number): { d: number; w: number; px: numbe
 /** Solid things standing in (or at the edge of) the walkable corridor. */
 const obstacles: { x: number; z: number; r: number }[] = [];
 
-/** Keep a ground position on the track corridor and out of trunks, rocks and the cart. */
+/** How far from the trails you can wander (the wood is dressed a little further than this). */
+const WANDER = 20;
+/** Half-width of a fallen trunk's walkable top. */
+const LOG_HALF = 0.45;
+
+/** Spatial hash of the obstacles (4-unit cells), built once the set is dressed. */
+const CELL = 4;
+const grid = new Map<string, { x: number; z: number; r: number }[]>();
+function indexObstacles(): void {
+  grid.clear();
+  for (const o of obstacles) {
+    const key = `${Math.floor(o.x / CELL)},${Math.floor(o.z / CELL)}`;
+    let list = grid.get(key);
+    if (!list) grid.set(key, (list = []));
+    list.push(o);
+  }
+}
+
+/**
+ * Keep a ground position walkable (mutates `p`): anywhere on the forest floor that is not a trunk,
+ * rock or prop, not down a ravine (except along a fallen-tree bridge) nor over the cliff, and not
+ * too deep into the wood away from every trail.
+ */
 export function clampToForest(p: Vector3, margin = 0.4): void {
+  // Too far into the wood: back towards the nearest trail.
   const n = nearestOnTrack(p.x, p.z);
-  const max = n.w - margin;
+  const max = WANDER + n.w - margin;
   if (n.d > max) {
     const k = max / n.d;
     p.x = n.px + (p.x - n.px) * k;
     p.z = n.pz + (p.z - n.pz) * k;
   }
-  for (const o of obstacles) {
-    const dx = p.x - o.x;
-    const dz = p.z - o.z;
-    const d = Math.hypot(dx, dz);
-    const r = o.r + margin * 0.5;
-    if (d < r && d > 1e-4) {
-      p.x = o.x + (dx / d) * r;
-      p.z = o.z + (dz / d) * r;
+
+  // Ravines: on a bridge you stay on the trunk; anywhere else you are held at the nearer lip.
+  let { u, v } = toUV(p.x, p.z);
+  for (const r of RAVINES) {
+    const c = ravineC(r, v);
+    const h = ravineH(r, v) + margin;
+    if (Math.abs(u - c) >= h) continue;
+    if (Math.abs(v - r.bridgeV) < LOG_HALF + 0.35) {
+      v = Math.min(r.bridgeV + LOG_HALF, Math.max(r.bridgeV - LOG_HALF, v));
+    } else {
+      u = u < c ? c - h : c + h;
     }
+  }
+  // The cliff edge.
+  const edge = cliffE(u) - margin;
+  if (v > edge) v = edge;
+  const back = forestPoint(u, v);
+  p.x = back.x;
+  p.z = back.z;
+
+  // Trunks, rocks and props: slide round them.
+  const cx = Math.floor(p.x / CELL);
+  const cz = Math.floor(p.z / CELL);
+  for (let ix = cx - 1; ix <= cx + 1; ix++)
+    for (let iz = cz - 1; iz <= cz + 1; iz++) {
+      const list = grid.get(`${ix},${iz}`);
+      if (!list) continue;
+      for (const o of list) {
+        const dx = p.x - o.x;
+        const dz = p.z - o.z;
+        const d = Math.hypot(dx, dz);
+        const rr = o.r + margin * 0.5;
+        if (d < rr && d > 1e-4) {
+          p.x = o.x + (dx / d) * rr;
+          p.z = o.z + (dz / d) * rr;
+        }
+      }
+    }
+}
+
+/** A tall thing that may stand between the camera and someone walking behind it. */
+interface Occluder {
+  inst: InstancedMesh;
+  src: Mesh;
+  x: number;
+  z: number;
+  height: number;
+  crown: number;
+}
+const occluders: Occluder[] = [];
+
+/** Does an occluder hide a figure standing at (px, pz) from the iso camera? */
+function hides(o: Occluder, px: number, pz: number): boolean {
+  const dx = px - o.x;
+  const dz = pz - o.z;
+  const up = dx * FWD.x + dz * FWD.z; // > 0: the figure is above the tree's foot on screen
+  // (the figure's own height — ~2 — counts: its head can be hidden while its feet show)
+  if (up < -1.2 || up > o.height * TAN_BETA + o.crown + 2) return false;
+  return Math.abs(dx * SIDE.x + dz * SIDE.z) < o.crown + 0.8;
+}
+
+/**
+ * See-through trees: when one stands between the camera and the player, it is swapped for a
+ * translucent copy that fades in, and back once the player is clear. (Instances can't fade one by
+ * one, so the fade runs on a plain clone of the source — mesh visibility — cloned on demand, pooled.)
+ */
+class TreeFader {
+  private ghosts = new Map<Occluder, { mesh: Mesh; out: boolean }>();
+  private pool = new Map<Mesh, Mesh[]>();
+
+  update(focus: Vector3, dt: number): void {
+    // Who hides the player right now (only trees near enough can).
+    for (const o of occluders) {
+      if (Math.abs(o.x - focus.x) + Math.abs(o.z - focus.z) > 40) continue;
+      const hiding = hides(o, focus.x, focus.z);
+      const g = this.ghosts.get(o);
+      if (hiding && !g) this.ghosts.set(o, { mesh: this.take(o), out: false });
+      else if (hiding && g) g.out = false;
+      else if (!hiding && g) g.out = true;
+    }
+    const k = Math.min(1, dt * 6);
+    for (const [o, g] of this.ghosts) {
+      const target = g.out ? 1 : 0.18;
+      g.mesh.visibility += (target - g.mesh.visibility) * k;
+      if (g.out && g.mesh.visibility > 0.97) {
+        o.inst.setEnabled(true);
+        g.mesh.setEnabled(false);
+        this.pool.get(o.src)!.push(g.mesh);
+        this.ghosts.delete(o);
+      }
+    }
+  }
+
+  private take(o: Occluder): Mesh {
+    let list = this.pool.get(o.src);
+    if (!list) this.pool.set(o.src, (list = []));
+    let mesh = list.pop();
+    if (!mesh) {
+      mesh = o.src.clone(`${o.src.name}Ghost`, null, true)!;
+      mesh.isPickable = false;
+    }
+    mesh.position.copyFrom(o.inst.position);
+    mesh.rotation.copyFrom(o.inst.rotation);
+    mesh.scaling.copyFrom(o.inst.scaling);
+    mesh.visibility = 1;
+    mesh.setEnabled(true);
+    o.inst.setEnabled(false);
+    return mesh;
   }
 }
 
@@ -262,6 +385,7 @@ function occludesTrack(x: number, z: number, height: number, crown: number): boo
 /** The Forest as a combat world. */
 export function forestWorld(scene: Scene): World {
   obstacles.length = 0;
+  occluders.length = 0;
   const root = new TransformNode("forest", scene); // decor
   const fixed = new TransformNode("forestFixed", scene); // floor, track, rock walls, sea
   const rand = mulberry32(0x0f0e57); // fixed seed: the same forest every visit
@@ -280,6 +404,8 @@ export function forestWorld(scene: Scene): World {
   buildSky(scene, fixed);
   buildPollen(scene);
 
+  indexObstacles();
+  const fader = new TreeFader();
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
     m.freezeWorldMatrix();
@@ -290,6 +416,7 @@ export function forestWorld(scene: Scene): World {
     framing: 2.5,
     shadowReceivers: [...floors, track],
     ownFill: [],
+    update: (focus, dt) => fader.update(focus, dt),
   };
 }
 
@@ -801,7 +928,9 @@ function treeSource(i: number, scene: Scene, bark: StandardMaterial, leaves: Sta
     b.material = leaves;
     parts.push(b);
   }
-  return mergeSource(`forestTree${i}`, parts);
+  const tree = mergeSource(`forestTree${i}`, parts);
+  tree.metadata = { height };
+  return tree;
 }
 
 /** A sapling: thin trunk, small crown — short enough to stand nearer the camera. */
@@ -873,12 +1002,13 @@ function fernSource(scene: Scene, rand: () => number): Mesh {
 }
 
 /** Place an instance of `src`, frozen in place. */
-function place(src: Mesh, root: TransformNode, x: number, z: number, scale: number, rotY: number): void {
+function place(src: Mesh, root: TransformNode, x: number, z: number, scale: number, rotY: number): InstancedMesh {
   const inst = src.createInstance(`${src.name}_${x.toFixed(1)}_${z.toFixed(1)}`);
   inst.parent = root;
   inst.position.set(x, 0, z);
   inst.scaling.setAll(scale);
   inst.rotation.y = rotY;
+  return inst;
 }
 
 /**
@@ -918,11 +1048,16 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
 
       if (edge > 0.9 && roll < (open ? 0.22 : dense ? 0.95 : 0.78) && !occludesTrack(x, z, 13, 3.4)) {
         const s = 0.85 + rand() * 0.4;
-        place(trees[(rand() * trees.length) | 0], root, x, z, s, rot);
+        const src = trees[(rand() * trees.length) | 0];
+        const inst = place(src, root, x, z, s, rot);
         shade.push({ x, z, r: 3.2 * s });
-        if (edge < 2.2) obstacles.push({ x, z, r: 0.9 * s }); // trunks at the corridor's edge block
+        obstacles.push({ x, z, r: 0.75 * s }); // every trunk is solid
+        occluders.push({ inst, src, x, z, height: ((src.metadata?.height as number) ?? 11) * s + 1.5 * s, crown: 4.4 * s });
       } else if (edge > 0.4 && roll < 0.5 && !occludesTrack(x, z, 2.2, 1)) {
-        place(sapling, root, x, z, 0.8 + rand() * 0.5, rot);
+        const s = 0.8 + rand() * 0.5;
+        const inst = place(sapling, root, x, z, s, rot);
+        obstacles.push({ x, z, r: 0.2 * s });
+        occluders.push({ inst, src: sapling, x, z, height: 2.3 * s, crown: 0.9 * s });
       } else if (edge > -0.6) {
         // Low growth: a clump of ferns, a bush, or a mossy rock — never more than knee-high.
         const what = rand();
@@ -932,12 +1067,16 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
         } else if (what < (open ? 0.6 : 0.85)) {
           // Big rounded clumps where they hide nothing (the reference screens are packed with them),
           // knee-high ones right at the verge.
-          if (edge > 0.6 && !occludesTrack(x, z, 2, 1.8)) place(bush, root, x, z, 1.4 + rand() * 0.9, rot);
+          if (edge > 0.6 && !occludesTrack(x, z, 2, 1.8)) {
+            const s = 1.4 + rand() * 0.9;
+            place(bush, root, x, z, s, rot);
+            obstacles.push({ x, z, r: 0.5 * s }); // a big clump is in the way; small ones you push through
+          }
           else if (edge > 0.3) place(bush, root, x, z, 0.7 + rand() * 0.4, rot);
         } else if (edge > 0.2) {
           const s = 0.6 + rand() * 0.8;
           place(rock, root, x, z, s, rot);
-          if (edge < 1) obstacles.push({ x, z, r: 0.75 * s });
+          obstacles.push({ x, z, r: 0.75 * s });
         }
       }
       // Ferns along the corridor's own grass verge too (walk-through, no collision).

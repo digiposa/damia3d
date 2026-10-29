@@ -952,6 +952,7 @@ export abstract class ArenaCombatMode extends GameMode {
       this.world.clamp(this.player.position); // the wall is a hard boundary
     }
     this.camera.follow(this.player.position);
+    this.world.update?.(this.player.position, dt);
     this.camera.tickShake(dt);
     // Procedural walk/run/idle animation (visual only, uses real time). While an Addition combo is
     // running (or a ranged shot is mid-flight), stay in the attack stance so the swing doesn't snap
