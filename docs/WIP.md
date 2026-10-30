@@ -26,6 +26,9 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
+- **Fuite des combats (à faire, ne pas oublier)** — canon : on peut fuir (90 % dans la Forêt).
+  En temps réel, piste : s'éloigner assez loin des ennemis pour qu'ils abandonnent la poursuite
+  (et le groupe disparaît / retourne d'où il vient). À cadrer avec le joueur avant de coder.
 - **Knight of Sandora — review d'IA : variante Seles TRAITÉE, Black Castle en attente.**
   Fait côté Seles : l'arme de jet passe sur un **cooldown de 10 s** (`THROW_COOLDOWN`) — sans lui le
   chevalier ne venait jamais au corps à corps, il relançait une dague à chaque jauge pleine hors de

@@ -1002,6 +1002,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const worldScale = this.runner.active ? COMBO_TIME_SCALE : 1;
     const worldDt = cdt * worldScale;
     this.player.tickGuard(cdt);
+    for (const m of this.party) m.avatar.evadeT = Math.max(0, m.avatar.evadeT - cdt); // Charm Potion
     if (this.actionRecoveryT > 0) this.actionRecoveryT = Math.max(0, this.actionRecoveryT - cdt);
     // Keep the ATB gauge's fill time in sync with the bearer's Speed (gear can change it).
     this.runner.setFillTime(this.player.atbFillTime);
@@ -1329,8 +1330,20 @@ export abstract class ArenaCombatMode extends GameMode {
       const gained = a.restoreMp(stock.def.mpRestore);
       if (gained > 0) this.popText(m.position.add(new Vector3(0, 2.8, 0)), `+${gained} ${t("stat.mp")}`, TEXT.mp);
     }
+    if (stock.def.charm) {
+      if (this.enemies.some((e) => e.alive)) {
+        // In battle: dodge every enemy attack for 3 of the user's turns (canon "3 turns").
+        a.evadeT = 3 * a.atbFillTime;
+        this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("story.charm.evade"), TEXT.sp);
+      } else {
+        this.onCharmOutOfBattle(m);
+      }
+    }
     stock.count -= 1;
   }
+
+  /** Charm Potion used with no foe about: the mode resets its random-encounter counter (Story). */
+  protected onCharmOutOfBattle(_m: PartyMember): void {}
 
   /** True when the Special command is available: every member can transform (≥1 SP block and
    *  not already in Dragoon form). Looser than canon (which needs full SP meters) by design. */
@@ -1991,6 +2004,11 @@ export abstract class ArenaCombatMode extends GameMode {
     const victim = this.player;
     const applyHit = (amount: number): void => {
       if (this.player !== victim) return; // downed / switched out mid-swing — the blow misses them
+      if (victim.evadeT > 0) {
+        // Charm Potion: the blow is dodged.
+        this.popText(victim.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), t("combat.miss"), TEXT.sp, false, enemy.bodyPosition);
+        return;
+      }
       this.player.hp = Math.max(0, this.player.hp - amount);
       // Leaned toward the attacker: with two enemies striking at once you see WHICH one hit you.
       // Aimed at the enemy's HEAD, not its feet: from a head-height anchor, feet project almost

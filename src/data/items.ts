@@ -14,6 +14,9 @@ export interface ItemDef {
   spRestore?: number;
   /** Flat MP restored to the Dragoon-magic pool, clamped to Max MP (a big value = full restore). */
   mpRestore?: number;
+  /** Charm Potion (canon, dual-purpose): out of battle it resets the distance counter to the next
+   *  random encounter; in battle the user avoids enemy attacks for 3 of their turns. */
+  charm?: boolean;
   /**
    * Offensive ("magic") item: elemental magic damage to one enemy (`"enemy"`) or all
    * (`"allEnemies"`). Per the LoD formula doc, item magic uses the USER's MAT + level and the
@@ -35,6 +38,13 @@ export const HEALING_POTION: ItemDef = {
   id: "healingPotion",
   nameKey: "item.healingPotion",
   healFraction: 0.5,
+};
+
+export const CHARM_POTION: ItemDef = {
+  id: "charmPotion",
+  nameKey: "item.charmPotion",
+  healFraction: 0,
+  charm: true,
 };
 
 export const SPIRIT_POTION: ItemDef = {

@@ -116,6 +116,8 @@ export class Player {
   private additionPerf = new Map<string, number>();
 
   private guardTimer = 0;
+  /** Charm Potion in battle: seconds left of dodging every enemy attack. */
+  evadeT = 0;
   private guardCdTimer = 0;
   private guardShield!: Mesh;
   /** Remaining actions of the active Dragoon transformation (0 = human form). */

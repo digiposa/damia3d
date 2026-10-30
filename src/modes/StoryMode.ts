@@ -2,9 +2,10 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 import { TrainingMode } from "./TrainingMode";
 import { Enemy } from "../entities/Enemy";
+import type { PartyMember } from "../entities/PartyMember";
 import { ASSASSIN_COCK, BERSERK_MOUSE, GOBLIN, TRENT, type EnemyDef } from "../data/enemies";
 import { EncounterMeter, meterAnchor } from "../ui/EncounterMeter";
-import { HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
+import { CHARM_POTION, HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
 import { t } from "../core/i18n";
 import { SpeechBubble } from "../ui/SpeechBubble";
 import { InteractPrompt } from "../ui/InteractPrompt";
@@ -58,13 +59,13 @@ const SHOP: { id: string; price: number; item?: () => ItemDef | undefined; nameK
   { id: "healingPotion", price: 10, item: () => HEALING_POTION, nameKey: "item.healingPotion", blurbKey: "story.shop.healingPotion" },
   { id: "burnOut", price: 10, item: () => ATTACK_ITEM_BY_ID.get("burnOut"), nameKey: "item.burnOut", blurbKey: "story.shop.burnOut" },
   { id: "bodyPurifier", price: 10, nameKey: "story.item.bodyPurifier", blurbKey: "story.shop.bodyPurifier" },
-  { id: "charmPotion", price: 4, nameKey: "story.item.charmPotionName", blurbKey: "story.shop.charmPotion" },
+  { id: "charmPotion", price: 4, item: () => CHARM_POTION, nameKey: "item.charmPotion", blurbKey: "story.shop.charmPotion" },
 ];
 
 /** What each Forest chest holds (wiki: the four Forest chests). */
 const CHEST_LOOT: Record<string, { item?: () => ItemDef | undefined; gold?: number; labelKey?: string }> = {
   healingPotion: { item: () => HEALING_POTION },
-  charmPotion: { labelKey: "story.item.charmPotion" }, // not in the item system yet
+  charmPotion: { item: () => CHARM_POTION },
   gold20: { gold: 20 },
   burnOut: { item: () => ATTACK_ITEM_BY_ID.get("burnOut") },
 };
@@ -126,6 +127,12 @@ export class StoryMode extends TrainingMode {
     this.updateEncounters(dt);
     this.updateInteract(dt);
     this.updateTalk();
+  }
+
+  /** Charm Potion out of battle: the next random encounter starts its count from zero again. */
+  protected override onCharmOutOfBattle(m: PartyMember): void {
+    this.rollNext();
+    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("story.charm.reset"), "#9fd0ff");
   }
 
   /** The area (canon submap) the hero is in. */
