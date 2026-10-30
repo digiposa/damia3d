@@ -23,6 +23,9 @@ export interface World {
   ownFill: AbstractMesh[];
   /** Lighting that varies across the map (e.g. per area of a big map); `preset` is the start. */
   presetAt?(p: Vector3): LightingPreset;
+  /** A framed "moment" at this spot (zoom multiplier, ground offset of the view), or null for the
+   *  plain follow. Applied outside fights only. */
+  shotAt?(p: Vector3): { zoom: number; offset?: Vector3 } | null;
   /** Per-frame upkeep around the controlled character (e.g. animated props), if any. */
   update?(focus: Vector3, dt: number): void;
 }

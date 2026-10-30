@@ -36,14 +36,39 @@ export class IsoCamera {
    *  zoom actually changed (runs every frame via onBeforeRender, but the bounds rarely move). */
   private applyOrtho(scene: Scene): void {
     const aspect = scene.getEngine().getAspectRatio(this.camera);
-    if (aspect === this.lastAspect && settings.cameraZoom === this.lastZoom) return;
+    const zoom = settings.cameraZoom * this.shotZoom;
+    if (aspect === this.lastAspect && zoom === this.lastZoom) return;
     this.lastAspect = aspect;
-    this.lastZoom = settings.cameraZoom;
-    const half = VIEW_HEIGHT / settings.cameraZoom / 2;
+    this.lastZoom = zoom;
+    const half = VIEW_HEIGHT / zoom / 2;
     this.camera.orthoTop = half;
     this.camera.orthoBottom = -half;
     this.camera.orthoLeft = -half * aspect;
     this.camera.orthoRight = half * aspect;
+  }
+
+  // --- Framed "moments" (a map's set pieces: a cliff edge, a boss arena) -------------------
+
+  /** Current shot: zoom multiplier on the player's zoom setting, and a ground offset of the target. */
+  private shotZoom = 1;
+  private readonly shotOffset = Vector3.Zero();
+  private readonly wantOffset = Vector3.Zero();
+  private wantZoom = 1;
+
+  /** Ask for a framing (eased in over ~1 s); `setShot(1)` returns to the plain follow. */
+  setShot(zoom: number, offset?: Vector3): void {
+    this.wantZoom = zoom;
+    if (offset) this.wantOffset.copyFrom(offset);
+    else this.wantOffset.setAll(0);
+  }
+
+  /** Ease the shot toward the wanted one; call once per frame. */
+  tickShot(dt: number): void {
+    const k = Math.min(1, dt * 1.8);
+    const z = this.shotZoom + (this.wantZoom - this.shotZoom) * k;
+    this.shotZoom = Math.abs(z - this.wantZoom) < 1e-3 ? this.wantZoom : z;
+    Vector3.LerpToRef(this.shotOffset, this.wantOffset, k, this.shotOffset);
+    this.applyTarget();
   }
 
   // The camera target we're actually following (the "clean" point); the live camera.target is this
@@ -103,7 +128,7 @@ export class IsoCamera {
   /** Set the live camera target = followed base + framing lead + current (decaying) shake offset. */
   private applyTarget(): void {
     if (!this.base) return;
-    this.camera.target.copyFrom(this.base);
+    this.camera.target.copyFrom(this.base).addInPlace(this.shotOffset);
     if (this.framing) {
       const f = this.groundForward;
       this.camera.target.x += f.x * this.framing;

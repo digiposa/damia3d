@@ -335,6 +335,7 @@ export function forestWorld(scene: Scene): ForestWorld {
     shadowReceivers: [...floors, track],
     ownFill: [],
     presetAt: (p) => light.at(toUV(p.x, p.z).u),
+    shotAt: (p) => forestShotAt(toUV(p.x, p.z)),
     update: (_focus, dt) => {
       for (const c of chests.values()) c.tick(dt);
     },
@@ -359,6 +360,21 @@ const LIGHT_KEYS: [number, LightingPreset][] = [
   [120, LIGHTING_PRESETS.forestDay],
   [129, LIGHTING_PRESETS.forestMeadow],
 ];
+
+/**
+ * The Forest's framed moments — the iso view, just recomposed for a beat: pulled back and looking
+ * out to sea at the cliff edge, closer on the fallen-tree bridges, and opened up on the fork with
+ * the two roads ahead. Zones are soft (the zoom blends in over ~1 s as you walk in).
+ */
+function forestShotAt({ u, v }: { u: number; v: number }): { zoom: number; offset?: Vector3 } | null {
+  // On a bridge: closer, the drop on both sides.
+  for (const r of RAVINES) if (Math.abs(u - ravineC(r, v)) < ravineH(r, v) + 1.5 && Math.abs(v - r.bridgeV) < 2) return { zoom: 1.18 };
+  // The cliff top: wider, the view shifted out over the sea.
+  if (u > 50 && u < 64 && v > 0) return { zoom: 0.82, offset: SIDE.scale(4).addInPlace(FWD.scale(1)) };
+  // The fork: wider, looking up both roads.
+  if (u > 129 && u < 140) return { zoom: 0.85, offset: FWD.scale(4) };
+  return null;
+}
 
 /** Extent of the terrain in the local frame (well past what the camera can see). */
 const U_MIN = -50;

@@ -955,6 +955,14 @@ export abstract class ArenaCombatMode extends GameMode {
       this.world.clamp(this.player.position); // the wall is a hard boundary
     }
     this.camera.follow(this.player.position);
+    if (this.world.shotAt) {
+      // Set-piece framing only while exploring: a fight always gets the plain, readable view.
+      const p = this.player.position;
+      const fighting = this.enemies.some((e) => e.alive && Math.hypot(e.position.x - p.x, e.position.z - p.z) < 14);
+      const shot = fighting ? null : this.world.shotAt(p);
+      this.camera.setShot(shot?.zoom ?? 1, shot?.offset);
+    }
+    this.camera.tickShot(dt);
     this.world.update?.(this.player.position, dt);
     if (this.world.presetAt && this.atmosphere) {
       const light = this.world.presetAt(this.player.position);
