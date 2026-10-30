@@ -78,7 +78,7 @@ export const LIGHTING_PRESETS = {
     clearColor: [0.12, 0.07, 0.06],
     ambientIntensity: 0.8,
     ambientGround: [0.24, 0.15, 0.1],
-    sunIntensity: 1.32,
+    sunIntensity: 1.42,
     sunColor: [1.0, 0.72, 0.52],
     sunDirection: [-0.5, -1, -0.4],
     exposure: 1.28,
@@ -92,7 +92,7 @@ export const LIGHTING_PRESETS = {
   /** The Forest's maze: deep under the canopy — darker, greener, heavier corners. */
   forestDeep: {
     clearColor: [0.04, 0.06, 0.04],
-    ambientIntensity: 0.6,
+    ambientIntensity: 0.52,
     ambientGround: [0.12, 0.16, 0.08],
     sunIntensity: 0.9,
     sunColor: [0.9, 0.9, 0.66],
@@ -110,7 +110,7 @@ export const LIGHTING_PRESETS = {
     clearColor: [0.12, 0.09, 0.05],
     ambientIntensity: 0.82,
     ambientGround: [0.24, 0.2, 0.1],
-    sunIntensity: 1.35,
+    sunIntensity: 1.45,
     sunColor: [1.0, 0.84, 0.6],
     sunDirection: [-0.5, -1, -0.4],
     exposure: 1.26,

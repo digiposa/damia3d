@@ -537,7 +537,16 @@ function forestLightAt(u: number): LightingPreset {
   const [u1, b] = LIGHT_KEYS[k + 1];
   const t = Math.min(1, Math.max(0, (q - u0) / (u1 - u0)));
   const s = t * t * (3 - 2 * t);
-  lastLight = a === b ? a : lerpPreset(a, b, s);
+  const base = LIGHTING_PRESETS.forestDay;
+  // Exposure, contrast and vignette stay those of the whole map: changing any of them makes Babylon
+  // re-check every material, a visible hitch on phones. The areas differ through the lights, fog,
+  // backdrop and bloom only — all free to change every frame.
+  lastLight = {
+    ...(a === b ? a : lerpPreset(a, b, s)),
+    exposure: base.exposure,
+    contrast: base.contrast,
+    vignetteWeight: base.vignetteWeight,
+  };
   return lastLight;
 }
 
