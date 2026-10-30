@@ -4,13 +4,16 @@ import type { Scene } from "@babylonjs/core/scene";
 import { clampToScreen, projectToScreen } from "../world/project";
 
 /**
- * The danger indicator of the original: a small triangle over the hero's head that shifts from
- * blue to yellow to red as a random encounter draws near (red pulses: it is about to happen).
+ * The danger indicator of the original: a small triangle over the hero's head, spinning on itself,
+ * that shifts from blue to yellow to red as a random encounter draws near (it spins faster as the
+ * danger grows, and pulses in red: it is about to happen).
  * DOM, pinned over the head every frame. `level` is 0 (just reset) … 1 (encounter now).
  */
 export class EncounterMeter {
   private readonly el: HTMLDivElement;
   private t = 0;
+  /** Spin angle about the vertical axis (radians). */
+  private spin = 0;
 
   constructor(private readonly scene: Scene) {
     this.el = document.createElement("div");
@@ -37,6 +40,7 @@ export class EncounterMeter {
       return;
     }
     this.t += dt;
+    this.spin += dt * (2.5 + 5 * level);
     const raw = projectToScreen(this.scene, head);
     if (!raw.visible) return;
     const p = clampToScreen(this.scene, raw, 20);
@@ -47,7 +51,8 @@ export class EncounterMeter {
     this.el.style.borderTopColor = color;
     this.el.style.left = `${p.x}px`;
     this.el.style.top = `${p.y - 4}px`;
-    this.el.style.transform = `translate(-50%, -100%) scale(${pulse.toFixed(3)})`;
+    // rotateY in perspective: the triangle turns edge-on and back, like the original's spinning marker.
+    this.el.style.transform = `translate(-50%, -100%) perspective(60px) rotateY(${this.spin.toFixed(3)}rad) scale(${pulse.toFixed(3)})`;
   }
 
   dispose(): void {
