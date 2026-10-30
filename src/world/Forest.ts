@@ -475,6 +475,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   buildDeadTree(scene, root, rand);
   buildCliffRim(scene, root, rand);
   buildMeadow(scene, root, rand);
+  buildUndergrowth(scene, root, rand);
   shadeGround([...floors, track], trees);
   buildSunShafts(scene, root, rand);
   buildSky(scene, fixed);
@@ -1111,7 +1112,7 @@ function limb(name: string, scene: Scene, path: Vector3[], r0: number, r1: numbe
     name,
     {
       path,
-      tessellation: 8,
+      tessellation: 6, // enough for a trunk seen from the iso camera; trees are the scene's bulk
       cap: Mesh.CAP_START,
       radiusFunction: (i, d) => {
         const t = i / (path.length - 1);
@@ -1181,7 +1182,7 @@ function treeSource(i: number, scene: Scene, bark: StandardMaterial, leaves: Sta
   const blobs = 9 + ((rand() * 3) | 0);
   for (let k = 0; k < blobs; k++) {
     const c = centres[k % centres.length];
-    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.2 + rand() * 0.7, subdivisions: 2, flat: false }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.2 + rand() * 0.7, subdivisions: 1, flat: false }, scene);
     const a = rand() * Math.PI * 2;
     const d = rand() * 1.8;
     b.position.set(c.x + Math.cos(a) * d, c.y + 0.6 + rand() * 1.2, c.z + Math.sin(a) * d);
@@ -1210,7 +1211,7 @@ function groveSource(scene: Scene, bark: StandardMaterial, leaves: StandardMater
   for (let k = 0; k < 9; k++) {
     const a = rand() * Math.PI * 2;
     const d = Math.sqrt(rand()) * 1.9;
-    const b = MeshBuilder.CreateIcoSphere(`groveLeaf${k}`, { radius: 1.0 + rand() * 0.5, subdivisions: 2, flat: false }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`groveLeaf${k}`, { radius: 1.0 + rand() * 0.5, subdivisions: 1, flat: false }, scene);
     b.position.set(Math.cos(a) * d, 3 + (1 - d / 1.9) * 0.9 + rand() * 0.4, Math.sin(a) * d);
     b.scaling.y = 0.8;
     jitter(b, 0.2, rand);
@@ -1665,6 +1666,129 @@ function buildMeadow(scene: Scene, root: TransformNode, rand: () => number): voi
       if (rand() < (open ? 0.35 : 0.15)) place(flowers, root, x, z, 0.7 + rand() * 0.5, rand() * Math.PI);
       else place(grass, root, x, z, 0.7 + rand() * 0.7, rand() * Math.PI);
     }
+  }
+}
+
+/**
+ * The odds and ends that make a wood look lived-in rather than tiled: clusters of red-capped and
+ * pale mushrooms, mossy stumps, fallen trunks lying in the undergrowth, and patches of colourful
+ * wild flowers in the clearings. Scenery only, off the trails, never where a chest or NPC stands.
+ */
+function buildUndergrowth(scene: Scene, root: TransformNode, rand: () => number): void {
+  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial;
+  const leaves = scene.getMaterialByName("forestLeafMat") as StandardMaterial;
+  const capRed = matte("forestCapRedMat", scene, undefined, new Color3(0.72, 0.16, 0.1));
+  const capPale = matte("forestCapPaleMat", scene, undefined, new Color3(0.86, 0.74, 0.56));
+  const stem = matte("forestStemMat", scene, undefined, new Color3(0.9, 0.86, 0.76));
+  const spot = matte("forestSpotMat", scene, undefined, new Color3(0.95, 0.93, 0.88));
+
+  // Mushroom clusters (two kinds), merged sources so they instance cheaply.
+  const mushroom = (name: string, cap: StandardMaterial, spotted: boolean): Mesh => {
+    const parts: Mesh[] = [];
+    for (let k = 0; k < 4; k++) {
+      const h = 0.12 + rand() * 0.14;
+      const a = rand() * Math.PI * 2;
+      const d = k === 0 ? 0 : 0.1 + rand() * 0.14;
+      const st = MeshBuilder.CreateCylinder(`${name}Stem${k}`, { height: h, diameterTop: 0.035, diameterBottom: 0.05, tessellation: 6 }, scene);
+      st.position.set(Math.cos(a) * d, h / 2, Math.sin(a) * d);
+      st.material = stem;
+      const c = MeshBuilder.CreateSphere(`${name}Cap${k}`, { diameter: 0.13 + rand() * 0.1, segments: 6, slice: 0.5 }, scene);
+      c.position.set(Math.cos(a) * d, h - 0.01, Math.sin(a) * d);
+      c.scaling.y = 0.7;
+      c.material = cap;
+      parts.push(st, c);
+      if (spotted)
+        for (let q = 0; q < 3; q++) {
+          const sp = MeshBuilder.CreateSphere(`${name}Spot${k}${q}`, { diameter: 0.022, segments: 3 }, scene);
+          const b = rand() * Math.PI * 2;
+          sp.position.set(Math.cos(a) * d + Math.cos(b) * 0.04, h + 0.02, Math.sin(a) * d + Math.sin(b) * 0.04);
+          sp.material = spot;
+          parts.push(sp);
+        }
+    }
+    return mergeSource(name, parts, false);
+  };
+  const redShrooms = mushroom("forestShroomRed", capRed, true);
+  const paleShrooms = mushroom("forestShroomPale", capPale, false);
+
+  // A mossy stump: a short, flared trunk, a lighter cut top and a cushion of moss.
+  const stumpParts: Mesh[] = [];
+  const stumpBody = MeshBuilder.CreateCylinder("forestStumpBody", { height: 0.55, diameterTop: 0.62, diameterBottom: 0.9, tessellation: 9, subdivisions: 2 }, scene);
+  jitter(stumpBody, 0.06, rand);
+  stumpBody.position.y = 0.27;
+  stumpBody.material = bark;
+  const ring = matte("forestStumpTopMat", scene, undefined, new Color3(0.62, 0.48, 0.3));
+  const stumpTop = MeshBuilder.CreateCylinder("forestStumpTop", { height: 0.02, diameter: 0.58, tessellation: 9 }, scene);
+  stumpTop.position.y = 0.55;
+  stumpTop.material = ring;
+  const moss = MeshBuilder.CreateIcoSphere("forestStumpMoss", { radius: 0.25, subdivisions: 1 }, scene);
+  moss.position.set(0.2, 0.5, 0.05);
+  moss.scaling.y = 0.4;
+  moss.material = leaves;
+  gradeColors(stumpBody, [0.6, 0.56, 0.5], PLAIN);
+  gradeColors(stumpTop, PLAIN, PLAIN);
+  gradeColors(moss, LEAF_SHADE, LEAF_SUN);
+  stumpParts.push(stumpBody, stumpTop, moss);
+  const stump = mergeSource("forestStump", stumpParts, false);
+
+  // Flower patches: red, violet and yellow blooms on a card, like the white ones.
+  const bloom = (name: string, petal: [number, number, number]): Mesh => {
+    const tex = pixelTexture(`${name}Tex`, scene, 32, 32, (ctx, w, h) => {
+      ctx.clearRect(0, 0, w, h);
+      for (let f = 0; f < 7; f++) {
+        const x = 3 + ((rand() * (w - 6)) | 0);
+        const top = 8 + ((rand() * 14) | 0);
+        ctx.fillStyle = rgb(74, 104, 40);
+        ctx.fillRect(x, top, 1, h - top);
+        ctx.fillStyle = rgb(petal[0], petal[1], petal[2]);
+        ctx.fillRect(x - 1, top - 1, 3, 3);
+        ctx.fillStyle = rgb(240, 214, 90);
+        ctx.fillRect(x, top, 1, 1);
+      }
+    });
+    tex.hasAlpha = true;
+    tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+    return cardSource(name, scene, tex, 0.8, 0.6);
+  };
+  const blooms = [bloom("forestBloomRed", [210, 60, 50]), bloom("forestBloomViolet", [150, 90, 200]), bloom("forestBloomYellow", [236, 196, 60])];
+
+  for (let u = -30; u < 175; u += 2.2) {
+    for (let k = 0; k < 3; k++) {
+      const v = (rand() - 0.5) * 36;
+      if (inVoid(u, v, 1)) continue;
+      const { x, z } = forestPoint(u + rand() * 2, v);
+      const n = nearestOnTrack(x, z);
+      if (n.d < n.w + 0.3) continue; // off the trails and their verges
+      if (CLEARINGS.some((c) => Math.hypot(c.x - x, c.z - z) < 2.5)) continue;
+      const open = (u > 50 && u < 64) || u > 120;
+      const roll = rand();
+      if (roll < 0.22) place(rand() < 0.5 ? redShrooms : paleShrooms, root, x, z, 0.8 + rand() * 0.6, rand() * 6);
+      else if (roll < 0.3 && !open) place(stump, root, x, z, 0.8 + rand() * 0.5, rand() * 6);
+      else if (roll < (open ? 0.6 : 0.4)) {
+        const b = blooms[(rand() * blooms.length) | 0];
+        for (let q = 0; q < 3; q++) place(b, root, x + (rand() - 0.5) * 1.2, z + (rand() - 0.5) * 1.2, 0.7 + rand() * 0.4, rand() * 3);
+      }
+    }
+  }
+
+  // A few fallen trunks lying in the undergrowth, off the trails (not on a walkable line).
+  for (const [u, v, len, turn] of [[6, 11, 4.5, 0.5], [22, -12, 5, -0.4], [88, 12, 4, 1.1], [116, -9, 5.5, 0.2], [142, 14, 4, -0.8]] as const) {
+    if (inVoid(u, v, 1)) continue;
+    const at = forestPoint(u, v);
+    const dir = new Vector3(Math.cos(turn) * FWD.x - Math.sin(turn) * SIDE.x, 0, Math.cos(turn) * FWD.z - Math.sin(turn) * SIDE.z);
+    const pts = [-0.5, 0, 0.5].map((t) => new Vector3(at.x + dir.x * len * t, 0.32 + 0.05 * Math.sin(t * 6), at.z + dir.z * len * t));
+    const log = limb(`forestFallen${u}`, scene, pts, 0.4, 0.3, rand);
+    log.material = bark;
+    log.parent = root;
+    for (let q = 0; q < 4; q++) {
+      const f = (q + 0.5) / 4 - 0.5;
+      const m = MeshBuilder.CreateIcoSphere(`forestFallenMoss${u}${q}`, { radius: 0.18 + rand() * 0.12, subdivisions: 1 }, scene);
+      m.scaling.y = 0.45;
+      m.position.set(at.x + dir.x * len * f, 0.66, at.z + dir.z * len * f);
+      m.material = leaves;
+      m.parent = root;
+    }
+    place(redShrooms, root, at.x + dir.x * len * 0.4 + 0.4, at.z + dir.z * len * 0.4, 0.9, 0);
   }
 }
 

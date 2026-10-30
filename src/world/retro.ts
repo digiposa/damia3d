@@ -63,7 +63,8 @@ export function retroEnabled(): boolean {
 export function applyRetroResolution(engine: Engine): void {
   const canvas = engine.getRenderingCanvas();
   if (!canvas) return;
-  const native = 1 / Math.max(1, window.devicePixelRatio || 1);
+  // Capped at 2× density: a 3× phone screen gains nothing visible over 2×, but costs 2.25× the pixels.
+  const native = 1 / Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   const lines = settings.retroLines;
   const cssHeight = canvas.clientHeight || window.innerHeight;
   // Never ABOVE native resolution: on a small window, 280 lines may already be coarser than native.
