@@ -3,12 +3,14 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TrainingMode } from "./TrainingMode";
 import { Enemy } from "../entities/Enemy";
 import { ASSASSIN_COCK, BERSERK_MOUSE, GOBLIN, TRENT, type EnemyDef } from "../data/enemies";
+import { EncounterMeter, meterAnchor } from "../ui/EncounterMeter";
 import { HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
 import { t } from "../core/i18n";
 import { SpeechBubble } from "../ui/SpeechBubble";
 import { InteractPrompt } from "../ui/InteractPrompt";
 import { ShopPanel, type ShopLine } from "../ui/ShopPanel";
 import {
+  FOREST_ZONES,
   MAP_END_U,
   MAP_START_U,
   MERCHANT_SPOT,
@@ -20,17 +22,28 @@ import {
 } from "../world/Forest";
 import type { World } from "../world/World";
 
-/** A canon encounter group waiting at a spot on the map, woken when the party comes near. */
-interface Encounter {
-  /** Spot on the track, in the Forest's local (u, v) frame. */
-  u: number;
-  v: number;
-  group: EnemyDef[];
-  triggered: boolean;
-}
-
-/** Wake distance: about where the spot comes into view, so the group walks in from the edge. */
-const WAKE_RANGE = 14;
+/**
+ * Random encounters, the original's way: a distance counter. Every step walked (with no foe about)
+ * fills it; when it reaches a threshold drawn at random, one of the area's canon formations comes
+ * in from the edge of the screen and the counter starts over. The area's encounter rate (canon,
+ * per submap: higher = more frequent) sets how far you walk on average between fights.
+ * Formations and rates: docs/damia2D/features/locations/Forest.md, "Maps canon".
+ */
+const M = BERSERK_MOUSE;
+const C = ASSASSIN_COCK;
+const G = GOBLIN;
+const T = TRENT;
+const ENCOUNTERS: Record<string, { rate: number; formations: EnemyDef[][] }> = {
+  merchant: { rate: 14, formations: [[M, M], [M, C], [G, C], [M]] }, // submap 624
+  ravine: { rate: 10, formations: [[C, C], [T, C], [T], [C]] }, // 5 — the cliff
+  maze: { rate: 10, formations: [[G, C], [T, C], [M, C], [G]] }, // 625
+  gorge: { rate: 7, formations: [[C, C], [M, M], [G, T], [T]] }, // 6
+  fork: { rate: 10, formations: [[G, T], [M, M], [C, C], [T]] }, // 7 — the final trail
+};
+/** Average distance walked between encounters = DISTANCE_PER_RATE / rate (rate 14 → ~21 units). */
+const DISTANCE_PER_RATE = 300;
+/** How far from the hero a formation appears: just past the edge of the view. */
+const SPAWN_DIST = 11;
 /** How close a chest / the merchant must be for the "interact" prompt to offer it. */
 const CHEST_REACH = 1.9;
 const TALK_REACH = 2.8;
@@ -68,15 +81,11 @@ const CHEST_LOOT: Record<string, { item?: () => ItemDef | undefined; gold?: numb
 export class StoryMode extends TrainingMode {
   override readonly name: string = "Story";
 
-  private encounters: Encounter[] = [
-    // Forest groups (docs/damia2D/features/locations/Forest.md), placed along the five areas.
-    { u: 15, v: 1.5, group: [BERSERK_MOUSE, BERSERK_MOUSE], triggered: false },
-    { u: 30, v: -2, group: [BERSERK_MOUSE, ASSASSIN_COCK], triggered: false },
-    { u: 59, v: 1, group: [GOBLIN, ASSASSIN_COCK], triggered: false }, // past the first trunk
-    { u: 80, v: -2, group: [BERSERK_MOUSE], triggered: false }, // in the maze…
-    { u: 95, v: -8, group: [TRENT], triggered: false }, // …down a dead end
-    { u: 129, v: 0, group: [GOBLIN, ASSASSIN_COCK], triggered: false }, // before the fork
-  ];
+  /** Distance walked toward the next encounter, and the (random) distance it happens at. */
+  private walked = 0;
+  private nextAt = 0;
+  private lastPos?: Vector3;
+  private meter?: EncounterMeter;
 
   private forest?: ForestWorld;
   private bubble?: SpeechBubble;
@@ -92,6 +101,7 @@ export class StoryMode extends TrainingMode {
   protected override createWorld(): World {
     this.forest = forestWorld(this.scene);
     this.bubble = new SpeechBubble(this.scene);
+    this.meter = new EncounterMeter(this.scene);
     this.prompt = new InteractPrompt(this.scene, () => this.offer?.());
     this.shop = new ShopPanel(
       {
@@ -113,16 +123,63 @@ export class StoryMode extends TrainingMode {
   override update(dt: number): void {
     super.update(dt);
     if (this.paused) return;
-    const p = this.player.position;
-    for (const e of this.encounters) {
-      if (e.triggered) continue;
-      const at = forestPoint(e.u, e.v);
-      if (Math.hypot(p.x - at.x, p.z - at.z) > WAKE_RANGE) continue;
-      e.triggered = true;
-      void this.spawnGroup(e, at);
-    }
+    this.updateEncounters(dt);
     this.updateInteract(dt);
     this.updateTalk();
+  }
+
+  /** The area (canon submap) the hero is in. */
+  private areaId(): string {
+    const { u } = forestUV(this.player.position);
+    return (FOREST_ZONES.find((z) => u >= z.u0 && u < z.u1) ?? FOREST_ZONES[0]).id;
+  }
+
+  private rollNext(): void {
+    const rate = ENCOUNTERS[this.areaId()]?.rate ?? 10;
+    this.walked = 0;
+    this.nextAt = (DISTANCE_PER_RATE / rate) * (0.7 + Math.random() * 0.6);
+  }
+
+  /** Fill the counter as the hero walks (never mid-fight); spring a formation when it is full. */
+  private updateEncounters(dt: number): void {
+    const p = this.player.position;
+    const fighting = this.enemies.some((e) => e.alive);
+    if (!this.nextAt) this.rollNext();
+    if (this.lastPos && !fighting) {
+      const step = Math.hypot(p.x - this.lastPos.x, p.z - this.lastPos.z);
+      if (step < 2) this.walked += step; // (a teleport / respawn doesn't count)
+    }
+    this.lastPos = p.clone();
+    const level = Math.min(1, this.walked / this.nextAt);
+    this.meter?.update(dt, meterAnchor(p), fighting ? null : level);
+    if (!fighting && this.walked >= this.nextAt) {
+      const table = ENCOUNTERS[this.areaId()];
+      if (table) void this.spawnFormation(table.formations[(Math.random() * table.formations.length) | 0]);
+      this.rollNext();
+    }
+  }
+
+  /** Bring a formation in from just past the edge of the view, on walkable ground. */
+  private async spawnFormation(group: EnemyDef[]): Promise<void> {
+    for (const def of group) await this.ensureEnemyAssets(def);
+    if (this.scene.isDisposed) return;
+    const p = this.player.position;
+    let at = p.clone();
+    for (let k = 0; k < 16; k++) {
+      const a = Math.random() * Math.PI * 2;
+      const c = p.add(new Vector3(Math.cos(a) * SPAWN_DIST, 0, Math.sin(a) * SPAWN_DIST));
+      this.world.clamp(c);
+      if (Math.hypot(c.x - p.x, c.z - p.z) > SPAWN_DIST * 0.6) {
+        at = c;
+        break;
+      }
+    }
+    group.forEach((def, i) => {
+      const a = (i / group.length) * Math.PI * 2;
+      const pos = at.add(new Vector3(Math.cos(a) * 1.4, 0, Math.sin(a) * 1.4));
+      this.world.clamp(pos);
+      this.addEnemy(new Enemy(this.scene, def, pos));
+    });
   }
 
   /**
@@ -256,18 +313,10 @@ export class StoryMode extends TrainingMode {
   override dispose(): void {
     this.bubble?.dispose();
     this.prompt?.dispose();
+    this.meter?.dispose();
     this.shop?.dispose();
     super.dispose();
   }
 
-  private async spawnGroup(e: Encounter, at: Vector3): Promise<void> {
-    for (const def of e.group) await this.ensureEnemyAssets(def);
-    if (this.scene.isDisposed) return;
-    e.group.forEach((def, i) => {
-      const a = (i / e.group.length) * Math.PI * 2;
-      const pos = at.add(new Vector3(Math.cos(a) * 1.4, 0, Math.sin(a) * 1.4));
-      this.world.clamp(pos);
-      this.addEnemy(new Enemy(this.scene, def, pos));
-    });
-  }
+
 }
