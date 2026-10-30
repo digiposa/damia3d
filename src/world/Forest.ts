@@ -18,7 +18,7 @@ import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 
 import { softDotTexture } from "./atmosphere";
 import { buildForestLife } from "./forestLife";
-import { LIGHTING_PRESETS } from "./lighting";
+import { LIGHTING_PRESETS, lerpPreset, type LightingPreset } from "./lighting";
 import { mulberry32, pixelTexture, rgb } from "./paint";
 import type { World } from "./World";
 
@@ -457,6 +457,7 @@ export interface ForestWorld extends World {
 export function forestWorld(scene: Scene): ForestWorld {
   obstacles.length = 0;
   canopies.length = 0;
+  lastLightU = NaN;
   const root = new TransformNode("forest", scene); // decor
   const fixed = new TransformNode("forestFixed", scene); // floor, track, rock walls, sea
   const rand = mulberry32(0x0f0e57); // fixed seed: the same forest every visit
@@ -496,6 +497,7 @@ export function forestWorld(scene: Scene): ForestWorld {
     framing: 2.5,
     shadowReceivers: [...floors, track],
     ownFill: [],
+    presetAt: (p) => forestLightAt(toUV(p.x, p.z).u),
     update: (_focus, dt) => {
       for (const c of chests.values()) c.tick(dt);
     },
@@ -503,6 +505,39 @@ export function forestWorld(scene: Scene): ForestWorld {
     openChest: (id) => chests.get(id)?.open(),
     merchantHead,
   };
+}
+
+/**
+ * The light along the wood, area by area — golden on the merchant's path, rose and open on the
+ * cliff, deep and green in the maze, full sun on the meadow — blended as you walk (no cut).
+ */
+const LIGHT_KEYS: [number, LightingPreset][] = [
+  [-50, LIGHTING_PRESETS.forestDay],
+  [32, LIGHTING_PRESETS.forestDay],
+  [44, LIGHTING_PRESETS.forestCliff],
+  [62, LIGHTING_PRESETS.forestCliff],
+  [71, LIGHTING_PRESETS.forestDeep],
+  [96, LIGHTING_PRESETS.forestDeep],
+  [104, LIGHTING_PRESETS.forestDay],
+  [120, LIGHTING_PRESETS.forestDay],
+  [129, LIGHTING_PRESETS.forestMeadow],
+];
+
+let lastLightU = NaN;
+let lastLight: LightingPreset = LIGHTING_PRESETS.forestDay;
+function forestLightAt(u: number): LightingPreset {
+  // Quantised: the blend only needs recomputing when you have moved a little.
+  const q = Math.round(u * 4) / 4;
+  if (q === lastLightU) return lastLight;
+  lastLightU = q;
+  let k = 0;
+  while (k < LIGHT_KEYS.length - 2 && q > LIGHT_KEYS[k + 1][0]) k++;
+  const [u0, a] = LIGHT_KEYS[k];
+  const [u1, b] = LIGHT_KEYS[k + 1];
+  const t = Math.min(1, Math.max(0, (q - u0) / (u1 - u0)));
+  const s = t * t * (3 - 2 * t);
+  lastLight = a === b ? a : lerpPreset(a, b, s);
+  return lastLight;
 }
 
 /** Matte material for the set (the PS1 had no specular to speak of). */
@@ -689,12 +724,26 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
   };
   // The cliff face down to the sea: a steep slope rather than a sheer drop, so the iso camera (which
   // looks straight along the edge) actually sees its strata.
-  const cliffCols = 70;
-  const cliff = gridMesh("forestCliffFace", scene, 1, cliffCols, (i, j) => {
-    const u = 40 + (66 - 40) * (j / cliffCols);
+  // It runs along the WHOLE edge — including where the edge curves away inland at both ends, until
+  // it leaves the terrain — and always falls away perpendicular to the edge, so it never stops on a
+  // straight cut with the sea showing past it.
+  let cu0 = 52;
+  while (cu0 > U_MIN && cliffE(cu0) < V_MAX + 2) cu0 -= 0.5;
+  let cu1 = 52;
+  while (cu1 < U_MAX && cliffE(cu1) < V_MAX + 2) cu1 += 0.5;
+  const cliffCols = 120;
+  const cliff = gridMesh("forestCliffFace", scene, 4, cliffCols, (i, j) => {
+    const u = cu0 + (cu1 - cu0) * (j / cliffCols);
     const e = cliffE(u);
-    const p = forestPoint(u, i === 0 ? e : e + 9);
-    return { x: p.x, y: i === 0 ? 0.02 : -26, z: p.z, tu: u / 4, tv: i === 0 ? 0 : 3.4 };
+    // Outward normal of the edge curve v = e(u), in the local (u, v) plane.
+    const de = (cliffE(u + 0.05) - cliffE(u - 0.05)) / 0.1;
+    const len = Math.hypot(de, 1);
+    const nu = -de / len;
+    const nv = 1 / len;
+    const f = i / 4; // 0 = the lip … 1 = the foot, in the sea
+    const out = 9 * Math.pow(f, 0.8);
+    const p = forestPoint(u + nu * out, Math.min(V_MAX + 4, e) + nv * out);
+    return { x: p.x, y: f === 0 ? 0.02 : -26 * f, z: p.z, tu: u / 4, tv: f * 3.4 };
   }, new Vector3(SIDE.x, 1, SIDE.z));
   cliff.material = stone;
   cliff.parent = parent;
@@ -1806,13 +1855,95 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   foamMat.disableLighting = true;
   foamMat.fogEnabled = false;
   const foam = gridMesh("forestFoam", scene, 1, 60, (i, j) => {
-    const u = 38 + (68 - 38) * (j / 60);
-    const p = forestPoint(u, cliffE(u) + 9 + i * 2.2);
+    const u = 36 + (68 - 36) * (j / 60);
+    const de = (cliffE(u + 0.05) - cliffE(u - 0.05)) / 0.1;
+    const len = Math.hypot(de, 1);
+    const out = 9 + i * 2.2;
+    const p = forestPoint(u - (de / len) * out, Math.min(V_MAX + 4, cliffE(u)) + out / len);
     return { x: p.x, y: SEA_Y + 0.08, z: p.z, tu: u / 4, tv: i };
   }, Vector3.Up());
   foam.material = foamMat;
   foam.parent = parent;
   foamTex.uScale = 1;
+
+  // The sunset on the water: an additive wash, dark at the cliff's foot and burning rose-orange
+  // towards the open sea — the horizon the camera can't see, felt through its reflection.
+  const glowTex = new DynamicTexture("forestSeaGlowTex", { width: 4, height: 256 }, scene, false);
+  const gctx = glowTex.getContext();
+  for (let y = 0; y < 256; y++) {
+    const f = y / 255; // 0 = at the cliff … 1 = far out
+    const a = Math.pow(f, 1.6);
+    gctx.fillStyle = `rgb(${Math.round(255 * a)},${Math.round(130 * a)},${Math.round(90 * a)})`;
+    gctx.fillRect(0, y, 4, 1);
+  }
+  glowTex.update();
+  const glowMat = new StandardMaterial("forestSeaGlowMat", scene);
+  glowMat.emissiveTexture = glowTex;
+  glowMat.diffuseColor = Color3.Black();
+  glowMat.specularColor = Color3.Black();
+  glowMat.disableLighting = true;
+  glowMat.fogEnabled = false;
+  glowMat.alphaMode = Constants.ALPHA_ADD;
+  const SEA_V0 = 8;
+  const SEA_V1 = 70;
+  const seaGlow = gridMesh("forestSeaGlow", scene, 8, 8, (i, j) => {
+    const v = SEA_V0 + (SEA_V1 - SEA_V0) * (i / 8);
+    const p = forestPoint(20 + 120 * (j / 8), v);
+    return { x: p.x, y: SEA_Y + 0.12, z: p.z, tu: 0.5, tv: i / 8 };
+  }, Vector3.Up());
+  seaGlow.material = glowMat;
+  seaGlow.parent = parent;
+
+  // Sea haze hanging part-way down the drop: the distance between the cliff top and the water.
+  const hazeTex = new DynamicTexture("forestSeaHazeTex", { width: 4, height: 128 }, scene, false);
+  const hctx = hazeTex.getContext();
+  for (let y = 0; y < 128; y++) {
+    const f = y / 127;
+    const a = Math.pow(f, 1.4) * 0.3; // clear right under the cliff, a veil further out
+    hctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+    hctx.fillRect(0, y, 4, 1);
+  }
+  hazeTex.hasAlpha = true;
+  hazeTex.update();
+  const hazeMat = new StandardMaterial("forestSeaHazeMat", scene);
+  hazeMat.diffuseTexture = hazeTex;
+  hazeMat.useAlphaFromDiffuseTexture = true;
+  hazeMat.emissiveColor = new Color3(0.86, 0.62, 0.6);
+  hazeMat.diffuseColor = Color3.Black();
+  hazeMat.specularColor = Color3.Black();
+  hazeMat.disableLighting = true;
+  hazeMat.fogEnabled = false;
+  hazeMat.backFaceCulling = false;
+  const haze = gridMesh("forestSeaHaze", scene, 8, 8, (i, j) => {
+    const v = SEA_V0 + 4 + (SEA_V1 - SEA_V0) * (i / 8);
+    const p = forestPoint(20 + 120 * (j / 8), v);
+    return { x: p.x, y: -13, z: p.z, tu: 0.5, tv: i / 8 };
+  }, Vector3.Up());
+  haze.material = hazeMat;
+  haze.parent = parent;
+  haze.alphaIndex = 6;
+
+  // Sea stacks off the coast: dark rock pillars with surf at their feet, for scale and distance.
+  const stackMat = scene.getMaterialByName("forestStrataMat") as StandardMaterial | null;
+  const stackRand = mulberry32(0x57ac);
+  for (const [u, v, h, r] of [[44, 22, 9, 2.2], [58, 30, 13, 3], [70, 24, 7, 1.6], [50, 38, 10, 2.6]] as const) {
+    const at = forestPoint(u, v);
+    const stack = MeshBuilder.CreateCylinder(`forestSeaStack${u}`, { height: h, diameterTop: r * 0.9, diameterBottom: r * 2, tessellation: 8, subdivisions: 4 }, scene);
+    jitter(stack, 0.5, stackRand);
+    stack.position.set(at.x, SEA_Y + h / 2 - 0.5, at.z);
+    if (stackMat) stack.material = stackMat;
+    stack.parent = parent;
+    const cap = MeshBuilder.CreateIcoSphere(`forestSeaStackCap${u}`, { radius: r * 0.6, subdivisions: 2, flat: false }, scene);
+    cap.scaling.y = 0.5;
+    cap.position.set(at.x, SEA_Y + h - 0.3, at.z);
+    cap.material = scene.getMaterialByName("forestLeafMat");
+    cap.parent = parent;
+    const surf = MeshBuilder.CreateTorus(`forestSeaStackSurf${u}`, { diameter: r * 2.3, thickness: 0.35, tessellation: 20 }, scene);
+    surf.position.set(at.x, SEA_Y + 0.1, at.z);
+    surf.scaling.y = 0.2;
+    surf.material = foamMat;
+    surf.parent = parent;
+  }
 
   // Emissive, so keep both out of the mode's glow layer (created after the world: first frame),
   // then let the swell drift and the glitter shimmer.
@@ -1821,7 +1952,7 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   scene.onBeforeRenderObservable.add(() => {
     if (!excluded) {
       excluded = true;
-      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint, foam]) layer.addExcludedMesh(m);
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint, foam, seaGlow, haze]) layer.addExcludedMesh(m);
     }
     t += scene.getEngine().getDeltaTime() / 1000;
     tex.vOffset = t * 0.01;

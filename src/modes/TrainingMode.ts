@@ -9,6 +9,7 @@ import { GameMode } from "../core/GameMode";
 import { settings } from "../core/settings";
 import { IsoCamera } from "../world/IsoCamera";
 import { arenaWorld, type World } from "../world/World";
+import type { LightingPreset } from "../world/lighting";
 import { Atmosphere } from "../world/atmosphere";
 import { SpellFx } from "../world/SpellFx";
 import { TargetMarker } from "../world/TargetMarker";
@@ -283,6 +284,8 @@ export abstract class ArenaCombatMode extends GameMode {
   protected atmosphere?: Atmosphere;
   /** Where the fight happens — built first thing in {@link enter}. */
   protected world!: World;
+  /** Last lighting applied from {@link World.presetAt} (re-applied only when it changes). */
+  private lastLight?: LightingPreset;
   protected spellFx?: SpellFx;
   /** Running action log (bottom-left) — the "what just happened" companion to skill captions. */
   protected combatLog?: CombatLog;
@@ -953,6 +956,10 @@ export abstract class ArenaCombatMode extends GameMode {
     }
     this.camera.follow(this.player.position);
     this.world.update?.(this.player.position, dt);
+    if (this.world.presetAt && this.atmosphere) {
+      const light = this.world.presetAt(this.player.position);
+      if (light !== this.lastLight) this.atmosphere.applyPreset((this.lastLight = light)); // per-area mood
+    }
     this.camera.tickShake(dt);
     // Procedural walk/run/idle animation (visual only, uses real time). While an Addition combo is
     // running (or a ranged shot is mid-flight), stay in the attack stance so the swing doesn't snap
