@@ -171,6 +171,11 @@ function toUV(x: number, z: number): { u: number; v: number } {
   return { u: x * FWD.x + z * FWD.z, v: x * SIDE.x + z * SIDE.z };
 }
 
+/** Local (u, v) of a world position: u along the wood, v sideways. */
+export function forestUV(p: Vector3): { u: number; v: number } {
+  return toUV(p.x, p.z);
+}
+
 /** No ground here: inside a ravine, or over the cliff edge. */
 function inVoid(u: number, v: number, margin = 0): boolean {
   for (const r of RAVINES) if (Math.abs(u - ravineC(r, v)) < ravineH(r, v) + margin) return true;
