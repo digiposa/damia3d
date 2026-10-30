@@ -15,7 +15,8 @@ import { type DragoonSpell, spellsForClass } from "../data/dragoonSpells";
 import type { Bearer } from "../data/bearers";
 import type { Element } from "../combat/element";
 import { atbFillTime } from "../combat/AtbGauge";
-import { Humanoid } from "./humanoid";
+import { Humanoid, type Figure } from "./humanoid";
+import { DartFigure } from "./dartFigure";
 import { DragoonForm } from "./DragoonForm";
 import { flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import { instantiateModel } from "../core/AssetService";
@@ -120,7 +121,7 @@ export class Player {
   /** Remaining actions of the active Dragoon transformation (0 = human form). */
   private dragoonTurns = 0;
   private dragoonAura!: Mesh;
-  private humanoid?: Humanoid;
+  private humanoid?: Figure;
   /** Procedural Dragoon-form model, shown while transformed (currently Dart's Red-Eye only). */
   private dragoonForm?: DragoonForm;
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
@@ -844,6 +845,11 @@ export class Player {
    *  when its model fails to load. No-op if one already exists. */
   private buildHumanoid(scene: Scene): void {
     if (this.humanoid) return;
+    if (this.bearer.figure === "dart") {
+      this.humanoid = new DartFigure(scene, { scale: this.bearer.scale });
+      this.humanoid.rig.parent = this.root;
+      return;
+    }
     this.humanoid = new Humanoid(scene, {
       color: this.bearer.color,
       bodyColor: this.bearer.bodyColor,

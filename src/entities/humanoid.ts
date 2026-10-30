@@ -25,6 +25,15 @@ export interface HumanoidOptions {
   scale?: number;
 }
 
+/** What a bearer's procedural figure must offer the Player (placeholder or a bespoke build). */
+export interface Figure {
+  readonly rig: TransformNode;
+  update(dt: number, moving: boolean): void;
+  strike(): void;
+  setEnabled(on: boolean): void;
+  dispose(): void;
+}
+
 /** How long one strike animation lasts (seconds). */
 const STRIKE_DUR = 0.42;
 
@@ -49,7 +58,7 @@ const STRIKE_STYLE: Record<WeaponKind, StrikeStyle> = {
  * a light procedural walk/idle animation plus a one-shot {@link strike}. Pure
  * transforms; no skeleton. Faces +Z (the owner rotates the parent to steer).
  */
-export class Humanoid {
+export class Humanoid implements Figure {
   /** Visual root — parent this under the entity's node. */
   readonly rig: TransformNode;
 

@@ -141,6 +141,8 @@ export interface Bearer {
   weapon?: WeaponKind;
   /** Optional weapon variant for a signature look (e.g. Zieg's spiked broadsword). */
   weaponVariant?: WeaponVariant;
+  /** A bespoke code-built figure replacing the generic placeholder (see entities/dartFigure). */
+  figure?: "dart";
   /** Distinctive hairstyle on the placeholder figure (e.g. Meru's high ponytail). */
   hair?: HairStyle;
   /** Outfit overlaid on the placeholder figure (e.g. Dart's red adventuring armour). */

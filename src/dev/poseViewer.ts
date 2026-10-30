@@ -101,5 +101,21 @@ void player.modelReady.then(() => {
   hud.dataset.ready = "1"; // Playwright waits on this before screenshotting
 });
 
+// Dev: drive the procedural animator — `&move=1` walks in place, `&strike=1` swings on a loop;
+// `&at=0.6` renders a fixed animation time (seconds, 60 fps steps) for reproducible stills.
+if (q.has("move") || q.has("strike") || q.has("at")) {
+  const moving = q.has("move");
+  let since = 0;
+  const step = (dt: number): void => {
+    if (q.has("strike") && (since += dt) > 0.8) {
+      since = 0;
+      player.strike();
+    }
+    player.animate(dt, moving);
+  };
+  if (q.has("at")) for (let t = 0; t < num("at", 0); t += 1 / 60) step(1 / 60);
+  else scene.onBeforeRenderObservable.add(() => step(engine.getDeltaTime() / 1000));
+}
+
 engine.runRenderLoop(() => scene.render());
 window.addEventListener("resize", () => engine.resize());
