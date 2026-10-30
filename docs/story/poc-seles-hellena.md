@@ -10,25 +10,29 @@ intro → Seles → Forêt → Hellena (1re visite) → fuite vers la Prairie.
 
 ## Déroulé (version de travail — à corriger)
 
-### 0. Intro (cold open)
-1. ⚠️ Cinématique : Seles attaquée de nuit par les soldats de Sandora, Shana capturée.
-2. Dart, de retour de voyage, traverse une forêt / plaine ; **le Feyrbrand l'attaque**.
-3. **Rose intervient** et repousse le dragon. ⚠️ Combat jouable ou scène scriptée ? (dans le
-   jeu d'origine : pas de vrai combat contre le Feyrbrand ici — proposition : scène scriptée +
-   fuite courte jouable).
+### 0. Intro — la forêt sans nom (canon : `locations/Seles.md`)
+1. Cinématique : Seles attaquée de nuit, Shana arrêtée (gemme qui brille, homme encapuchonné).
+2. Rose observe le Feyrbrand depuis une falaise (675).
+3. Dart lit un **avis de guerre** (676), puis **deux Knights de Sandora l'interrogent** (677).
+4. **Le Feyrbrand poursuit Dart** (703) ; **Rose le sauve** au bord d'une falaise (704).
+   Pas de vrai combat contre le dragon : course-poursuite jouable + scène.
+5. Dart apprend la destruction de Seles et part ; la gemme de Rose brille.
 
 ### 1. Seles (village en ruines, crépuscule sépia)
-D'après les captures : village brûlé, **puits au centre**, **cimetière** (tombes) en haut,
-**maison/chapelle en pierre en ruine** à droite, maisons en bois calcinées, arbres morts, clôtures.
-1. Dart **dévale le talus** pour entrer dans Seles (capture 7/10).
-2. Exploration libre : **coffre Burn Out** près de la clôture cassée (capture 4/10).
-3. Devant la maison en pierre : un **villageois blessé** menacé par **2 Knights of Sandora** ;
-   le **Commander** les accompagne — « Besting a private is no reason to be confident. »
-4. **Combat scripté** (formation canon 384) : Commander + Knight of Sandora ×2, sans fuite.
-   Le Commander passe en **Power Up** quand les Knights tombent (déjà codé).
-5. Après le combat : le Commander révèle que **Shana a été emmenée à Hellena**.
-6. ⚠️ **Plos** (survivant) / le blessé : dialogue, Dart promet de ramener Shana.
-7. Sortie vers la **Forêt**.
+Puits au centre, cimetière en haut, maison/chapelle en pierre en ruine, maisons en bois
+calcinées, arbres morts, clôtures.
+1. Plateau : Dart voit Seles en cendres et **dévale la pente** (9).
+2. Il saute la clôture (est) : **combat 1** — Knight of Sandora ×2 menaçant un villageois (10,
+   formation 477). Le villageois meurt : « sauve Shana ». **Save Point** juste là.
+3. **Coffre Burn Out** près du Save Point (accessible après le combat 1).
+4. Vers l'ouest : **Plos** devant la maison brûlée du centre ; il explique que Shana était la cible.
+5. **Combat 2** (725, formation 384) : Commander + Knight ×2 ; il révèle que Shana est à Hellena.
+   Power Up quand les Knights tombent (déjà codé).
+6. Plos rassure Dart ; **Lowe et Isha** dans la maison où Plos est adossé (optionnel).
+7. **Stardust** : 3e tombe à gauche devant l'arbre (12) ; **Master Tasman** : tutoriel optionnel
+   (Additions, contre-attaques, garde).
+8. Sortie au **nord** → cinématique à Hellena (Shana en cellule, Fruegel vs l'homme
+   encapuchonné) → Forêt.
 
 ### 2. Forêt — ✅ faite (carte, rencontres canon, marchand, coffres, scène Shana à jouer)
 
@@ -58,7 +62,8 @@ Le groupe fuit, poursuivi ; ⚠️ Lavitz touché à la jambe par une flèche. F
 5. **Mécaniques de boss** : Fruegel (gating par les Wardens, Whistle, Power up anti-magie).
 
 ## Cartes à construire (méthode « tout en code » + `src/world/kit`)
-- **Intro** : forêt/plaine (réutilise la flore de la Forêt), ⚠️ de nuit ou au crépuscule ?
+- **Intro** : forêt sans nom (réutilise la flore de la Forêt) : falaise, sous-bois, fourche,
+  falaise du sauvetage.
 - **Seles** : village en ruines (nouveaux éléments : maisons en pierre/bois calcinées, puits,
   tombes, clôtures, arbres morts, fumée).
 - **Hellena** : forteresse de pierre (nouveaux : murs, portes, couloirs, cellules, pont, torches —
@@ -76,7 +81,7 @@ Le groupe fuit, poursuivi ; ⚠️ Lavitz touché à la jambe par une flèche. F
 | Hellena Warden (+ arme) | humanoïde à rigger | ~30k (+3k) | en cours |
 | Senior Warden | humanoïde à rigger | ~30k | à faire (ou variante de la Warden) |
 | Fruegel | boss | ≤ 90k | à faire |
-| Plos, villageois, marchand | PNJ | ~15k | à faire |
+| Plos, Master Tasman, Lowe, Isha, villageois, marchand | PNJ | ~15k | à faire |
 
 En attendant les GLB : placeholders procéduraux (le jeu reste jouable).
 
