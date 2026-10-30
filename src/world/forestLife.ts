@@ -3,9 +3,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
-import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
-import { Constants } from "@babylonjs/core/Engines/constants";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
@@ -14,9 +12,8 @@ import { mulberry32 } from "./paint";
 
 /**
  * What makes the wood feel alive rather than painted: things that MOVE on their own, independent
- * of the player — butterflies over the grass, leaves letting go of the canopy, the shadows of the
- * leaves shifting on the ground as the wind moves the crowns, and now and then a few birds crossing
- * high overhead. All of it follows the camera, so it costs the same anywhere on the map.
+ * of the player — butterflies over the grass, leaves letting go of the canopy, and now and then a
+ * few birds crossing high overhead. All of it follows the camera, so it costs the same anywhere on the map.
  *
  * `walkable(x, z)` says where open ground is (butterflies stay over it, not inside the trees).
  */
@@ -28,7 +25,6 @@ export function buildForestLife(scene: Scene, walkable: (x: number, z: number) =
   };
   const dt = (): number => Math.min(0.05, scene.getEngine().getDeltaTime() / 1000);
 
-  buildLeafShadows(scene, focus);
   buildFallingLeaves(scene, focus);
   buildButterflies(scene, focus, walkable, rand, dt);
   buildBirds(scene, focus, rand, dt);
@@ -50,60 +46,6 @@ function softTexture(name: string, scene: Scene, w: number, h: number, paint: (c
  * multiplied onto it, drifting back and forth as gusts sway the crowns. Two layers at different
  * scales and speeds, so the pattern never visibly repeats.
  */
-function buildLeafShadows(scene: Scene, focus: () => Vector3): void {
-  const rand = mulberry32(0x5ad0);
-  const tex = softTexture("forestLeafShadowTex", scene, 128, 128, (ctx) => {
-    ctx.fillStyle = "rgba(255,255,255,1)";
-    ctx.fillRect(0, 0, 128, 128);
-    for (let i = 0; i < 60; i++) {
-      const x = rand() * 128;
-      const y = rand() * 128;
-      const r = 4 + rand() * 14;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, "rgba(120,110,95,0.9)");
-      g.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = g;
-      for (const dx of [-128, 0, 128]) for (const dy of [-128, 0, 128]) ctx.fillRect(x - r + dx, y - r + dy, r * 2, r * 2);
-    }
-  });
-  tex.hasAlpha = false;
-  tex.wrapU = tex.wrapV = Texture.WRAP_ADDRESSMODE;
-  const layers: { mesh: Mesh; tex: Texture; scale: number; phase: number }[] = [];
-  [0, 1].forEach((k) => {
-    const lt = k === 0 ? tex : (tex.clone() as Texture);
-    const mat = new StandardMaterial(`forestLeafShadowMat${k}`, scene);
-    mat.diffuseTexture = lt;
-    mat.diffuseColor = Color3.White();
-    mat.emissiveColor = Color3.White(); // its own colour, whatever the light: it is a multiplier
-    mat.disableLighting = true;
-    mat.specularColor = Color3.Black();
-    mat.alphaMode = Constants.ALPHA_MULTIPLY;
-    mat.fogEnabled = false;
-    mat.zOffset = -4;
-    const mesh = MeshBuilder.CreateGround(`forestLeafShadow${k}`, { width: 44, height: 44 }, scene);
-    mesh.material = mat;
-    mesh.isPickable = false;
-    mesh.position.y = 0.04 + k * 0.01;
-    mesh.alphaIndex = 2;
-    mesh.visibility = 0.999; // routes it through the transparent pass (after the ground)
-    layers.push({ mesh, tex: lt, scale: k === 0 ? 0.09 : 0.055, phase: k * 1.7 });
-  });
-  let t = 0;
-  scene.onBeforeRenderObservable.add(() => {
-    t += scene.getEngine().getDeltaTime() / 1000;
-    const f = focus();
-    const gust = Math.sin(t * 0.7) * 0.6 + Math.sin(t * 1.9) * 0.25;
-    for (const l of layers) {
-      // The layer follows the camera, but its texture stays pinned to the world (plus the sway).
-      l.mesh.position.x = f.x;
-      l.mesh.position.z = f.z;
-      l.tex.uScale = l.tex.vScale = 44 * l.scale;
-      l.tex.uOffset = (f.x * l.scale) + Math.sin(t * 0.5 + l.phase) * 0.02 + gust * 0.012;
-      l.tex.vOffset = (-f.z * l.scale) + Math.cos(t * 0.4 + l.phase) * 0.02;
-    }
-  });
-}
-
 /** Leaves letting go of the canopy: tumbling slowly down, drifting with the breeze. */
 function buildFallingLeaves(scene: Scene, focus: () => Vector3): void {
   const tex = softTexture("forestFallingLeafTex", scene, 32, 32, (ctx) => {
