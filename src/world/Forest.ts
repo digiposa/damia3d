@@ -1248,7 +1248,7 @@ function bushSource(scene: Scene, leaves: StandardMaterial, rand: () => number):
   const parts: Mesh[] = [];
   for (let k = 0; k < 7; k++) {
     const r = 0.32 + rand() * 0.22;
-    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 2, flat: false }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 1, flat: false }, scene);
     const a = rand() * Math.PI * 2;
     const d = k === 0 ? 0 : 0.35 + rand() * 0.4;
     b.position.set(Math.cos(a) * d, r * 0.8 + (k === 0 ? 0.25 : rand() * 0.15), Math.sin(a) * d);
@@ -1419,7 +1419,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
         // most they hide your feet, never you).
         const s = 1.5 + rand() * 0.6;
         place(bush, root, x, z, s, rot);
-        for (let k = 0; k < 2; k++) place(bush, root, x + (rand() - 0.5) * 2.2, z + (rand() - 0.5) * 2.2, s * (0.7 + rand() * 0.3), rand() * 6);
+        place(bush, root, x + (rand() - 0.5) * 2.2, z + (rand() - 0.5) * 2.2, s * (0.8 + rand() * 0.3), rand() * 6);
       } else if (edge > 0.9 && roll < (meadow ? 0.15 : open ? 0.4 : 0.85) && !occludesTrack(x, z, 15, 4.4, 9 * TAN_BETA - 4.4)) {
         const s = 0.85 + rand() * 0.4;
         const src = trees[(rand() * trees.length) | 0];
@@ -2018,35 +2018,6 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   seaGlow.material = glowMat;
   seaGlow.parent = parent;
 
-  // Sea haze hanging part-way down the drop: the distance between the cliff top and the water.
-  const hazeTex = new DynamicTexture("forestSeaHazeTex", { width: 4, height: 128 }, scene, false);
-  const hctx = hazeTex.getContext();
-  for (let y = 0; y < 128; y++) {
-    const f = y / 127;
-    const a = Math.pow(f, 1.4) * 0.3; // clear right under the cliff, a veil further out
-    hctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-    hctx.fillRect(0, y, 4, 1);
-  }
-  hazeTex.hasAlpha = true;
-  hazeTex.update();
-  const hazeMat = new StandardMaterial("forestSeaHazeMat", scene);
-  hazeMat.diffuseTexture = hazeTex;
-  hazeMat.useAlphaFromDiffuseTexture = true;
-  hazeMat.emissiveColor = new Color3(0.86, 0.62, 0.6);
-  hazeMat.diffuseColor = Color3.Black();
-  hazeMat.specularColor = Color3.Black();
-  hazeMat.disableLighting = true;
-  hazeMat.fogEnabled = false;
-  hazeMat.backFaceCulling = false;
-  const haze = gridMesh("forestSeaHaze", scene, 8, 8, (i, j) => {
-    const v = SEA_V0 + 4 + (SEA_V1 - SEA_V0) * (i / 8);
-    const p = forestPoint(20 + 120 * (j / 8), v);
-    return { x: p.x, y: -13, z: p.z, tu: 0.5, tv: i / 8 };
-  }, Vector3.Up());
-  haze.material = hazeMat;
-  haze.parent = parent;
-  haze.alphaIndex = 6;
-
   // Sea stacks off the coast: dark rock pillars with surf at their feet, for scale and distance.
   const stackMat = scene.getMaterialByName("forestStrataMat") as StandardMaterial | null;
   const stackRand = mulberry32(0x57ac);
@@ -2076,7 +2047,7 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   scene.onBeforeRenderObservable.add(() => {
     if (!excluded) {
       excluded = true;
-      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint, foam, seaGlow, haze]) layer.addExcludedMesh(m);
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint, foam, seaGlow]) layer.addExcludedMesh(m);
     }
     t += scene.getEngine().getDeltaTime() / 1000;
     tex.vOffset = t * 0.01;
@@ -2109,7 +2080,8 @@ function buildRavineMist(scene: Scene, parent: TransformNode): void {
   tex.update();
   tex.wrapU = tex.wrapV = Texture.WRAP_ADDRESSMODE;
   const layers: { mat: StandardMaterial; tex: Texture; speed: number }[] = [];
-  for (const [k, depth, alpha, tint] of [[0, 5, 0.55, [0.8, 0.72, 0.68]], [1, 10, 0.75, [0.62, 0.56, 0.6]]] as const) {
+  // One layer (each full-width transparent layer costs a screen's worth of pixels on a phone).
+  for (const [k, depth, alpha, tint] of [[0, 7, 0.7, [0.72, 0.65, 0.65]]] as const) {
     const lt = tex.clone() as Texture;
     lt.uScale = lt.vScale = 0.12;
     const mat = new StandardMaterial(`forestRavineMistMat${k}`, scene);
@@ -2122,8 +2094,9 @@ function buildRavineMist(scene: Scene, parent: TransformNode): void {
     mat.alpha = alpha;
     mat.backFaceCulling = false;
     RAVINES.forEach((r, ri) => {
-      const m = gridMesh(`forestRavineMist${ri}_${k}`, scene, V_MAX - V_MIN, 2, (i, j) => {
-        const v = V_MIN + i;
+      // Only as wide as the wood beside the trails (the camera never sees further out).
+      const m = gridMesh(`forestRavineMist${ri}_${k}`, scene, 50, 2, (i, j) => {
+        const v = -25 + i;
         const u = ravineC(r, v) + ravineH(r, v) * (j - 1) * 0.98;
         const p = forestPoint(u, Math.min(v, cliffE(u) + 2));
         return { x: p.x, y: -depth, z: p.z, tu: p.x, tv: p.z };
