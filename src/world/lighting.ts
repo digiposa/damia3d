@@ -3,6 +3,11 @@
  * scene's ambiance is data, not code duplicated per mode. {@link Atmosphere} applies a preset
  * (and can transition between them), so a bright town and a pitch-black cave are the same
  * renderer with different numbers — nothing is baked into geometry.
+ *
+ * ⚠️ Performance rule (learned on the Forest, mobile): exposure, contrast and vignette must NOT
+ * change continuously while playing — each change makes Babylon re-check every material, a hitch
+ * per change on phones. Vary a map's mood by area through lights, fog, backdrop and bloom only
+ * (see Forest's `forestLightAt`); a full preset switch is fine for one-off cuts (scene changes).
  */
 export interface LightingPreset {
   /** Backdrop colour behind the world (RGB 0–1). */
