@@ -8,6 +8,8 @@ import { hasTouch } from "./device";
 import type { GameHost, SystemSection } from "./menu";
 import { TrainingMode } from "../modes/TrainingMode";
 import { StoryMode } from "../modes/StoryMode";
+import { startNewStory, story } from "../story/state";
+import type { ModeFactory } from "./GameMode";
 import { SurvivalMode } from "../modes/SurvivalMode";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
 import { MainMenu, type ModeId } from "../ui/MainMenu";
@@ -103,6 +105,12 @@ export class Game implements GameHost {
     this.openMainMenu();
   }
 
+  /** GameHost: replace the running mode with another (a Story map change rebuilds the scene). */
+  switchMode(factory: ModeFactory): void {
+    this.modes.switchTo(factory);
+    this.paused = false;
+  }
+
   private openMainMenu(): void {
     this.system.hide();
     this.modes.clear();
@@ -124,6 +132,11 @@ export class Game implements GameHost {
         this.modes.switchTo((s, i, h) => new TrainingMode(s, i, h));
         break;
       case "Story":
+        story(); // continue the save (or start a new game if there is none)
+        this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
+        break;
+      case "StoryNew":
+        startNewStory();
         this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
         break;
       case "Survival":

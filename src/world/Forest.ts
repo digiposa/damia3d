@@ -183,6 +183,20 @@ function inVoid(u: number, v: number, margin = 0): boolean {
 const DIRT_HALF = 2.3; // the reference track is broad: a cart road, not a footpath
 
 /** World position of the local track coordinates (u along the screen's up, v sideways). */
+/** Where the main track crosses `u` (entry points, spawns). */
+export function trackPointAt(u: number): Vector3 {
+  let best = TRAILS[0][0];
+  let bestD = Infinity;
+  for (const s of TRAILS[0]) {
+    const d = Math.abs(toUV(s.p.x, s.p.z).u - u);
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
+  }
+  return best.p.clone();
+}
+
 export function forestPoint(u: number, v: number): Vector3 {
   return fromUV(u, v); // a function declaration (hoisted): module-level data below already uses it
 }

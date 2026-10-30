@@ -100,6 +100,8 @@ export class Enemy {
   private burnOutCooldown = 0;
   /** Seconds until the thrown weapon is available again (counts down in {@link aiUpdate}). */
   private throwCooldown = 0;
+  /** Held by a story scene: placed but inactive until released (see StoryMode battles). */
+  held = false;
   private bodyMat: StandardMaterial;
 
   /** Resolves once the optional rigged model has loaded (or immediately if there's none). */
@@ -553,6 +555,8 @@ export class Enemy {
     if (this.dead) return null;
     // The training dummy just stands there: no chasing, no attacks.
     if (this.def.behavior === "dummy") return null;
+    // Held by a story scene (placed, waiting for the dialogue before the fight): stand still.
+    if (this.held) return null;
     this.burnOutCooldown = Math.max(0, this.burnOutCooldown - dt); // spell recharge: thaws even stunned
     this.throwCooldown = Math.max(0, this.throwCooldown - dt); // idem for the thrown weapon
     // Stunned: frozen — no chase, no acting, and the ATB does NOT charge (that's what a stun is).

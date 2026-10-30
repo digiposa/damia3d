@@ -1,167 +1,275 @@
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
-import { TrainingMode } from "./TrainingMode";
+import { ArenaCombatMode } from "./TrainingMode";
 import { Enemy } from "../entities/Enemy";
+import { Humanoid, type HumanoidOptions } from "../entities/humanoid";
 import type { PartyMember } from "../entities/PartyMember";
-import { ASSASSIN_COCK, BERSERK_MOUSE, GOBLIN, TRENT, type EnemyDef } from "../data/enemies";
-import { EncounterMeter, meterAnchor } from "../ui/EncounterMeter";
-import { CHARM_POTION, HEALING_POTION, ATTACK_ITEM_BY_ID, type ItemDef } from "../data/items";
+import type { EnemyDef } from "../data/enemies";
+import { bearerById, type Bearer } from "../data/bearers";
+import type { ItemDef } from "../data/items";
 import { t } from "../core/i18n";
-import { SpeechBubble } from "../ui/SpeechBubble";
+import { DialogueBox } from "../ui/DialogueBox";
+import { EncounterMeter, meterAnchor } from "../ui/EncounterMeter";
+import { Fader } from "../ui/Fader";
 import { InteractPrompt } from "../ui/InteractPrompt";
-import { ShopPanel, type ShopLine } from "../ui/ShopPanel";
-import {
-  FOREST_ZONES,
-  MAP_END_U,
-  MAP_START_U,
-  MERCHANT_SPOT,
-  SHANA_SCENE_SPOT,
-  forestPoint,
-  forestUV,
-  forestWorld,
-  type ForestWorld,
-} from "../world/Forest";
+import { SpeechBubble } from "../ui/SpeechBubble";
+import { MAPS } from "../story/maps";
+import { hasFlag, itemDef, saveStory, setFlag, story } from "../story/state";
+import type { BattleUnit, NpcHandle, StoryApi, StoryMap } from "../story/StoryMap";
 import type { World } from "../world/World";
 
-/**
- * Random encounters, the original's way: a distance counter. Every step walked (with no foe about)
- * fills it; when it reaches a threshold drawn at random, one of the area's canon formations comes
- * in from the edge of the screen and the counter starts over. The area's encounter rate (canon,
- * per submap: higher = more frequent) sets how far you walk on average between fights.
- * Formations and rates: docs/damia2D/features/locations/Forest.md, "Maps canon".
- */
-const M = BERSERK_MOUSE;
-const C = ASSASSIN_COCK;
-const G = GOBLIN;
-const T = TRENT;
-const ENCOUNTERS: Record<string, { rate: number; formations: EnemyDef[][] }> = {
-  merchant: { rate: 14, formations: [[M, M], [M, C], [G, C], [M]] }, // submap 624
-  ravine: { rate: 10, formations: [[C, C], [T, C], [T], [C]] }, // 5 — the cliff
-  maze: { rate: 10, formations: [[G, C], [T, C], [M, C], [G]] }, // 625
-  gorge: { rate: 7, formations: [[C, C], [M, M], [G, T], [T]] }, // 6
-  fork: { rate: 10, formations: [[G, T], [M, M], [C, C], [T]] }, // 7 — the final trail
-};
 /** Average distance walked between encounters = DISTANCE_PER_RATE / rate (rate 14 → ~21 units). */
 const DISTANCE_PER_RATE = 300;
-/** How far from the hero a formation appears: just past the edge of the view. */
+/** How far from the hero a random formation appears: just past the edge of the view. */
 const SPAWN_DIST = 11;
-/** How close a chest / the merchant must be for the "interact" prompt to offer it. */
-const CHEST_REACH = 1.9;
-const TALK_REACH = 2.8;
-/** Walk this far from a story beat or a map exit and its bubble closes. */
-const TALK_LEAVE = 4.5;
-/** How close to the end of the map counts as "at the exit". */
-const EXIT_REACH = 1.5;
 
-/** The merchant's wares (wiki: the Forest Item Shop). Body Purifier and Charm Potion are canon
- *  but not in the item system yet — listed, not sold. */
-const SHOP: { id: string; price: number; item?: () => ItemDef | undefined; nameKey: string; blurbKey: string }[] = [
-  { id: "healingPotion", price: 10, item: () => HEALING_POTION, nameKey: "item.healingPotion", blurbKey: "story.shop.healingPotion" },
-  { id: "burnOut", price: 10, item: () => ATTACK_ITEM_BY_ID.get("burnOut"), nameKey: "item.burnOut", blurbKey: "story.shop.burnOut" },
-  { id: "bodyPurifier", price: 10, nameKey: "story.item.bodyPurifier", blurbKey: "story.shop.bodyPurifier" },
-  { id: "charmPotion", price: 4, item: () => CHARM_POTION, nameKey: "item.charmPotion", blurbKey: "story.shop.charmPotion" },
-];
-
-/** What each Forest chest holds (wiki: the four Forest chests). */
-const CHEST_LOOT: Record<string, { item?: () => ItemDef | undefined; gold?: number; labelKey?: string }> = {
-  healingPotion: { item: () => HEALING_POTION },
-  charmPotion: { item: () => CHARM_POTION },
-  gold20: { gold: 20 },
-  burnOut: { item: () => ATTACK_ITEM_BY_ID.get("burnOut") },
-};
+interface Trigger {
+  at: Vector3;
+  radius: number;
+  run: () => Promise<void> | void;
+  when?: () => boolean;
+  done: boolean;
+}
+interface Interactable {
+  at: Vector3;
+  label: string;
+  act: () => Promise<void> | void;
+  when?: () => boolean;
+  reach: number;
+}
+interface Sign {
+  at: Vector3;
+  radius: number;
+  title: string;
+  text: string;
+}
+interface Npc {
+  fig: Humanoid;
+  root: TransformNode;
+  walk?: { to: Vector3; speed: number; done: () => void };
+}
 
 /**
- * Story mode — test map: the Forest, built in code like the arena. Real-time fights happen in
- * place: each canon encounter group stands further along the track and engages when you come near.
+ * Story mode — the campaign, map by map. The current map and everything the party owns live in
+ * the save ({@link story}); a map change rebuilds the scene with the next map. Each map brings its
+ * own World and a script written against {@link StoryApi}: dialogue, scenes, NPCs, chests, scripted
+ * fights, exits. Random encounters follow the canon distance counter where the map has them.
  *
- * One seamless map: the camera simply follows you through the whole wood, from the merchant's
- * path to the fork (a split-into-screens variant was tried and dropped — seamless plays better).
- *
- * Still a test bed: it keeps Training's character picker and debug menu.
+ * Still a POC: the debug menu stays available.
  */
-export class StoryMode extends TrainingMode {
-  override readonly name: string = "Story";
+export class StoryMode extends ArenaCombatMode {
+  readonly name: string = "Story";
 
-  /** Distance walked toward the next encounter, and the (random) distance it happens at. */
+  private map!: StoryMap;
+  private api!: StoryApi;
+  private readonly mapId = story().map;
+  private readonly entry = story().entry;
+
+  private dialogue?: DialogueBox;
+  private fader?: Fader;
+  private bubble?: SpeechBubble;
+  private prompt?: InteractPrompt;
+  private meter?: EncounterMeter;
+
+  private triggers: Trigger[] = [];
+  private interactables: Interactable[] = [];
+  private signs: Sign[] = [];
+  private npcs: Npc[] = [];
+  private staged: Enemy[] = [];
+  private waits: { until: () => boolean; done: () => void }[] = [];
+  /** A script is running (one at a time). */
+  private busy = false;
+  private started = false;
+  private offer?: () => void;
+  private signShown?: Sign;
+
+  // Random encounters (canon distance counter).
   private walked = 0;
   private nextAt = 0;
   private lastPos?: Vector3;
-  private meter?: EncounterMeter;
 
-  private forest?: ForestWorld;
-  private bubble?: SpeechBubble;
-  private prompt?: InteractPrompt;
-  private shop?: ShopPanel;
-  /** What the prompt currently offers (acted on by the prompt, or the E key). */
-  private offer?: () => void;
-  /** Who the open bubble belongs to. */
-  private talking?: "shana" | "exit";
-  private opened = new Set<string>();
-  private shanaSeen = false;
+  // --- Setup ---------------------------------------------------------------------------------
 
   protected override createWorld(): World {
-    this.forest = forestWorld(this.scene);
+    const build = MAPS[this.mapId] ?? MAPS.seles;
+    this.map = build(this.scene);
+    this.api = this.makeApi();
+    this.dialogue = new DialogueBox();
+    this.fader = new Fader(true); // opens on black, faded in once the map is ready
     this.bubble = new SpeechBubble(this.scene);
-    this.meter = new EncounterMeter(this.scene);
     this.prompt = new InteractPrompt(this.scene, () => this.offer?.());
-    this.shop = new ShopPanel(
-      {
-        lines: () => this.shopLines(),
-        gold: () => this.gold,
-        buy: (id) => this.buy(id),
-      },
-      () => {
-        this.paused = false;
-      },
-    );
-    return this.forest;
+    this.meter = new EncounterMeter(this.scene);
+    return this.map.world;
+  }
+
+  protected override pickParty(): Bearer[] {
+    const s = story();
+    this.partyLevel = s.level;
+    this.gold = s.gold;
+    const party = s.party.map((id) => bearerById(id)).filter((b): b is Bearer => !!b);
+    return party.length ? party : this.defaultParty().slice(0, 1);
+  }
+
+  protected override initialItems(): { def: ItemDef; count: number }[] {
+    const out: { def: ItemDef; count: number }[] = [];
+    for (const { id, count } of story().items) {
+      const def = itemDef(id);
+      if (def && count > 0) out.push({ def, count });
+    }
+    return out;
   }
 
   protected override extraModels(): string[] {
-    return ["berserk_mouse", "assassin_cock", "goblin", "trent"];
+    return this.map?.models ?? [];
   }
+
+  override enter(): void {
+    super.enter();
+    // Stand the party at the map's entry point.
+    const at = this.map.entries[this.entry] ?? Object.values(this.map.entries)[0] ?? Vector3.Zero();
+    this.party.forEach((m, i) => {
+      const p = at.add(this.formationOffset(i));
+      this.world.clamp(p);
+      m.position.copyFrom(p);
+    });
+    this.camera.follow(this.player.position, 1);
+  }
+
+  protected override onAssetsReady(): void {
+    this.paused = false;
+    if (this.started) return;
+    this.started = true;
+    void this.fader?.fade(0, 0.8);
+    this.map.start(this.api, this.entry);
+  }
+
+  // --- Frame ---------------------------------------------------------------------------------
 
   override update(dt: number): void {
+    // Dialogue: Space / Enter / E finish or close the line (taps are handled by the box).
+    if (this.dialogue?.isOpen && ["Space", "Enter", "KeyE"].some((k) => this.input.wasPressed(k))) this.dialogue.advance();
     super.update(dt);
     if (this.paused) return;
-    this.updateEncounters(dt);
+    this.updateNpcs(dt);
+    for (const w of [...this.waits]) {
+      if (w.until()) {
+        this.waits.splice(this.waits.indexOf(w), 1);
+        w.done();
+      }
+    }
+    if (!this.busy && !this.inputLocked) {
+      this.runTriggers();
+      this.updateEncounters(dt);
+    } else {
+      this.meter?.update(dt, meterAnchor(this.player.position), null);
+    }
     this.updateInteract(dt);
-    this.updateTalk();
+    this.updateSigns();
   }
 
-  /** Charm Potion out of battle: the next random encounter starts its count from zero again. */
-  protected override onCharmOutOfBattle(m: PartyMember): void {
-    this.rollNext();
-    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("story.charm.reset"), "#9fd0ff");
+  private runTriggers(): void {
+    const p = this.player.position;
+    for (const tr of this.triggers) {
+      if (tr.done || Math.hypot(p.x - tr.at.x, p.z - tr.at.z) > tr.radius) continue;
+      if (tr.when && !tr.when()) continue;
+      tr.done = true;
+      void this.runScript(tr.run);
+      return;
+    }
   }
 
-  /** The area (canon submap) the hero is in. */
-  private areaId(): string {
-    const { u } = forestUV(this.player.position);
-    return (FOREST_ZONES.find((z) => u >= z.u0 && u < z.u1) ?? FOREST_ZONES[0]).id;
+  /** Run one script at a time; the controls come back when it ends. */
+  private async runScript(run: () => Promise<void> | void): Promise<void> {
+    this.busy = true;
+    try {
+      await run();
+    } finally {
+      this.busy = false;
+      this.unlock();
+    }
   }
+
+  private updateInteract(dt: number): void {
+    if (!this.prompt) return;
+    const p = this.player.position;
+    let best: { d: number; it: Interactable } | undefined;
+    if (!this.busy && !this.inputLocked && !this.enemies.some((e) => e.alive)) {
+      for (const it of this.interactables) {
+        if (it.when && !it.when()) continue;
+        const d = Math.hypot(p.x - it.at.x, p.z - it.at.z);
+        if (d < it.reach && (!best || d < best.d)) best = { d, it };
+      }
+    }
+    if (!best) {
+      this.offer = undefined;
+      this.prompt.hide();
+      return;
+    }
+    const it = best.it;
+    this.offer = () => void this.runScript(it.act);
+    this.prompt.show(it.at.add(new Vector3(0, 1.6, 0)), it.label);
+    this.prompt.update(dt);
+    if (this.input.wasPressed("KeyE")) this.offer();
+  }
+
+  private updateSigns(): void {
+    if (!this.bubble) return;
+    const p = this.player.position;
+    const sign = this.busy ? undefined : this.signs.find((s) => Math.hypot(p.x - s.at.x, p.z - s.at.z) < s.radius);
+    if (sign) this.bubble.show(p.add(new Vector3(0, 2.2, 0)), sign.title, sign.text);
+    else if (this.signShown) this.bubble.hide();
+    this.signShown = sign;
+  }
+
+  private updateNpcs(dt: number): void {
+    for (const n of this.npcs) {
+      let moving = false;
+      if (n.walk) {
+        const to = n.walk.to.subtract(n.root.position);
+        to.y = 0;
+        const d = to.length();
+        if (d < 0.1) {
+          const done = n.walk.done;
+          n.walk = undefined;
+          done();
+        } else {
+          const step = Math.min(d, n.walk.speed * dt);
+          n.root.position.addInPlace(to.scale(step / d));
+          n.root.rotation.y = Math.atan2(to.x, to.z);
+          moving = true;
+        }
+      }
+      n.fig.update(dt, moving);
+    }
+  }
+
+  // --- Random encounters ---------------------------------------------------------------------
 
   private rollNext(): void {
-    const rate = ENCOUNTERS[this.areaId()]?.rate ?? 10;
+    const rate = this.map.encounterAt?.(this.player.position)?.rate ?? 10;
     this.walked = 0;
     this.nextAt = (DISTANCE_PER_RATE / rate) * (0.7 + Math.random() * 0.6);
   }
 
-  /** Fill the counter as the hero walks (never mid-fight); spring a formation when it is full. */
   private updateEncounters(dt: number): void {
     const p = this.player.position;
+    const table = this.map.encounterAt?.(p);
     const fighting = this.enemies.some((e) => e.alive);
+    if (!table) {
+      this.meter?.update(dt, meterAnchor(p), null);
+      this.lastPos = p.clone();
+      return;
+    }
     if (!this.nextAt) this.rollNext();
     if (this.lastPos && !fighting) {
       const step = Math.hypot(p.x - this.lastPos.x, p.z - this.lastPos.z);
       if (step < 2) this.walked += step; // (a teleport / respawn doesn't count)
     }
     this.lastPos = p.clone();
-    const level = Math.min(1, this.walked / this.nextAt);
-    this.meter?.update(dt, meterAnchor(p), fighting ? null : level);
+    this.meter?.update(dt, meterAnchor(p), fighting ? null : Math.min(1, this.walked / this.nextAt));
     if (!fighting && this.walked >= this.nextAt) {
-      const table = ENCOUNTERS[this.areaId()];
-      if (table) void this.spawnFormation(table.formations[(Math.random() * table.formations.length) | 0]);
+      void this.spawnFormation(table.formations[(Math.random() * table.formations.length) | 0]);
       this.rollNext();
     }
   }
@@ -189,141 +297,198 @@ export class StoryMode extends TrainingMode {
     });
   }
 
-  /**
-   * The nearest thing you can act on — an unopened chest, the merchant — gets the prompt; acting
-   * (tap the prompt, or E) opens it / opens his shop.
-   */
-  private updateInteract(dt: number): void {
-    if (!this.forest || !this.prompt) return;
-    const p = this.player.position;
-    let best: { d: number; at: Vector3; label: string; act: () => void } | undefined;
-    for (const [id, at] of this.forest.chests) {
-      if (this.opened.has(id)) continue;
-      const d = Math.hypot(p.x - at.x, p.z - at.z);
-      if (d < CHEST_REACH && (!best || d < best.d)) best = { d, at: at.add(new Vector3(0, 1.1, 0)), label: t("story.interact.open"), act: () => this.openChest(id) };
-    }
-    const m = forestPoint(MERCHANT_SPOT.u, MERCHANT_SPOT.v);
-    const dm = Math.hypot(p.x - m.x, p.z - m.z);
-    if (dm < TALK_REACH && (!best || dm < best.d)) best = { d: dm, at: this.forest.merchantHead, label: t("story.interact.talk"), act: () => this.openShop() };
-    if (best) {
-      this.offer = best.act;
-      this.prompt.show(best.at, best.label);
-      this.prompt.update(dt);
-      if (this.input.wasPressed("KeyE")) best.act();
-    } else {
-      this.offer = undefined;
-      this.prompt.hide();
-    }
+  /** Charm Potion out of battle: the next random encounter starts its count from zero again. */
+  protected override onCharmOutOfBattle(m: PartyMember): void {
+    this.rollNext();
+    this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("story.charm.reset"), "#9fd0ff");
   }
 
-  private openShop(): void {
-    if (!this.shop || this.shop.isOpen) return;
-    this.prompt?.hide();
-    this.paused = true;
-    this.shop.show();
+  // --- The script API ------------------------------------------------------------------------
+
+  private lock(): void {
+    this.inputLocked = true;
+    this.clearNav();
   }
 
-  private shopLines(): ShopLine[] {
-    return SHOP.map((w) => {
-      const def = w.item?.();
-      return {
-        id: w.id,
-        name: t(w.nameKey),
-        blurb: t(w.blurbKey),
-        price: w.price,
-        owned: def ? (this.items.find((s) => s.def.id === def.id)?.count ?? 0) : 0,
-        soon: !def,
-      };
-    });
+  private unlock(): void {
+    this.inputLocked = false;
+    this.scriptWalk = undefined;
   }
 
-  private buy(id: string): boolean {
-    const w = SHOP.find((x) => x.id === id);
-    const def = w?.item?.();
-    if (!w || !def || this.gold < w.price) return false;
-    this.gold -= w.price;
-    this.addItem(def);
-    return true;
+  private waitUntil(until: () => boolean): Promise<void> {
+    return new Promise((done) => this.waits.push({ until, done }));
   }
 
-  private addItem(def: ItemDef): void {
+  private addItem(def: ItemDef, count = 1): void {
     const stock = this.items.find((s) => s.def.id === def.id);
-    if (stock) stock.count++;
-    else this.items.push({ def, count: 1 });
+    if (stock) stock.count += count;
+    else this.items.push({ def, count });
+  }
+
+  /** Copy what the party owns back into the save. */
+  private syncState(): void {
+    const s = story();
+    s.gold = this.gold;
+    s.level = this.partyLevel;
+    s.items = this.items.filter((i) => i.count > 0).map((i) => ({ id: i.def.id, count: i.count }));
+  }
+
+  private makeApi(): StoryApi {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const mode = this; // the getters below need the mode, not the API object
+    const wait = (seconds: number): Promise<void> => {
+      let elapsed = 0;
+      return this.waitUntil(() => (elapsed += this.scene.getEngine().getDeltaTime() / 1000) >= seconds);
+    };
+    return {
+      scene: this.scene,
+      get hero(): Vector3 {
+        return mode.player.position;
+      },
+      lock: () => this.lock(),
+      unlock: () => this.unlock(),
+      say: (speaker, text) => this.dialogue!.say(speaker, text),
+      wait,
+      fade: (to, seconds) => this.fader!.fade(to, seconds),
+      walkHero: (to) => {
+        this.lock();
+        this.scriptWalk = to.clone();
+        return this.waitUntil(() => !this.scriptWalk);
+      },
+      npc: (name, at, look) => this.spawnNpc(name, at, look),
+      stage: (units) => this.stage(units),
+      battle: async (units) => {
+        if (units) this.stage(units);
+        const foes = this.staged;
+        this.staged = [];
+        for (const e of foes) e.held = false;
+        this.unlock();
+        await this.waitUntil(() => foes.every((e) => !e.alive));
+        await wait(1); // let the last one fall
+        this.lock();
+      },
+      trigger: (at, radius, run, when) => this.triggers.push({ at, radius, run, when, done: false }),
+      interact: (at, label, act, when, reach = 2.2) => this.interactables.push({ at, label, act, when, reach }),
+      chest: (id, at, loot, onOpen) => {
+        const flag = `chest:${this.mapId}:${id}`;
+        if (hasFlag(flag)) onOpen?.();
+        this.interactables.push({
+          at,
+          label: t("story.interact.open"),
+          when: () => !hasFlag(flag),
+          reach: 1.9,
+          act: () => {
+            setFlag(flag);
+            onOpen?.();
+            let label = "";
+            if (loot.item) {
+              this.addItem(loot.item);
+              label = t(loot.item.nameKey);
+            } else if (loot.gold) {
+              this.gold += loot.gold;
+              label = t("story.chest.gold", { n: loot.gold });
+            }
+            const text = t("story.chest.found", { item: label });
+            this.popText(at.add(new Vector3(0, 1.2, 0)), text, "#f0d070", true);
+            this.combatLog?.push(text, "#f0d070");
+          },
+        });
+      },
+      sign: (at, radius, title, text) => this.signs.push({ at, radius, title, text }),
+      goto: (map, entry) => this.gotoMap(map, entry),
+      hasFlag,
+      setFlag,
+      addItem: (item, count) => this.addItem(item, count),
+      get gold(): number {
+        return mode.gold;
+      },
+      addGold: (n) => {
+        this.gold += n;
+      },
+      spend: (n) => {
+        if (this.gold < n) return false;
+        this.gold -= n;
+        return true;
+      },
+      owned: (item) => this.items.find((s) => s.def.id === item.id)?.count ?? 0,
+      pop: (at, text, color = "#f0d070") => this.popText(at, text, color, true),
+      setPaused: (on) => {
+        this.paused = on;
+      },
+      resetEncounters: () => this.rollNext(),
+    };
+  }
+
+  private stage(units: BattleUnit[]): void {
+    for (const u of units) {
+      const pos = u.at.clone();
+      this.world.clamp(pos);
+      const e = new Enemy(this.scene, u.def, pos);
+      e.held = true;
+      this.staged.push(e);
+      this.addEnemy(e);
+    }
+  }
+
+  private spawnNpc(name: string, at: Vector3, look?: Partial<HumanoidOptions>): NpcHandle {
+    const root = new TransformNode(`npc:${name}`, this.scene);
+    root.position.copyFrom(at);
+    const fig = new Humanoid(this.scene, { color: [0.45, 0.38, 0.3], hair: "short", ...look });
+    fig.rig.parent = root;
+    for (const m of root.getChildMeshes()) m.isPickable = false;
+    const npc: Npc = { fig, root };
+    this.npcs.push(npc);
+    return {
+      get position() {
+        return root.position;
+      },
+      get head() {
+        return root.position.add(new Vector3(0, 2.1, 0));
+      },
+      walkTo: (to, speed = 2.2) =>
+        new Promise<void>((done) => {
+          npc.walk = { to: to.clone(), speed, done };
+        }),
+      face: (p) => {
+        root.rotation.y = Math.atan2(p.x - root.position.x, p.z - root.position.z);
+      },
+      setVisible: (on) => root.setEnabled(on),
+      setLying: (on) => {
+        fig.rig.rotation.x = on ? -Math.PI / 2 : 0;
+        fig.rig.position.y = on ? 0.18 : 0;
+      },
+    };
+  }
+
+  /** Leave for another map: fade out, save, rebuild the scene with the next map. */
+  private async gotoMap(map: string, entry: string): Promise<void> {
+    this.lock();
+    await this.fader?.fade(1, 0.6);
+    this.syncState();
+    const s = story();
+    s.map = map;
+    s.entry = entry;
+    saveStory();
+    this.host.switchMode((sc, i, h) => new StoryMode(sc, i, h));
   }
 
   override hasOpenMenu(): boolean {
-    return !!this.shop?.isOpen || super.hasOpenMenu();
+    return !!this.dialogue?.isOpen || super.hasOpenMenu();
   }
 
   override closeTopMenu(): boolean {
-    if (this.shop?.isOpen) {
-      this.shop.close();
-      return true;
-    }
+    if (this.dialogue?.isOpen) return true; // a line must be read, not dismissed by Escape
     return super.closeTopMenu();
   }
 
-  /** Open a chest: the lid swings, the loot goes to the party. */
-  private openChest(id: string): void {
-    const at = this.forest?.chests.get(id);
-    if (!this.forest || !at || this.opened.has(id)) return;
-    this.opened.add(id);
-    this.forest.openChest(id);
-    const loot = CHEST_LOOT[id];
-    let label = "";
-    const def = loot?.item?.();
-    if (def) {
-      this.addItem(def);
-      label = t(def.nameKey);
-    } else if (loot?.gold) {
-      this.gold += loot.gold;
-      label = t("story.chest.gold", { n: loot.gold });
-    } else if (loot?.labelKey) {
-      label = t(loot.labelKey);
-    }
-    const text = t("story.chest.found", { item: label });
-    this.popText(at.add(new Vector3(0, 1.2, 0)), text, "#f0d070", true);
-    this.combatLog?.push(text, "#f0d070");
-  }
-
-  /**
-   * Story beats and signposts: Dart's memory after the gorge (once), and at the ends of the map,
-   * where the next map will connect, a note saying where the road leads.
-   */
-  private updateTalk(): void {
-    if (!this.forest || !this.bubble) return;
-    const p = this.player.position;
-    const at = forestPoint(SHANA_SCENE_SPOT.u, SHANA_SCENE_SPOT.v);
-    const nearShana = Math.hypot(p.x - at.x, p.z - at.z);
-    const { u, v } = forestUV(p);
-    const exit = u > MAP_END_U - EXIT_REACH ? (v < 0 ? "hellena" : "prairie") : u < MAP_START_U + EXIT_REACH ? "seles" : undefined;
-    if (this.talking === "shana" && nearShana > TALK_LEAVE + 2) this.endTalk();
-    if (this.talking === "exit" && !exit) this.endTalk();
-    if (!this.talking && !this.shanaSeen && nearShana < TALK_REACH + 1.2) {
-      this.talking = "shana";
-      this.shanaSeen = true;
-    } else if (!this.talking && exit) {
-      this.talking = "exit";
-    }
-    // Both follow Dart (re-anchored over the player each frame).
-    const head = p.add(new Vector3(0, 2.2, 0));
-    if (this.talking === "shana") this.bubble.show(head, t("story.dart"), t("story.shana.line"));
-    else if (this.talking === "exit" && exit) this.bubble.show(head, t(`story.exit.${exit}.title`), t("story.exit.soon"));
-  }
-
-  private endTalk(): void {
-    this.talking = undefined;
-    this.bubble?.hide();
-  }
-
   override dispose(): void {
+    this.syncState();
+    saveStory();
+    this.dialogue?.dispose();
+    this.fader?.dispose();
     this.bubble?.dispose();
     this.prompt?.dispose();
     this.meter?.dispose();
-    this.shop?.dispose();
     super.dispose();
   }
-
-
 }

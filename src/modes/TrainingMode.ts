@@ -284,6 +284,10 @@ export abstract class ArenaCombatMode extends GameMode {
   protected atmosphere?: Atmosphere;
   /** Where the fight happens — built first thing in {@link enter}. */
   protected world!: World;
+  /** A story scene has the controls: no player input (movement, actions, targeting). */
+  protected inputLocked = false;
+  /** While locked, a scene can walk the hero to this point. */
+  protected scriptWalk?: Vector3;
   /** Last lighting applied from {@link World.presetAt} (re-applied only when it changes). */
   private lastLight?: LightingPreset;
   protected spellFx?: SpellFx;
@@ -935,7 +939,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // running or while a ranged shot is in progress/cooling down (no move-spam/kiting),
     // and guarding roots in place too. The post-whiff lockout doesn't root (you may
     // reposition while you can't attack).
-    const rooted = this.player.guardActive || this.runner.active || this.attackAnimT > 0;
+    const rooted = this.player.guardActive || this.runner.active || this.attackAnimT > 0 || this.inputLocked;
     const before = this.player.position.clone();
     // Walk vs run: gauged by joystick magnitude on touch (past RUN_THRESHOLD = run); desktop
     // click-to-move has no analog input, so it defaults to a run. Holding Alt forces a walk
@@ -953,6 +957,18 @@ export abstract class ArenaCombatMode extends GameMode {
         this.navigate(dt, running); // click-to-move: run unless Alt (walk) is held
       }
       this.world.clamp(this.player.position); // the wall is a hard boundary
+    } else if (this.inputLocked && this.scriptWalk) {
+      // A story scene walks the hero somewhere: same move + animation as player input.
+      const to = this.scriptWalk.subtract(this.player.position);
+      to.y = 0;
+      const d = to.length();
+      // Snap the last step: at a low frame rate one step can overshoot and oscillate forever.
+      if (d > Math.max(0.15, 3.3 * dt)) this.player.move(to.normalize(), dt, false);
+      else {
+        this.player.position.x = this.scriptWalk.x;
+        this.player.position.z = this.scriptWalk.z;
+        this.scriptWalk = undefined;
+      }
     }
     this.camera.follow(this.player.position);
     if (this.world.shotAt) {
@@ -985,6 +1001,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     // Attack is the ⚔ button / click / Space (the timed combo). The other ATB actions
     // are the left-column buttons (or G/R/T/F keys); each is gated by the ATB gauge.
+    if (this.inputLocked) return this.updateLockedWorld(dt); // a story scene owns the controls
     if (this.input.wasPressed("Space") && !this.player.guardActive) this.attack(this.attackTarget ?? this.locked);
     if (this.guardPressed()) this.playerAct("guard");
     if (this.input.wasPressed("Item") || this.input.wasPressed("KeyR")) this.playerAct("item");
@@ -1934,6 +1951,14 @@ export abstract class ArenaCombatMode extends GameMode {
       );
     }
     for (const m of this.party) m.avatar.setCombat(inCombat);
+  }
+
+  /** A story scene has the controls: the world keeps living (held enemies idle, the HUD stays in
+   *  sync), but no ATB, no actions, no AI fighting. */
+  private updateLockedWorld(dt: number): void {
+    this.updateEnemies(dt * settings.combatSpeed);
+    for (const m of this.party) if (m !== this.controlled) m.avatar.animate(dt, false);
+    this.refreshHud();
   }
 
   private updateEnemies(cdt: number): void {

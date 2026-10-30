@@ -1,11 +1,12 @@
 import { hasTouch } from "../core/device";
 import { t, onLocaleChange } from "../core/i18n";
 
-export type ModeId = "Training" | "Story" | "Survival";
+export type ModeId = "Training" | "Story" | "StoryNew" | "Survival";
 
 const ENTRIES: { mode: ModeId; labelKey: string; blurbKey: string }[] = [
   { mode: "Training", labelKey: "mode.training", blurbKey: "mode.training.blurb" },
   { mode: "Story", labelKey: "mode.story", blurbKey: "mode.story.blurb" },
+  { mode: "StoryNew", labelKey: "mode.storyNew", blurbKey: "mode.storyNew.blurb" },
   { mode: "Survival", labelKey: "mode.survival", blurbKey: "mode.survival.blurb" },
 ];
 

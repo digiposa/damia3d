@@ -158,4 +158,6 @@ export interface GameHost {
   openSystemMenu(section?: SystemSection): void;
   /** Leave the current mode and return to the title screen (disposes the running mode). */
   toMainMenu(): void;
+  /** Replace the running mode (e.g. the Story moving to its next map). */
+  switchMode(factory: import("./GameMode").ModeFactory): void;
 }
