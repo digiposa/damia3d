@@ -147,10 +147,14 @@ export class Atmosphere {
     this.sun.intensity = p.sunIntensity;
     this.sun.diffuse = new Color3(p.sunColor[0], p.sunColor[1], p.sunColor[2]);
     this.sun.direction = new Vector3(p.sunDirection[0], p.sunDirection[1], p.sunDirection[2]);
+    // Image-processing values are snapped to coarse steps: every change of one of them makes Babylon
+    // re-check every material in the scene, which on a phone stalls the frame. A map whose lighting
+    // blends as you walk (World.presetAt) would otherwise trigger that on nearly every step.
     const ip = this.pipeline.imageProcessing;
-    ip.exposure = p.exposure;
-    ip.contrast = p.contrast;
-    ip.vignetteWeight = p.vignetteWeight;
+    const snap = (v: number, step: number): number => Math.round(v / step) * step;
+    ip.exposure = snap(p.exposure, 0.04);
+    ip.contrast = snap(p.contrast, 0.04);
+    ip.vignetteWeight = snap(p.vignetteWeight, 0.2);
     this.pipeline.bloomWeight = p.bloomWeight;
     this.scene.fogStart = p.fogStart;
     this.scene.fogEnd = p.fogEnd;
