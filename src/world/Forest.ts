@@ -17,6 +17,7 @@ import "@babylonjs/core/Meshes/instancedMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 
 import { softDotTexture } from "./atmosphere";
+import { buildForestLife } from "./forestLife";
 import { LIGHTING_PRESETS } from "./lighting";
 import { mulberry32, pixelTexture, rgb } from "./paint";
 import type { World } from "./World";
@@ -471,10 +472,15 @@ export function forestWorld(scene: Scene): ForestWorld {
   shadeGround([...floors, track], trees);
   buildSunShafts(scene, root, rand);
   buildSky(scene, fixed);
+  buildRavineMist(scene, fixed);
   buildPollen(scene);
 
   indexObstacles();
   buildMask();
+  buildForestLife(scene, (x, z) => {
+    const { u, v } = toUV(x, z);
+    return walkable(u, v);
+  });
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
     if (!m.name.startsWith("forestChestLid")) m.freezeWorldMatrix();
@@ -1163,17 +1169,23 @@ function groveSource(scene: Scene, bark: StandardMaterial, leaves: StandardMater
 
 /** A sapling: thin trunk, small crown — short enough to stand nearer the camera. */
 function saplingSource(scene: Scene, bark: StandardMaterial, leaves: StandardMaterial, rand: () => number): Mesh {
-  const trunk = MeshBuilder.CreateCylinder("sapTrunk", { height: 1.6, diameterTop: 0.08, diameterBottom: 0.16, tessellation: 5 }, scene);
-  trunk.position.y = 0.8;
+  // A young tree: a slightly bent trunk under a soft, lumpy crown (not one faceted ball).
+  const trunk = limb("sapTrunk", scene, [new Vector3(0, 0, 0), new Vector3(0.06, 0.9, 0.03), new Vector3(0, 1.7, 0)], 0.1, 0.05, rand);
   trunk.material = bark;
-  gradeColors(trunk, PLAIN, PLAIN);
-  const crown = MeshBuilder.CreateIcoSphere("sapCrown", { radius: 0.75, subdivisions: 1 }, scene);
-  crown.position.y = 1.75;
-  crown.scaling.y = 0.85;
-  jitter(crown, 0.3, rand);
-  gradeColors(crown, LEAF_SHADE, LEAF_SUN);
-  crown.material = leaves;
-  return mergeSource("forestSapling", [trunk, crown]);
+  gradeColors(trunk, [0.62, 0.58, 0.52], PLAIN);
+  const parts: Mesh[] = [trunk];
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + rand();
+    const d = k === 0 ? 0 : 0.35 + rand() * 0.2;
+    const b = MeshBuilder.CreateIcoSphere(`sapCrown${k}`, { radius: 0.42 + rand() * 0.18, subdivisions: 2, flat: false }, scene);
+    b.position.set(Math.cos(a) * d, 1.75 + (k === 0 ? 0.3 : rand() * 0.25), Math.sin(a) * d);
+    b.scaling.y = 0.85;
+    jitter(b, 0.12, rand);
+    gradeColors(b, LEAF_SHADE, LEAF_SUN);
+    b.material = leaves;
+    parts.push(b);
+  }
+  return mergeSource("forestSapling", parts, false);
 }
 
 function bushSource(scene: Scene, leaves: StandardMaterial, rand: () => number): Mesh {
@@ -1704,18 +1716,25 @@ function buildSignpost(scene: Scene, root: TransformNode): void {
 function buildSky(scene: Scene, parent: TransformNode): void {
   const rand = mulberry32(0x5ea);
   const tex = pixelTexture("forestSeaTex", scene, 64, 64, (ctx, w, h) => {
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const k = 0.9 + rand() * 0.15;
-        ctx.fillStyle = rgb(126 * k, 116 * k, 140 * k);
+    // Deep evening water: blue-violet, in long slow bands (texture x runs up the screen once laid
+    // on the map, so a swell — sideways on screen — is a vertical band here).
+    for (let x = 0; x < w; x++) {
+      const band = 0.88 + 0.12 * Math.sin((x / w) * Math.PI * 6);
+      for (let y = 0; y < h; y++) {
+        const k = band * (0.94 + rand() * 0.08);
+        ctx.fillStyle = rgb(52 * k, 66 * k, 112 * k);
         ctx.fillRect(x, y, 1, 1);
       }
-    for (let i = 0; i < 140; i++) {
-      // Swell crests: short pale dashes.
-      // (texture x runs up the screen once laid on the map, so a crest — sideways on screen — is
-      // a short vertical run here)
-      ctx.fillStyle = rand() < 0.5 ? rgb(184, 166, 186) : rgb(96, 88, 118);
-      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1, 3 + ((rand() * 5) | 0));
+    }
+    for (let i = 0; i < 70; i++) {
+      // Swell crests: long pale strokes catching the sunset, a dark trough line beside each.
+      const x = (rand() * w) | 0;
+      const y = (rand() * h) | 0;
+      const len = 4 + ((rand() * 8) | 0);
+      ctx.fillStyle = rand() < 0.4 ? rgb(196, 150, 160) : rgb(120, 136, 186);
+      ctx.fillRect(x, y, 1, len);
+      ctx.fillStyle = rgb(34, 42, 80);
+      ctx.fillRect(x + 1, y + 1, 1, len - 1);
     }
   });
   // Sun glitter: a warm streak across the water, in its own (additive) layer over the swell.
@@ -1742,8 +1761,8 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   sea.position.set(centre.x, SEA_Y, centre.z);
   sea.material = mat;
   sea.parent = parent;
-  tex.uScale = 40;
-  tex.vScale = 30;
+  tex.uScale = 14;
+  tex.vScale = 11;
 
   const gmat = new StandardMaterial("forestGlitterMat", scene);
   gmat.emissiveTexture = glitter;
@@ -1758,8 +1777,37 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   glint.position.set(centre.x, SEA_Y + 0.05, centre.z);
   glint.material = gmat;
   glint.parent = parent;
-  glitter.uScale = 30;
-  glitter.vScale = 22;
+  glitter.uScale = 14;
+  glitter.vScale = 11;
+
+  // Surf breaking along the cliff's foot: a ragged white band where rock meets water.
+  const foamTex = pixelTexture("forestFoamTex", scene, 64, 16, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    for (let x = 0; x < w; x++) {
+      const depth = 4 + ((rand() * 10) | 0);
+      for (let y = 0; y < depth; y++) {
+        if (rand() < y / depth) continue;
+        const k = 0.85 + rand() * 0.15;
+        ctx.fillStyle = rgb(236 * k, 226 * k, 230 * k);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  });
+  foamTex.hasAlpha = true;
+  const foamMat = new StandardMaterial("forestFoamMat", scene);
+  foamMat.emissiveTexture = foamTex;
+  foamMat.diffuseTexture = foamTex;
+  foamMat.diffuseColor = Color3.Black();
+  foamMat.disableLighting = true;
+  foamMat.fogEnabled = false;
+  const foam = gridMesh("forestFoam", scene, 1, 60, (i, j) => {
+    const u = 38 + (68 - 38) * (j / 60);
+    const p = forestPoint(u, cliffE(u) + 9 + i * 2.2);
+    return { x: p.x, y: SEA_Y + 0.08, z: p.z, tu: u / 4, tv: i };
+  }, Vector3.Up());
+  foam.material = foamMat;
+  foam.parent = parent;
+  foamTex.uScale = 1;
 
   // Emissive, so keep both out of the mode's glow layer (created after the world: first frame),
   // then let the swell drift and the glitter shimmer.
@@ -1768,11 +1816,67 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   scene.onBeforeRenderObservable.add(() => {
     if (!excluded) {
       excluded = true;
-      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint]) layer.addExcludedMesh(m);
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint, foam]) layer.addExcludedMesh(m);
     }
     t += scene.getEngine().getDeltaTime() / 1000;
     tex.vOffset = t * 0.01;
     glitter.vOffset = Math.floor(t * 3) * 0.37; // jumps, like light flickering on water
+    foamTex.uOffset = Math.sin(t * 0.6) * 0.03; // the surf washing in and out
+  });
+}
+
+/**
+ * Haze hanging in the ravines: two pale layers part-way down, so the drop reads as DEPTH (the floor
+ * fades into mist) instead of a dark slab at the bottom.
+ */
+function buildRavineMist(scene: Scene, parent: TransformNode): void {
+  const rand = mulberry32(0x3157);
+  const tex = new DynamicTexture("forestRavineMistTex", { width: 64, height: 64 }, scene, true);
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.clearRect(0, 0, 64, 64);
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * 64;
+    const y = rand() * 64;
+    const r = 8 + rand() * 16;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, "rgba(255,255,255,0.5)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    // Wrap the blobs so the texture tiles without seams.
+    for (const dx of [-64, 0, 64]) for (const dy of [-64, 0, 64]) ctx.fillRect(x - r + dx, y - r + dy, r * 2, r * 2);
+  }
+  tex.hasAlpha = true;
+  tex.update();
+  tex.wrapU = tex.wrapV = Texture.WRAP_ADDRESSMODE;
+  const layers: { mat: StandardMaterial; tex: Texture; speed: number }[] = [];
+  for (const [k, depth, alpha, tint] of [[0, 5, 0.55, [0.8, 0.72, 0.68]], [1, 10, 0.75, [0.62, 0.56, 0.6]]] as const) {
+    const lt = tex.clone() as Texture;
+    lt.uScale = lt.vScale = 0.12;
+    const mat = new StandardMaterial(`forestRavineMistMat${k}`, scene);
+    mat.diffuseTexture = lt;
+    mat.useAlphaFromDiffuseTexture = true;
+    mat.emissiveColor = new Color3(tint[0], tint[1], tint[2]);
+    mat.diffuseColor = Color3.Black();
+    mat.specularColor = Color3.Black();
+    mat.disableLighting = true;
+    mat.alpha = alpha;
+    mat.backFaceCulling = false;
+    RAVINES.forEach((r, ri) => {
+      const m = gridMesh(`forestRavineMist${ri}_${k}`, scene, V_MAX - V_MIN, 2, (i, j) => {
+        const v = V_MIN + i;
+        const u = ravineC(r, v) + ravineH(r, v) * (j - 1) * 0.98;
+        const p = forestPoint(u, Math.min(v, cliffE(u) + 2));
+        return { x: p.x, y: -depth, z: p.z, tu: p.x, tv: p.z };
+      }, Vector3.Up());
+      m.material = mat;
+      m.parent = parent;
+      m.alphaIndex = 5;
+    });
+    layers.push({ mat, tex: lt, speed: 0.01 + k * 0.006 });
+  }
+  scene.onBeforeRenderObservable.add(() => {
+    const dt = scene.getEngine().getDeltaTime() / 1000;
+    for (const l of layers) l.tex.uOffset += dt * l.speed;
   });
 }
 

@@ -192,6 +192,20 @@ Animation FBXs (uploads, not committed): `Character__Clip.fbx` — e.g. `Damia__
 - Weapons mount on a **hand socket** (drawn/combat) and a **back socket** (sheathed/exploration);
   placement offsets go on the weapon node, **below** the bone's scale-cancel.
 
+### Triangle budgets (Tripo output, measured on the shipped GLBs)
+
+| Class | Target tris | Examples |
+|---|---|---|
+| Weapons / props | ~3 000 | every `*_sword`, `meru_hammer`, `shana_bow` |
+| Minor enemy | ~15 000 | `berserk_mouse`, `goblin`, `trent` |
+| Elite / named enemy, or a humanoid mob that will be rigged | ~30 000 | `knight_sandora` |
+| Boss | ≤ ~90 000 | `commander` |
+| Playable character | ~120 000 (Tripo max) | damia, shana, meru, miranda, haschel, rose |
+
+Hard ceiling: **Mixamo auto-rig ≈ 150 000 tris** (playables at 120k pass, no margin). File weight
+matters as much as tris for the Pages build: after WebP + meshopt, a minor mob ≈ 350–400 KB, a
+playable ≈ 2–3 MB.
+
 ### Performance / repo size
 
 GLBs are binary and inflate the git repo + the Pages download. Keep meshes **low-poly**, always run
