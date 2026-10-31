@@ -62,8 +62,9 @@ export const SELES_SPOTS = {
   fence: { u: -11.5, v: -3.5 },
   // The yard below the fence (PS1 "Acquired Burn Out"): the chest by the gap, the Save Point to
   // the left, the collapsed timber house to the right, rubble along the bottom.
-  battle1: { u: -8.5, v: -4.5 },
-  villager: { u: -7.6, v: -1 },
+  battle1: { u: -6, v: -1 },
+  villager: { u: -3.7, v: 1.4 }, // dying, on the right, in front of the debris (the knights over him)
+  woman: { u: -2.5, v: -6.4 }, // dead, on the left a little lower, by the overturned cart
   savePoint: { u: -9.4, v: -9.2 },
   chest: { u: -10.7, v: -1.6 },
   plos: vil(3, -4.5), // lying in front of the burned house
@@ -180,7 +181,7 @@ export function selesWorld(scene: Scene): SelesWorld {
   const wood = matte("selesWood", scene, undefined, new Color3(0.38, 0.27, 0.18));
 
   // The yard below the fence.
-  buildYard(scene, root, rand, charred, wood);
+  const ticks = buildYard(scene, root, rand, charred, wood, stone);
   // The burned house at the centre (Plos lies in front of it; the kids hide inside).
   ruinHouse(scene, root, rand, stone, charred, SELES_SPOTS.plosHouse, 5, 4, 0.2, 3.2);
   // The stone church, roofless, its belfry half standing.
@@ -217,7 +218,10 @@ export function selesWorld(scene: Scene): SelesWorld {
     shadowReceivers: [ground, hill],
     heightAt: selesHeight,
     ownFill: [],
-    update: (_focus, dt) => chests.forEach((c) => c.tick(dt)),
+    update: (_focus, dt) => {
+      chests.forEach((c) => c.tick(dt));
+      for (const tick of ticks) tick(dt);
+    },
     openChest: (id) => chests.get(id)?.open(),
   };
 }
@@ -262,6 +266,10 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
     if (n.d < n.w) c += 0.1;
     if (grass === 0) c *= 1 - Math.min(0.6, Math.max(0, (n.d - n.w - 4) / 18));
     const g = grass * (0.85 + 0.25 * scorch);
+    // Long tree shadows across the ground (continuing the hill's), and the yard warm in the low sun.
+    const shade = noise2(u * 0.22 - v * 0.3 + 3, v * 0.12 + u * 0.05);
+    c *= 1 - 0.36 * smooth(0.5, 0.64, shade);
+    c *= 1 + 0.16 * (1 - smooth(4, 9, Math.hypot(u + 6.5, v + 2.5)));
     col.push(c * (1 - 0.45 * g), c * (0.95 + 0.05 * g), c * (0.88 - 0.45 * g), 1);
   }
   ground.setVerticesData("color", col);
@@ -386,25 +394,30 @@ function burnedWoodHouse(scene: Scene, root: TransformNode, rand: () => number, 
  * column of light on the left, a timber house collapsed in on itself on the right (its roof lying
  * in one charred slab), heaps of burned debris along the bottom, a broken cart and a sack.
  */
-function buildYard(scene: Scene, root: TransformNode, rand: () => number, charred: StandardMaterial, wood: StandardMaterial): void {
+function buildYard(scene: Scene, root: TransformNode, rand: () => number, charred: StandardMaterial, wood: StandardMaterial, stone: StandardMaterial): ((dt: number) => void)[] {
   const planks = planksMaterial(scene, rand);
   collapsedHouse(scene, root, rand, planks, charred, fromUV(-6.4, 3.6), -0.5);
   saveColumn(scene, root, selesPoint(SELES_SPOTS.savePoint));
 
-  // Debris heaps along the bottom of the yard.
-  for (const [u, v, s] of [[-2.4, -2.6, 1], [-2.0, 0.6, 1.3], [-2.6, 3.6, 1.1], [-1.6, 6.4, 1.2], [-3.4, 8.6, 0.9]] as const) {
+  // Debris heaps along the bottom of the yard (the villager lies in front of them, on the right).
+  for (const [u, v, s] of [[-2.2, -2.4, 1], [-1.2, 1, 1.2], [-2.4, 4, 1.1], [-1.6, 6.6, 1.2], [-3.4, 8.8, 0.9]] as const) {
     debrisHeap(scene, root, rand, planks, charred, fromUV(u, v), s);
   }
   brokenCart(scene, root, rand, wood, charred, fromUV(-3.6, -4.6));
-  // A sack dropped in the flight (canvas, half spilled).
-  const sackAt = fromUV(-3.3, 1.9);
-  const sack = MeshBuilder.CreateCapsule("selesSack", { height: 1.1, radius: 0.32, tessellation: 8 }, scene);
-  sack.rotation.set(Math.PI / 2, 0.7, 0);
-  sack.scaling.set(1, 1, 0.75);
-  sack.position.set(sackAt.x, 0.26, sackAt.z);
-  jitter(sack, 0.05, rand);
-  sack.material = matte("selesSackMat", scene, undefined, new Color3(0.34, 0.36, 0.26));
-  sack.parent = root;
+
+  // Just below: more of the village burned — a stone house gutted, a timber one fallen in.
+  ruinHouse(scene, root, rand, stone, charred, { u: 3.4, v: 2.4 }, 5, 4, 0.25, 2.6);
+  burnedWoodHouse(scene, root, rand, charred, { u: 2.2, v: -3.6 }, 0.5);
+  collapsedHouse(scene, root, rand, planks, charred, fromUV(3.2, 9.6), 0.3, 0.7);
+
+  // Fires still burning in the wrecks: the yard's warm light, without a real light (mobile).
+  return [
+    fireSpot(scene, root, rand, fromUV(-6.8, 2.6), 1),
+    fireSpot(scene, root, rand, fromUV(-4.9, 5.6), 0.7),
+    fireSpot(scene, root, rand, fromUV(2.2, -3.6), 0.9),
+    fireSpot(scene, root, rand, fromUV(3.4, 9.2), 0.8),
+    ashFall(scene, fromUV(-6, -1)),
+  ];
 
   // Sticks and splinters strewn over the trodden earth, a few stakes still standing.
   const stick = matte("selesStick", scene, undefined, new Color3(0.2, 0.14, 0.1));
@@ -449,11 +462,12 @@ function planksMaterial(scene: Scene, rand: () => number): StandardMaterial {
  * A timber house collapsed in on itself: its roof down in one slab leaning on the stumps of the
  * walls, a second piece broken off, posts still standing at the corners, beams fallen across.
  */
-function collapsedHouse(scene: Scene, root: TransformNode, rand: () => number, planks: StandardMaterial, charred: StandardMaterial, at: Vector3, rot: number): void {
+function collapsedHouse(scene: Scene, root: TransformNode, rand: () => number, planks: StandardMaterial, charred: StandardMaterial, at: Vector3, rot: number, size = 1): void {
   const node = new TransformNode("selesCollapsed", scene);
   node.parent = root;
   node.position.copyFrom(at);
   node.rotation.y = rot;
+  node.scaling.setAll(size);
   const W = 7.5;
   const D = 5.5;
   const part = (m: Mesh): Mesh => {
@@ -503,7 +517,81 @@ function collapsedHouse(scene: Scene, root: TransformNode, rand: () => number, p
   ash.scaling.y = 0.8;
   ash.position.y = 0.025;
   ash.material = matte("selesWreckAshMat", scene, undefined, new Color3(0.13, 0.1, 0.08));
-  obstacles.addBox(at.x, at.z, W / 2 + 0.2, D / 2 + 0.2, rot);
+  obstacles.addBox(at.x, at.z, (W / 2) * size + 0.2, (D / 2) * size + 0.2, rot);
+}
+
+/**
+ * A fire still burning in a wreck: a few flames, and a pool of warm light on the ground under them
+ * that flickers. No real light (each one would cost every material on a phone): the pool is an
+ * additive disc, and only its own colour changes.
+ */
+function fireSpot(scene: Scene, root: TransformNode, rand: () => number, at: Vector3, s: number): (dt: number) => void {
+  const dot = softDotTexture(scene);
+  const flames = new ParticleSystem("selesFire", 26, scene);
+  flames.particleTexture = dot;
+  flames.emitter = new Vector3(at.x, 0.3, at.z);
+  flames.minEmitBox = new Vector3(-0.5 * s, 0, -0.5 * s);
+  flames.maxEmitBox = new Vector3(0.5 * s, 0.2, 0.5 * s);
+  flames.blendMode = ParticleSystem.BLENDMODE_ADD;
+  flames.color1 = new Color4(1, 0.62, 0.22, 1);
+  flames.color2 = new Color4(1, 0.4, 0.12, 1);
+  flames.colorDead = new Color4(0.5, 0.08, 0, 0);
+  flames.minSize = 0.35 * s;
+  flames.maxSize = 0.8 * s;
+  flames.minLifeTime = 0.45;
+  flames.maxLifeTime = 0.9;
+  flames.emitRate = 28 * s;
+  flames.direction1 = new Vector3(-0.15, 1, -0.15);
+  flames.direction2 = new Vector3(0.15, 1.6, 0.15);
+  flames.minEmitPower = 0.8;
+  flames.maxEmitPower = 1.4;
+  flames.gravity = new Vector3(0, 0.6, 0);
+  flames.start();
+
+  const pool = MeshBuilder.CreateDisc("selesFirePool", { radius: 3.2 * s, tessellation: 20 }, scene);
+  pool.rotation.x = Math.PI / 2;
+  pool.position.set(at.x, 0.06, at.z);
+  const m = new StandardMaterial("selesFirePoolMat", scene);
+  m.disableLighting = true;
+  m.opacityTexture = dot;
+  m.alphaMode = 1; // additive
+  m.fogEnabled = false;
+  const base = new Color3(0.42, 0.2, 0.06);
+  m.emissiveColor = base.clone();
+  pool.material = m;
+  pool.parent = root;
+  let t = rand() * 10;
+  return (dt) => {
+    t += dt;
+    const k = 0.82 + 0.1 * Math.sin(t * 9.1) + 0.08 * Math.sin(t * 23.7 + 1.3);
+    m.emissiveColor.set(base.r * k, base.g * k, base.b * k);
+  };
+}
+
+/** Ash drifting down over the yard, a few embers among it. One small system, all of it. */
+function ashFall(scene: Scene, at: Vector3): (dt: number) => void {
+  const ps = new ParticleSystem("selesAsh", 60, scene);
+  ps.particleTexture = softDotTexture(scene);
+  ps.emitter = new Vector3(at.x, 6, at.z);
+  ps.minEmitBox = new Vector3(-10, 0, -10);
+  ps.maxEmitBox = new Vector3(10, 2, 10);
+  ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+  ps.color1 = new Color4(0.62, 0.58, 0.55, 0.75);
+  ps.color2 = new Color4(1, 0.5, 0.18, 0.9); // the odd ember
+  ps.colorDead = new Color4(0.4, 0.38, 0.36, 0);
+  ps.minSize = 0.05;
+  ps.maxSize = 0.11;
+  ps.minLifeTime = 5;
+  ps.maxLifeTime = 8;
+  ps.emitRate = 8;
+  ps.direction1 = new Vector3(-0.3, -0.4, -0.2);
+  ps.direction2 = new Vector3(0.3, -0.6, 0.3);
+  ps.minEmitPower = 0.3;
+  ps.maxEmitPower = 0.6;
+  ps.gravity = new Vector3(0.1, -0.05, 0.05);
+  ps.preWarmCycles = 300;
+  ps.start();
+  return () => undefined;
 }
 
 /** A heap of burned debris: charred lumps and planks sticking out of it. */
@@ -955,7 +1043,7 @@ function buildRubble(scene: Scene, root: TransformNode, rand: () => number, ston
 function buildSmoke(scene: Scene, rand: () => number): void {
   const dot = softDotTexture(scene);
   const spots = [[4, -8.5], [10, 9], [-2, 8.5], [14, -10], [0, 8]].map(([u, v]) => vilPoint(u, v));
-  spots.push(fromUV(-6.4, 3.6)); // the yard's collapsed house
+  spots.push(fromUV(-6.4, 3.6), fromUV(-4.6, 6), fromUV(2.2, -3.6), fromUV(3.4, 2.4)); // the yard's wrecks, and below
   for (const at of spots) {
     const ps = new ParticleSystem("selesSmoke", 60, scene);
     ps.particleTexture = dot;

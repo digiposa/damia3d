@@ -440,7 +440,7 @@ export class StoryMode extends ArenaCombatMode {
   private spawnNpc(name: string, at: Vector3, look?: Partial<HumanoidOptions>): NpcHandle {
     const root = new TransformNode(`npc:${name}`, this.scene);
     root.position.copyFrom(at);
-    const fig = new Humanoid(this.scene, { color: [0.45, 0.38, 0.3], hair: "short", ...look });
+    const fig = new Humanoid(this.scene, { color: [0.45, 0.38, 0.3], hair: "short", weapon: "fist", ...look }); // villagers go unarmed
     fig.rig.parent = root;
     for (const m of root.getChildMeshes()) m.isPickable = false;
     const npc: Npc = { fig, root };

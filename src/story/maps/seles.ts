@@ -35,6 +35,12 @@ export const selesMap: MapFactory = (scene) => {
     models: SCENES ? ["knight_sandora", "kos_sword", "commander", "commander_sword"] : [],
     encounterAt: () => null, // a town: scripted fights only
     start(api, entry) {
+      // The yard's dead and dying: set dressing even without the scenes (the composition of the
+      // knights' scene: the villager on the right, the woman on the left a little lower).
+      const villager = api.npc("villager", P(SELES_SPOTS.villager), { color: [0.36, 0.42, 0.28], hair: "elder" });
+      villager.setLying(true);
+      const woman = api.npc("woman", P(SELES_SPOTS.woman), { color: [0.46, 0.5, 0.62], hair: "long" });
+      woman.setLying(true);
       // The Save Point in the yard below the fence.
       api.interact(P(SELES_SPOTS.savePoint), t("story.interact.save"), () => api.save("savePoint"), undefined, 1.8);
       if (!SCENES) {
@@ -47,8 +53,6 @@ export const selesMap: MapFactory = (scene) => {
       const done2 = (): boolean => api.hasFlag("seles:commander");
 
       // --- People ------------------------------------------------------------------------------
-      const villager = api.npc("villager", P(SELES_SPOTS.villager), { color: [0.42, 0.36, 0.26], hair: "short" });
-      villager.setLying(true);
       const plos = api.npc("plos", P(SELES_SPOTS.plos), { color: [0.4, 0.3, 0.22], hair: "elder" });
       plos.setLying(!done2() && !api.hasFlag("seles:plosHelped"));
       if (api.hasFlag("seles:plosHelped") || done2()) plos.walkTo(P({ u: SELES_SPOTS.plosHouse.u - 2.6, v: SELES_SPOTS.plosHouse.v + 2.6 }), 99);
@@ -76,8 +80,9 @@ export const selesMap: MapFactory = (scene) => {
       // --- Fight 1: the knights and the villager --------------------------------------------
       if (!done1()) {
         api.stage([
-          { def: KNIGHT_OF_SANDORA, at: P({ u: SELES_SPOTS.villager.u + 1.6, v: SELES_SPOTS.villager.v - 1.2 }) },
-          { def: KNIGHT_OF_SANDORA, at: P({ u: SELES_SPOTS.villager.u - 0.6, v: SELES_SPOTS.villager.v - 2.2 }) },
+          // Standing over the villager, between him and the woman.
+          { def: KNIGHT_OF_SANDORA, at: P({ u: SELES_SPOTS.villager.u - 1.5, v: SELES_SPOTS.villager.v - 1.4 }) },
+          { def: KNIGHT_OF_SANDORA, at: P({ u: SELES_SPOTS.villager.u - 0.4, v: SELES_SPOTS.villager.v - 2.6 }) },
         ]);
       }
       api.trigger(P(SELES_SPOTS.fence), 4.5, async () => {
