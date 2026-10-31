@@ -1,7 +1,7 @@
 import { COMMANDER_SELES, KNIGHT_OF_SANDORA } from "../../data/enemies";
 import { ATTACK_ITEM_BY_ID } from "../../data/items";
 import { t } from "../../core/i18n";
-import { SELES_SPOTS, selesPoint, selesWorld } from "../../world/Seles";
+import { SELES_SPOTS, selesPoint, selesWorld, type SelesWorld } from "../../world/Seles";
 import type { MapFactory, StoryApi } from "../StoryMap";
 
 /**
@@ -32,7 +32,7 @@ export const selesMap: MapFactory = (scene) => {
     encounterAt: () => null, // a town: scripted fights only
     start(api, entry) {
       if (!SCENES) {
-        openChest(api);
+        openChest(api, world);
         api.trigger(P(SELES_SPOTS.exitForest), 3, () => api.goto("forest", "fromSeles"));
         return;
       }
@@ -85,9 +85,9 @@ export const selesMap: MapFactory = (scene) => {
         await api.say(S("villager"), S("villager3"));
         await api.say(dart, S("dart2"));
         api.setFlag("seles:fight1");
-        openChest(api);
+        openChest(api, world);
       }, () => !done1());
-      if (done1()) openChest(api);
+      if (done1()) openChest(api, world);
 
       // --- Plos, then the Commander ----------------------------------------------------------
       api.trigger(P(SELES_SPOTS.plos), 5, async () => {
@@ -158,7 +158,7 @@ export const selesMap: MapFactory = (scene) => {
 };
 
 /** The Burn Out chest by the Save Point (reachable once the first fight is over). */
-function openChest(api: StoryApi): void {
+function openChest(api: StoryApi, world: SelesWorld): void {
   const burnOut = ATTACK_ITEM_BY_ID.get("burnOut");
-  if (burnOut) api.chest("burnOut", P(SELES_SPOTS.chest), { item: burnOut });
+  if (burnOut) api.chest("burnOut", P(SELES_SPOTS.chest), { item: burnOut }, () => world.openChest("burnOut"));
 }
