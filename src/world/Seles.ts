@@ -15,7 +15,9 @@ import { mulberry32, pixelTexture, rgb } from "./paint";
 import { fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
 import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource } from "./kit/flora";
 import { gradeColors, gridMesh, jitter, limb, matte, mergeSource, place } from "./kit/mesh";
+import { hash01, noise2 } from "./kit/noise";
 import { Obstacles } from "./kit/obstacles";
+import { GROUND_PPU } from "./kit/texels";
 import { TrailNet, type Knot } from "./kit/trails";
 import type { World } from "./World";
 
@@ -184,24 +186,27 @@ export function selesWorld(scene: Scene): World {
 // --- Ground ------------------------------------------------------------------------------------
 
 function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mesh {
-  const tex = pixelTexture("selesDirtTex", scene, 128, 128, (ctx, w, h) => {
-    for (let y = 0; y < h; y += 2)
-      for (let x = 0; x < w; x += 2) {
-        const k = 0.8 + rand() * 0.3;
+  // One tile of scorched earth at the standard ground density (128 px over 6.4 units = GROUND_PPU).
+  const TILE = 128;
+  const tex = pixelTexture("selesDirtTex", scene, TILE, TILE, (ctx, w, h) => {
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const k = 0.84 + rand() * 0.22;
         ctx.fillStyle = rgb(122 * k, 92 * k, 64 * k);
-        ctx.fillRect(x, y, 2, 2);
+        ctx.fillRect(x, y, 1, 1);
       }
-    for (let i = 0; i < 160; i++) {
-      ctx.fillStyle = rand() < 0.5 ? rgb(70, 52, 38) : rgb(150, 120, 88);
-      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1 + ((rand() * 2) | 0), 1);
+    for (let i = 0; i < 520; i++) {
+      const roll = rand();
+      ctx.fillStyle = roll < 0.45 ? rgb(70, 52, 38) : roll < 0.8 ? rgb(150, 120, 88) : rgb(46, 40, 36); // clod, pebble, ash
+      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1 + ((rand() * 2) | 0), 1 + ((rand() * 1.4) | 0));
     }
   });
-  tex.uScale = tex.vScale = 12;
+  const tileU = TILE / GROUND_PPU;
   const ground = gridMesh("selesGround", scene, 60, 60, (i, j) => {
     const u = -40 + (90 * j) / 60;
     const v = -40 + (80 * i) / 60;
     const p = fromUV(u, v);
-    return { x: p.x, y: 0, z: p.z, tu: u / 7.5, tv: v / 7.5 };
+    return { x: p.x, y: 0, z: p.z, tu: u / tileU, tv: v / tileU };
   }, Vector3.Up());
   ground.material = matte("selesGroundMat", scene, tex);
   ground.parent = root;
@@ -516,27 +521,7 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number): M
   return hill;
 }
 
-/** A repeatable random value in [0, 1) for an integer lattice point. */
-function hash01(i: number, j: number): number {
-  const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
-  return n - Math.floor(n);
-}
-
-/** Smooth 2D value noise in [0, 1] (hash lattice, smoothstep blend). */
-function noise2(x: number, y: number): number {
-  const h = hash01;
-  const xi = Math.floor(x);
-  const yi = Math.floor(y);
-  const fx = x - xi;
-  const fy = y - yi;
-  const sx = fx * fx * (3 - 2 * fx);
-  const sy = fy * fy * (3 - 2 * fy);
-  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * sx;
-  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * sx;
-  return a + (b - a) * sy;
-}
-
-const HILL_PPU = 20; // texture pixels per unit (the Forest's trails use 10: this one is seen close up)
+const HILL_PPU = GROUND_PPU;
 
 /**
  * The hillside, painted pixel by pixel (PS1 reference: the steep path down to Seles). The path:

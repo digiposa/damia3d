@@ -20,7 +20,9 @@ import { buildForestLife } from "./forestLife";
 import { LIGHTING_PRESETS, type LightingPreset } from "./lighting";
 import { AreaLight } from "./kit/areaLight";
 import { FWD, SIDE, TAN_BETA, fromUV, toUV } from "./kit/frame";
+import { hash01 } from "./kit/noise";
 import { Obstacles } from "./kit/obstacles";
+import { GROUND_PPU, MAX_TEX } from "./kit/texels";
 import { TrailNet, type Knot, type TrailSample } from "./kit/trails";
 import { WalkMask, type Canopy } from "./kit/walkMask";
 import { mulberry32, pixelTexture, rgb } from "./paint";
@@ -326,7 +328,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   buildCliffRim(scene, root, rand);
   buildMeadow(scene, root, rand);
   buildUndergrowth(scene, root, rand);
-  shadeGround([...floors, track], trees);
+  shadeGround([...floors, ...track], trees);
   buildSunShafts(scene, root, rand);
   buildSky(scene, fixed);
   buildRavineMist(scene, fixed);
@@ -346,7 +348,7 @@ export function forestWorld(scene: Scene): ForestWorld {
     clamp: clampToForest,
     preset: LIGHTING_PRESETS.forestDay,
     framing: 2.5,
-    shadowReceivers: [...floors, track],
+    shadowReceivers: [...floors, ...track],
     ownFill: [],
     presetAt: (p) => light.at(toUV(p.x, p.z).u),
     shotAt: (p) => forestShotAt(toUV(p.x, p.z)),
@@ -599,7 +601,7 @@ const DIRT_V0 = -20;
 
 const DIRT_V1 = 20;
 
-const DIRT_PPU = 10;
+const DIRT_PPU = GROUND_PPU;
 
 /**
  * The beaten earth of every trail, painted as ONE texture over the whole map rather than a ribbon
@@ -607,8 +609,10 @@ const DIRT_PPU = 10;
  * meet they simply merge — one rounded junction with one ragged edge, instead of overlapping
  * strips with crossing borders. The cart ruts follow the main track. The layer is a flat mesh just
  * above the floor, alpha-tested on the painted mask (crisp pixel edges, like the rest of the set).
+ * It is painted whole, then cut along u into chunks no wider than MAX_TEX pixels (one texture and
+ * one mesh each).
  */
-function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh {
+function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh[] {
   const W = (DIRT_U1 - DIRT_U0) * DIRT_PPU;
   const H = (DIRT_V1 - DIRT_V0) * DIRT_PPU;
   // Texture pixel of a local point (canvas rows run from v = DIRT_V1 down: the texture is flipped).
@@ -702,13 +706,10 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
   // Colour it: terracotta earth, darker at the ragged rim and in the ruts, a few pebbles and clods.
   const maskPx = m.getImageData(0, 0, W, H).data;
   const rutPx = r.getImageData(0, 0, W, H).data;
-  const tex = new DynamicTexture("forestTrackTex", { width: W, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
-  tex.hasAlpha = true;
-  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
-  const ctx = tex.getContext() as CanvasRenderingContext2D;
-  const img = ctx.createImageData(W, H);
+  const img = new ImageData(W, H);
   const out = img.data;
   const inside = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < W && y < H && maskPx[(y * W + x) * 4] > 127;
+  const RIM = Math.round(DIRT_PPU / 5); // the nibbled rim: a fifth of a unit, whatever the resolution
   for (let y = 0; y < H; y++) {
     const v = DIRT_V1 - (y + 0.5) / DIRT_PPU;
     for (let x = 0; x < W; x++) {
@@ -717,15 +718,16 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
       const u = DIRT_U0 + (x + 0.5) / DIRT_PPU;
       if (inVoid(u, v, 0.15)) continue; // never over a ravine or the cliff
       // Grass nibbling at the edge: rim pixels drop out at random, the next ring darkens.
-      const rim = !inside(x - 2, y) || !inside(x + 2, y) || !inside(x, y - 2) || !inside(x, y + 2);
-      if (rim && rand() < 0.35) continue;
+      const rim = !inside(x - RIM, y) || !inside(x + RIM, y) || !inside(x, y - RIM) || !inside(x, y + RIM);
+      if (rim && hash01(Math.floor(u * 10), Math.floor(v * 10) + 7919) < 0.35) continue;
       let k = 0.86 + rand() * 0.22;
       if (rim) k *= 0.88;
       if (rutPx[o] > 127) k *= 0.86;
       let cr = 178 * k;
       let cg = 120 * k;
       let cb = 92 * k;
-      const speck = rand();
+      // Pebbles and clods a tenth of a unit across, whatever the resolution.
+      const speck = hash01(Math.floor(u * 10), Math.floor(v * 10));
       if (speck < 0.012) [cr, cg, cb] = [206, 150, 116]; // pebble
       else if (speck < 0.02) [cr, cg, cb] = [118, 74, 52]; // clod
       out[o] = cr;
@@ -734,27 +736,44 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
       out[o + 3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
-  tex.update();
 
-  const mesh = gridMesh(
-    "forestTrack",
-    scene,
-    DIRT_V1 - DIRT_V0,
-    DIRT_U1 - DIRT_U0,
-    (i, j) => {
-      const u = DIRT_U0 + j;
-      const v = DIRT_V0 + i;
-      const p = forestPoint(u, v);
-      return { x: p.x, y: 0.02, z: p.z, tu: (u - DIRT_U0) / (DIRT_U1 - DIRT_U0), tv: (v - DIRT_V0) / (DIRT_V1 - DIRT_V0) };
-    },
-    Vector3.Up(),
-  );
-  const mat = matte("forestTrackMat", scene, tex);
-  mat.zOffset = -2; // sit on the floor without z-fighting
-  mesh.material = mat;
-  mesh.parent = root;
-  return mesh;
+  // Cut into chunks along u: one texture and one mesh each.
+  const chunks = Math.ceil(W / MAX_TEX);
+  const spanU = Math.ceil((DIRT_U1 - DIRT_U0) / chunks);
+  const meshes: Mesh[] = [];
+  const mat0 = (k: number, tex: DynamicTexture): StandardMaterial => {
+    const mat = matte(`forestTrackMat${k}`, scene, tex);
+    mat.zOffset = -2; // sit on the floor without z-fighting
+    return mat;
+  };
+  for (let k = 0; k < chunks; k++) {
+    const cu0 = DIRT_U0 + k * spanU;
+    const cu1 = Math.min(DIRT_U1, cu0 + spanU);
+    const x0 = (cu0 - DIRT_U0) * DIRT_PPU;
+    const cw = (cu1 - cu0) * DIRT_PPU;
+    const tex = new DynamicTexture(`forestTrackTex${k}`, { width: cw, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
+    tex.hasAlpha = true;
+    tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+    (tex.getContext() as CanvasRenderingContext2D).putImageData(img, -x0, 0, x0, 0, cw, H);
+    tex.update();
+    const mesh = gridMesh(
+      `forestTrack${k}`,
+      scene,
+      DIRT_V1 - DIRT_V0,
+      cu1 - cu0,
+      (i, j) => {
+        const u = cu0 + j;
+        const v = DIRT_V0 + i;
+        const p = forestPoint(u, v);
+        return { x: p.x, y: 0.02, z: p.z, tu: (u - cu0) / (cu1 - cu0), tv: (v - DIRT_V0) / (DIRT_V1 - DIRT_V0) };
+      },
+      Vector3.Up(),
+    );
+    mesh.material = mat0(k, tex);
+    mesh.parent = root;
+    meshes.push(mesh);
+  }
+  return meshes;
 }
 
 // --- Vegetation ------------------------------------------------------------------
