@@ -10,8 +10,9 @@ import type { Scene } from "@babylonjs/core/scene";
 import { softDotTexture } from "./atmosphere";
 import { LIGHTING_PRESETS } from "./lighting";
 import { mulberry32, pixelTexture, rgb } from "./paint";
-import { fromUV, toUV } from "./kit/frame";
-import { gradeColors, gridMesh, jitter, limb, matte } from "./kit/mesh";
+import { TAN_BETA, fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
+import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource, treeSource } from "./kit/flora";
+import { gradeColors, gridMesh, jitter, limb, matte, place } from "./kit/mesh";
 import { Obstacles } from "./kit/obstacles";
 import { TrailNet, type Knot } from "./kit/trails";
 import type { World } from "./World";
@@ -19,17 +20,22 @@ import type { World } from "./World";
 /**
  * Seles in ruins — Dart's home village the evening after the raid (canon:
  * docs/damia2D/features/locations/Seles.md). Built in code with the map kit, laid out after the
- * PS1 screens: the slope Dart comes down, the fence and the dirt path where the first knights
- * wait, the village square with its well, the burned house at the centre where Plos lies, the
- * stone church in ruins, the cemetery under a dead tree, and the road north to the Forest.
- * Sepia dusk, smoke still rising.
+ * PS1 screens: the wooded hillside Dart comes down from the top of the screen (the road back to
+ * the Forest), the fence and the dirt path where the first knights wait, the village square with
+ * its well, the burned house at the centre where Plos lies, the stone church in ruins, the
+ * cemetery under a dead tree. Sepia dusk, smoke still rising.
  *
- * Authored in the iso (u, v) frame: u up the screen, v sideways.
+ * Authored in a mirrored iso frame: u runs DOWN the screen (the hillside at low u is at the top),
+ * v sideways. {@link fromUV} / {@link selesUV} do the flip.
  */
+
+function fromUV(u: number, v: number): Vector3 {
+  return kitFromUV(-u, v);
+}
 
 /** Story spots (u, v), for the map's script. */
 export const SELES_SPOTS = {
-  start: { u: -20, v: -13 }, // top of the slope
+  start: { u: -21, v: -13.5 }, // up the hillside (top of the screen)
   slopeFoot: { u: -14, v: -8 },
   fence: { u: -11.5, v: -3.5 },
   battle1: { u: -8, v: 1 }, // the dirt path past the fence
@@ -44,13 +50,15 @@ export const SELES_SPOTS = {
   church: { u: 10, v: 9 },
   tasman: { u: 15, v: 4.5 },
   tomb3: { u: 19.6, v: -6.2 }, // the Stardust tomb: 3rd from the left, before the tree
-  exitNorth: { u: 31, v: 1 },
-  fromForest: { u: 28, v: 1 },
+  exitForest: { u: -27, v: -16.5 }, // back up the hillside, off the top of the screen
+  fromForest: { u: -22, v: -14 },
 };
 
 const TRAILS: Knot[][] = [
-  // Down the slope, east along the fence, through the gap, along the dirt path to the square.
+  // Down the hillside, through the gap in the fence, along the dirt path to the square.
   [
+    { u: -34, v: -20, w: 2.2 }, // off the top of the screen: the road to the Forest
+    { u: -27, v: -16.5, w: 2.4 },
     { u: -22, v: -14, w: 2.4 },
     { u: -17, v: -11, w: 2.6 },
     { u: -13.5, v: -7.5, w: 2.8 },
@@ -60,9 +68,7 @@ const TRAILS: Knot[][] = [
     { u: 3, v: 0, w: 7.5 }, // the square
     { u: 9, v: 0.5, w: 7.5 },
     { u: 15, v: 0.5, w: 6 },
-    { u: 21, v: 0.5, w: 4 },
-    { u: 28, v: 1, w: 3 },
-    { u: 36, v: 1.5, w: 3 }, // north, to the Forest
+    { u: 20, v: 0.5, w: 4 },
   ],
   // The cemetery, under the dead tree.
   [{ u: 14, v: 0, w: 3.5 }, { u: 18, v: -4.5, w: 4.5 }, { u: 20.5, v: -8, w: 3.5 }],
@@ -70,7 +76,16 @@ const TRAILS: Knot[][] = [
   [{ u: 7, v: 3, w: 3.5 }, { u: 9, v: 7, w: 3 }],
 ];
 
-const NET = new TrailNet(TRAILS);
+const NET = new TrailNet(TRAILS.map((t) => t.map((k) => ({ ...k, u: -k.u }))));
+
+/**
+ * How far (u, v) lies up the hillside, past the fence line (< 0: the village side). The hill is
+ * wooded and grassy; the village below is scorched earth.
+ */
+function hillDepth(u: number, v: number): number {
+  // The fence runs straight across the screen at u = -11.5 (a little wavy for the grass edge).
+  return -11.5 - u + 0.6 * Math.sin(v * 0.45);
+}
 
 /** Where you can walk: the trails, a little give either side. */
 let obstacles = new Obstacles();
@@ -116,7 +131,7 @@ export function selesWorld(scene: Scene): World {
   buildWell(scene, root, stone, wood, selesPoint(SELES_SPOTS.well));
   buildCemetery(scene, root, rand, stone);
   buildFences(scene, root, rand, wood);
-  buildSlope(scene, root, rand);
+  buildHillside(scene, root, rand);
   buildDeadTrees(scene, root, rand);
   buildRubble(scene, root, rand, stone, charred);
   buildSmoke(scene, rand);
@@ -165,10 +180,14 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
   for (let k = 0; k < pos.length; k += 3) {
     const n = NET.nearest(pos[k], pos[k + 2]);
     const scorch = 0.5 + 0.5 * Math.sin(pos[k] * 0.31 + Math.cos(pos[k + 2] * 0.27) * 2);
-    let c = 0.75 + 0.2 * scorch;
+    const { u, v } = selesUV(new Vector3(pos[k], 0, pos[k + 2]));
+    // Grass up the hillside (the trodden path stays bare), scorched earth below.
+    const grass = clamp01((hillDepth(u, v) + 0.4) / 2.2) * clamp01((n.d - n.w * 0.6) / 1.6);
+    let c = 0.75 + 0.2 * (1 - grass) * scorch;
     if (n.d < n.w) c += 0.1;
-    c *= 1 - Math.min(0.6, Math.max(0, (n.d - n.w - 4) / 18));
-    col.push(c, c * 0.95, c * 0.88, 1);
+    if (grass === 0) c *= 1 - Math.min(0.6, Math.max(0, (n.d - n.w - 4) / 18));
+    const g = grass * (0.85 + 0.25 * scorch);
+    col.push(c * (1 - 0.45 * g), c * (0.95 + 0.05 * g), c * (0.88 - 0.45 * g), 1);
   }
   ground.setVerticesData("color", col);
   return ground;
@@ -347,7 +366,7 @@ function deadTree(scene: Scene, root: TransformNode, rand: () => number, bark: S
 
 function buildDeadTrees(scene: Scene, root: TransformNode, rand: () => number): void {
   const bark = matte("selesDeadBark2", scene, undefined, new Color3(0.22, 0.16, 0.12));
-  for (const [u, v, s] of [[-6, 10, 1.1], [16, 11, 1.3], [-18, 2, 1], [25, -9, 1.2], [5, -14, 1.1], [-14, -16, 0.9]] as const) {
+  for (const [u, v, s] of [[-6, 10, 1.1], [16, 11, 1.3], [-8, -14, 1], [25, -9, 1.2], [5, -14, 1.1]] as const) {
     deadTree(scene, root, rand, bark, fromUV(u, v), s);
   }
 }
@@ -359,16 +378,17 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
     const b = fromUV(to.u, to.v);
     const len = Vector3.Distance(a, b);
     const n = Math.max(2, Math.round(len / 1.6));
+    const gapHalf = 1.5 / len;
     for (let k = 0; k <= n; k++) {
       const f = k / n;
-      if (gapAt !== undefined && Math.abs(f - gapAt) < 0.09) continue;
+      if (gapAt !== undefined && Math.abs(f - gapAt) < gapHalf) continue;
       const p = Vector3.Lerp(a, b, f);
       const post = MeshBuilder.CreateBox("selesFencePost", { width: 0.14, height: 1.1, depth: 0.14 }, scene);
       post.position.set(p.x, 0.55, p.z);
       post.rotation.z = (rand() - 0.5) * 0.2;
       post.material = wood;
       post.parent = root;
-      if (k < n && !(gapAt !== undefined && Math.abs((k + 0.5) / n - gapAt) < 0.09) && rand() > 0.15) {
+      if (k < n && !(gapAt !== undefined && Math.abs((k + 0.5) / n - gapAt) < gapHalf) && rand() > 0.15) {
         const q = Vector3.Lerp(a, b, (k + 0.5) / n);
         for (const y of [0.45, 0.85]) {
           const rail = MeshBuilder.CreateBox("selesFenceRail", { width: len / n, height: 0.08, depth: 0.08 }, scene);
@@ -380,24 +400,60 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
       }
     }
   };
-  run({ u: -18, v: -2 }, { u: -6, v: -6.5 }, 0.5); // the one Dart jumps (the gap)
+  // Across the foot of the hillside, with the gap Dart comes through.
+  run({ u: -11.5, v: -24 }, { u: -11.5, v: 10 }, 20.5 / 34);
   run({ u: -4, v: 12 }, { u: 12, v: 13 });
-  run({ u: 24, v: -11 }, { u: 26, v: 9 }, 0.47); // the north gate out
 }
 
-/** The hillside Dart comes down: a raised bank of earth behind the start, framing the entry. */
-function buildSlope(scene: Scene, root: TransformNode, rand: () => number): void {
-  const earth = matte("selesBank", scene, undefined, new Color3(0.36, 0.27, 0.19));
-  for (let k = 0; k < 9; k++) {
-    const p = fromUV(-26 + k * 1.6 + (rand() - 0.5), -20 + k * 1.2 + (rand() - 0.5) * 2);
-    const bank = MeshBuilder.CreateSphere("selesBankLump", { diameter: 6 + rand() * 3, segments: 8 }, scene);
-    bank.scaling.y = 0.45;
-    bank.position.set(p.x, 0, p.z);
-    jitter(bank, 0.4, rand);
-    bank.material = earth;
-    bank.parent = root;
-  }
+/**
+ * The hillside Dart comes down (PS1: a dirt path through the wood, down to the fence): grass,
+ * trees either side of the path, bushes and ferns at its verges. No crown may hide the path.
+ */
+function buildHillside(scene: Scene, root: TransformNode, rand: () => number): void {
+  const bark = matte("selesBarkMat", scene, barkTexture(scene, rand));
+  const leaves = matte("selesLeafMat", scene, leafTexture(scene, rand));
+  const trees = [0, 1, 2].map((i) => treeSource(i, scene, bark, leaves, rand));
+  const sapling = saplingSource(scene, bark, leaves, rand);
+  const bush = bushSource(scene, leaves, rand);
+  const fern = fernSource(scene, rand);
+  const grass = grassSource(scene, rand);
+  const rock = rockSource(scene, rand);
+  const STEP = 2.8;
+  for (let gu = -44; gu < -2; gu += STEP)
+    for (let gv = -34; gv < 16; gv += STEP) {
+      const u = gu + (rand() - 0.5) * STEP * 0.9;
+      const v = gv + (rand() - 0.5) * STEP * 0.9;
+      const depth = hillDepth(u, v);
+      if (depth < 0.6) continue;
+      const { x, z } = fromUV(u, v);
+      const near = NET.nearest(x, z);
+      const edge = near.d - near.w;
+      const rot = rand() * Math.PI * 2;
+      const roll = rand();
+      if (depth > 2.5 && edge > 1.2 && roll < 0.7 && !NET.occludes(x, z, 15, 4.4, 9 * TAN_BETA - 4.4)) {
+        const s = 0.8 + rand() * 0.35;
+        place(trees[(rand() * trees.length) | 0], root, x, z, s, rot);
+        obstacles.add(x, z, 0.75 * s);
+      } else if (edge > 0.6 && roll < 0.8 && !NET.occludes(x, z, 2.2, 1)) {
+        const s = 0.8 + rand() * 0.4;
+        if (rand() < 0.4) place(sapling, root, x, z, s, rot);
+        else place(bush, root, x, z, 1.1 + rand() * 0.6, rot);
+        obstacles.add(x, z, 0.4 * s);
+      } else if (edge > 0.2 && roll < 0.9) {
+        place(rock, root, x, z, 0.5 + rand() * 0.5, rot);
+      }
+      // Grass and ferns everywhere on the hill, the path's verges included (walk-through).
+      for (let k = 0; k < 2; k++) {
+        const gx = x + (rand() - 0.5) * STEP;
+        const gz = z + (rand() - 0.5) * STEP;
+        const n = NET.nearest(gx, gz);
+        if (n.d < n.w * 0.7) continue;
+        place(rand() < 0.6 ? grass : fern, root, gx, gz, 0.7 + rand() * 0.5, rand() * Math.PI);
+      }
+    }
 }
+
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
 /** Rubble, crates and barrels knocked about the square. */
 function buildRubble(scene: Scene, root: TransformNode, rand: () => number, stone: StandardMaterial, charred: StandardMaterial): void {
@@ -479,5 +535,6 @@ function buildSmoke(scene: Scene, rand: () => number): void {
 
 /** Local (u, v) of a world point. */
 export function selesUV(p: Vector3): { u: number; v: number } {
-  return toUV(p.x, p.z);
+  const { u, v } = kitToUV(p.x, p.z);
+  return { u: -u, v };
 }

@@ -216,7 +216,7 @@ export class StoryMode extends ArenaCombatMode {
   private updateSigns(): void {
     if (!this.bubble) return;
     const p = this.player.position;
-    const sign = this.busy ? undefined : this.signs.find((s) => Math.hypot(p.x - s.at.x, p.z - s.at.z) < s.radius);
+    const sign = this.busy || this.inputLocked ? undefined : this.signs.find((s) => Math.hypot(p.x - s.at.x, p.z - s.at.z) < s.radius);
     if (sign) this.bubble.show(p.add(new Vector3(0, 2.2, 0)), sign.title, sign.text);
     else if (this.signShown) this.bubble.hide();
     this.signShown = sign;

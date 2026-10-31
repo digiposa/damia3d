@@ -9,7 +9,7 @@ import type { MapFactory, StoryApi } from "../StoryMap";
  * Dart comes down the slope; past the fence two knights are about to kill a villager (fight 1,
  * formation 477); the Burn Out chest by the Save Point; Plos in front of the burned house, then
  * the Commander and two knights (fight 2, formation 384) — Shana was taken to Hellena; Lowe and
- * Isha, the Stardust tomb, Master Tasman; the road north, with the scene at Hellena, to the Forest.
+ * Isha, the Stardust tomb, Master Tasman; the hillside road, with the scene at Hellena, back to the Forest.
  *
  * Only the Commander's first line is canon; the rest is a draft to be corrected.
  */
@@ -124,9 +124,9 @@ export const selesMap: MapFactory = (scene) => {
         await api.say(S("tasman"), S("tasman3"));
       }, done2, 2.8);
 
-      // --- North: the scene at Hellena, then the Forest -----------------------------------------
-      api.sign(P(SELES_SPOTS.exitNorth), 3.5, dart, S("notYet"));
-      api.trigger(P(SELES_SPOTS.exitNorth), 3, async () => {
+      // --- Back up the hillside: the scene at Hellena, then the Forest -----------------------------------------
+      api.sign(P(SELES_SPOTS.exitForest), 3.5, dart, S("notYet"));
+      api.trigger(P(SELES_SPOTS.exitForest), 3, async () => {
         api.lock();
         await api.fade(1, 0.8);
         if (!api.hasFlag("seles:hellenaScene")) {
