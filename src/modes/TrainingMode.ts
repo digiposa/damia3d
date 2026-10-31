@@ -1978,6 +1978,7 @@ export abstract class ArenaCombatMode extends GameMode {
       const action = enemy.aiUpdate(cdt, this.player.position, ctx);
       enemy.tickKnockback(cdt); // hit recoil, applied on top of the AI move
       this.world.clamp(enemy.position);
+      if (this.world.heightAt) enemy.position.y = this.world.heightAt(enemy.position.x, enemy.position.z); // on the relief
       enemy.syncHud(this.scene);
       if (action) this.resolveEnemyAction(enemy, action);
     }
