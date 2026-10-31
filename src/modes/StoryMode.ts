@@ -417,6 +417,12 @@ export class StoryMode extends ArenaCombatMode {
         this.paused = on;
       },
       resetEncounters: () => this.rollNext(),
+      save: (entry) => {
+        this.syncState();
+        story().entry = entry;
+        saveStory();
+        this.popText(this.player.position.add(new Vector3(0, 2.4, 0)), t("story.saved"), "#9fe0ff", true);
+      },
     };
   }
 

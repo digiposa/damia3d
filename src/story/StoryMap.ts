@@ -91,4 +91,6 @@ export interface StoryApi {
   setPaused(on: boolean): void;
   /** Reset the random-encounter counter (Charm Potion). */
   resetEncounters(): void;
+  /** Save the game here: "Continue" will resume at this map's `entry` (a Save Point). */
+  save(entry: string): void;
 }

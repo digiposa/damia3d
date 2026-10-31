@@ -690,7 +690,7 @@ function buildDeadTrees(scene: Scene, root: TransformNode, rand: () => number): 
   for (const [u, v, s] of [[-6, 10, 1.1], [16, 9.5, 1.3], [25, -9, 1.2], [5, -14, 1.1]] as const) {
     deadTree(scene, root, rand, bark, vilPoint(u, v), s);
   }
-  deadTree(scene, root, rand, bark, fromUV(-8.6, -14.5), 1); // the yard's left edge
+  deadTree(scene, root, rand, bark, fromUV(-8.4, -17.5), 1); // the yard's left edge
 }
 
 /** Split-rail fences: along the slope's foot (the gap Dart takes) and round the square. */
