@@ -10,9 +10,9 @@ import type { Scene } from "@babylonjs/core/scene";
 import { softDotTexture } from "./atmosphere";
 import { LIGHTING_PRESETS } from "./lighting";
 import { mulberry32, pixelTexture, rgb } from "./paint";
-import { TAN_BETA, fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
-import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource, treeSource } from "./kit/flora";
-import { gradeColors, gridMesh, jitter, limb, matte, place } from "./kit/mesh";
+import { fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
+import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource } from "./kit/flora";
+import { gradeColors, gridMesh, jitter, limb, matte, mergeSource, place } from "./kit/mesh";
 import { Obstacles } from "./kit/obstacles";
 import { TrailNet, type Knot } from "./kit/trails";
 import type { World } from "./World";
@@ -35,8 +35,9 @@ function fromUV(u: number, v: number): Vector3 {
 
 /** Story spots (u, v), for the map's script. */
 export const SELES_SPOTS = {
-  start: { u: -25, v: -15.5 }, // the top of the cliff, where the steep path starts down
-  slopeFoot: { u: -14, v: -8 },
+  start: { u: -29, v: -6.9 }, // the top of the steep path, under the ledge Dart jumps from
+  slideTo: { u: -22, v: -5.4 }, // where his slide down the loose earth stops
+  slopeFoot: { u: -14, v: -4 },
   fence: { u: -11.5, v: -3.5 },
   battle1: { u: -8, v: 1 }, // the dirt path past the fence
   villager: { u: -6.5, v: 3.2 },
@@ -50,26 +51,26 @@ export const SELES_SPOTS = {
   church: { u: 10, v: 9 },
   tasman: { u: 15, v: 4.5 },
   tomb3: { u: 19.6, v: -6.2 }, // the Stardust tomb: 3rd from the left, before the tree
-  exitForest: { u: -32, v: -19 }, // back up the path, off the top of the screen
-  fromForest: { u: -27, v: -16.5 },
+  exitForest: { u: 31, v: 1 }, // the road out past the cemetery, off the bottom of the screen
+  fromForest: { u: 28, v: 1 },
 };
 
 const TRAILS: Knot[][] = [
   // Down the hillside, through the gap in the fence, along the dirt path to the square.
   [
-    { u: -40, v: -22, w: 2.2 }, // off the top of the screen: the road to the Forest
-    { u: -32, v: -19, w: 2.2 },
-    { u: -25, v: -15.5, w: 2.4 }, // the cliff top: the path drops from here
-    { u: -21, v: -13.5, w: 2.6 },
-    { u: -17, v: -11, w: 2.6 },
-    { u: -13.5, v: -7.5, w: 2.8 },
+    { u: -30, v: -7.2, w: 2.2 }, // the foot of the ledge Dart jumps from (no way back up)
+    { u: -25, v: -6.1, w: 2.6 },
+    { u: -19, v: -4.9, w: 2.8 }, // down from the north, drifting a little to the right (PS1)
+    { u: -14, v: -4, w: 2.6 },
     { u: -11.5, v: -3.5, w: 2.4 }, // the gap in the fence
     { u: -8.5, v: 1, w: 4.2 }, // the dirt path — first fight
     { u: -3, v: 1.5, w: 4.2 },
     { u: 3, v: 0, w: 7.5 }, // the square
     { u: 9, v: 0.5, w: 7.5 },
     { u: 15, v: 0.5, w: 6 },
-    { u: 20, v: 0.5, w: 4 },
+    { u: 21, v: 0.5, w: 4 },
+    { u: 28, v: 1, w: 3 },
+    { u: 36, v: 1.5, w: 3 }, // the road out, to the Forest
   ],
   // The cemetery, under the dead tree.
   [{ u: 14, v: 0, w: 3.5 }, { u: 18, v: -4.5, w: 4.5 }, { u: 20.5, v: -8, w: 3.5 }],
@@ -88,7 +89,9 @@ function hillDepth(u: number, v: number): number {
   return -11.5 - u + 0.6 * Math.sin(v * 0.45);
 }
 
-const CLIFF_H = 9; // the hilltop Dart comes down from, over the village
+const SLOPE_H = 7; // the top of the steep path
+const LEDGE_H = 10.5; // the grassy ledge above it, out of reach: Dart jumps down from it
+const LEDGE_D = 19; // how far up the hill (depth) the ledge's edge stands
 
 const smooth = (a: number, b: number, x: number): number => {
   const t = clamp01((x - a) / (b - a));
@@ -107,7 +110,9 @@ function selesHeight(x: number, z: number): number {
   const n = NET.nearest(x, z);
   const edge = n.d - n.w;
   const rise = smooth(0, 3, depth);
-  return CLIFF_H * smooth(0.4, 11, depth) + rise * (1.7 * smooth(0.1, 2.6, edge) + 2.6 * smooth(5, 12, edge));
+  const ledge = smooth(LEDGE_D - 0.6, LEDGE_D + 0.6, depth); // a short rocky drop
+  const banks = rise * (1 - ledge) * (1.4 * smooth(0.1, 2.6, edge) + 1.6 * smooth(6, 13, edge));
+  return SLOPE_H * smooth(0.4, LEDGE_D - 0.5, depth) + (LEDGE_H - SLOPE_H) * ledge + banks + ledge * 0.4 * Math.sin(u * 0.8 + v * 0.6);
 }
 
 /** Where you can walk: the trails, a little give either side. */
@@ -427,18 +432,20 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
   // Across the foot of the hillside, with the gap Dart comes through.
   run({ u: -11.5, v: -24 }, { u: -11.5, v: 10 }, 20.5 / 34);
   run({ u: -4, v: 12 }, { u: 12, v: 13 });
+  run({ u: 24, v: -11 }, { u: 26, v: 9 }, 0.6); // the gate out
 }
 
 /**
- * The hillside Dart comes down (PS1: a steep earth path worn between dark scrub, down from the
- * clifftop to the fence): its own relief mesh, then dense low brush, ferns and rocks either side,
- * a few trees up on the top. Nothing may hide the path.
+ * The hillside Dart comes down (PS1: a steep earth path worn straight down between scrub, from
+ * the foot of a grassy ledge to the fence): its own relief mesh, then brush, ferns and rocks either
+ * side; up on the ledge (out of reach — Dart jumps down from it), tall golden grass and pines.
+ * Nothing may hide the path.
  */
 function buildHillside(scene: Scene, root: TransformNode, rand: () => number, dirt: StandardMaterial): Mesh {
-  const U0 = -46;
+  const U0 = -62;
   const U1 = -10;
   const V0 = -36;
-  const V1 = 20;
+  const V1 = 26;
   const STEP_M = 0.5;
   const cols = Math.round((U1 - U0) / STEP_M);
   const rows = Math.round((V1 - V0) / STEP_M);
@@ -450,37 +457,45 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number, di
   }, Vector3.Up());
   hill.material = dirt;
   hill.parent = root;
-  // Colour: the worn path warm and bare, streaked down the slope; the banks dark scrubby earth.
+  // Colour: the worn path warm and bare, rutted across; the banks olive scrub; the ledge's drop
+  // bare rock; the ledge itself golden grass.
   const pos = hill.getVerticesData("position")!;
   const col: number[] = [];
   for (let k = 0; k < pos.length; k += 3) {
     const { u, v } = selesUV(new Vector3(pos[k], 0, pos[k + 2]));
+    const depth = hillDepth(u, v);
     const n = NET.nearest(pos[k], pos[k + 2]);
     const bare = 1 - smooth(-1.4, 0.3, n.d - n.w);
     // Ruts across the slope (PS1: the earth is ridged where feet slid down it).
     const streak = 0.84 + 0.12 * Math.sin(u * 3.4 + Math.sin(v * 1.3) * 1.5) + 0.06 * Math.sin(v * 5.3) + (rand() - 0.5) * 0.12;
-    const scrub = 0.55 + 0.2 * Math.sin(u * 1.3 + v * 0.9) + (rand() - 0.5) * 0.2;
-    const fade = clamp01(hillDepth(u, v) / 1.2); // into the village ground at the fence
-    const r = bare * 1.12 * streak + (1 - bare) * 0.36 * scrub;
-    const g = bare * 0.9 * streak + (1 - bare) * 0.42 * scrub;
-    const b = bare * 0.68 * streak + (1 - bare) * 0.2 * scrub;
+    const scrub = 0.85 + 0.15 * Math.sin(u * 1.3 + v * 0.9) + (rand() - 0.5) * 0.2;
+    let r = bare * 1.12 * streak + (1 - bare) * 0.66 * scrub;
+    let g = bare * 0.9 * streak + (1 - bare) * 0.66 * scrub;
+    let b = bare * 0.68 * streak + (1 - bare) * 0.36 * scrub;
+    const face = smooth(LEDGE_D - 1.2, LEDGE_D - 0.4, depth) * (1 - smooth(LEDGE_D + 0.4, LEDGE_D + 1, depth));
+    const meadow = smooth(LEDGE_D + 0.4, LEDGE_D + 1, depth);
+    const m = 0.9 + 0.12 * Math.sin(u * 0.9 + Math.sin(v * 0.7) * 2) + (rand() - 0.5) * 0.14;
+    r = r * (1 - face - meadow) + face * 0.62 + meadow * 0.98 * m;
+    g = g * (1 - face - meadow) + face * 0.6 + meadow * 1.02 * m;
+    b = b * (1 - face - meadow) + face * 0.56 + meadow * 0.4 * m;
+    const fade = clamp01(depth / 1.2); // into the village ground at the fence
     col.push(r * fade + 0.85 * (1 - fade), g * fade + 0.8 * (1 - fade), b * fade + 0.72 * (1 - fade), 1);
   }
   hill.setVerticesData("color", col);
 
   const bark = matte("selesBarkMat", scene, barkTexture(scene, rand));
   const leaves = matte("selesLeafMat", scene, leafTexture(scene, rand));
-  leaves.diffuseColor = new Color3(0.5, 0.48, 0.34); // dusk scrub: darker, browner than the Forest
-  const trees = [0, 1].map((i) => treeSource(i, scene, bark, leaves, rand));
+  leaves.diffuseColor = new Color3(0.62, 0.6, 0.42); // dusk scrub: browner than the Forest
   const sapling = saplingSource(scene, bark, leaves, rand);
   const bush = bushSource(scene, leaves, rand);
   const fern = fernSource(scene, rand);
   const grass = grassSource(scene, rand);
   const rock = rockSource(scene, rand);
+  const pine = pineSource(scene, bark, rand);
   const at = (src: Mesh, x: number, z: number, s: number): void => {
     place(src, root, x, z, s, rand() * Math.PI * 2).position.y = selesHeight(x, z);
   };
-  const STEP = 1.9;
+  const STEP = 1.7;
   for (let gu = U0; gu < U1; gu += STEP)
     for (let gv = V0; gv < V1; gv += STEP) {
       const u = gu + (rand() - 0.5) * STEP * 0.9;
@@ -491,18 +506,27 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number, di
       const near = NET.nearest(x, z);
       const edge = near.d - near.w;
       const roll = rand();
-      if (depth > 13 && edge > 2 && roll < 0.35 && !NET.occludes(x, z, 15, 4.4, 9 * TAN_BETA - 4.4)) {
-        at(trees[(rand() * trees.length) | 0], x, z, 0.75 + rand() * 0.3); // up on the hilltop
-        obstacles.add(x, z, 0.6);
-      } else if (edge > 0.5 && roll < 0.75 && !NET.occludes(x, z, 2.6, 1.2)) {
-        // The scrub: big dark clumps packed along the banks (knee-to-waist high at most).
+      if (depth > LEDGE_D + 1) {
+        // Up on the ledge: tall grass everywhere, pines here and there (none over the path's top).
+        if (roll < 0.12 && !NET.occludes(x, z, 12, 2.5)) {
+          at(pine, x, z, 0.8 + rand() * 0.5);
+        } else if (roll < 0.16) at(rock, x, z, 0.6 + rand() * 0.8);
+        for (let k = 0; k < 3; k++) at(grass, x + (rand() - 0.5) * STEP, z + (rand() - 0.5) * STEP, 1 + rand() * 0.6);
+        continue;
+      }
+      if (depth > LEDGE_D - 1.2) {
+        if (roll < 0.5) at(rock, x, z, 0.8 + rand() * 0.9); // the ledge's broken edge
+        continue;
+      }
+      if (edge > 0.5 && roll < 0.7 && !NET.occludes(x, z, 2.6, 1.2)) {
+        // The scrub: clumps packed along the banks (knee-to-waist high at most).
         if (rand() < 0.15) at(sapling, x, z, 0.8 + rand() * 0.3);
         else at(bush, x, z, 1.1 + rand() * 0.7);
-      } else if (edge > 0.3 && roll < 0.88) {
+      } else if (edge > 0.3 && roll < 0.82) {
         at(rock, x, z, 0.4 + rand() * 0.6);
       }
       // Ferns and tufts everywhere off the trodden middle (walk-through).
-      for (let k = 0; k < 2; k++) {
+      for (let k = 0; k < 3; k++) {
         const gx = x + (rand() - 0.5) * STEP;
         const gz = z + (rand() - 0.5) * STEP;
         const n = NET.nearest(gx, gz);
@@ -510,16 +534,29 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number, di
         at(rand() < 0.55 ? grass : fern, gx, gz, 0.7 + rand() * 0.5);
       }
     }
-  // Rocky shoulders where the hill breaks either side of the path, near the top.
-  for (let k = 0; k < 26; k++) {
-    const u = -26 + rand() * 12;
-    const v = -34 + rand() * 50;
-    const { x, z } = fromUV(u, v);
-    const n = NET.nearest(x, z);
-    if (n.d - n.w < 3.5 || NET.occludes(x, z, 2, 1.5)) continue;
-    at(rock, x, z, 1.2 + rand() * 1.4);
-  }
   return hill;
+}
+
+/** A dark pine (PS1 hilltop): a straight trunk under stacked, drooping cones. */
+function pineSource(scene: Scene, bark: StandardMaterial, rand: () => number): Mesh {
+  const needles = matte("selesPineMat", scene, undefined, new Color3(0.2, 0.26, 0.16));
+  const parts: Mesh[] = [];
+  const trunk = MeshBuilder.CreateCylinder("selesPineTrunk", { height: 9, diameterTop: 0.15, diameterBottom: 0.5, tessellation: 6 }, scene);
+  trunk.position.y = 4.5;
+  trunk.material = bark;
+  gradeColors(trunk, [0.6, 0.57, 0.54], [1, 1, 1]);
+  parts.push(trunk);
+  for (let k = 0; k < 5; k++) {
+    const y = 2.4 + k * 1.45;
+    const r = 2.1 - k * 0.38;
+    const cone = MeshBuilder.CreateCylinder("selesPineCone", { height: 2.4, diameterTop: 0, diameterBottom: r * 2, tessellation: 7 }, scene);
+    cone.position.y = y + 1.2;
+    jitter(cone, 0.15, rand);
+    cone.material = needles;
+    gradeColors(cone, [0.55, 0.55, 0.5], [1.15, 1.1, 0.9]);
+    parts.push(cone);
+  }
+  return mergeSource("selesPine", parts, true);
 }
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));

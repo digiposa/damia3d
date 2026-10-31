@@ -350,9 +350,10 @@ export class StoryMode extends ArenaCombatMode {
       say: (speaker, text) => this.dialogue!.say(speaker, text),
       wait,
       fade: (to, seconds) => this.fader!.fade(to, seconds),
-      walkHero: (to) => {
+      walkHero: (to, run) => {
         this.lock();
         this.scriptWalk = to.clone();
+        this.scriptRun = !!run;
         return this.waitUntil(() => !this.scriptWalk);
       },
       npc: (name, at, look) => this.spawnNpc(name, at, look),

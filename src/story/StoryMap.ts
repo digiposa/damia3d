@@ -58,8 +58,8 @@ export interface StoryApi {
   wait(seconds: number): Promise<void>;
   /** Fade the screen to black (1) or back (0). */
   fade(to: number, seconds?: number): Promise<void>;
-  /** Walk the hero to a point. */
-  walkHero(to: Vector3): Promise<void>;
+  /** Walk the hero to a point (`run`: at running pace — a dash, a slide down a slope). */
+  walkHero(to: Vector3, run?: boolean): Promise<void>;
   /** Place an NPC. */
   npc(name: string, at: Vector3, look?: Partial<HumanoidOptions>): NpcHandle;
   /** Place a scripted fight's enemies, inactive (for the scene before the fight). */

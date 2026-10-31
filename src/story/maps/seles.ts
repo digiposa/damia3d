@@ -9,7 +9,7 @@ import type { MapFactory, StoryApi } from "../StoryMap";
  * Dart comes down the slope; past the fence two knights are about to kill a villager (fight 1,
  * formation 477); the Burn Out chest by the Save Point; Plos in front of the burned house, then
  * the Commander and two knights (fight 2, formation 384) — Shana was taken to Hellena; Lowe and
- * Isha, the Stardust tomb, Master Tasman; the hillside road, with the scene at Hellena, back to the Forest.
+ * Isha, the Stardust tomb, Master Tasman; the road out, with the scene at Hellena, to the Forest.
  *
  * Only the Commander's first line is canon; the rest is a draft to be corrected.
  */
@@ -44,7 +44,10 @@ export const selesMap: MapFactory = (scene) => {
       if (entry === "start" && !api.hasFlag("seles:arrived")) {
         void (async () => {
           api.lock();
-          await api.wait(0.9);
+          // He has just jumped down from the ledge: he slides down the loose earth, then sees Seles.
+          await api.wait(1.4); // the screen fades in on him at the foot of the ledge
+          await api.walkHero(P(SELES_SPOTS.slideTo), true);
+          await api.wait(0.5);
           await api.say(dart, S("arrive1"));
           await api.say(dart, S("arrive2"));
           await api.walkHero(P(SELES_SPOTS.slopeFoot));
@@ -124,7 +127,7 @@ export const selesMap: MapFactory = (scene) => {
         await api.say(S("tasman"), S("tasman3"));
       }, done2, 2.8);
 
-      // --- Back up the hillside: the scene at Hellena, then the Forest -----------------------------------------
+      // --- The road out: the scene at Hellena, then the Forest -----------------------------------------
       api.sign(P(SELES_SPOTS.exitForest), 3.5, dart, S("notYet"));
       api.trigger(P(SELES_SPOTS.exitForest), 3, async () => {
         api.lock();

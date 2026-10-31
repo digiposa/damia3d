@@ -288,6 +288,8 @@ export abstract class ArenaCombatMode extends GameMode {
   protected inputLocked = false;
   /** While locked, a scene can walk the hero to this point. */
   protected scriptWalk?: Vector3;
+  /** The scripted walk runs (a slide down a slope, a dash) instead of walking. */
+  protected scriptRun = false;
   /** Last lighting applied from {@link World.presetAt} (re-applied only when it changes). */
   private lastLight?: LightingPreset;
   protected spellFx?: SpellFx;
@@ -963,7 +965,7 @@ export abstract class ArenaCombatMode extends GameMode {
       to.y = 0;
       const d = to.length();
       // Snap the last step: at a low frame rate one step can overshoot and oscillate forever.
-      if (d > Math.max(0.15, 3.3 * dt)) this.player.move(to.normalize(), dt, false);
+      if (d > Math.max(0.15, (this.scriptRun ? 6.6 : 3.3) * dt)) this.player.move(to.normalize(), dt, this.scriptRun);
       else {
         this.player.position.x = this.scriptWalk.x;
         this.player.position.z = this.scriptWalk.z;
