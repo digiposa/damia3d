@@ -15,6 +15,12 @@ import type { MapFactory, StoryApi } from "../StoryMap";
  */
 
 const S = (key: string): string => t(`seles.${key}`);
+
+/**
+ * The scenes (opening, the two scripted fights, Plos, the scene at Hellena) — off while the map
+ * itself is being built: Seles is then free to explore, with only its chest and its exit.
+ */
+const SCENES = false;
 const P = selesPoint;
 
 export const selesMap: MapFactory = (scene) => {
@@ -22,9 +28,14 @@ export const selesMap: MapFactory = (scene) => {
   return {
     world,
     entries: { start: P(SELES_SPOTS.start), fromForest: P(SELES_SPOTS.fromForest) },
-    models: ["knight_sandora", "kos_sword", "commander", "commander_sword"],
+    models: SCENES ? ["knight_sandora", "kos_sword", "commander", "commander_sword"] : [],
     encounterAt: () => null, // a town: scripted fights only
     start(api, entry) {
+      if (!SCENES) {
+        openChest(api);
+        api.trigger(P(SELES_SPOTS.exitForest), 3, () => api.goto("forest", "fromSeles"));
+        return;
+      }
       const dart = t("story.dart");
       const done1 = (): boolean => api.hasFlag("seles:fight1");
       const done2 = (): boolean => api.hasFlag("seles:commander");
