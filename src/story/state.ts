@@ -32,8 +32,9 @@ export function story(): StoryState {
   return current;
 }
 
-export function startNewStory(): StoryState {
-  current = newStory();
+/** A new game, optionally dropped on another map (to explore it: "Explore a map"). */
+export function startNewStory(at?: { map: string; entry: string }): StoryState {
+  current = { ...newStory(), ...at };
   saveStory();
   return current;
 }

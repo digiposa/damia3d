@@ -1,12 +1,14 @@
 import { hasTouch } from "../core/device";
 import { t, onLocaleChange } from "../core/i18n";
+import { EXPLORE } from "../story/maps";
 
-export type ModeId = "Training" | "Story" | "StoryNew" | "Survival";
+export type ModeId = "Training" | "Story" | "StoryNew" | "Explore" | "Survival";
 
 const ENTRIES: { mode: ModeId; labelKey: string; blurbKey: string }[] = [
   { mode: "Training", labelKey: "mode.training", blurbKey: "mode.training.blurb" },
   { mode: "Story", labelKey: "mode.story", blurbKey: "mode.story.blurb" },
   { mode: "StoryNew", labelKey: "mode.storyNew", blurbKey: "mode.storyNew.blurb" },
+  { mode: "Explore", labelKey: "mode.explore", blurbKey: "mode.explore.blurb" },
   { mode: "Survival", labelKey: "mode.survival", blurbKey: "mode.survival.blurb" },
 ];
 
@@ -20,8 +22,10 @@ export class MainMenu {
   private subtitle: HTMLDivElement;
   private hint: HTMLDivElement;
   private entryNodes: { label: HTMLSpanElement; blurb: HTMLSpanElement; labelKey: string; blurbKey: string }[] = [];
+  private list!: HTMLDivElement;
+  private picker!: HTMLDivElement;
 
-  constructor(private onSelect: (mode: ModeId) => void) {
+  constructor(private onSelect: (mode: ModeId, at?: { map: string; entry: string }) => void) {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "fixed",
@@ -63,25 +67,10 @@ export class MainMenu {
       gap: "12px",
       width: "min(320px, 80vw)",
     } satisfies Partial<CSSStyleDeclaration>);
+    this.list = list;
 
     for (const entry of ENTRIES) {
-      const btn = document.createElement("button");
-      Object.assign(btn.style, {
-        display: "flex",
-        flexDirection: "column",
-        gap: "3px",
-        font: "600 18px/1.2 system-ui, sans-serif",
-        color: "#eaf2ff",
-        background: "rgba(30,42,66,0.85)",
-        border: "1px solid rgba(120,150,200,0.4)",
-        borderRadius: "12px",
-        padding: "16px 18px",
-        cursor: "pointer",
-        touchAction: "manipulation",
-        textAlign: "left",
-      } satisfies Partial<CSSStyleDeclaration>);
-      btn.style.setProperty("-webkit-tap-highlight-color", "transparent");
-
+      const btn = this.button();
       const label = document.createElement("span");
       const blurb = document.createElement("span");
       Object.assign(blurb.style, { font: "400 12px/1.3 system-ui", opacity: "0.65" } satisfies Partial<CSSStyleDeclaration>);
@@ -90,11 +79,24 @@ export class MainMenu {
 
       btn.addEventListener("pointerup", (e) => {
         e.preventDefault();
-        this.onSelect(entry.mode);
+        if (entry.mode === "Explore") this.showPicker(true);
+        else this.onSelect(entry.mode);
       });
       list.appendChild(btn);
     }
     this.root.appendChild(list);
+
+    // "Explore a map": every Story map and where to start on it (scenes off: free exploration).
+    this.picker = document.createElement("div");
+    Object.assign(this.picker.style, {
+      display: "none",
+      flexDirection: "column",
+      gap: "10px",
+      width: "min(320px, 80vw)",
+      maxHeight: "60vh",
+      overflowY: "auto",
+    } satisfies Partial<CSSStyleDeclaration>);
+    this.root.appendChild(this.picker);
 
     this.hint = document.createElement("div");
     Object.assign(this.hint.style, {
@@ -107,6 +109,59 @@ export class MainMenu {
     document.body.appendChild(this.root);
     this.applyTexts();
     onLocaleChange(() => this.applyTexts());
+  }
+
+  /** A menu button (the title screen's look). */
+  private button(): HTMLButtonElement {
+    const btn = document.createElement("button");
+    Object.assign(btn.style, {
+      display: "flex",
+      flexDirection: "column",
+      gap: "3px",
+      font: "600 18px/1.2 system-ui, sans-serif",
+      color: "#eaf2ff",
+      background: "rgba(30,42,66,0.85)",
+      border: "1px solid rgba(120,150,200,0.4)",
+      borderRadius: "12px",
+      padding: "16px 18px",
+      cursor: "pointer",
+      touchAction: "manipulation",
+      textAlign: "left",
+    } satisfies Partial<CSSStyleDeclaration>);
+    btn.style.setProperty("-webkit-tap-highlight-color", "transparent");
+    return btn;
+  }
+
+  /** Swap the mode list for the map picker (rebuilt each time: texts follow the language). */
+  private showPicker(on: boolean): void {
+    this.list.style.display = on ? "none" : "flex";
+    this.picker.style.display = on ? "flex" : "none";
+    if (!on) return;
+    this.picker.replaceChildren();
+    for (const { map, entries } of EXPLORE) {
+      for (const entry of entries) {
+        const btn = this.button();
+        const label = document.createElement("span");
+        label.textContent = t(`explore.${map}`);
+        const blurb = document.createElement("span");
+        blurb.textContent = t(`explore.${map}.${entry}`);
+        Object.assign(blurb.style, { font: "400 12px/1.3 system-ui", opacity: "0.65" } satisfies Partial<CSSStyleDeclaration>);
+        btn.append(label, blurb);
+        btn.addEventListener("pointerup", (e) => {
+          e.preventDefault();
+          this.onSelect("Explore", { map, entry });
+        });
+        this.picker.appendChild(btn);
+      }
+    }
+    const back = this.button();
+    back.textContent = t("explore.back");
+    back.style.alignItems = "center";
+    back.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      this.showPicker(false);
+    });
+    this.picker.appendChild(back);
   }
 
   private applyTexts(): void {
@@ -124,6 +179,7 @@ export class MainMenu {
 
   show(): void {
     this.applyTexts();
+    this.showPicker(false);
     this.root.style.display = "flex";
   }
 

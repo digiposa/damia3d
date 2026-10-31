@@ -51,7 +51,7 @@ export class Game implements GameHost {
     // The build tag lives in the DOM for the page lifetime; no need to retain it.
     new TechOverlay(__COMMIT__);
     if (hasTouch()) this.joystick = new VirtualJoystick(this.input);
-    this.menu = new MainMenu((mode) => this.startMode(mode));
+    this.menu = new MainMenu((mode, at) => this.startMode(mode, at));
     this.system = new SystemMenu({
       data: () => this.modes.current?.menuData?.(),
       onResume: () => this.closeSystemMenu(),
@@ -126,7 +126,7 @@ export class Game implements GameHost {
     prefetchModels([...names]);
   }
 
-  private startMode(mode: ModeId): void {
+  private startMode(mode: ModeId, at?: { map: string; entry: string }): void {
     switch (mode) {
       case "Training":
         this.modes.switchTo((s, i, h) => new TrainingMode(s, i, h));
@@ -137,6 +137,10 @@ export class Game implements GameHost {
         break;
       case "StoryNew":
         startNewStory();
+        this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
+        break;
+      case "Explore":
+        startNewStory(at); // a fresh game, dropped on the chosen map
         this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
         break;
       case "Survival":
