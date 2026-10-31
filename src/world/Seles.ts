@@ -516,12 +516,15 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number): M
   return hill;
 }
 
+/** A repeatable random value in [0, 1) for an integer lattice point. */
+function hash01(i: number, j: number): number {
+  const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+}
+
 /** Smooth 2D value noise in [0, 1] (hash lattice, smoothstep blend). */
 function noise2(x: number, y: number): number {
-  const h = (i: number, j: number): number => {
-    const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
-    return n - Math.floor(n);
-  };
+  const h = hash01;
   const xi = Math.floor(x);
   const yi = Math.floor(y);
   const fx = x - xi;
@@ -533,7 +536,7 @@ function noise2(x: number, y: number): number {
   return a + (b - a) * sy;
 }
 
-const HILL_PPU = 10; // texture pixels per unit (crisp pixels, like the Forest's trails)
+const HILL_PPU = 20; // texture pixels per unit (the Forest's trails use 10: this one is seen close up)
 
 /**
  * The hillside, painted pixel by pixel (PS1 reference: the steep path down to Seles). The path:
@@ -579,7 +582,8 @@ function paintHillside(scene: Scene, rand: () => number, U0: number, U1: number,
         r = 176 * k;
         g = 118 * k;
         b = 78 * k;
-        const speck = rand();
+        // Pebbles and clods a tenth of a unit across, whatever the texture's resolution.
+        const speck = hash01(Math.floor(u * 10), Math.floor(v * 10));
         if (speck < 0.014) [r, g, b] = [222, 176, 128]; // pebble
         else if (speck < 0.03) [r, g, b] = [104, 66, 44]; // clod
       } else if (edge < 0.7) {
