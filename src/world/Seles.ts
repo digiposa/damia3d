@@ -4,6 +4,8 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
@@ -159,7 +161,7 @@ export function selesWorld(scene: Scene): World {
   buildWell(scene, root, stone, wood, selesPoint(SELES_SPOTS.well));
   buildCemetery(scene, root, rand, stone);
   buildFences(scene, root, rand, wood);
-  const hill = buildHillside(scene, root, rand, ground.material as StandardMaterial);
+  const hill = buildHillside(scene, root, rand);
   buildDeadTrees(scene, root, rand);
   buildRubble(scene, root, rand, stone, charred);
   buildSmoke(scene, rand);
@@ -441,7 +443,7 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
  * side; up on the ledge (out of reach — Dart jumps down from it), tall golden grass and pines.
  * Nothing may hide the path.
  */
-function buildHillside(scene: Scene, root: TransformNode, rand: () => number, dirt: StandardMaterial): Mesh {
+function buildHillside(scene: Scene, root: TransformNode, rand: () => number): Mesh {
   const U0 = -62;
   const U1 = -10;
   const V0 = -36;
@@ -453,35 +455,12 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number, di
     const u = U0 + j * STEP_M;
     const v = V0 + i * STEP_M;
     const p = fromUV(u, v);
-    return { x: p.x, y: selesHeight(p.x, p.z) + 0.03, z: p.z, tu: u / 7.5, tv: v / 7.5 };
+    return { x: p.x, y: selesHeight(p.x, p.z) + 0.03, z: p.z, tu: (u - U0) / (U1 - U0), tv: (v - V0) / (V1 - V0) };
   }, Vector3.Up());
-  hill.material = dirt;
+  const mat = matte("selesHillMat", scene, paintHillside(scene, rand, U0, U1, V0, V1));
+  mat.zOffset = -1;
+  hill.material = mat;
   hill.parent = root;
-  // Colour: the worn path warm and bare, rutted across; the banks olive scrub; the ledge's drop
-  // bare rock; the ledge itself golden grass.
-  const pos = hill.getVerticesData("position")!;
-  const col: number[] = [];
-  for (let k = 0; k < pos.length; k += 3) {
-    const { u, v } = selesUV(new Vector3(pos[k], 0, pos[k + 2]));
-    const depth = hillDepth(u, v);
-    const n = NET.nearest(pos[k], pos[k + 2]);
-    const bare = 1 - smooth(-1.4, 0.3, n.d - n.w);
-    // Ruts across the slope (PS1: the earth is ridged where feet slid down it).
-    const streak = 0.84 + 0.12 * Math.sin(u * 3.4 + Math.sin(v * 1.3) * 1.5) + 0.06 * Math.sin(v * 5.3) + (rand() - 0.5) * 0.12;
-    const scrub = 0.85 + 0.15 * Math.sin(u * 1.3 + v * 0.9) + (rand() - 0.5) * 0.2;
-    let r = bare * 1.12 * streak + (1 - bare) * 0.66 * scrub;
-    let g = bare * 0.9 * streak + (1 - bare) * 0.66 * scrub;
-    let b = bare * 0.68 * streak + (1 - bare) * 0.36 * scrub;
-    const face = smooth(LEDGE_D - 1.2, LEDGE_D - 0.4, depth) * (1 - smooth(LEDGE_D + 0.4, LEDGE_D + 1, depth));
-    const meadow = smooth(LEDGE_D + 0.4, LEDGE_D + 1, depth);
-    const m = 0.9 + 0.12 * Math.sin(u * 0.9 + Math.sin(v * 0.7) * 2) + (rand() - 0.5) * 0.14;
-    r = r * (1 - face - meadow) + face * 0.62 + meadow * 0.98 * m;
-    g = g * (1 - face - meadow) + face * 0.6 + meadow * 1.02 * m;
-    b = b * (1 - face - meadow) + face * 0.56 + meadow * 0.4 * m;
-    const fade = clamp01(depth / 1.2); // into the village ground at the fence
-    col.push(r * fade + 0.85 * (1 - fade), g * fade + 0.8 * (1 - fade), b * fade + 0.72 * (1 - fade), 1);
-  }
-  hill.setVerticesData("color", col);
 
   const bark = matte("selesBarkMat", scene, barkTexture(scene, rand));
   const leaves = matte("selesLeafMat", scene, leafTexture(scene, rand));
@@ -535,6 +514,114 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number, di
       }
     }
   return hill;
+}
+
+/** Smooth 2D value noise in [0, 1] (hash lattice, smoothstep blend). */
+function noise2(x: number, y: number): number {
+  const h = (i: number, j: number): number => {
+    const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const fx = x - xi;
+  const fy = y - yi;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * sx;
+  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * sx;
+  return a + (b - a) * sy;
+}
+
+const HILL_PPU = 10; // texture pixels per unit (crisp pixels, like the Forest's trails)
+
+/**
+ * The hillside, painted pixel by pixel (PS1 reference: the steep path down to Seles). The path:
+ * warm ochre earth ridged across where feet slid down it — each ridge lit on top, shadowed below —
+ * with pebbles and clods, crumbling at its rim into dark crumbs. Around it, leaf litter under the
+ * scrub; long shadows of the trees lying across it all; the ledge's rock drop; golden grass on top.
+ * Near the fence the pixels thin out into the village ground.
+ */
+function paintHillside(scene: Scene, rand: () => number, U0: number, U1: number, V0: number, V1: number): DynamicTexture {
+  const W = (U1 - U0) * HILL_PPU;
+  const H = (V1 - V0) * HILL_PPU;
+  const tex = new DynamicTexture("selesHillTex", { width: W, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
+  tex.hasAlpha = true;
+  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  const img = ctx.createImageData(W, H);
+  const out = img.data;
+  for (let y = 0; y < H; y++) {
+    const v = V1 - (y + 0.5) / HILL_PPU; // canvas rows run from V1 down: the texture is flipped
+    for (let x = 0; x < W; x++) {
+      const u = U0 + (x + 0.5) / HILL_PPU;
+      const o = (y * W + x) * 4;
+      const depth = hillDepth(u, v);
+      // Into the village ground at the fence: the pixels thin out.
+      if (depth < 1.4 && rand() > clamp01((depth - 0.2) / 1.2)) continue;
+      const p = fromUV(u, v);
+      const n = NET.nearest(p.x, p.z);
+      // A ragged path edge: noise pushes it in and out.
+      const edge = n.d - n.w + (noise2(u * 1.3, v * 1.3) - 0.5) * 0.9;
+      const grain = rand();
+      let r: number;
+      let g: number;
+      let b: number;
+      if (edge < -0.25) {
+        // The path. Ridges across the slope: lit top, shadowed foot (sawtooth along u).
+        const wob = (noise2(u * 0.6, v * 0.9) - 0.5) * 1.6 + v * 0.12;
+        const ph = (u * 1.6 + wob) % 1;
+        const ridge = ph < 0 ? ph + 1 : ph;
+        const lit = ridge < 0.22 ? 1.18 : ridge < 0.4 ? 0.9 : 1;
+        const mottle = 0.86 + 0.24 * noise2(u * 0.8 + 7, v * 0.8);
+        const centre = 1.08 - 0.12 * clamp01((edge + n.w) / n.w); // the trodden middle catches the light
+        const k = lit * mottle * centre * (0.93 + grain * 0.14);
+        r = 176 * k;
+        g = 118 * k;
+        b = 78 * k;
+        const speck = rand();
+        if (speck < 0.014) [r, g, b] = [222, 176, 128]; // pebble
+        else if (speck < 0.03) [r, g, b] = [104, 66, 44]; // clod
+      } else if (edge < 0.7) {
+        // The crumbling rim: earth broken up by dark crumbs and the first tufts.
+        const t = (edge + 0.25) / 0.95;
+        const crumb = rand() < 0.25 + 0.4 * t;
+        const k = 0.8 + grain * 0.2;
+        if (crumb) [r, g, b] = rand() < 0.5 ? [70 * k, 52 * k, 32 * k] : [96 * k, 84 * k, 44 * k];
+        else [r, g, b] = [152 * k, 102 * k, 68 * k];
+      } else {
+        // Under the scrub: leaf litter, in clumps, with sunlit flecks.
+        const clump = noise2(u * 0.9, v * 0.9) * 0.6 + noise2(u * 3.1, v * 3.1) * 0.4;
+        const k = 0.7 + 0.5 * clump;
+        r = 92 * k;
+        g = 82 * k;
+        b = 44 * k;
+        if (grain < 0.08) [r, g, b] = [146, 128, 66]; // a lit leaf
+        else if (grain < 0.2) [r, g, b] = [52, 44, 26];
+      }
+      // The ledge: a short rock drop, then golden grass on top.
+      const face = smooth(LEDGE_D - 1.2, LEDGE_D - 0.4, depth) * (1 - smooth(LEDGE_D + 0.4, LEDGE_D + 1, depth));
+      const meadow = smooth(LEDGE_D + 0.4, LEDGE_D + 1, depth);
+      if (face > 0.5) {
+        const strata = 0.85 + 0.15 * Math.sin(depth * 9 + noise2(u, v) * 3);
+        const k = strata * (0.8 + grain * 0.25);
+        [r, g, b] = [128 * k, 112 * k, 92 * k];
+      } else if (meadow > 0.5) {
+        const k = (0.75 + 0.35 * noise2(u * 0.7, v * 0.7)) * (0.85 + grain * 0.25);
+        [r, g, b] = grain < 0.1 ? [214, 186, 96] : [168 * k, 146 * k, 66 * k];
+      }
+      // Long tree shadows lying across the slope (the low dusk sun through the wood).
+      const shade = noise2(u * 0.22 - v * 0.3 + 3, v * 0.12 + u * 0.05);
+      const sh = 1 - 0.42 * smooth(0.5, 0.64, shade);
+      out[o] = Math.min(255, r * sh);
+      out[o + 1] = Math.min(255, g * sh);
+      out[o + 2] = Math.min(255, b * sh);
+      out[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.update();
+  return tex;
 }
 
 /** A dark pine (PS1 hilltop): a straight trunk under stacked, drooping cones. */
