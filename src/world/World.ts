@@ -26,6 +26,8 @@ export interface World {
   /** A framed "moment" at this spot (zoom multiplier, ground offset of the view), or null for the
    *  plain follow. Applied outside fights only. */
   shotAt?(p: Vector3): { zoom: number; offset?: Vector3 } | null;
+  /** Ground height at a point, for maps with relief (a hillside); flat (y = 0) when absent. */
+  heightAt?(x: number, z: number): number;
   /** Per-frame upkeep around the controlled character (e.g. animated props), if any. */
   update?(focus: Vector3, dt: number): void;
 }

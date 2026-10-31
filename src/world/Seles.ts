@@ -35,7 +35,7 @@ function fromUV(u: number, v: number): Vector3 {
 
 /** Story spots (u, v), for the map's script. */
 export const SELES_SPOTS = {
-  start: { u: -21, v: -13.5 }, // up the hillside (top of the screen)
+  start: { u: -25, v: -15.5 }, // the top of the cliff, where the steep path starts down
   slopeFoot: { u: -14, v: -8 },
   fence: { u: -11.5, v: -3.5 },
   battle1: { u: -8, v: 1 }, // the dirt path past the fence
@@ -50,16 +50,17 @@ export const SELES_SPOTS = {
   church: { u: 10, v: 9 },
   tasman: { u: 15, v: 4.5 },
   tomb3: { u: 19.6, v: -6.2 }, // the Stardust tomb: 3rd from the left, before the tree
-  exitForest: { u: -27, v: -16.5 }, // back up the hillside, off the top of the screen
-  fromForest: { u: -22, v: -14 },
+  exitForest: { u: -32, v: -19 }, // back up the path, off the top of the screen
+  fromForest: { u: -27, v: -16.5 },
 };
 
 const TRAILS: Knot[][] = [
   // Down the hillside, through the gap in the fence, along the dirt path to the square.
   [
-    { u: -34, v: -20, w: 2.2 }, // off the top of the screen: the road to the Forest
-    { u: -27, v: -16.5, w: 2.4 },
-    { u: -22, v: -14, w: 2.4 },
+    { u: -40, v: -22, w: 2.2 }, // off the top of the screen: the road to the Forest
+    { u: -32, v: -19, w: 2.2 },
+    { u: -25, v: -15.5, w: 2.4 }, // the cliff top: the path drops from here
+    { u: -21, v: -13.5, w: 2.6 },
     { u: -17, v: -11, w: 2.6 },
     { u: -13.5, v: -7.5, w: 2.8 },
     { u: -11.5, v: -3.5, w: 2.4 }, // the gap in the fence
@@ -85,6 +86,28 @@ const NET = new TrailNet(TRAILS.map((t) => t.map((k) => ({ ...k, u: -k.u }))));
 function hillDepth(u: number, v: number): number {
   // The fence runs straight across the screen at u = -11.5 (a little wavy for the grass edge).
   return -11.5 - u + 0.6 * Math.sin(v * 0.45);
+}
+
+const CLIFF_H = 9; // the hilltop Dart comes down from, over the village
+
+const smooth = (a: number, b: number, x: number): number => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Ground height: the village is flat; behind the fence the ground climbs steeply to the clifftop
+ * (PS1: a steep earth slope Dart comes down). The path is a groove worn into it, the scrub either
+ * side stands on banks, and away from the path the hill breaks into rocky shoulders.
+ */
+function selesHeight(x: number, z: number): number {
+  const { u, v } = selesUV(new Vector3(x, 0, z));
+  const depth = hillDepth(u, v);
+  if (depth <= 0) return 0;
+  const n = NET.nearest(x, z);
+  const edge = n.d - n.w;
+  const rise = smooth(0, 3, depth);
+  return CLIFF_H * smooth(0.4, 11, depth) + rise * (1.7 * smooth(0.1, 2.6, edge) + 2.6 * smooth(5, 12, edge));
 }
 
 /** Where you can walk: the trails, a little give either side. */
@@ -131,7 +154,7 @@ export function selesWorld(scene: Scene): World {
   buildWell(scene, root, stone, wood, selesPoint(SELES_SPOTS.well));
   buildCemetery(scene, root, rand, stone);
   buildFences(scene, root, rand, wood);
-  buildHillside(scene, root, rand);
+  const hill = buildHillside(scene, root, rand, ground.material as StandardMaterial);
   buildDeadTrees(scene, root, rand);
   buildRubble(scene, root, rand, stone, charred);
   buildSmoke(scene, rand);
@@ -145,7 +168,8 @@ export function selesWorld(scene: Scene): World {
     clamp: clampToSeles,
     preset: LIGHTING_PRESETS.selesRuins,
     framing: 2,
-    shadowReceivers: [ground],
+    shadowReceivers: [ground, hill],
+    heightAt: selesHeight,
     ownFill: [],
   };
 }
@@ -406,51 +430,96 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
 }
 
 /**
- * The hillside Dart comes down (PS1: a dirt path through the wood, down to the fence): grass,
- * trees either side of the path, bushes and ferns at its verges. No crown may hide the path.
+ * The hillside Dart comes down (PS1: a steep earth path worn between dark scrub, down from the
+ * clifftop to the fence): its own relief mesh, then dense low brush, ferns and rocks either side,
+ * a few trees up on the top. Nothing may hide the path.
  */
-function buildHillside(scene: Scene, root: TransformNode, rand: () => number): void {
+function buildHillside(scene: Scene, root: TransformNode, rand: () => number, dirt: StandardMaterial): Mesh {
+  const U0 = -46;
+  const U1 = -10;
+  const V0 = -36;
+  const V1 = 20;
+  const STEP_M = 0.5;
+  const cols = Math.round((U1 - U0) / STEP_M);
+  const rows = Math.round((V1 - V0) / STEP_M);
+  const hill = gridMesh("selesHill", scene, rows, cols, (i, j) => {
+    const u = U0 + j * STEP_M;
+    const v = V0 + i * STEP_M;
+    const p = fromUV(u, v);
+    return { x: p.x, y: selesHeight(p.x, p.z) + 0.03, z: p.z, tu: u / 7.5, tv: v / 7.5 };
+  }, Vector3.Up());
+  hill.material = dirt;
+  hill.parent = root;
+  // Colour: the worn path warm and bare, streaked down the slope; the banks dark scrubby earth.
+  const pos = hill.getVerticesData("position")!;
+  const col: number[] = [];
+  for (let k = 0; k < pos.length; k += 3) {
+    const { u, v } = selesUV(new Vector3(pos[k], 0, pos[k + 2]));
+    const n = NET.nearest(pos[k], pos[k + 2]);
+    const bare = 1 - smooth(-1.4, 0.3, n.d - n.w);
+    // Ruts across the slope (PS1: the earth is ridged where feet slid down it).
+    const streak = 0.84 + 0.12 * Math.sin(u * 3.4 + Math.sin(v * 1.3) * 1.5) + 0.06 * Math.sin(v * 5.3) + (rand() - 0.5) * 0.12;
+    const scrub = 0.55 + 0.2 * Math.sin(u * 1.3 + v * 0.9) + (rand() - 0.5) * 0.2;
+    const fade = clamp01(hillDepth(u, v) / 1.2); // into the village ground at the fence
+    const r = bare * 1.12 * streak + (1 - bare) * 0.36 * scrub;
+    const g = bare * 0.9 * streak + (1 - bare) * 0.42 * scrub;
+    const b = bare * 0.68 * streak + (1 - bare) * 0.2 * scrub;
+    col.push(r * fade + 0.85 * (1 - fade), g * fade + 0.8 * (1 - fade), b * fade + 0.72 * (1 - fade), 1);
+  }
+  hill.setVerticesData("color", col);
+
   const bark = matte("selesBarkMat", scene, barkTexture(scene, rand));
   const leaves = matte("selesLeafMat", scene, leafTexture(scene, rand));
-  const trees = [0, 1, 2].map((i) => treeSource(i, scene, bark, leaves, rand));
+  leaves.diffuseColor = new Color3(0.5, 0.48, 0.34); // dusk scrub: darker, browner than the Forest
+  const trees = [0, 1].map((i) => treeSource(i, scene, bark, leaves, rand));
   const sapling = saplingSource(scene, bark, leaves, rand);
   const bush = bushSource(scene, leaves, rand);
   const fern = fernSource(scene, rand);
   const grass = grassSource(scene, rand);
   const rock = rockSource(scene, rand);
-  const STEP = 2.8;
-  for (let gu = -44; gu < -2; gu += STEP)
-    for (let gv = -34; gv < 16; gv += STEP) {
+  const at = (src: Mesh, x: number, z: number, s: number): void => {
+    place(src, root, x, z, s, rand() * Math.PI * 2).position.y = selesHeight(x, z);
+  };
+  const STEP = 1.9;
+  for (let gu = U0; gu < U1; gu += STEP)
+    for (let gv = V0; gv < V1; gv += STEP) {
       const u = gu + (rand() - 0.5) * STEP * 0.9;
       const v = gv + (rand() - 0.5) * STEP * 0.9;
       const depth = hillDepth(u, v);
-      if (depth < 0.6) continue;
+      if (depth < 0.5) continue;
       const { x, z } = fromUV(u, v);
       const near = NET.nearest(x, z);
       const edge = near.d - near.w;
-      const rot = rand() * Math.PI * 2;
       const roll = rand();
-      if (depth > 2.5 && edge > 1.2 && roll < 0.7 && !NET.occludes(x, z, 15, 4.4, 9 * TAN_BETA - 4.4)) {
-        const s = 0.8 + rand() * 0.35;
-        place(trees[(rand() * trees.length) | 0], root, x, z, s, rot);
-        obstacles.add(x, z, 0.75 * s);
-      } else if (edge > 0.6 && roll < 0.8 && !NET.occludes(x, z, 2.2, 1)) {
-        const s = 0.8 + rand() * 0.4;
-        if (rand() < 0.4) place(sapling, root, x, z, s, rot);
-        else place(bush, root, x, z, 1.1 + rand() * 0.6, rot);
-        obstacles.add(x, z, 0.4 * s);
-      } else if (edge > 0.2 && roll < 0.9) {
-        place(rock, root, x, z, 0.5 + rand() * 0.5, rot);
+      if (depth > 13 && edge > 2 && roll < 0.35 && !NET.occludes(x, z, 15, 4.4, 9 * TAN_BETA - 4.4)) {
+        at(trees[(rand() * trees.length) | 0], x, z, 0.75 + rand() * 0.3); // up on the hilltop
+        obstacles.add(x, z, 0.6);
+      } else if (edge > 0.5 && roll < 0.75 && !NET.occludes(x, z, 2.6, 1.2)) {
+        // The scrub: big dark clumps packed along the banks (knee-to-waist high at most).
+        if (rand() < 0.15) at(sapling, x, z, 0.8 + rand() * 0.3);
+        else at(bush, x, z, 1.1 + rand() * 0.7);
+      } else if (edge > 0.3 && roll < 0.88) {
+        at(rock, x, z, 0.4 + rand() * 0.6);
       }
-      // Grass and ferns everywhere on the hill, the path's verges included (walk-through).
+      // Ferns and tufts everywhere off the trodden middle (walk-through).
       for (let k = 0; k < 2; k++) {
         const gx = x + (rand() - 0.5) * STEP;
         const gz = z + (rand() - 0.5) * STEP;
         const n = NET.nearest(gx, gz);
-        if (n.d < n.w * 0.7) continue;
-        place(rand() < 0.6 ? grass : fern, root, gx, gz, 0.7 + rand() * 0.5, rand() * Math.PI);
+        if (n.d < n.w * 0.75) continue;
+        at(rand() < 0.55 ? grass : fern, gx, gz, 0.7 + rand() * 0.5);
       }
     }
+  // Rocky shoulders where the hill breaks either side of the path, near the top.
+  for (let k = 0; k < 26; k++) {
+    const u = -26 + rand() * 12;
+    const v = -34 + rand() * 50;
+    const { x, z } = fromUV(u, v);
+    const n = NET.nearest(x, z);
+    if (n.d - n.w < 3.5 || NET.occludes(x, z, 2, 1.5)) continue;
+    at(rock, x, z, 1.2 + rand() * 1.4);
+  }
+  return hill;
 }
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));

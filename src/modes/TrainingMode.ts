@@ -970,6 +970,7 @@ export abstract class ArenaCombatMode extends GameMode {
         this.scriptWalk = undefined;
       }
     }
+    if (this.world.heightAt) this.player.position.y = this.world.heightAt(this.player.position.x, this.player.position.z);
     this.camera.follow(this.player.position);
     if (this.world.shotAt) {
       // Set-piece framing only while exploring: a fight always gets the plain, readable view.
@@ -2206,6 +2207,7 @@ export abstract class ArenaCombatMode extends GameMode {
       }
     }
     this.world.clamp(member.position);
+    if (this.world.heightAt) member.position.y = this.world.heightAt(member.position.x, member.position.z);
     const dx = member.position.x - bx;
     const dz = member.position.z - bz;
     member.avatar.animate(dt, dx * dx + dz * dz > 1e-6);
