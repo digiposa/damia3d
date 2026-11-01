@@ -218,6 +218,7 @@ export function selesWorld(scene: Scene): SelesWorld {
     shadowReceivers: [ground, hill],
     heightAt: selesHeight,
     ownFill: [],
+    shotAt: chapelShot,
     update: (_focus, dt) => {
       chests.forEach((c) => c.tick(dt));
       for (const tick of ticks) tick(dt);
@@ -387,6 +388,19 @@ function burnedWoodHouse(scene: Scene, root: TransformNode, rand: () => number, 
   obstacles.addBox(at.x, at.z, 2.1, 1.7, rot);
 }
 
+/**
+ * Before the chapel the view pulls back and up the screen, so its bell tower stands whole in the
+ * frame (PS1: the tower over the chapel), easing in over a few units.
+ */
+function chapelShot(p: Vector3): { zoom: number; offset?: Vector3 } | null {
+  const front = fromUV(SELES_SPOTS.chapel.u + 4, SELES_SPOTS.chapel.v);
+  const d = Math.hypot(p.x - front.x, p.z - front.z);
+  const k = 1 - smooth(6, 11, d);
+  if (k <= 0) return null;
+  const up = fromUV(-1, 0); // one unit up the screen
+  return { zoom: 1 - 0.24 * k, offset: up.scale(3.2 * k) };
+}
+
 // --- The ruined chapel (PS1: Plos, then the Commander) --------------------------------------------
 
 /** Rough fieldstone: rounded stones of uneven size in dark mortar, soot-darkened (GROUND_PPU). */
@@ -520,6 +534,50 @@ function buildChapel(scene: Scene, root: TransformNode, rand: () => number, char
     r.scaling.y = 0.6;
   }
   obstacles.addBox(at.x, at.z, W / 2 + 0.3, D / 2 + 0.3, node.rotation.y);
+
+  // The bell tower at the back (PS1: what is left of it, standing over the chapel): tall
+  // fieldstone walls broken off high, a corner still taller, pairs of arched openings up where the
+  // bells hung, a low arched doorway into the nave; the bell lies cracked at its foot.
+  const TW = 3.4;
+  const tx = 1.6;
+  const tz = D / 2 + TW / 2 - 0.3;
+  const arch = (x: number, y: number, z: number, w: number, ry: number): void => {
+    for (let k = 0; k <= 6; k++) {
+      const a = (k / 6) * Math.PI;
+      const v = part(MeshBuilder.CreateBox("selesTowerArch", { width: 0.18, height: 0.14, depth: T + 0.08 }, scene), pale);
+      const along = Math.cos(a) * (w / 2);
+      v.position.set(x + Math.cos(ry) * along, y + Math.sin(a) * (w / 2) * 0.9, z - Math.sin(ry) * along);
+      v.rotation.set(0, ry, a - Math.PI / 2);
+    }
+  };
+  const top = (f: number, hi: number): number => hi - 1.6 * Math.abs(Math.sin(f * 7.3)) - (f > 0.7 ? (f - 0.7) * 6 : 0);
+  const BELLS: [number, number, number, number][] = [[-1.1, -0.35, 6.2, 7.8], [0.35, 1.1, 6.2, 7.8]];
+  wall(TW, tx, tz - TW / 2, 0, (f) => top(f, 10.5), [...BELLS, [-0.5, 0.5, 0, 2.2]]); // facing the camera
+  wall(TW, tx, tz + TW / 2, 0, (f) => top(1 - f, 9.6), BELLS);
+  wall(TW, tx - TW / 2, tz, Math.PI / 2, (f) => (f > 0.6 ? 11.6 : top(f, 10)), BELLS); // the taller corner
+  wall(TW, tx + TW / 2, tz, Math.PI / 2, (f) => top(f, 8.4), [[-0.4, 0.4, 6.2, 7.8]]);
+  for (const [a0, a1, , y1] of BELLS) arch(tx + (a0 + a1) / 2, y1, tz - TW / 2, a1 - a0, 0);
+  arch(tx, 2.2, tz - TW / 2, 1, 0);
+  for (const [a0, a1, , y1] of BELLS) arch(tx - TW / 2, y1, tz + (a0 + a1) / 2, a1 - a0, Math.PI / 2);
+  // A string course of pale stone round the tower, and the bell floor's charred joists.
+  for (const [x, z, w, d] of [[tx, tz - TW / 2, TW + 0.2, T + 0.1], [tx - TW / 2, tz, T + 0.1, TW + 0.2]] as const) {
+    const band = part(MeshBuilder.CreateBox("selesTowerBand", { width: w, height: 0.16, depth: d }, scene), pale);
+    band.position.set(x, 5.9, z);
+  }
+  for (let k = 0; k < 3; k++) {
+    const joist = part(MeshBuilder.CreateBox("selesTowerJoist", { width: TW - 0.4, height: 0.2, depth: 0.2 }, scene), charred);
+    joist.position.set(tx, 5.6 - k * 0.3, tz - 0.8 + k * 0.8);
+    joist.rotation.z = (rand() - 0.5) * 0.5;
+  }
+  // The fallen bell, cracked, half sunk at the tower's foot (seen past the chapel's left).
+  const bell = part(MeshBuilder.CreateCylinder("selesBell", { height: 1.1, diameterTop: 0.55, diameterBottom: 1.1, tessellation: 12 }, scene), matte("selesBronze", scene, undefined, new Color3(0.26, 0.3, 0.22)));
+  bell.position.set(-W / 2 - 1.2, 0.42, D / 2 + 0.6);
+  bell.rotation.set(1.3, 0.4, 0);
+  node.computeWorldMatrix(true);
+  const towerAt = Vector3.TransformCoordinates(new Vector3(tx, 0, tz), node.getWorldMatrix());
+  obstacles.addBox(towerAt.x, towerAt.z, TW / 2 + 0.3, TW / 2 + 0.3, node.rotation.y);
+  const bellAt = Vector3.TransformCoordinates(bell.position, node.getWorldMatrix());
+  obstacles.add(bellAt.x, bellAt.z, 0.7);
 
   // Behind it: the great gnarled dead tree (right), two chimney stumps (left), the fence.
   const bark = matte("selesGnarlBark", scene, undefined, new Color3(0.26, 0.2, 0.15));
