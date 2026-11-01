@@ -73,18 +73,18 @@ export const SELES_SPOTS = {
   plos: { u: -1.3, v: -23.4 }, // lying in front of the chapel
   plosHouse: { u: -2, v: -21 }, // the chapel's door (where he gets up to)
   burnedHouse: { u: 13.4, v: -20 }, // a gutted house below the square (the kids hide in it)
-  commanderFrom: { u: 0.5, v: -33 }, // from the square, left of the chapel
+  commanderFrom: { u: 0.5, v: -31.5 }, // from the square, left of the chapel
   kids: { u: 12.4, v: -21.6 },
-  well: { u: -0.5, v: -36.5 }, // in the middle of the square
+  well: { u: -0.5, v: -34.12 }, // in the middle of the square
   church: { u: -5, v: -23 }, // the chapel
-  tasman: { u: -2.6, v: -30.4 },
+  tasman: { u: -2.6, v: -29.55 },
   // The square left of the chapel (PS1): the well in the middle, the cemetery up on the left, the
   // road out going up the screen between the cemetery and the chapel.
-  square: { u: -0.5, v: -36 },
-  cemetery: { u: -14, v: -39.5 }, // above the square
-  tomb3: { u: -14.4, v: -38.6 }, // the Stardust tomb: 3rd from the left, before the tree
-  exitForest: { u: -22, v: -31.2 }, // the road out, at the top of the screen
-  fromForest: { u: -17, v: -31 },
+  square: { u: -0.5, v: -33.75 },
+  cemetery: { u: -14, v: -36.38 }, // above the square
+  tomb3: { u: -14.4, v: -35.7 }, // the Stardust tomb: 3rd from the left, before the tree
+  exitForest: { u: -22, v: -30.15 }, // the road out, at the top of the screen
+  fromForest: { u: -17, v: -30.0 },
 };
 
 const knot = (u: number, v: number, w: number): Knot => ({ ...vil(u, v), w });
@@ -102,14 +102,14 @@ const TRAILS: Knot[][] = [
     knot(-3, 1.5, 4.2),
     { u: 0.8, v: -18, w: 5.2 }, // past the chapel's front (Plos)
     { u: 0.4, v: -26, w: 5.6 },
-    { u: -0.5, v: -33, w: 8 }, // the square
-    { u: -0.5, v: -39, w: 8 },
-    { u: 0.5, v: -44, w: 6.5 },
+    { u: -0.5, v: -31.5, w: 6.6 }, // the square
+    { u: -0.5, v: -36.0, w: 6.6 },
+    { u: 0.5, v: -39.75, w: 5.4 },
   ],
   // Up from the square to the cemetery above it.
-  [{ u: -3, v: -38, w: 4.4 }, { u: -9, v: -39, w: 4.6 }, { u: -14, v: -39.5, w: 4.6 }],
+  [{ u: -3, v: -35.25, w: 4.4 }, { u: -9, v: -36.0, w: 4.6 }, { u: -14, v: -36.38, w: 4.6 }],
   // The road out: up the screen between the cemetery and the chapel, off the top into the hills.
-  [{ u: -3, v: -31.2, w: 3 }, { u: -10, v: -31, w: 2.8 }, { u: -17, v: -31, w: 2.6 }, { u: -24, v: -31.6, w: 2.4 }, { u: -36, v: -32.4, w: 2.2 }],
+  [{ u: -3, v: -30.15, w: 3 }, { u: -10, v: -30.0, w: 2.8 }, { u: -17, v: -30.0, w: 2.6 }, { u: -24, v: -30.45, w: 2.4 }, { u: -36, v: -31.05, w: 2.2 }],
 ];
 
 const NET = new TrailNet(TRAILS.map((t) => t.map((k) => ({ ...k, u: -k.u }))));
@@ -162,7 +162,7 @@ function hillHeight(x: number, z: number, u: number, v: number, depth: number): 
 }
 
 /** The village's open ground (flat): walkable anywhere between its edges, round the ruins. */
-const VILLAGE = { u0: -18.2, u1: 9, v0: -47.6, v1: 8 };
+const VILLAGE = { u0: -18.2, u1: 9, v0: -42.45, v1: 8 };
 
 /** Where you can walk: anywhere on the village's flat ground; on the hill, the trails only. */
 let obstacles = new Obstacles();
@@ -617,7 +617,7 @@ function buildChapel(scene: Scene, root: TransformNode, rand: () => number, char
   // Behind it: the great gnarled dead tree (right), two chimney stumps (left), the fence.
   const bark = matte("selesGnarlBark", scene, undefined, new Color3(0.26, 0.2, 0.15));
   deadTree(scene, root, rand, bark, fromUV(C.u - 3.6, C.v + 6), 1.9);
-  belfry(scene, root, rand, fieldstone, fromUV(C.u - 4.2, C.v - 5));
+  belfry(scene, root, rand, fieldstone, fromUV(C.u - 4.4, C.v - 3.4)); // behind the chapel's left corner, clear of the road out
   const stump = MeshBuilder.CreateBox("selesChimney", { width: 0.9, height: 4.6, depth: 0.9 }, scene);
   const sAt = fromUV(C.u - 4.2, C.v - 2.4);
   stump.position.set(sAt.x, 2.3, sAt.z);
@@ -1081,7 +1081,7 @@ function buildWell(scene: Scene, root: TransformNode, stone: StandardMaterial, w
  */
 function buildSquare(scene: Scene, root: TransformNode, rand: () => number, charred: StandardMaterial, wood: StandardMaterial, stone: StandardMaterial): void {
   // The poles at the top of the square: two posts, a crossbar, a rope with a bucket.
-  const posts = [fromUV(-4.6, -34.2), fromUV(-4.2, -37.4)];
+  const posts = [fromUV(-4.6, -32.4), fromUV(-4.2, -34.8)];
   for (const p of posts) {
     const post = MeshBuilder.CreateBox("selesPole", { width: 0.16, height: 2.6, depth: 0.16 }, scene);
     post.position.set(p.x, 1.3, p.z);
@@ -1106,18 +1106,18 @@ function buildSquare(scene: Scene, root: TransformNode, rand: () => number, char
   bucket.parent = root;
 
   // A gutted stone house on the left, its gable still up.
-  ruinHouse(scene, root, rand, stone, charred, { u: -1.6, v: -48.6 }, 5.5, 4.2, 0.1, 3.6);
-  ruinHouse(scene, root, rand, stone, charred, { u: 3.6, v: -49.4 }, 3.4, 3, -0.25, 2);
+  ruinHouse(scene, root, rand, stone, charred, { u: -1.6, v: -43.2 }, 5.5, 4.2, 0.1, 3.6);
+  ruinHouse(scene, root, rand, stone, charred, { u: 3.6, v: -43.8 }, 3.4, 3, -0.25, 2);
 
   // Along the bottom: fallen-in timber houses and debris, the cart in the corner.
   const planks = planksMaterial(scene, rand);
-  collapsedHouse(scene, root, rand, planks, charred, fromUV(8.6, -37.5), 0.15, 0.75);
-  burnedWoodHouse(scene, root, rand, charred, { u: 8.4, v: -30.4 }, 0.2);
-  burnedWoodHouse(scene, root, rand, charred, { u: 8.8, v: -45 }, -0.3);
-  for (const [u, v, s] of [[5.6, -33.5, 1], [5.8, -41.6, 1.1], [6.2, -27.6, 0.9]] as const) {
+  collapsedHouse(scene, root, rand, planks, charred, fromUV(8.6, -34.88), 0.15, 0.75);
+  burnedWoodHouse(scene, root, rand, charred, { u: 8.4, v: -29.55 }, 0.2);
+  burnedWoodHouse(scene, root, rand, charred, { u: 8.8, v: -40.5 }, -0.3);
+  for (const [u, v, s] of [[5.6, -31.88, 1], [5.8, -37.95, 1.1], [6.2, -27.6, 0.9]] as const) {
     debrisHeap(scene, root, rand, planks, charred, fromUV(u, v), s);
   }
-  brokenCart(scene, root, rand, wood, charred, fromUV(5, -46.4));
+  brokenCart(scene, root, rand, wood, charred, fromUV(5, -41.55));
 }
 
 /**
@@ -1144,11 +1144,11 @@ function buildCemetery(scene: Scene, root: TransformNode, rand: () => number, st
   }
   // Dead trees round it (the Stardust tomb is "directly in front of the tree").
   const bark = matte("selesDeadBark", scene, undefined, new Color3(0.24, 0.18, 0.14));
-  deadTree(scene, root, rand, bark, fromUV(C.u - 2.6, C.v + 1.2), 1.3);
-  deadTree(scene, root, rand, bark, fromUV(C.u - 1.4, C.v - 5.2), 1.5);
-  deadTree(scene, root, rand, bark, fromUV(C.u + 1.8, C.v + 4.4), 1);
+  deadTree(scene, root, rand, bark, fromUV(C.u - 2.6, C.v + 0.9), 1.3);
+  deadTree(scene, root, rand, bark, fromUV(C.u - 1.4, C.v - 3.9), 1.5);
+  deadTree(scene, root, rand, bark, fromUV(C.u + 1.8, C.v + 3.3), 1);
   // The small ruin beside it, at the top of the square.
-  ruinHouse(scene, root, rand, stone, matte("selesCharred2", scene, undefined, new Color3(0.16, 0.11, 0.08)), { u: -15.8, v: -34.8 }, 2.8, 2.4, 0.15, 1.8);
+  ruinHouse(scene, root, rand, stone, matte("selesCharred2", scene, undefined, new Color3(0.16, 0.11, 0.08)), { u: -15.8, v: -32.85 }, 2.8, 2.4, 0.15, 1.8);
 }
 
 function deadTree(scene: Scene, root: TransformNode, rand: () => number, bark: StandardMaterial, at: Vector3, s: number): void {
@@ -1208,9 +1208,9 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
   // Along the foot of the hillside: level along the village, rising across the yard to the right,
   // with the gap Dart comes through.
   run({ u: fenceU(-26), v: -26 }, { u: fenceU(-12), v: -12 }); // behind the chapel
-  run({ u: -18.2, v: -29.4 }, { u: fenceU(-26), v: -26 }); // from the road out round to it
-  run({ u: -18.6, v: -47 }, { u: -18.2, v: -33.4 }); // behind the cemetery
-  run({ u: -18.6, v: -47 }, { u: -5.4, v: -48.4 }); // down its left side, to the gutted house
+  run({ u: -18.2, v: -28.8 }, { u: fenceU(-26), v: -26 }); // from the road out round to it
+  run({ u: -18.6, v: -42.0 }, { u: -18.2, v: -31.8 }); // behind the cemetery
+  run({ u: -18.6, v: -42.0 }, { u: -5.4, v: -43.05 }); // down its left side, to the gutted house
   run({ u: fenceU(-12), v: -12 }, { u: fenceU(9), v: 9 }, 8.5 / 21);
   run({ u: fenceU(9), v: 9 }, { u: fenceU(9) - 0.4, v: 16 });
 }
