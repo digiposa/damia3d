@@ -1188,6 +1188,7 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
   // with the gap Dart comes through.
   run({ u: fenceU(-28), v: -28 }, { u: fenceU(-12), v: -12 }); // behind the chapel
   run({ u: -18.6, v: -47 }, { u: -18.2, v: -33.4 }); // behind the cemetery
+  run({ u: -18.6, v: -47 }, { u: -5.4, v: -48.4 }); // down its left side, to the gutted house
   run({ u: fenceU(-12), v: -12 }, { u: fenceU(9), v: 9 }, 8.5 / 21);
   run({ u: fenceU(9), v: 9 }, { u: fenceU(9) - 0.4, v: 16 });
 }
