@@ -28,7 +28,7 @@ import type { World } from "./World";
  * PS1 screens: the wooded hillside Dart comes down from the top of the screen (the road back to
  * the Forest), the fence and the dirt path where the first knights wait, the village square with
  * its well, the burned house at the centre where Plos lies, the stone church in ruins, the
- * cemetery under a dead tree. Sepia dusk, smoke still rising.
+ * cemetery under a dead tree. The morning after the raid: pale sun, smoke hanging over it all.
  *
  * Authored in a mirrored iso frame: u runs DOWN the screen (the hillside at low u is at the top),
  * v sideways. {@link fromUV} / {@link selesUV} do the flip.
@@ -405,10 +405,17 @@ function buildYard(scene: Scene, root: TransformNode, rand: () => number, charre
   }
   brokenCart(scene, root, rand, wood, charred, fromUV(-3.6, -4.6));
 
-  // Just below: more of the village burned — a stone house gutted, a timber one fallen in.
+  // Just below: more of the village burned — stone houses gutted, timber ones fallen in.
   ruinHouse(scene, root, rand, stone, charred, { u: 3.4, v: 2.4 }, 5, 4, 0.25, 2.6);
   burnedWoodHouse(scene, root, rand, charred, { u: 2.2, v: -3.6 }, 0.5);
   collapsedHouse(scene, root, rand, planks, charred, fromUV(3.2, 9.6), 0.3, 0.7);
+  ruinHouse(scene, root, rand, stone, charred, { u: 3.6, v: -8.4 }, 4.5, 3.6, -0.2, 2.2);
+  ruinHouse(scene, root, rand, stone, charred, { u: 8.6, v: 5.4 }, 5.5, 4, 0.1, 3);
+  burnedWoodHouse(scene, root, rand, charred, { u: 7.8, v: -1.8 }, -0.3);
+  collapsedHouse(scene, root, rand, planks, charred, fromUV(8.4, -10.6), 1.2, 0.6);
+  for (const [u, v, s] of [[5.4, -4.8, 1], [6, 1.6, 0.9], [5.6, 9, 1.1], [9.6, 1.4, 0.8]] as const) {
+    debrisHeap(scene, root, rand, planks, charred, fromUV(u, v), s);
+  }
 
   // Fires still burning in the wrecks: the yard's warm light, without a real light (mobile).
   return [
@@ -416,7 +423,10 @@ function buildYard(scene: Scene, root: TransformNode, rand: () => number, charre
     fireSpot(scene, root, rand, fromUV(-4.9, 5.6), 0.7),
     fireSpot(scene, root, rand, fromUV(2.2, -3.6), 0.9),
     fireSpot(scene, root, rand, fromUV(3.4, 9.2), 0.8),
+    fireSpot(scene, root, rand, fromUV(8.4, -10.4), 0.8),
+    fireSpot(scene, root, rand, fromUV(7.8, -1.8), 0.7),
     ashFall(scene, fromUV(-6, -1)),
+    smokeHaze(scene, fromUV(2, -2)),
   ];
 
   // Sticks and splinters strewn over the trodden earth, a few stakes still standing.
@@ -590,6 +600,35 @@ function ashFall(scene: Scene, at: Vector3): (dt: number) => void {
   ps.maxEmitPower = 0.6;
   ps.gravity = new Vector3(0.1, -0.05, 0.05);
   ps.preWarmCycles = 300;
+  ps.start();
+  return () => undefined;
+}
+
+/**
+ * The smoke of the night's fires still hanging low over the village: a few big, slow, faint puffs
+ * drifting across. Kept to a handful (each puff is a large transparent quad: overdraw on a phone).
+ */
+function smokeHaze(scene: Scene, at: Vector3): (dt: number) => void {
+  const ps = new ParticleSystem("selesHaze", 16, scene);
+  ps.particleTexture = softDotTexture(scene);
+  ps.emitter = new Vector3(at.x, 2.5, at.z);
+  ps.minEmitBox = new Vector3(-14, 0, -14);
+  ps.maxEmitBox = new Vector3(14, 2, 14);
+  ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+  ps.color1 = new Color4(0.5, 0.47, 0.44, 0.16);
+  ps.color2 = new Color4(0.42, 0.4, 0.38, 0.12);
+  ps.colorDead = new Color4(0.45, 0.43, 0.4, 0);
+  ps.minSize = 5;
+  ps.maxSize = 9;
+  ps.minLifeTime = 14;
+  ps.maxLifeTime = 20;
+  ps.emitRate = 1;
+  ps.direction1 = new Vector3(0.3, 0.02, 0.1);
+  ps.direction2 = new Vector3(0.5, 0.06, 0.25);
+  ps.minEmitPower = 0.3;
+  ps.maxEmitPower = 0.5;
+  ps.gravity = new Vector3(0, 0, 0);
+  ps.preWarmCycles = 400;
   ps.start();
   return () => undefined;
 }
@@ -1043,21 +1082,23 @@ function buildRubble(scene: Scene, root: TransformNode, rand: () => number, ston
 function buildSmoke(scene: Scene, rand: () => number): void {
   const dot = softDotTexture(scene);
   const spots = [[4, -8.5], [10, 9], [-2, 8.5], [14, -10], [0, 8]].map(([u, v]) => vilPoint(u, v));
-  spots.push(fromUV(-6.4, 3.6), fromUV(-4.6, 6), fromUV(2.2, -3.6), fromUV(3.4, 2.4)); // the yard's wrecks, and below
+  // The yard's wrecks, and the houses below it.
+  spots.push(fromUV(-6.4, 3.6), fromUV(-4.6, 6), fromUV(2.2, -3.6), fromUV(3.4, 2.4), fromUV(3.6, -8.4), fromUV(8.6, 5.4), fromUV(7.8, -1.8), fromUV(8.4, -10.6));
   for (const at of spots) {
-    const ps = new ParticleSystem("selesSmoke", 60, scene);
+    const ps = new ParticleSystem("selesSmoke", 70, scene);
     ps.particleTexture = dot;
     ps.emitter = new Vector3(at.x, 1.5, at.z);
     ps.minEmitBox = new Vector3(-1, 0, -1);
     ps.maxEmitBox = new Vector3(1, 0.5, 1);
     ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
-    ps.color1 = new Color4(0.24, 0.21, 0.19, 0.4);
-    ps.color2 = new Color4(0.32, 0.28, 0.25, 0.3);
-    ps.colorDead = new Color4(0.3, 0.27, 0.25, 0);
+    // Morning smoke: grey, rising tall in the still air before it drifts off.
+    ps.color1 = new Color4(0.4, 0.37, 0.35, 0.4);
+    ps.color2 = new Color4(0.5, 0.47, 0.44, 0.3);
+    ps.colorDead = new Color4(0.5, 0.48, 0.46, 0);
     ps.minSize = 1.2;
-    ps.maxSize = 2.6;
-    ps.minLifeTime = 4;
-    ps.maxLifeTime = 7;
+    ps.maxSize = 3;
+    ps.minLifeTime = 6;
+    ps.maxLifeTime = 10;
     ps.emitRate = 6 + rand() * 4;
     ps.gravity = new Vector3(0.15, 0.35, 0.1);
     ps.direction1 = new Vector3(-0.1, 0.5, -0.1);

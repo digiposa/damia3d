@@ -78,22 +78,22 @@ export const LIGHTING_PRESETS = {
     fogEnd: 85,
     fogColor: [0.14, 0.1, 0.07],
   },
-  /** Seles in ruins, the evening after the raid: sepia dusk, a low orange sun through smoke,
-   *  brown haze — the colours of the PS1 screens. */
+  /** Seles in ruins, the morning after the raid (Dart arrives at dawn): a pale low sun through the
+   *  smoke still hanging over the village, grey-brown haze closing in the distance. */
   selesRuins: {
-    clearColor: [0.1, 0.07, 0.05],
-    ambientIntensity: 0.7,
-    ambientGround: [0.22, 0.15, 0.1],
-    sunIntensity: 1.1,
-    sunColor: [1.0, 0.74, 0.5],
+    clearColor: [0.3, 0.27, 0.24],
+    ambientIntensity: 0.78,
+    ambientGround: [0.24, 0.2, 0.16],
+    sunIntensity: 1.12,
+    sunColor: [1.0, 0.86, 0.66],
     sunDirection: [-0.5, -1, -0.4],
-    exposure: 1.15,
-    contrast: 1.25,
+    exposure: 1.18,
+    contrast: 1.18,
     vignetteWeight: 1.8,
-    bloomWeight: 0.35,
-    fogStart: 36,
-    fogEnd: 85,
-    fogColor: [0.2, 0.14, 0.1],
+    bloomWeight: 0.4,
+    fogStart: 24,
+    fogEnd: 72,
+    fogColor: [0.34, 0.3, 0.27],
   },
   /** The Forest's cliff top over the sea: open sky, the sunset full on — warmer, brighter, rosier. */
   forestCliff: {
