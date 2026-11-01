@@ -44,6 +44,8 @@ export const selesMap: MapFactory = (scene) => {
       // The Save Point in the yard below the fence.
       api.interact(P(SELES_SPOTS.savePoint), t("story.interact.save"), () => api.save("savePoint"), undefined, 1.8);
       if (!SCENES) {
+        // Plos, lying before the chapel (set dressing for the scene's composition).
+        api.npc("plos", P(SELES_SPOTS.plos), { color: [0.36, 0.42, 0.3], hair: "elder" }).setLying(true);
         openChest(api, world);
         api.trigger(P(SELES_SPOTS.exitForest), 3, () => api.goto("forest", "fromSeles"));
         return;
@@ -55,7 +57,7 @@ export const selesMap: MapFactory = (scene) => {
       // --- People ------------------------------------------------------------------------------
       const plos = api.npc("plos", P(SELES_SPOTS.plos), { color: [0.4, 0.3, 0.22], hair: "elder" });
       plos.setLying(!done2() && !api.hasFlag("seles:plosHelped"));
-      if (api.hasFlag("seles:plosHelped") || done2()) plos.walkTo(P({ u: SELES_SPOTS.plosHouse.u - 2.6, v: SELES_SPOTS.plosHouse.v + 2.6 }), 99);
+      if (api.hasFlag("seles:plosHelped") || done2()) plos.walkTo(P(SELES_SPOTS.plosHouse), 99);
       const lowe = api.npc("lowe", P(SELES_SPOTS.kids), { color: [0.5, 0.42, 0.3], hair: "short", scale: 0.65 });
       const isha = api.npc("isha", P({ u: SELES_SPOTS.kids.u + 1, v: SELES_SPOTS.kids.v + 0.6 }), { color: [0.62, 0.4, 0.38], hair: "bob", scale: 0.62 });
       const tasman = api.npc("tasman", P(SELES_SPOTS.tasman), { color: [0.3, 0.3, 0.36], hair: "elder", weapon: "sword" });
@@ -106,7 +108,7 @@ export const selesMap: MapFactory = (scene) => {
         await api.say(dart, S("dart3"));
         await api.walkHero(P({ u: SELES_SPOTS.plos.u - 1.3, v: SELES_SPOTS.plos.v + 1 }));
         plos.setLying(false);
-        await plos.walkTo(P({ u: SELES_SPOTS.plosHouse.u - 2.6, v: SELES_SPOTS.plosHouse.v + 2.6 }), 1);
+        await plos.walkTo(P(SELES_SPOTS.plosHouse), 1);
         plos.face(api.hero);
         api.setFlag("seles:plosHelped");
         await api.say(S("plos"), S("plos1"));

@@ -6,7 +6,7 @@ import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3, Vector4 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { softDotTexture } from "./atmosphere";
@@ -67,12 +67,16 @@ export const SELES_SPOTS = {
   woman: { u: -2.5, v: -6.4 }, // dead, on the left a little lower, by the overturned cart
   savePoint: { u: -9.4, v: -9.2 },
   chest: { u: -10.7, v: -1.6 },
-  plos: vil(3, -4.5), // lying in front of the burned house
-  plosHouse: vil(4, -8.5),
+  // The ruined chapel (PS1: Plos lies before it, then the Commander comes): its front faces the
+  // camera, the square's path running past it.
+  chapel: { u: -5, v: -23 },
+  plos: { u: -1.3, v: -23.4 }, // lying in front of the chapel
+  plosHouse: { u: -2, v: -21 }, // the chapel's door (where he gets up to)
+  burnedHouse: { u: 13.4, v: -20 }, // a gutted house below the square (the kids hide in it)
   commanderFrom: vil(13, 0),
-  kids: vil(3.2, -9.6),
-  well: vil(7, 1),
-  church: vil(10, 9),
+  kids: { u: 12.4, v: -21.6 },
+  well: { u: 5.2, v: -26.5 }, // out on the square
+  church: { u: -5, v: -23 }, // the chapel
   tasman: vil(15, 4.5),
   tomb3: vil(19.6, -6.2), // the Stardust tomb: 3rd from the left, before the tree
   exitForest: vil(31, 1), // the road out past the cemetery, off the left of the screen
@@ -101,8 +105,6 @@ const TRAILS: Knot[][] = [
   ],
   // The cemetery, under the dead tree.
   [knot(14, 0, 3.5), knot(18, -4.5, 4.5), knot(20.5, -8, 3.5)],
-  // Round to the church.
-  [knot(7, 3, 3.5), knot(9, 7, 3)],
 ];
 
 const NET = new TrailNet(TRAILS.map((t) => t.map((k) => ({ ...k, u: -k.u }))));
@@ -182,18 +184,16 @@ export function selesWorld(scene: Scene): SelesWorld {
 
   // The yard below the fence.
   const ticks = buildYard(scene, root, rand, charred, wood, stone);
-  // The burned house at the centre (Plos lies in front of it; the kids hide inside).
-  ruinHouse(scene, root, rand, stone, charred, SELES_SPOTS.plosHouse, 5, 4, 0.2, 3.2);
-  // The stone church, roofless, its belfry half standing.
-  ruinHouse(scene, root, rand, stone, charred, SELES_SPOTS.church, 7, 5, -0.15, 5.5);
-  belfry(scene, root, rand, stone, vilPoint(12.5, 5.8));
+  // The ruined chapel, where Plos lies (and the Commander comes).
+  ticks.push(...buildChapel(scene, root, rand, charred, wood, stone));
+  // A gutted house off the square (the kids hide inside).
+  ruinHouse(scene, root, rand, stone, charred, SELES_SPOTS.burnedHouse, 5, 4, 0.2, 3.2);
   // More ruins round the square and along the path.
-  ruinHouse(scene, root, rand, stone, charred, vil(0, 8), 4.5, 3.5, 0.35, 2.4);
-  ruinHouse(scene, root, rand, stone, charred, vil(-1, -6), 4, 3.5, -0.3, 2.2);
+  ruinHouse(scene, root, rand, stone, charred, { u: 12.6, v: -14 }, 4, 3.5, -0.3, 2.2);
   burnedWoodHouse(scene, root, rand, charred, vil(14, -10), 0.4);
   burnedWoodHouse(scene, root, rand, charred, vil(-2, 8.5), -0.2);
   burnedWoodHouse(scene, root, rand, charred, vil(22, 6), 0.1);
-  burnedWoodHouse(scene, root, rand, charred, vil(9, -7), 0.9);
+  burnedWoodHouse(scene, root, rand, charred, { u: 13.6, v: -27.5 }, 0.9);
 
   buildWell(scene, root, stone, wood, selesPoint(SELES_SPOTS.well));
   buildCemetery(scene, root, rand, stone);
@@ -385,6 +385,210 @@ function burnedWoodHouse(scene: Scene, root: TransformNode, rand: () => number, 
   ash.material = matte("selesAshMat", scene, undefined, new Color3(0.12, 0.1, 0.09));
   ash.parent = node;
   obstacles.addBox(at.x, at.z, 2.1, 1.7, rot);
+}
+
+// --- The ruined chapel (PS1: Plos, then the Commander) --------------------------------------------
+
+/** Rough fieldstone: rounded stones of uneven size in dark mortar, soot-darkened (GROUND_PPU). */
+function fieldstoneMaterial(scene: Scene, rand: () => number): StandardMaterial {
+  const tex = pixelTexture("selesFieldstoneTex", scene, 64, 64, (ctx, w, h) => {
+    ctx.fillStyle = rgb(30, 25, 21);
+    ctx.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; ) {
+      const row = 6 + ((rand() * 5) | 0);
+      for (let x = -((rand() * 6) | 0); x < w; ) {
+        const len = 7 + ((rand() * 8) | 0);
+        const k = 0.65 + rand() * 0.45;
+        ctx.fillStyle = rgb(104 * k, 92 * k, 80 * k);
+        ctx.fillRect(x + 1, y + 1, len - 1, row - 1);
+        ctx.fillStyle = rgb(128 * k, 116 * k, 100 * k); // the lit top of each stone
+        ctx.fillRect(x + 2, y + 1, len - 3, 1);
+        ctx.fillStyle = rgb(30, 25, 21); // round the corners
+        for (const [cx, cy] of [[x + 1, y + 1], [x + len - 1, y + 1], [x + 1, y + row - 1], [x + len - 1, y + row - 1]]) ctx.fillRect(cx, cy, 1, 1);
+        x += len;
+      }
+      y += row;
+    }
+  });
+  return matte("selesFieldstone", scene, tex);
+}
+
+/** A box whose faces tile `mat`'s texture at one repeat per `tile` units (walls of any size). */
+function tiledBox(name: string, scene: Scene, w: number, h: number, d: number, tile = 3.2): Mesh {
+  const f = (a: number, b: number): Vector4 => new Vector4(0, 0, a / tile, b / tile);
+  // Babylon's box faces: back, front, right, left, top, bottom.
+  return MeshBuilder.CreateBox(name, { width: w, height: h, depth: d, faceUV: [f(w, h), f(w, h), f(d, h), f(d, h), f(w, d), f(w, d)] }, scene);
+}
+
+/**
+ * The little stone chapel, burned out (PS1): fieldstone walls broken off at uneven heights, the left
+ * gable still standing high, an arched window and a timber door frame in the front wall (facing the
+ * camera); charred beams fallen in and leaning against it, rubble at its foot, smoke still rising
+ * inside. Behind: a great gnarled dead tree, the stumps of two chimneys, the fence. Before it: a
+ * broken fence with a crow on a post, and flat stone blocks where Dart stands.
+ */
+function buildChapel(scene: Scene, root: TransformNode, rand: () => number, charred: StandardMaterial, wood: StandardMaterial, stone: StandardMaterial): ((dt: number) => void)[] {
+  const fieldstone = fieldstoneMaterial(scene, rand);
+  fieldstone.getActiveTextures()[0].wrapU = Texture.WRAP_ADDRESSMODE;
+  const pale = matte("selesPaleStone", scene, undefined, new Color3(0.58, 0.52, 0.44));
+  const C = SELES_SPOTS.chapel;
+  const node = new TransformNode("selesChapel", scene);
+  node.parent = root;
+  const at = fromUV(C.u, C.v);
+  node.position.copyFrom(at);
+  node.rotation.y = -Math.PI / 4; // local +x: right on screen; local +z: up the screen (front at -z)
+  const W = 8; // along the front
+  const D = 5;
+  const T = 0.55;
+  const part = (m: Mesh, mat: StandardMaterial): Mesh => {
+    m.material = mat;
+    m.parent = node;
+    return m;
+  };
+  // A wall as columns of stone, each broken off at its own height; `holes` cut openings
+  // [from, to, bottom, top] along it (door, window).
+  const wall = (len: number, x: number, z: number, ry: number, heights: (f: number) => number, holes: [number, number, number, number][] = []): void => {
+    const segs = Math.round(len / 0.7);
+    for (let k = 0; k < segs; k++) {
+      const f = (k + 0.5) / segs; // 0..1 along the wall
+      const top = heights(f) * (0.9 + rand() * 0.2);
+      const pos = (f - 0.5) * len;
+      const hole = holes.find(([a, b]) => pos >= a && pos <= b);
+      const spans: [number, number][] = hole ? [[0, hole[2]], [hole[3], top]] : [[0, top]];
+      for (const [lo, hi] of spans) {
+        if (hi - lo < 0.15) continue;
+        const seg = part(tiledBox("selesChapelWall", scene, len / segs + 0.03, hi - lo, T), fieldstone);
+        seg.position.set(x + Math.cos(ry) * pos, (lo + hi) / 2, z - Math.sin(ry) * pos);
+        seg.rotation.y = ry;
+      }
+    }
+  };
+  const DOOR: [number, number, number, number] = [1.6, 2.8, 0, 2.4];
+  const WINDOW: [number, number, number, number] = [-1.6, -0.6, 1.3, 2.7];
+  // Front (facing the camera): high at the left gable, broken low towards the right.
+  wall(W, 0, -D / 2, 0, (f) => (f < 0.18 ? 5.4 - f * 6 : 3.6 - f * 1.4 + Math.sin(f * 17) * 0.5), [WINDOW, DOOR]);
+  // Back: the other gable, standing.
+  wall(W, 0, D / 2, 0, (f) => 3.4 + 2.2 * Math.max(0, 1 - Math.abs(f - 0.35) * 3.2));
+  // Sides.
+  wall(D, -W / 2, 0, Math.PI / 2, () => 4.6);
+  wall(D, W / 2, 0, Math.PI / 2, (f) => 2.2 + f * 1.2);
+  // The window: a pale stone frame with its round arch.
+  const wx = (WINDOW[0] + WINDOW[1]) / 2;
+  const ww = WINDOW[1] - WINDOW[0];
+  for (const sx of [-1, 1]) {
+    const jamb = part(MeshBuilder.CreateBox("selesWinJamb", { width: 0.16, height: WINDOW[3] - WINDOW[2], depth: T + 0.08 }, scene), pale);
+    jamb.position.set(wx + (sx * ww) / 2, (WINDOW[2] + WINDOW[3]) / 2, -D / 2);
+  }
+  const sill = part(MeshBuilder.CreateBox("selesWinSill", { width: ww + 0.3, height: 0.14, depth: T + 0.12 }, scene), pale);
+  sill.position.set(wx, WINDOW[2], -D / 2);
+  for (let k = 0; k <= 6; k++) {
+    const a = (k / 6) * Math.PI;
+    const voussoir = part(MeshBuilder.CreateBox("selesWinArch", { width: 0.2, height: 0.16, depth: T + 0.08 }, scene), pale);
+    voussoir.position.set(wx + Math.cos(a) * (ww / 2), WINDOW[3] + Math.sin(a) * (ww / 2) * 0.9, -D / 2);
+    voussoir.rotation.z = a - Math.PI / 2;
+  }
+  // The door: a timber frame, its door gone (a plank or two lie in front).
+  const dx = (DOOR[0] + DOOR[1]) / 2;
+  const dw = DOOR[1] - DOOR[0];
+  for (const sx of [-1, 1]) {
+    const post = part(MeshBuilder.CreateBox("selesDoorPost", { width: 0.18, height: DOOR[3], depth: T + 0.1 }, scene), wood);
+    post.position.set(dx + (sx * dw) / 2, DOOR[3] / 2, -D / 2);
+  }
+  const lintel = part(MeshBuilder.CreateBox("selesDoorLintel", { width: dw + 0.5, height: 0.2, depth: T + 0.12 }, scene), wood);
+  lintel.position.set(dx, DOOR[3] + 0.1, -D / 2);
+  for (let k = 0; k < 3; k++) {
+    const plank = part(MeshBuilder.CreateBox("selesDoorPlank", { width: 0.28, height: 0.06, depth: 1.6 }, scene), charred);
+    plank.position.set(dx - 0.6 + k * 0.5, 0.05, -D / 2 - 1.1);
+    plank.rotation.y = 0.5 + rand() * 0.6;
+  }
+  // Charred beams: fallen in, and leaning against the left of the front.
+  for (let k = 0; k < 4; k++) {
+    const beam = part(MeshBuilder.CreateBox("selesChapelBeam", { width: 4 + rand() * 2.5, height: 0.24, depth: 0.24 }, scene), charred);
+    beam.position.set((rand() - 0.5) * W * 0.7, 0.6 + rand() * 1.6, (rand() - 0.3) * D * 0.6);
+    beam.rotation.set((rand() - 0.5) * 0.5, (rand() - 0.5) * 0.6, (rand() - 0.5) * 0.7);
+  }
+  for (let k = 0; k < 4; k++) {
+    const lean = part(MeshBuilder.CreateBox("selesLeanBeam", { width: 0.2, height: 3 + rand(), depth: 0.2 }, scene), charred);
+    lean.position.set(-W / 2 + 0.2 + k * 0.45, 1.3, -D / 2 - 1.1);
+    lean.rotation.set(-0.5 - rand() * 0.2, 0, (rand() - 0.5) * 0.5);
+  }
+  // Rubble at the foot of the walls.
+  for (let k = 0; k < 16; k++) {
+    const r = part(MeshBuilder.CreateIcoSphere("selesChapelRubble", { radius: 0.15 + rand() * 0.3, subdivisions: 1 }, scene), rand() < 0.6 ? fieldstone : stone);
+    const side = rand();
+    r.position.set(side < 0.6 ? (rand() - 0.5) * W : (rand() < 0.5 ? -1 : 1) * (W / 2 + 0.5), 0.08, side < 0.6 ? -D / 2 - 0.5 - rand() * 0.6 : (rand() - 0.5) * D);
+    r.scaling.y = 0.6;
+  }
+  obstacles.addBox(at.x, at.z, W / 2 + 0.3, D / 2 + 0.3, node.rotation.y);
+
+  // Behind it: the great gnarled dead tree (right), two chimney stumps (left), the fence.
+  const bark = matte("selesGnarlBark", scene, undefined, new Color3(0.26, 0.2, 0.15));
+  deadTree(scene, root, rand, bark, fromUV(C.u - 3.6, C.v + 6), 1.9);
+  belfry(scene, root, rand, fieldstone, fromUV(C.u - 4.6, C.v - 6.4));
+  const stump = MeshBuilder.CreateBox("selesChimney", { width: 0.9, height: 4.6, depth: 0.9 }, scene);
+  const sAt = fromUV(C.u - 3.2, C.v - 8.6);
+  stump.position.set(sAt.x, 2.3, sAt.z);
+  stump.rotation.y = 0.4;
+  jitter(stump, 0.06, rand);
+  stump.material = fieldstone;
+  stump.parent = root;
+  obstacles.add(sAt.x, sAt.z, 0.7);
+
+  // Before it: a broken fence with a crow on a post; flat stone blocks to the right.
+  const fenceFrom = fromUV(C.u + 9.6, C.v - 4.4);
+  for (let k = 0; k < 3; k++) {
+    const p = fromUV(C.u + 9.6 - k * 0.2, C.v - 4.4 + k * 1.7);
+    const hgt = 0.9 + rand() * 0.5;
+    const post = MeshBuilder.CreateBox("selesBrokenPost", { width: 0.22, height: hgt, depth: 0.22 }, scene);
+    post.position.set(p.x, hgt / 2, p.z);
+    post.rotation.z = (rand() - 0.5) * 0.25;
+    post.material = wood;
+    post.parent = root;
+    obstacles.add(p.x, p.z, 0.25);
+    if (k === 0) crow(scene, root, new Vector3(p.x, hgt, p.z));
+  }
+  const rail = MeshBuilder.CreateBox("selesFallenRail", { width: 4.2, height: 0.16, depth: 0.16 }, scene);
+  const rAt = fromUV(C.u + 9.3, C.v - 2.2);
+  rail.position.set(rAt.x, 0.3, rAt.z);
+  rail.rotation.set(0, -Math.PI / 4 + 0.2, 0.14);
+  rail.material = wood;
+  rail.parent = root;
+  void fenceFrom;
+  for (const [du, dv, w, h] of [[3.2, 5.2, 1.8, 0.5], [4.4, 6.2, 1.4, 0.35], [2.6, 6.6, 1.2, 0.3]] as const) {
+    const block = tiledBox("selesStoneBlock", scene, w, h, w * 0.8, 1.6);
+    const bAt = fromUV(C.u + du, C.v + dv);
+    block.position.set(bAt.x, h / 2, bAt.z);
+    block.rotation.y = -Math.PI / 4 + (rand() - 0.5) * 0.4;
+    block.material = fieldstone;
+    block.parent = root;
+    obstacles.add(bAt.x, bAt.z, w * 0.5);
+  }
+  return [];
+}
+
+/** A crow perched on a post (PS1: the one in the foreground before the chapel). */
+function crow(scene: Scene, root: TransformNode, at: Vector3): void {
+  const black = matte("selesCrow", scene, undefined, new Color3(0.06, 0.06, 0.07));
+  const node = new TransformNode("selesCrowNode", scene);
+  node.parent = root;
+  node.position.copyFrom(at);
+  node.rotation.y = 2.2;
+  const body = MeshBuilder.CreateSphere("selesCrowBody", { diameter: 0.34, segments: 6 }, scene);
+  body.scaling.set(0.8, 0.85, 1.3);
+  body.position.y = 0.2;
+  body.rotation.x = -0.4;
+  const head = MeshBuilder.CreateSphere("selesCrowHead", { diameter: 0.18, segments: 6 }, scene);
+  head.position.set(0, 0.38, 0.16);
+  const beak = MeshBuilder.CreateCylinder("selesCrowBeak", { height: 0.14, diameterTop: 0, diameterBottom: 0.06, tessellation: 4 }, scene);
+  beak.rotation.x = Math.PI / 2;
+  beak.position.set(0, 0.36, 0.3);
+  const tail = MeshBuilder.CreateBox("selesCrowTail", { width: 0.14, height: 0.03, depth: 0.26 }, scene);
+  tail.position.set(0, 0.14, -0.24);
+  tail.rotation.x = -0.5;
+  for (const m of [body, head, beak, tail]) {
+    m.material = black;
+    m.parent = node;
+  }
 }
 
 // --- The yard below the fence (PS1 "Acquired Burn Out") ----------------------------------------
@@ -814,7 +1018,7 @@ function deadTree(scene: Scene, root: TransformNode, rand: () => number, bark: S
 
 function buildDeadTrees(scene: Scene, root: TransformNode, rand: () => number): void {
   const bark = matte("selesDeadBark2", scene, undefined, new Color3(0.22, 0.16, 0.12));
-  for (const [u, v, s] of [[-6, 10, 1.1], [16, 9.5, 1.3], [25, -9, 1.2], [5, -14, 1.1]] as const) {
+  for (const [u, v, s] of [[-6, 10, 1.1], [25, -9, 1.2], [5, -14, 1.1]] as const) {
     deadTree(scene, root, rand, bark, vilPoint(u, v), s);
   }
   deadTree(scene, root, rand, bark, fromUV(-8.4, -17.5), 1); // the yard's left edge
@@ -1081,7 +1285,9 @@ function buildRubble(scene: Scene, root: TransformNode, rand: () => number, ston
 /** Smoke still rising from the ruins, and embers drifting up. */
 function buildSmoke(scene: Scene, rand: () => number): void {
   const dot = softDotTexture(scene);
-  const spots = [[4, -8.5], [10, 9], [-2, 8.5], [14, -10], [0, 8]].map(([u, v]) => vilPoint(u, v));
+  const spots = [[-2, 8.5], [14, -10]].map(([u, v]) => vilPoint(u, v));
+  spots.push(fromUV(13.4, -20)); // the kids' house
+  spots.push(fromUV(-5.4, -24.6), fromUV(-4.4, -20.6)); // inside the chapel
   // The yard's wrecks, and the houses below it.
   spots.push(fromUV(-6.4, 3.6), fromUV(-4.6, 6), fromUV(2.2, -3.6), fromUV(3.4, 2.4), fromUV(3.6, -8.4), fromUV(8.6, 5.4), fromUV(7.8, -1.8), fromUV(8.4, -10.6));
   for (const at of spots) {
