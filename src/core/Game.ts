@@ -14,6 +14,7 @@ import { SurvivalMode } from "../modes/SurvivalMode";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
 import { MainMenu, type ModeId } from "../ui/MainMenu";
 import { SystemMenu } from "../ui/SystemMenu";
+import { LoadingOverlay } from "../ui/LoadingOverlay";
 import { TechOverlay } from "../ui/TechOverlay";
 import { Button } from "../ui/Button";
 import { applyRetroResolution } from "../world/retro";
@@ -107,8 +108,31 @@ export class Game implements GameHost {
 
   /** GameHost: replace the running mode with another (a Story map change rebuilds the scene). */
   switchMode(factory: ModeFactory): void {
-    this.modes.switchTo(factory);
+    void this.launch(factory);
     this.paused = false;
+  }
+
+  /**
+   * Switch to a mode behind the loading screen, shown at once: building a map (painted textures,
+   * vegetation, ruins) blocks the page for a moment, and its models may then download — the screen
+   * stays up through both, and through the first frames (shader compilation), until it is playable.
+   * The mode's own loading gate, when it downloads models, shows its byte progress on top.
+   */
+  private async launch(factory: ModeFactory): Promise<void> {
+    const overlay = new LoadingOverlay();
+    overlay.setProgress(0.05);
+    const frame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
+    await frame();
+    await frame(); // let the loading screen paint before the build blocks the page
+    this.modes.switchTo(factory);
+    overlay.setProgress(0.6);
+    try {
+      await this.modes.current?.ready;
+    } finally {
+      await frame();
+      await frame(); // the first frames compile the map's shaders
+      overlay.close();
+    }
   }
 
   private openMainMenu(): void {
@@ -129,22 +153,22 @@ export class Game implements GameHost {
   private startMode(mode: ModeId, at?: { map: string; entry: string }): void {
     switch (mode) {
       case "Training":
-        this.modes.switchTo((s, i, h) => new TrainingMode(s, i, h));
+        void this.launch((s, i, h) => new TrainingMode(s, i, h));
         break;
       case "Story":
         story(); // continue the save (or start a new game if there is none)
-        this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
+        void this.launch((s, i, h) => new StoryMode(s, i, h));
         break;
       case "StoryNew":
         startNewStory();
-        this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
+        void this.launch((s, i, h) => new StoryMode(s, i, h));
         break;
       case "Explore":
         startNewStory(at); // a fresh game, dropped on the chosen map
-        this.modes.switchTo((s, i, h) => new StoryMode(s, i, h));
+        void this.launch((s, i, h) => new StoryMode(s, i, h));
         break;
       case "Survival":
-        this.modes.switchTo((s, i, h) => new SurvivalMode(s, i, h));
+        void this.launch((s, i, h) => new SurvivalMode(s, i, h));
         break;
     }
     this.menu.hide();

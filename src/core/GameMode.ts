@@ -18,6 +18,10 @@ export abstract class GameMode {
   /** Build the scene contents. Called once when the mode becomes active. */
   abstract enter(): void;
 
+  /** Settles once the mode is playable (its models loaded and placed), if it loads any. The game
+   *  keeps its loading screen up until then. */
+  ready?: Promise<void>;
+
   /** Called every frame. `dt` is seconds since the last frame. */
   update(_dt: number): void {}
 

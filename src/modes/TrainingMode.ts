@@ -518,7 +518,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // Loading gate: pause behind a full-screen overlay until every required model (party bodies,
     // weapons, Dragoon forms, the arena's stock enemies) is downloaded, parsed and instantiated —
     // characters then appear fully formed and animated, never as placeholders.
-    void this.gateAssets().then(() => this.onAssetsReady());
+    this.ready = this.gateAssets().then(() => this.onAssetsReady());
 
     // Party HUD: one ATB row per member (EXP/Gold/Addition live in the System menu).
     // Tapping a row takes control of that member.
