@@ -26,6 +26,11 @@ Soucis spécifiques **PC/souris** → voir `docs/WIP-desktop.md`.
 - **Barre SP segmentée** par tranches de 100 (PartyPanel).
 
 ## ⏭️ Backlog (voir DESIGN_NOTES.md)
+- **Accélérer le chargement des cartes (plus tard)** — le temps vient du calcul au lancement (pente
+  de Seles et chemins de la Forêt peints pixel par pixel, végétation, ruines), pas des modèles.
+  Pas de chargement par zones (saccades en marchant sur mobile). Piste retenue : mesurer d'abord,
+  puis mettre les textures peintes en cache navigateur et compiler les shaders derrière l'écran de
+  chargement ; plus tard, textures pré-générées à la publication une fois les cartes stabilisées.
 - **Fuite des combats (à faire, ne pas oublier)** — canon : on peut fuir (90 % dans la Forêt).
   En temps réel, piste : s'éloigner assez loin des ennemis pour qu'ils abandonnent la poursuite
   (et le groupe disparaît / retourne d'où il vient). À cadrer avec le joueur avant de coder.
