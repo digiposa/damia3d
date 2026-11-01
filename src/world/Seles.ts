@@ -81,10 +81,10 @@ export const SELES_SPOTS = {
   // The square left of the chapel (PS1): the well in the middle, the cemetery up on the left, the
   // road out going up the screen between the cemetery and the chapel.
   square: { u: -0.5, v: -36 },
-  cemetery: { u: -7.4, v: -42.5 },
-  tomb3: { u: -6.9, v: -41.5 }, // the Stardust tomb: 3rd from the left, before the tree
-  exitForest: { u: -14, v: -32 }, // up the road out, past the fence
-  fromForest: { u: -9.5, v: -32 },
+  cemetery: { u: -14, v: -39.5 }, // above the square
+  tomb3: { u: -14.4, v: -38.6 }, // the Stardust tomb: 3rd from the left, before the tree
+  exitForest: { u: -22, v: -31.2 }, // the road out, at the top of the screen
+  fromForest: { u: -17, v: -31 },
 };
 
 const knot = (u: number, v: number, w: number): Knot => ({ ...vil(u, v), w });
@@ -106,10 +106,10 @@ const TRAILS: Knot[][] = [
     { u: -0.5, v: -39, w: 8 },
     { u: 0.5, v: -44, w: 6.5 },
   ],
-  // The cemetery, up on the left of the square.
-  [{ u: -2, v: -40, w: 4 }, { u: -6, v: -43, w: 4.4 }],
-  // The road out: up the screen between the cemetery and the chapel, through the fence, up the hill.
-  [{ u: -3, v: -32, w: 3 }, { u: -9, v: -32, w: 2.6 }, { u: -15, v: -32.3, w: 2.4 }, { u: -26, v: -33, w: 2.2 }],
+  // Up from the square to the cemetery above it.
+  [{ u: -3, v: -38, w: 4.4 }, { u: -9, v: -39, w: 4.6 }, { u: -14, v: -39.5, w: 4.6 }],
+  // The road out: up the screen between the cemetery and the chapel, off the top into the hills.
+  [{ u: -3, v: -31.2, w: 3 }, { u: -10, v: -31, w: 2.8 }, { u: -17, v: -31, w: 2.6 }, { u: -24, v: -31.6, w: 2.4 }, { u: -36, v: -32.4, w: 2.2 }],
 ];
 
 const NET = new TrailNet(TRAILS.map((t) => t.map((k) => ({ ...k, u: -k.u }))));
@@ -125,7 +125,10 @@ function hillDepth(u: number, v: number): number {
 /** The fence along the hill's foot: rising a little to the right across the yard (PS1), level
  *  along the village to the left. */
 function fenceU(v: number): number {
-  return -11.5 - 0.18 * (Math.max(-12, Math.min(9, v)) + 3.5);
+  // Left of the chapel the hill falls back up the screen: the village goes on upwards there (the
+  // square, then the cemetery above it, then the road out at the top).
+  const back = smooth(27, 40, -v);
+  return -11.5 - 0.18 * (Math.max(-12, Math.min(9, v)) + 3.5) - 22 * back;
 }
 
 const SLOPE_H = 7; // the top of the steep path
@@ -204,6 +207,7 @@ export function selesWorld(scene: Scene): SelesWorld {
   buildSquare(scene, root, rand, charred, wood, stone);
   buildFences(scene, root, rand, wood);
   const hill = buildHillside(scene, root, rand);
+  const paths = buildVillagePaths(scene, root, rand);
   buildDeadTrees(scene, root, rand);
   buildRubble(scene, root, rand, stone, charred);
   buildSmoke(scene, rand);
@@ -220,7 +224,7 @@ export function selesWorld(scene: Scene): SelesWorld {
     clamp: clampToSeles,
     preset: LIGHTING_PRESETS.selesRuins,
     framing: 2,
-    shadowReceivers: [ground, hill],
+    shadowReceivers: [ground, hill, paths],
     heightAt: selesHeight,
     ownFill: [],
     shotAt: chapelShot,
@@ -1123,7 +1127,7 @@ function buildCemetery(scene: Scene, root: TransformNode, rand: () => number, st
   deadTree(scene, root, rand, bark, fromUV(C.u - 1.4, C.v - 5.2), 1.5);
   deadTree(scene, root, rand, bark, fromUV(C.u + 1.8, C.v + 4.4), 1);
   // The small ruin beside it, at the top of the square.
-  ruinHouse(scene, root, rand, stone, matte("selesCharred2", scene, undefined, new Color3(0.16, 0.11, 0.08)), { u: -7.6, v: -36.6 }, 3.2, 2.6, 0.15, 1.8);
+  ruinHouse(scene, root, rand, stone, matte("selesCharred2", scene, undefined, new Color3(0.16, 0.11, 0.08)), { u: -15.8, v: -34.8 }, 2.8, 2.4, 0.15, 1.8);
 }
 
 function deadTree(scene: Scene, root: TransformNode, rand: () => number, bark: StandardMaterial, at: Vector3, s: number): void {
@@ -1182,7 +1186,8 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
   };
   // Along the foot of the hillside: level along the village, rising across the yard to the right,
   // with the gap Dart comes through.
-  run({ u: fenceU(-52), v: -52 }, { u: fenceU(-12), v: -12 }, 20 / 40); // the gap of the road out
+  run({ u: fenceU(-28), v: -28 }, { u: fenceU(-12), v: -12 }); // behind the chapel
+  run({ u: -18.6, v: -47 }, { u: -18.2, v: -33.4 }); // behind the cemetery
   run({ u: fenceU(-12), v: -12 }, { u: fenceU(9), v: 9 }, 8.5 / 21);
   run({ u: fenceU(9), v: 9 }, { u: fenceU(9) - 0.4, v: 16 });
 }
@@ -1356,6 +1361,65 @@ function paintHillside(scene: Scene, rand: () => number, U0: number, U1: number,
   ctx.putImageData(img, 0, 0);
   tex.update();
   return tex;
+}
+
+/**
+ * The village's trodden earth, painted (GROUND_PPU) as one layer over the flat ground, like the
+ * Forest's trails: the yard, the way past the chapel, the square, the way up to the cemetery and the
+ * road out at the top — lighter, worn earth with a ragged edge, footprints and pebbles, the long
+ * tree shadows carried across it. Stops where the hill starts (the hill paints its own path).
+ */
+function buildVillagePaths(scene: Scene, root: TransformNode, rand: () => number): Mesh {
+  const U0 = -40;
+  const U1 = 12;
+  const V0 = -52;
+  const V1 = 2;
+  const W = (U1 - U0) * GROUND_PPU;
+  const H = (V1 - V0) * GROUND_PPU;
+  const tex = new DynamicTexture("selesPathTex", { width: W, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
+  tex.hasAlpha = true;
+  tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  const img = ctx.createImageData(W, H);
+  const out = img.data;
+  for (let y = 0; y < H; y++) {
+    const v = V1 - (y + 0.5) / GROUND_PPU;
+    for (let x = 0; x < W; x++) {
+      const u = U0 + (x + 0.5) / GROUND_PPU;
+      if (hillDepth(u, v) > 0.2) continue;
+      const p = fromUV(u, v);
+      const n = NET.nearest(p.x, p.z);
+      const edge = n.d - n.w * 0.8 + (noise2(u * 1.1, v * 1.1) - 0.5) * 1.2;
+      if (edge > 0) continue;
+      if (edge > -0.5 && rand() < 0.4) continue; // ragged rim
+      const mottle = 0.86 + 0.24 * noise2(u * 0.7 + 11, v * 0.7);
+      let k = mottle * (0.92 + rand() * 0.16) * (edge > -0.5 ? 0.9 : 1);
+      const shade = noise2(u * 0.22 - v * 0.3 + 3, v * 0.12 + u * 0.05);
+      k *= 1 - 0.36 * smooth(0.5, 0.64, shade);
+      let [r, g, b] = [146 * k, 110 * k, 76 * k];
+      const speck = hash01(Math.floor(u * 10), Math.floor(v * 10));
+      if (speck < 0.012) [r, g, b] = [178 * k, 146 * k, 108 * k]; // pebble
+      else if (speck < 0.03) [r, g, b] = [96 * k, 70 * k, 48 * k]; // a footprint, a clod
+      const o = (y * W + x) * 4;
+      out[o] = r;
+      out[o + 1] = g;
+      out[o + 2] = b;
+      out[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.update();
+  const mesh = gridMesh("selesPaths", scene, V1 - V0, U1 - U0, (i, j) => {
+    const u = U0 + j;
+    const v = V0 + i;
+    const p = fromUV(u, v);
+    return { x: p.x, y: 0.02, z: p.z, tu: (u - U0) / (U1 - U0), tv: (v - V0) / (V1 - V0) };
+  }, Vector3.Up());
+  const mat = matte("selesPathMat", scene, tex);
+  mat.zOffset = -2; // on the ground without z-fighting
+  mesh.material = mat;
+  mesh.parent = root;
+  return mesh;
 }
 
 /** A dark pine (PS1 hilltop): a straight trunk under stacked, drooping cones. */
