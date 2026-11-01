@@ -127,8 +127,8 @@ function hillDepth(u: number, v: number): number {
 function fenceU(v: number): number {
   // Left of the chapel the hill falls back up the screen: the village goes on upwards there (the
   // square, then the cemetery above it, then the road out at the top).
-  const back = smooth(27, 40, -v);
-  return -11.5 - 0.18 * (Math.max(-12, Math.min(9, v)) + 3.5) - 22 * back;
+  const back = smooth(26, 30, -v);
+  return -11.5 - 0.18 * (Math.max(-12, Math.min(9, v)) + 3.5) - 40 * back;
 }
 
 const SLOPE_H = 7; // the top of the steep path
@@ -148,7 +148,11 @@ const smooth = (a: number, b: number, x: number): number => {
 function selesHeight(x: number, z: number): number {
   const { u, v } = selesUV(new Vector3(x, 0, z));
   const depth = hillDepth(u, v);
-  if (depth <= 0) return 0;
+  if (depth <= 0 || v < -30) return 0;
+  return (1 - smooth(25, 30, -v)) * hillHeight(x, z, u, v, depth); // left of the chapel it is all flat
+}
+
+function hillHeight(x: number, z: number, u: number, v: number, depth: number): number {
   const n = NET.nearest(x, z);
   const edge = n.d - n.w;
   const rise = smooth(0, 3, depth);
@@ -157,11 +161,28 @@ function selesHeight(x: number, z: number): number {
   return SLOPE_H * smooth(0.4, LEDGE_D - 0.5, depth) + (LEDGE_H - SLOPE_H) * ledge + banks + ledge * 0.4 * Math.sin(u * 0.8 + v * 0.6);
 }
 
-/** Where you can walk: the trails, a little give either side. */
+/** The village's open ground (flat): walkable anywhere between its edges, round the ruins. */
+const VILLAGE = { u0: -18.2, u1: 9, v0: -47.6, v1: 8 };
+
+/** Where you can walk: anywhere on the village's flat ground; on the hill, the trails only. */
 let obstacles = new Obstacles();
 function clampToSeles(p: Vector3, margin = 0.4): void {
   const n = NET.nearest(p.x, p.z);
   const max = n.w - margin;
+  if (n.d > max) {
+    const { u, v } = selesUV(p);
+    const cv = Math.min(VILLAGE.v1, Math.max(VILLAGE.v0, v));
+    // The hill's foot (the fence) bounds the village up the screen.
+    const top = Math.max(VILLAGE.u0, fenceU(cv) + 0.6 * Math.sin(cv * 0.45) + margin + 0.3);
+    const cu = Math.min(VILLAGE.u1, Math.max(top, u));
+    if (top < VILLAGE.u1 && hillDepth(u, v) < 0.3) { // up on the hill: back to its path instead
+      const q = fromUV(cu, cv);
+      p.x = q.x;
+      p.z = q.z;
+      obstacles.pushOut(p, margin);
+      return;
+    }
+  }
   if (n.d > max) {
     const k = max / n.d;
     p.x = n.px + (p.x - n.px) * k;
@@ -1186,7 +1207,8 @@ function buildFences(scene: Scene, root: TransformNode, rand: () => number, wood
   };
   // Along the foot of the hillside: level along the village, rising across the yard to the right,
   // with the gap Dart comes through.
-  run({ u: fenceU(-28), v: -28 }, { u: fenceU(-12), v: -12 }); // behind the chapel
+  run({ u: fenceU(-26), v: -26 }, { u: fenceU(-12), v: -12 }); // behind the chapel
+  run({ u: -18.2, v: -29.4 }, { u: fenceU(-26), v: -26 }); // from the road out round to it
   run({ u: -18.6, v: -47 }, { u: -18.2, v: -33.4 }); // behind the cemetery
   run({ u: -18.6, v: -47 }, { u: -5.4, v: -48.4 }); // down its left side, to the gutted house
   run({ u: fenceU(-12), v: -12 }, { u: fenceU(9), v: 9 }, 8.5 / 21);
