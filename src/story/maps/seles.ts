@@ -41,6 +41,16 @@ export const selesMap: MapFactory = (scene) => {
       villager.setLying(true);
       const woman = api.npc("woman", P(SELES_SPOTS.woman), { color: [0.46, 0.5, 0.62], hair: "long" });
       woman.setLying(true);
+      // Things to look at, each with a word from Dart.
+      const look = (at: { u: number; v: number }, key: string, reach = 1.8): void =>
+        api.interact(P(at), S("examine"), async () => {
+          api.lock();
+          await api.say(t("story.dart"), S(`look.${key}`));
+        }, undefined, reach);
+      look(SELES_SPOTS.well, "well", 2.2);
+      look(SELES_SPOTS.doll, "doll");
+      look(SELES_SPOTS.laundry, "laundry", 2.2);
+      look(SELES_SPOTS.plosHouse, "chapel", 2);
       // The Save Point in the yard below the fence.
       api.interact(P(SELES_SPOTS.savePoint), t("story.interact.save"), () => api.save("savePoint"), undefined, 1.8);
       if (!SCENES) {

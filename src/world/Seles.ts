@@ -1,5 +1,7 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
+import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
@@ -86,6 +88,8 @@ export const SELES_SPOTS = {
   square: { u: -0.5, v: -33.75 },
   cemetery: { u: -14, v: -36.38 }, // above the square
   tomb3: { u: -14.4, v: -35.7 }, // the Stardust tomb: 3rd from the left, before the tree
+  doll: { u: -5.6, v: -38.4 }, // by the overturned table: a rag doll, half burnt
+  laundry: { u: 2.6, v: -39.6 }, // the washing line below the square
   exitForest: { u: -22, v: -30.15 }, // the road out, at the top of the screen
   fromForest: { u: -17, v: -30.0 },
 };
@@ -229,6 +233,11 @@ export function selesWorld(scene: Scene): SelesWorld {
   ticks.push(buildWell(scene, root, rand, wood, charred, selesPoint(SELES_SPOTS.well)));
   ticks.push(...buildCemetery(scene, root, rand, stone, wood));
   buildBackdrop(scene, root, rand);
+  buildBrokenLife(scene, root, rand, wood);
+  ticks.push(sunShafts(scene, root, rand));
+  ticks.push(emberPulse(scene));
+  // Ash and embers drifting over the square too, smoke from the chapel's tower.
+  ticks.push(ashFall(scene, fromUV(-6, -32)));
   buildSquare(scene, root, rand, charred, wood, stone);
   buildFences(scene, root, rand, wood);
   const hill = buildHillside(scene, root, rand);
@@ -823,6 +832,9 @@ function buildYard(scene: Scene, root: TransformNode, rand: () => number, charre
 
 /** Charred timber planks (roof and walls of the burned houses), embers still glowing in the cracks. */
 function planksMaterial(scene: Scene, rand: () => number): StandardMaterial {
+  const made = scene.getMaterialByName("selesPlanks");
+  if (made) return made as StandardMaterial;
+  const embers: [number, number, number, string][] = [];
   const tex = pixelTexture("selesPlanksTex", scene, 64, 64, (ctx, w, h) => {
     for (let y = 0; y < h; y += 8) {
       const base = 0.6 + rand() * 0.5;
@@ -835,12 +847,49 @@ function planksMaterial(scene: Scene, rand: () => number): StandardMaterial {
       ctx.fillStyle = rgb(14, 10, 8); // the gap between boards
       ctx.fillRect(0, y, w, 1);
       for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = rand() < 0.5 ? rgb(214, 96, 32) : rgb(150, 54, 20); // embers in the char
-        ctx.fillRect((rand() * w) | 0, y + 1 + ((rand() * 6) | 0), 1 + ((rand() * 2) | 0), 1);
+        const c = rand() < 0.5 ? rgb(214, 96, 32) : rgb(150, 54, 20); // embers in the char
+        const e: [number, number, number, string] = [(rand() * w) | 0, y + 1 + ((rand() * 6) | 0), 1 + ((rand() * 2) | 0), c];
+        ctx.fillStyle = c;
+        ctx.fillRect(e[0], e[1], e[2], 1);
+        embers.push(e);
       }
     }
   });
-  return matte("selesPlanks", scene, tex);
+  const mat = matte("selesPlanks", scene, tex);
+  // The embers glow on their own (an emissive layer of just them), pulsing slowly (see emberPulse).
+  mat.emissiveTexture = pixelTexture("selesEmbersTex", scene, 64, 64, (ctx, w, h) => {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    for (const [x, y, len, c] of embers) {
+      ctx.fillStyle = c;
+      ctx.fillRect(x, y, len, 1);
+    }
+  });
+  return mat;
+}
+
+/** Glowing coals for the debris heaps: unlit orange, pulsing with the planks' embers. */
+function emberMaterial(scene: Scene): StandardMaterial {
+  const made = scene.getMaterialByName("selesEmberGlow");
+  if (made) return made as StandardMaterial;
+  const m = new StandardMaterial("selesEmberGlow", scene);
+  m.disableLighting = true;
+  m.emissiveColor = new Color3(1, 0.42, 0.12);
+  return m;
+}
+
+/** The embers' slow breathing: every glowing plank and coal brightens and dims, out of step with
+ *  the fires' quick flicker. Only material colours change (cheap: no shader rebuild). */
+function emberPulse(scene: Scene): Tick {
+  let t = 0;
+  return (dt) => {
+    t += dt;
+    const k = 0.7 + 0.3 * Math.sin(t * 1.7) + 0.08 * Math.sin(t * 5.3);
+    const planks = scene.getMaterialByName("selesPlanks") as StandardMaterial | null;
+    if (planks) planks.emissiveColor.set(1.4 * k, 1.4 * k, 1.4 * k);
+    const coal = scene.getMaterialByName("selesEmberGlow") as StandardMaterial | null;
+    if (coal) coal.emissiveColor.set(1 * k, 0.42 * k, 0.12 * k);
+  };
 }
 
 /**
@@ -1018,6 +1067,13 @@ function debrisHeap(scene: Scene, root: TransformNode, rand: () => number, plank
     lump.material = charred;
     lump.parent = root;
   }
+  // A few coals still glowing in the heap.
+  for (let k = 0; k < 3; k++) {
+    const coal = MeshBuilder.CreateIcoSphere("selesCoal", { radius: (0.1 + rand() * 0.08) * s, subdivisions: 1 }, scene);
+    coal.position.set(at.x + (rand() - 0.5) * 1.4 * s, 0.12 + rand() * 0.25 * s, at.z + (rand() - 0.5) * 1.4 * s);
+    coal.material = emberMaterial(scene);
+    coal.parent = root;
+  }
   for (let k = 0; k < 3; k++) {
     const board = MeshBuilder.CreateBox("selesDebrisBoard", { width: 0.3, height: 0.08, depth: (1.2 + rand()) * s }, scene);
     board.position.set(at.x + (rand() - 0.5) * 1.2 * s, 0.45 * s, at.z + (rand() - 0.5) * 1.2 * s);
@@ -1128,22 +1184,192 @@ function saveColumn(scene: Scene, root: TransformNode, at: Vector3): void {
 }
 
 /**
+ * The morning sun breaking through the smoke in a few pale shafts over the yard and the square
+ * (as the Forest's: long additive cards along the sun's direction, unlit, kept out of the glow
+ * layer, breathing slowly as the smoke drifts across).
+ */
+function sunShafts(scene: Scene, root: TransformNode, rand: () => number): Tick {
+  const tex = new DynamicTexture("selesShaftTex", { width: 32, height: 128 }, scene, false);
+  const ctx = tex.getContext();
+  for (let y = 0; y < 128; y++) {
+    const along = y / 127;
+    const fade = Math.min(1, along / 0.25) * Math.min(1, (1 - along) / 0.35);
+    for (let x = 0; x < 32; x++) {
+      const across = 1 - Math.abs(x - 15.5) / 16;
+      ctx.fillStyle = `rgba(255,255,255,${(fade * across * across).toFixed(3)})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  tex.hasAlpha = true;
+  tex.update();
+  const mat = new StandardMaterial("selesShaftMat", scene);
+  mat.diffuseTexture = tex;
+  mat.useAlphaFromDiffuseTexture = true;
+  mat.diffuseColor = Color3.Black();
+  mat.emissiveColor = new Color3(1, 0.9, 0.7); // pale morning gold
+  mat.specularColor = Color3.Black();
+  mat.disableLighting = true;
+  mat.backFaceCulling = false;
+  mat.alphaMode = 1; // additive
+  mat.alpha = 0.22;
+  mat.fogEnabled = false;
+  const axis = new Vector3(0.5, 1, 0.4).normalize(); // towards the sun
+  const toCam = new Vector3(0.577, 0.577, -0.577);
+  const normal = toCam.subtract(axis.scale(Vector3.Dot(toCam, axis))).normalize();
+  const across = Vector3.Cross(axis, normal).normalize();
+  const shafts: Mesh[] = [];
+  for (const [u, v] of [[-7, -4], [-3.5, 3], [0.5, -16], [-1, -31], [2.5, -37], [-10, -36]] as const) {
+    const base = fromUV(u, v);
+    const width = 1.4 + rand() * 1.6;
+    const corners = [
+      base.add(across.scale(-width / 2)),
+      base.add(across.scale(width / 2)),
+      base.add(across.scale(width / 2)).addInPlace(axis.scale(18)),
+      base.add(across.scale(-width / 2)).addInPlace(axis.scale(18)),
+    ];
+    const vd = new VertexData();
+    vd.positions = corners.flatMap((c) => [c.x, c.y, c.z]);
+    vd.uvs = [0, 0, 1, 0, 1, 1, 0, 1];
+    vd.indices = [0, 1, 2, 0, 2, 3];
+    vd.normals = [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0];
+    const m = new Mesh(`selesShaft${shafts.length}`, scene);
+    vd.applyToMesh(m);
+    m.material = mat;
+    m.parent = root;
+    m.alphaIndex = 10;
+    m.isPickable = false;
+    shafts.push(m);
+  }
+  const phase = shafts.map(() => rand() * Math.PI * 2);
+  let t = 0;
+  let glowChecked = false;
+  return (dt) => {
+    if (!glowChecked) {
+      glowChecked = true; // the mode's glow layer comes after the world: exclude the shafts now
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of shafts) layer.addExcludedMesh(m);
+    }
+    t += dt;
+    shafts.forEach((m, i) => (m.visibility = 0.55 + 0.45 * Math.sin(t * 0.35 + phase[i])));
+  };
+}
+
+/**
+ * What the villagers left behind (the life the raid broke into): an overturned table and stool,
+ * a rag doll, broken pots, laundry still on its line, a pitchfork and a bucket dropped in the flight.
+ */
+function buildBrokenLife(scene: Scene, root: TransformNode, rand: () => number, wood: StandardMaterial): void {
+  const clay = matte("selesClay", scene, undefined, new Color3(0.56, 0.34, 0.22));
+  const cloth = [new Color3(0.62, 0.6, 0.5), new Color3(0.42, 0.46, 0.56), new Color3(0.58, 0.44, 0.36)].map((c, i) => matte(`selesCloth${i}`, scene, undefined, c));
+  const put = (m: Mesh, mat: StandardMaterial): Mesh => {
+    m.material = mat;
+    m.parent = root;
+    return m;
+  };
+  // The overturned table, a stool, and the doll beside them.
+  const T = fromUV(-6.2, -39.4);
+  const top = put(MeshBuilder.CreateBox("selesTable", { width: 1.6, height: 0.1, depth: 0.9 }, scene), wood);
+  top.position.set(T.x, 0.45, T.z);
+  top.rotation.set(Math.PI / 2 - 0.1, 0.6, 0); // on its side
+  for (const [dx, dz] of [[-0.65, 0.35], [0.65, 0.35], [-0.65, -0.35], [0.65, -0.35]]) {
+    const leg = put(MeshBuilder.CreateBox("selesTableLeg", { width: 0.08, height: 0.08, depth: 0.7 }, scene), wood);
+    leg.position.set(T.x + dx * 0.8, 0.3 + dz * 0.4, T.z + dx * 0.55);
+    leg.rotation.y = 0.6;
+  }
+  obstacles.add(T.x, T.z, 0.8);
+  const stool = put(MeshBuilder.CreateCylinder("selesStool", { height: 0.45, diameter: 0.5, tessellation: 8 }, scene), wood);
+  const S2 = fromUV(-7.4, -37.6);
+  stool.position.set(S2.x, 0.25, S2.z);
+  stool.rotation.z = Math.PI / 2;
+  const D = selesPoint(SELES_SPOTS.doll);
+  const doll = new TransformNode("selesDoll", scene);
+  doll.parent = root;
+  doll.position.set(D.x, 0.06, D.z);
+  doll.rotation.y = 1.1;
+  const dollCloth = cloth[2];
+  for (const [w, h, d, x, z, mat] of [[0.22, 0.08, 0.34, 0, 0, dollCloth], [0.16, 0.1, 0.16, 0, 0.24, cloth[0]], [0.07, 0.05, 0.22, 0.14, -0.02, dollCloth], [0.07, 0.05, 0.22, -0.14, -0.02, dollCloth]] as const) {
+    const m = MeshBuilder.CreateBox("selesDollPart", { width: w, height: h, depth: d }, scene);
+    m.position.set(x, 0, z);
+    m.material = mat;
+    m.parent = doll;
+  }
+  // Broken pots by the ruins.
+  for (const [u, v] of [[-3.4, -42], [3.4, -36.2], [-4.4, 6.6], [6.8, -7.2], [-9.4, -21]] as const) {
+    const p = fromUV(u, v);
+    for (let k = 0; k < 2; k++) {
+      const pot = put(MeshBuilder.CreateCylinder("selesPot", { height: 0.5, diameterTop: 0.26, diameterBottom: 0.34, tessellation: 8, arc: k === 0 ? 1 : 0.55 }, scene), clay);
+      pot.position.set(p.x + k * 0.45, k === 0 ? 0.25 : 0.12, p.z + k * 0.2);
+      pot.rotation.set(k === 0 ? 0 : Math.PI / 2, rand() * 3, 0);
+      clay.backFaceCulling = false; // the broken pot shows its inside
+    }
+    for (let k = 0; k < 4; k++) {
+      const shard = put(MeshBuilder.CreateBox("selesShard", { width: 0.14, height: 0.03, depth: 0.1 }, scene), clay);
+      shard.position.set(p.x + (rand() - 0.5) * 0.9, 0.02, p.z + (rand() - 0.5) * 0.9);
+      shard.rotation.y = rand() * 3;
+    }
+  }
+  // The washing line, still hung with clothes.
+  const L = selesPoint(SELES_SPOTS.laundry);
+  const a = fromUV(SELES_SPOTS.laundry.u - 0.4, SELES_SPOTS.laundry.v - 1.6);
+  const b = fromUV(SELES_SPOTS.laundry.u + 0.4, SELES_SPOTS.laundry.v + 1.6);
+  for (const p of [a, b]) {
+    const post = put(MeshBuilder.CreateBox("selesLinePost", { width: 0.1, height: 1.9, depth: 0.1 }, scene), wood);
+    post.position.set(p.x, 0.95, p.z);
+    obstacles.add(p.x, p.z, 0.15);
+  }
+  const yaw = -Math.atan2(b.z - a.z, b.x - a.x);
+  const line = put(MeshBuilder.CreateBox("selesLine", { width: Vector3.Distance(a, b), height: 0.02, depth: 0.02 }, scene), matte("selesRopeMat", scene, undefined, new Color3(0.3, 0.26, 0.2)));
+  line.position.set(L.x, 1.8, L.z);
+  line.rotation.y = yaw;
+  for (let k = 0; k < 4; k++) {
+    const f = 0.15 + k * 0.23;
+    const q = Vector3.Lerp(a, b, f);
+    const sheet = put(MeshBuilder.CreatePlane("selesSheet", { width: 0.5 + rand() * 0.3, height: 0.6 + rand() * 0.4 }, scene), cloth[k % 3]);
+    sheet.position.set(q.x, 1.45, q.z);
+    sheet.rotation.set(0, yaw, (rand() - 0.5) * 0.15);
+    cloth[k % 3].backFaceCulling = false;
+  }
+  // A pitchfork and a bucket dropped in the flight.
+  const F = fromUV(-3.6, -11.8);
+  const handle = put(MeshBuilder.CreateBox("selesForkHandle", { width: 0.06, height: 0.06, depth: 1.6 }, scene), wood);
+  handle.position.set(F.x, 0.04, F.z);
+  handle.rotation.y = 0.9;
+  for (let k = -1; k <= 1; k++) {
+    const tine = put(MeshBuilder.CreateBox("selesForkTine", { width: 0.03, height: 0.03, depth: 0.35 }, scene), matte("selesIron", scene, undefined, new Color3(0.3, 0.3, 0.32)));
+    tine.position.set(F.x + Math.sin(0.9) * 0.95 + Math.cos(0.9) * k * 0.08, 0.04, F.z + Math.cos(0.9) * 0.95 - Math.sin(0.9) * k * 0.08);
+    tine.rotation.y = 0.9;
+  }
+  const B = fromUV(-1.4, -13.6);
+  const bucket = put(MeshBuilder.CreateCylinder("selesDroppedBucket", { height: 0.4, diameterTop: 0.42, diameterBottom: 0.32, tessellation: 10 }, scene), wood);
+  bucket.position.set(B.x, 0.2, B.z);
+  bucket.rotation.set(Math.PI / 2, 0.4, 0);
+}
+
+/**
  * The hills beyond the village (PS1: low brown hills on the horizon behind the cemetery and the
  * road out): a few great low mounds far up the screen, fading into the morning haze. Cheap: a
  * handful of plain meshes, no texture.
  */
 function buildBackdrop(scene: Scene, root: TransformNode, rand: () => number): void {
-  const earth = matte("selesFarHills", scene, undefined, new Color3(0.36, 0.28, 0.2));
-  for (const [u, v, d, h] of [[-50, -62, 30, 0.3], [-56, -44, 34, 0.34], [-50, -30, 26, 0.28], [-60, -18, 30, 0.3], [-46, -50, 18, 0.22]] as const) {
+  const earth = matte("selesFarHills", scene, undefined, new Color3(0.3, 0.25, 0.16)); // darker than the village earth: it reads as a slope, not a plate
+  const grass = grassSource(scene, rand);
+  // Just past the cemetery's fence (the camera sees a dozen units up the screen), either side of the
+  // road out, and one closing the far end of the road.
+  for (const [u, v, d, h] of [[-28, -47, 10, 0.6], [-32, -40, 9, 0.55], [-36, -52, 16, 0.5], [-45, -32, 18, 0.45], [-30, -58, 14, 0.5]] as const) {
     const hill = MeshBuilder.CreateSphere("selesFarHill", { diameter: d, segments: 10 }, scene);
     const p = fromUV(u, v);
-    hill.position.set(p.x, -d * 0.12, p.z);
+    hill.position.set(p.x, -d * 0.08, p.z);
     hill.scaling.set(1.4, h, 1);
     hill.rotation.y = rand() * Math.PI;
     jitter(hill, 0.8, rand);
-    gradeColors(hill, [0.55, 0.5, 0.45], [1.1, 1.02, 0.92]);
+    gradeColors(hill, [0.45, 0.42, 0.38], [1, 1, 0.9]);
     hill.material = earth;
     hill.parent = root;
+    // Dry grass on its slopes.
+    for (let k = 0; k < 40; k++) {
+      const a = rand() * Math.PI * 2;
+      const r = rand() * d * 0.45;
+      place(grass, root, p.x + Math.cos(a) * r, p.z + Math.sin(a) * r, 1 + rand() * 0.6, rand() * 3).position.y = d * h * 0.5 * (1 - (r / (d * 0.5)) ** 2) - d * 0.08;
+    }
   }
 }
 
@@ -1616,7 +1842,14 @@ function buildVillagePaths(scene: Scene, root: TransformNode, rand: () => number
       let [r, g, b] = [146 * k, 110 * k, 76 * k];
       const speck = hash01(Math.floor(u * 10), Math.floor(v * 10));
       if (speck < 0.012) [r, g, b] = [178 * k, 146 * k, 108 * k]; // pebble
-      else if (speck < 0.03) [r, g, b] = [96 * k, 70 * k, 48 * k]; // a footprint, a clod
+      else if (speck < 0.03) [r, g, b] = [96 * k, 70 * k, 48 * k]; // a clod
+      // The raid's tracks: two cart ruts either side of each path's middle, and hoof prints
+      // trampled along it (PS1: the knights rode through).
+      if (Math.abs(n.d - 0.75) < 0.07 && noise2(u * 0.5, v * 0.5) > 0.3) [r, g, b] = [r * 0.84, g * 0.83, b * 0.82];
+      const hoof = hash01(Math.floor(u * 3.2) + 17, Math.floor(v * 3.2));
+      const frac = (x: number): number => x - Math.floor(x);
+      const inCell = Math.hypot(frac(u * 3.2) - 0.5, frac(v * 3.2) - 0.5);
+      if (n.d < 1.6 && hoof < 0.1 && inCell < 0.22) [r, g, b] = [r * 0.66, g * 0.64, b * 0.62];
       const o = (y * W + x) * 4;
       out[o] = r;
       out[o + 1] = g;
@@ -1692,7 +1925,7 @@ function buildSmoke(scene: Scene, rand: () => number): void {
   const dot = softDotTexture(scene);
   const spots = [[-2, 8.5], [14, -10]].map(([u, v]) => vilPoint(u, v));
   spots.push(fromUV(13.4, -20)); // the kids' house
-  spots.push(fromUV(-5.4, -24.6), fromUV(-4.4, -20.6)); // inside the chapel
+  spots.push(fromUV(-5.4, -24.6), fromUV(-4.4, -20.6), fromUV(-8.8, -21.4)); // inside the chapel, its tower
   // The yard's wrecks, and the houses below it.
   spots.push(fromUV(-6.4, 3.6), fromUV(-4.6, 6), fromUV(2.2, -3.6), fromUV(3.4, 2.4), fromUV(3.6, -8.4), fromUV(8.6, 5.4), fromUV(7.8, -1.8), fromUV(8.4, -10.6));
   for (const at of spots) {
