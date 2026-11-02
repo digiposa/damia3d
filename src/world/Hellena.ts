@@ -561,7 +561,8 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
     const sun = Math.max(0, d.x * toSun.x + d.z * toSun.z); // facing the sunset
     const low = 1 - smooth(0, 0.35, e);
     const glow = low * (0.35 + 0.65 * sun ** 2);
-    sc.push(0.12 + 0.22 * (1 - e) + 0.85 * glow, 0.08 + 0.08 * (1 - e) + 0.42 * glow, 0.24 + 0.12 * (1 - e) + 0.16 * glow, 1);
+    // Night overhead (deep blue-violet), the sunset a burning band low over the horizon (PS1).
+    sc.push(0.05 + 0.16 * (1 - e) ** 3 + 0.85 * glow, 0.04 + 0.05 * (1 - e) ** 3 + 0.4 * glow, 0.12 + 0.12 * (1 - e) ** 3 + 0.14 * glow, 1);
   }
   sky.setVerticesData("color", sc);
   sky.parent = root;
@@ -698,145 +699,165 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
   sea.parent = root;
   noGlow.push(sea);
 
-  // The prison, far out (PS1): a great spire of rock leaning to the left over the sea, built up
-  // in tiers — walls with rows of lit windows, turrets on its ledges, a broken crown of walls on
-  // top — a smaller rock at its foot, its lights trailing on the water.
+  // The prison, far out (PS1): one enormous raw rock rising from the sea like a broken tooth,
+  // leaning to the left, broad at its foot, its top snapped off jagged. Rough works cling to its
+  // right face — terraces, palisades of stakes, little spires — lit gold from within; black smoke
+  // trails off it on the wind; a thin causeway runs out to its foot.
   const node = new TransformNode("hellenaFarPrison", scene);
   node.parent = root;
-  const P = fromUV(300, -36); // a little left of the path: in frame on a phone too
+  const P = fromUV(300, -26); // just left of the path: in frame on a phone too
   node.position.set(P.x, SEA_Y, P.z);
   node.rotation.y = -Math.PI / 4; // local -z faces back down the path (the camera), +x is screen right
   const lean = new TransformNode("hellenaFarLean", scene);
   lean.parent = node;
-  lean.rotation.z = 0.26; // leaning left
-  const silhouette = unlit("hellenaFarRockMat");
+  lean.rotation.z = 0.36; // leaning left
   const H = 44;
-  const radius = (t: number): number => 12 * (1 - 0.45 * t) * (1 + 0.18 * Math.sin(t * 9)) + (t < 0.12 ? (0.12 - t) * 30 : 0);
-  const spire = MeshBuilder.CreateCylinder("hellenaFarSpire", { height: H, diameter: 2, tessellation: 16, subdivisions: 14 }, scene);
-  const sp2 = spire.getVerticesData("position")!;
-  for (let k = 0; k < sp2.length; k += 3) {
-    const t = (sp2[k + 1] + H / 2) / H;
-    const r = radius(t) * (0.85 + 0.3 * hash01(Math.round(sp2[k] * 7), Math.round(sp2[k + 1] * 3)));
-    sp2[k] *= r;
-    sp2[k + 2] *= r * 0.8;
-    sp2[k + 1] += H / 2;
+  const radius = (t: number): number => 17 - 7 * t + (t < 0.15 ? (0.15 - t) * 30 : 0); // stocky, like a broken tooth
+  const rockMesh = MeshBuilder.CreateCylinder("hellenaFarRock", { height: H, diameter: 2, tessellation: 18, subdivisions: 18 }, scene);
+  const rp = rockMesh.getVerticesData("position")!;
+  for (let k = 0; k < rp.length; k += 3) {
+    const t = (rp[k + 1] + H / 2) / H;
+    const ang = Math.atan2(rp[k + 2], rp[k]);
+    // Craggy: big buttresses and smaller knobs, the top snapped off at a slant with jagged teeth.
+    const crag = 1 + 0.16 * Math.sin(ang * 3 + t * 4) + 0.12 * (noise2(ang * 2.5, t * 9) - 0.5) * 2;
+    const r = radius(t) * crag;
+    rp[k] = Math.cos(ang) * r;
+    rp[k + 2] = Math.sin(ang) * r * 0.78;
+    let y = rp[k + 1] + H / 2;
+    if (t > 0.99) y += -Math.cos(ang) * 6 - 4 * hash01(Math.round(ang * 5), 3); // higher on the left, broken
+    rp[k + 1] = y;
   }
-  spire.setVerticesData("position", sp2);
-  spire.createNormals(false);
-  const shade = (m: Mesh, rimSide: number): void => {
+  rockMesh.setVerticesData("position", rp);
+  rockMesh.convertToFlatShadedMesh();
+  const shade = (m: Mesh, top: number): void => {
     const p = m.getVerticesData("position")!;
+    const n = m.getVerticesData("normal")!;
     const c: number[] = [];
     for (let k = 0; k < p.length; k += 3) {
-      const t = Math.max(0, p[k + 1]) / H;
-      // Dark violet, a rose rim on the side towards the sun (left), the top catching the light.
-      const rim = Math.max(0, (-p[k] * rimSide) / 12) * 0.5 + 0.25 * t;
-      c.push(0.08 + 0.06 * t + 0.4 * rim, 0.05 + 0.03 * t + 0.16 * rim, 0.1 + 0.05 * t + 0.12 * rim, 1);
+      const t = Math.max(0, p[k + 1]) / top;
+      // Dark brown-olive rock; the sunset (left) rims it rose, the gold works warm its right side.
+      const rim = Math.max(0, -n[k]) * 0.45 + Math.max(0, n[k + 1]) * 0.2;
+      const warm = Math.max(0, n[k]) * 0.18 * (1 - Math.abs(t - 0.45) * 2);
+      c.push(0.12 + 0.04 * t + 0.36 * rim + 0.5 * warm, 0.1 + 0.03 * t + 0.13 * rim + 0.3 * warm, 0.1 + 0.02 * t + 0.1 * rim + 0.05 * warm, 1);
     }
     m.setVerticesData("color", c);
   };
-  shade(spire, 1);
-  spire.material = silhouette;
-  spire.parent = lean;
-  noGlow.push(spire);
-  const foot = MeshBuilder.CreateCylinder("hellenaFarFoot", { height: 18, diameterTop: 10, diameterBottom: 22, tessellation: 10, subdivisions: 4 }, scene);
-  jitter(foot, 1.2, rand);
-  foot.position.set(16, 7, 2);
-  shade(foot, 1);
-  foot.material = silhouette;
-  foot.parent = node;
-  noGlow.push(foot);
+  shade(rockMesh, H);
+  rockMesh.material = unlit("hellenaFarRockMat");
+  rockMesh.parent = lean;
+  noGlow.push(rockMesh);
+  // Its foot: broken rock shelving into the sea.
+  for (const [x, z, r, h] of [[11, -3, 9, 6], [-6, -5, 7, 4], [4, -9, 6, 3]] as const) {
+    const foot = MeshBuilder.CreateCylinder("hellenaFarFoot", { height: h, diameterTop: r, diameterBottom: r * 1.8, tessellation: 8, subdivisions: 2 }, scene);
+    jitter(foot, 0.9, rand);
+    foot.position.set(x, h / 2 - 1, z);
+    foot.convertToFlatShadedMesh();
+    shade(foot, H);
+    foot.material = rockMesh.material;
+    foot.parent = node;
+    noGlow.push(foot);
+  }
 
-  // The built tiers on the camera's face: dark walls, rows of lit windows, turrets on ledges.
-  const wallMat = unlit("hellenaFarWallMat");
-  wallMat.emissiveColor = new Color3(0.13, 0.08, 0.12);
-  const winMat = unlit("hellenaFarWindow");
-  winMat.emissiveColor = new Color3(1, 0.68, 0.3);
-  const windows: Mesh[] = [];
-  const tiers: [number, number, number][] = [[0.16, 0.95, 2], [0.38, 0.8, 2], [0.58, 0.7, 1], [0.76, 0.6, 1]];
-  for (const [t, wf, rows] of tiers) {
+  // The works on its right face: terraces cut into the rock, palisades and little spires, lit gold.
+  const works = unlit("hellenaFarWorks");
+  works.emissiveColor = new Color3(0.32, 0.2, 0.1);
+  const gold = unlit("hellenaFarGold");
+  gold.emissiveColor = new Color3(1, 0.7, 0.3);
+  const lights: Mesh[] = [];
+  const workParts: Mesh[] = [];
+  for (const [t, a0, len] of [[0.12, -0.9, 1.4], [0.28, -0.6, 1.1], [0.42, -0.3, 0.9], [0.56, -0.1, 0.7], [0.7, 0.1, 0.5]] as const) {
     const y = t * H;
-    const r = radius(t);
-    const w = r * 2 * wf;
-    const z = -r * 0.8 - 0.6;
-    const wall = MeshBuilder.CreateBox("hellenaFarTier", { width: w, height: 3.4 * rows + 1, depth: 2.4 }, scene);
-    wall.position.set((rand() - 0.5) * 2, y, z + 0.6);
-    wall.material = wallMat;
-    wall.parent = lean;
-    noGlow.push(wall);
-    // A crenellated top on each tier.
-    for (let x = -w / 2 + 0.6; x < w / 2; x += 1.6) {
-      const merlon = MeshBuilder.CreateBox("hellenaFarMerlon", { width: 0.8, height: 0.9, depth: 2.4 }, scene);
-      merlon.position.set(wall.position.x + x, y + (3.4 * rows + 1) / 2 + 0.45, z + 0.6);
-      merlon.material = wallMat;
-      merlon.parent = lean;
-      noGlow.push(merlon);
-    }
-    for (let row = 0; row < rows; row++)
-      for (let x = -w / 2 + 1.4; x < w / 2 - 1; x += 2.2) {
-        if (rand() < 0.22) continue; // a few dark ones
-        const win = MeshBuilder.CreatePlane("hellenaFarLight", { width: 0.9, height: 1.5 }, scene);
-        win.position.set(wall.position.x + x, y - (3.4 * rows) / 2 + 1.9 + row * 3.4, z - 0.62);
-        windows.push(win); // a plane faces -z: the camera side
+    const r = radius(t) * 0.98;
+    // A ledge round part of the face (towards the camera and the right).
+    const steps = Math.round(len * 6);
+    for (let k = 0; k <= steps; k++) {
+      const ang = -Math.PI / 2 + a0 + (k / steps) * len * 1.6; // from facing the camera, round to the right
+      const x = Math.cos(ang) * r;
+      const z = Math.sin(ang) * r * 0.78;
+      const ledge = MeshBuilder.CreateBox("hellenaFarLedge", { width: 2.6, height: 0.8, depth: 1.6 }, scene);
+      ledge.position.set(x, y, z);
+      ledge.rotation.y = -ang + Math.PI / 2;
+      workParts.push(ledge);
+      // Stakes of a palisade along it, and here and there a little spire.
+      if (rand() < 0.7) {
+        const stake = MeshBuilder.CreateCylinder("hellenaFarStake", { height: 1.6 + rand() * 1.8, diameterTop: 0, diameterBottom: 0.35, tessellation: 4 }, scene);
+        stake.position.set(x * 1.06, y + 1.2, z * 1.06);
+        workParts.push(stake);
       }
-    if (rand() < 0.7) {
-      // A turret at the tier's end, with its pointed roof.
-      const side = rand() < 0.5 ? -1 : 1;
-      const tx = side * (w / 2 + 0.6);
-      const tower = MeshBuilder.CreateCylinder("hellenaFarTurret", { height: 7, diameter: 2.6, tessellation: 8 }, scene);
-      tower.position.set(tx, y + 2.5, z + 0.5);
-      tower.material = wallMat;
-      tower.parent = lean;
-      const roof = MeshBuilder.CreateCylinder("hellenaFarRoof", { height: 3, diameterTop: 0, diameterBottom: 3.4, tessellation: 8 }, scene);
-      roof.position.set(tx, y + 7.5, z + 0.5);
-      roof.material = wallMat;
-      roof.parent = lean;
-      noGlow.push(tower, roof);
-      const win = MeshBuilder.CreatePlane("hellenaFarLight", { width: 0.6, height: 1 }, scene);
-      win.position.set(tx, y + 3.5, z + 0.5 - 1.32);
-      windows.push(win);
+      if (rand() < 0.18) {
+        const spire = MeshBuilder.CreateCylinder("hellenaFarSpire", { height: 5 + rand() * 4, diameterTop: 0, diameterBottom: 1.1, tessellation: 5 }, scene);
+        spire.position.set(x, y + 3, z);
+        workParts.push(spire);
+      }
+      // Gold light glowing out of the openings cut in the rock behind the ledge.
+      if (Math.cos(ang) > -0.2 && rand() < 0.6) {
+        const glow = MeshBuilder.CreatePlane("hellenaFarOpening", { width: 1.1 + rand() * 1.4, height: 1 + rand() }, scene);
+        glow.position.set(Math.cos(ang) * (r + 0.85), y + 1.3, Math.sin(ang) * (r * 0.78 + 0.85));
+        glow.rotation.y = -ang - Math.PI / 2;
+        lights.push(glow);
+      }
     }
   }
-  // The broken crown on top: jagged stumps of wall.
-  for (let k = 0; k < 9; k++) {
-    const a = (k / 9) * Math.PI * 2;
-    const r = radius(1) * 0.9;
-    const h = 2 + rand() * 6;
-    const stump = MeshBuilder.CreateBox("hellenaFarCrown", { width: 2.2, height: h, depth: 1.2 }, scene);
-    stump.position.set(Math.cos(a) * r, H + h / 2 - 1, Math.sin(a) * r * 0.8);
-    stump.rotation.y = -a;
-    stump.material = wallMat;
-    stump.parent = lean;
-    noGlow.push(stump);
+  const worksMesh = Mesh.MergeMeshes(workParts, true, true);
+  if (worksMesh) {
+    worksMesh.material = works;
+    worksMesh.parent = lean;
+    noGlow.push(worksMesh);
   }
-  const lit = Mesh.MergeMeshes(windows, true, true);
+  const lit = Mesh.MergeMeshes(lights, true, true);
   if (lit) {
-    lit.material = winMat;
+    lit.material = gold;
+    gold.backFaceCulling = false;
     lit.parent = lean;
   }
-  // The lights trailing on the water below it (additive, a soft vertical streak towards us).
-  const trail = new DynamicTexture("hellenaFarTrailTex", { width: 8, height: 128 }, scene, false);
-  const tctx = trail.getContext();
-  for (let y = 0; y < 128; y++) {
-    const f = y / 127;
-    const a = (1 - f) ** 1.5;
-    for (let x = 0; x < 8; x++) {
-      const flick = (hash01(x, y) > 0.5 ? 1 : 0.4) * a * (1 - Math.abs(x - 3.5) / 4);
-      tctx.fillStyle = `rgb(${Math.round(255 * flick)},${Math.round(150 * flick)},${Math.round(70 * flick)})`;
-      tctx.fillRect(x, y, 1, 1);
-    }
+  // The gold haze round the works (soft, additive).
+  const haze = MeshBuilder.CreatePlane("hellenaFarGlow", { width: 30, height: 30 }, scene);
+  haze.position.set(10, 16, -14);
+  const hm = unlit("hellenaFarGlowMat");
+  hm.emissiveColor = new Color3(0.45, 0.25, 0.08);
+  hm.opacityTexture = softDotTexture(scene);
+  hm.alphaMode = 1; // additive
+  haze.material = hm;
+  haze.parent = node;
+  noGlow.push(haze);
+
+  // The thin causeway from the spit's end to its foot.
+  const cw = fromUV(292, -14);
+  const causeway = MeshBuilder.CreateBox("hellenaFarCauseway", { width: 1.4, height: 0.6, depth: Vector3.Distance(cw, P) }, scene);
+  causeway.position.set((cw.x + P.x) / 2, SEA_Y + 0.6, (cw.z + P.z) / 2);
+  causeway.rotation.y = Math.atan2(P.x - cw.x, P.z - cw.z);
+  causeway.material = works;
+  causeway.parent = root;
+
+  // Black smoke trailing off it on the wind (to the left, up into the sunset).
+  node.computeWorldMatrix(true);
+  lean.computeWorldMatrix(true);
+  for (const [t, x] of [[0.85, 2], [0.6, 8]] as const) {
+    const from = Vector3.TransformCoordinates(new Vector3(x, t * H, 0), lean.getWorldMatrix());
+    const smoke = new ParticleSystem("hellenaFarSmoke", 70, scene);
+    smoke.particleTexture = softDotTexture(scene);
+    smoke.emitter = from;
+    smoke.minEmitBox = new Vector3(-1.5, 0, -1.5);
+    smoke.maxEmitBox = new Vector3(1.5, 1, 1.5);
+    smoke.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    smoke.color1 = new Color4(0.12, 0.07, 0.08, 0.5);
+    smoke.color2 = new Color4(0.18, 0.1, 0.1, 0.4);
+    smoke.colorDead = new Color4(0.2, 0.12, 0.12, 0);
+    smoke.minSize = 6;
+    smoke.maxSize = 12;
+    smoke.minLifeTime = 10;
+    smoke.maxLifeTime = 16;
+    smoke.emitRate = 5;
+    const wind = fromUV(0.3, -1).normalize(); // towards screen left, a little away
+    smoke.direction1 = new Vector3(wind.x * 1.5, 1.6, wind.z * 1.5);
+    smoke.direction2 = new Vector3(wind.x * 2.4, 2.4, wind.z * 2.4);
+    smoke.minEmitPower = 1;
+    smoke.maxEmitPower = 1.6;
+    smoke.gravity = new Vector3(wind.x * 0.6, 0.3, wind.z * 0.6);
+    smoke.preWarmCycles = 600;
+    smoke.preWarmStepOffset = 4;
+    smoke.start();
   }
-  trail.update();
-  const trailMat = unlit("hellenaFarTrailMat");
-  trailMat.emissiveTexture = trail;
-  trailMat.alphaMode = 1; // additive
-  trailMat.emissiveColor = new Color3(0.55, 0.32, 0.18); // warm, faint: it must not read as a pale slab
-  const streak = MeshBuilder.CreateGround("hellenaFarTrail", { width: 6, height: 60 }, scene);
-  const sAt = fromUV(300 - 30 - 13, -36 + 2);
-  streak.position.set(sAt.x, SEA_Y + 0.05, sAt.z);
-  streak.rotation.y = -Math.PI / 4;
-  streak.material = trailMat;
-  streak.parent = root;
-  noGlow.push(streak);
   return noGlow;
 }
 
