@@ -87,8 +87,8 @@ const TRAILS: Knot[][] = [
     { u: 53.5, v: 0.4, w: 4.4 }, // the guard post's landing
     { u: 58.5, v: 1, w: 6.2 },
   ],
-  // To the lookout tower's stairs, at the cliff edge.
-  [{ u: 55, v: -1, w: 2.4 }, { u: 55.6, v: -5.6, w: 2 }],
+  // To the lookout tower's stairs, at the cliff edge before the drawbridge (PS1).
+  [{ u: 35.5, v: -0.5, w: 2.4 }, { u: 37, v: -3.2, w: 2 }],
 ];
 const GATE_NET = new TrailNet(TRAILS);
 /** The coastal path, straight on towards the prison. */
@@ -1059,7 +1059,7 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
   }
 
   // The lookout tower at the cliff's edge, its stairs coming down to the landing.
-  const T = fromUV(55.6, -7.6);
+  const T = fromUV(40.6, -4.2); // before the drawbridge, on the cliff edge (PS1)
   const TH = 4.6;
   for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
     const post = MeshBuilder.CreateBox("hellenaTowerPost", { width: 0.22, height: TH + 1, depth: 0.22 }, scene);
@@ -1087,8 +1087,8 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
     x.parent = root;
   }
   // The stairs: steps climbing from the landing to the tower's deck.
-  const S0 = fromUV(55.4, -3.4);
-  const S1 = fromUV(55.6, -6.2);
+  const S0 = fromUV(36.6, -3.6);
+  const S1 = fromUV(39.4, -4);
   for (let k = 0; k < 10; k++) {
     const f = k / 9;
     const step = MeshBuilder.CreateBox("hellenaStep", { width: 1.1, height: 0.12, depth: 0.4 }, scene);
@@ -1101,7 +1101,7 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
   obstacles.add(T.x, T.z, 1.8);
 
   // Torches either side of the gate and at the tower's foot; a lamp on the drawbridge's far post.
-  for (const at of [onWall(G.v - 2.6, 2.6, 0.4), onWall(G.v + 2.6, 2.6, 0.4), fromUV(54, -3).add(new Vector3(0, 1.6, 0)), fromUV(BRIDGE_U1 + 0.3, 1.8).add(new Vector3(0, 1.8, 0)), new Vector3(T.x + 1.1, TH + 1.1, T.z - 1.1)]) {
+  for (const at of [onWall(G.v - 2.6, 2.6, 0.4), onWall(G.v + 2.6, 2.6, 0.4), fromUV(37.4, -1.8).add(new Vector3(0, 1.6, 0)), fromUV(BRIDGE_U1 + 0.3, 1.8).add(new Vector3(0, 1.8, 0)), new Vector3(T.x + 1.1, TH + 1.1, T.z - 1.1)]) {
     ticks.push(torch(scene, root, rand, at, wood));
   }
   return ticks;
