@@ -78,6 +78,23 @@ export const LIGHTING_PRESETS = {
     fogEnd: 85,
     fogColor: [0.14, 0.1, 0.07],
   },
+  /** Hellena Prison from the coast, at dusk (PS1): a rose-orange sunset low over the sea, violet
+   *  shadows, the prison's windows burning orange. */
+  hellenaDusk: {
+    clearColor: [0.14, 0.08, 0.12],
+    ambientIntensity: 0.62,
+    ambientGround: [0.16, 0.12, 0.2],
+    sunIntensity: 0.95,
+    sunColor: [1.0, 0.62, 0.5],
+    sunDirection: [-0.5, -1, -0.4],
+    exposure: 1.15,
+    contrast: 1.22,
+    vignetteWeight: 1.8,
+    bloomWeight: 0.5,
+    fogStart: 40,
+    fogEnd: 110,
+    fogColor: [0.22, 0.12, 0.17],
+  },
   /** Seles in ruins, the morning after the raid (Dart arrives at dawn): a pale low sun through the
    *  smoke still hanging over the village, grey-brown haze closing in the distance. */
   selesRuins: {
