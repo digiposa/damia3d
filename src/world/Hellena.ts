@@ -18,6 +18,7 @@ import { grassSource, rockSource } from "./kit/flora";
 import { gradeColors, gridMesh, jitter, limb, matte, place } from "./kit/mesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { hash01, noise2 } from "./kit/noise";
+import { makeWater, type WaterOptions } from "./kit/water";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU } from "./kit/texels";
 import { TrailNet, type Knot } from "./kit/trails";
@@ -49,6 +50,21 @@ export const HELLENA_SPOTS = {
   landing: { u: 56, v: 1 },
   gate: { u: 60, v: 3 },
 };
+
+/** Hellena's sea at dusk (kit water), shared by both sections. */
+const HELLENA_WATER: WaterOptions = {
+  deep: new Color3(0.04, 0.03, 0.08),
+  // What it mirrors away from the sun: the violet dusk (PS1: dark purple water, orange only under the sun).
+  skyHorizon: new Color3(0.26, 0.13, 0.19),
+  skyZenith: new Color3(0.1, 0.06, 0.16),
+  sun: new Vector3(0, 0.06, 0).add(fromUV(1, -0.25).normalize()),
+  sunColor: new Color3(1, 0.55, 0.28),
+  glint: 1.2,
+  waveScale: 6,
+  fogColor: new Color3(0.55, 0.26, 0.22),
+  fogStart: 160,
+  fogEnd: 800,
+}
 
 const SEA_Y = -14;
 const BRIDGE_U0 = 45.5; // the gap the drawbridge spans
@@ -180,7 +196,7 @@ export function hellenaWorld(scene: Scene): World {
 
   const grounds = buildGround(scene, root, rand, 24, WALL_U + 1, [[24, BRIDGE_U0], [BRIDGE_U1, WALL_U + 1]]);
   buildCliffFaces(scene, root, rand, rock, [[22, BRIDGE_U0], [BRIDGE_U1, WALL_U + 2]], true);
-  buildSea(scene, root, rand);
+  const seaTick = buildSea(scene, root, rand);
   buildRightRocks(scene, root, rand, rock, 24, WALL_U - 1, false);
   const ticks = buildPrison(scene, root, rand, rock, wood);
   buildDrawbridge(scene, root, rand, wood);
@@ -203,6 +219,7 @@ export function hellenaWorld(scene: Scene): World {
       return k > 0 ? { zoom: 1 - 0.28 * k, offset: fromUV(4 * k, 0) } : null;
     },
     update: (_focus, dt) => {
+      seaTick(dt);
       for (const t of ticks) t(dt);
     },
   };
@@ -330,50 +347,16 @@ function buildCliffFaces(scene: Scene, root: TransformNode, rand: () => number, 
 
 /** The sea below the cliffs at dusk: violet near, burning rose-orange towards the open sea up the
  *  screen (the sunset behind the prison), a slow swell, sea stacks. Unlit, out of the fog. */
-function buildSea(scene: Scene, root: TransformNode, rand: () => number): void {
-  const tex = pixelTexture("hellenaSeaTex", scene, 64, 64, (ctx, w, h) => {
-    // Texture x runs up the screen, y sideways: the swell's long crests run sideways (along y).
-    for (let x = 0; x < w; x++)
-      for (let y = 0; y < h; y++) {
-        const k = (0.86 + 0.14 * Math.sin((x / w) * Math.PI * 6)) * (0.96 + rand() * 0.06);
-        ctx.fillStyle = rgb(200 * k, 200 * k, 210 * k);
-        ctx.fillRect(x, y, 1, 1);
-      }
-    for (let i = 0; i < 70; i++) {
-      const x = (rand() * w) | 0;
-      const y = (rand() * h) | 0;
-      const len = 4 + ((rand() * 8) | 0);
-      ctx.fillStyle = rgb(255, 238, 230); // a crest catching the sunset
-      ctx.fillRect(x, y, 1, len);
-      ctx.fillStyle = rgb(120, 120, 140); // its trough
-      ctx.fillRect(x + 1, y + 1, 1, len - 1);
-    }
-  });
-  tex.uScale = 20;
-  tex.vScale = 14;
-  // Unlit: the colour is all emissive (the texture), tinted per vertex by the sunset gradient.
-  const mat = new StandardMaterial("hellenaSeaMat", scene);
-  mat.emissiveTexture = tex;
-  mat.diffuseColor = Color3.Black();
-  mat.specularColor = Color3.Black();
-  mat.disableLighting = true;
-  mat.fogEnabled = false;
+function buildSea(scene: Scene, root: TransformNode, rand: () => number): (dt: number) => void {
   const sea = gridMesh("hellenaSea", scene, 16, 24, (i, j) => {
     const u = -40 + (j / 24) * 200;
     const v = -90 + (i / 16) * 140;
     const p = fromUV(u, v);
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 24, tv: i / 16 };
   }, Vector3.Up());
-  const pos = sea.getVerticesData("position")!;
-  const col: number[] = [];
-  for (let k = 0; k < pos.length; k += 3) {
-    const { u } = toUV(pos[k], pos[k + 2]);
-    const f = smooth(0, 150, u) ** 1.4; // towards the sunset, up the screen behind the prison
-    col.push(0.2 + 0.62 * f, 0.18 + 0.3 * f, 0.36 + 0.04 * f, 1);
-  }
-  sea.setVerticesData("color", col);
-  sea.material = mat;
   sea.parent = root;
+  // Seen from above, the sun would glint off every wave: just a faint sheen here.
+  const tick = makeWater(sea, { ...HELLENA_WATER, waveScale: 3.5, glint: 0.12, fogStart: 400, fogEnd: 900 });
   // Sea stacks off the coast, foam at their feet.
   const stackMat = matte("hellenaStack", scene, undefined, new Color3(0.22, 0.2, 0.26));
   for (const [u, v, h, r] of [[8, -18, 9, 2.4], [26, -24, 12, 3], [40, -15, 7, 1.8], [20, -34, 14, 3.6]] as const) {
@@ -384,6 +367,7 @@ function buildSea(scene: Scene, root: TransformNode, rand: () => number): void {
     stack.material = stackMat;
     stack.parent = root;
   }
+  return tick;
 }
 
 /** Rocks heaped along the right of the path, rising into a rough wall (the PS1 cliff on the right). */
@@ -713,83 +697,16 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number, tic
     noGlow.push(c);
   }
 
-  // The sea to the horizon: violet below the cliff, rose and orange towards the sun, a slow swell.
-  const tex = pixelTexture("hellenaFarSeaTex", scene, 64, 64, (ctx, w, h) => {
-    for (let x = 0; x < w; x++)
-      for (let y = 0; y < h; y++) {
-        const k = (0.86 + 0.14 * Math.sin((x / w) * Math.PI * 6)) * (0.96 + rand() * 0.06);
-        ctx.fillStyle = rgb(200 * k, 200 * k, 210 * k);
-        ctx.fillRect(x, y, 1, 1);
-      }
-    for (let i = 0; i < 70; i++) {
-      const x = (rand() * w) | 0;
-      const y = (rand() * h) | 0;
-      const len = 4 + ((rand() * 8) | 0);
-      ctx.fillStyle = rgb(255, 238, 230);
-      ctx.fillRect(x, y, 1, len);
-    }
-  });
-  tex.uScale = 60;
-  tex.vScale = 40;
-  const seaMat = unlit("hellenaFarSeaMat");
-  seaMat.emissiveTexture = tex;
+  // The sea to the horizon (kit water): dark violet deep water, the sunset sky reflected towards
+  // the horizon, the sun's road glittering on the swell, fading into the horizon's colour.
   const sea = gridMesh("hellenaFarSea", scene, 24, 24, (i, j) => {
     const u = -60 + (j / 24) * 900;
     const v = -500 + (i / 24) * 1000;
     const p = fromUV(u, v);
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 24, tv: i / 24 };
   }, Vector3.Up());
-  const pos = sea.getVerticesData("position")!;
-  const col: number[] = [];
-  for (let k = 0; k < pos.length; k += 3) {
-    const { u, v } = toUV(pos[k], pos[k + 2]);
-    const far = smooth(0, 320, u);
-    const sun = Math.exp(-(((v + u * 0.25) / (60 + u * 0.4)) ** 2)); // the sun's road on the water
-    col.push(0.2 + 0.55 * far + 0.6 * sun * far, 0.16 + 0.26 * far + 0.32 * sun * far, 0.36 + 0.08 * far, 1);
-  }
-  sea.setVerticesData("color", col);
-  sea.material = seaMat;
   sea.parent = root;
-  // Gold glitter on the swell under the sunset (PS1), drifting slowly: an additive layer over the
-  // sea, strongest on the sun's road, its sparkles sliding so the water shimmers.
-  const sparkle = pixelTexture("hellenaGlitterTex", scene, 64, 64, (ctx, w, h) => {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, w, h);
-    for (let k = 0; k < 140; k++) {
-      ctx.fillStyle = rand() < 0.6 ? rgb(255, 190, 110) : rgb(255, 232, 190);
-      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1, 2 + ((rand() * 4) | 0));
-    }
-  });
-  sparkle.uScale = 90;
-  sparkle.vScale = 60;
-  const gm = unlit("hellenaGlitterMat");
-  gm.emissiveTexture = sparkle;
-  gm.alphaMode = 1; // additive
-  gm.alpha = 0.99; // below 1: blended, not drawn opaque over the sea
-  sparkle.updateSamplingMode(Texture.NEAREST_SAMPLINGMODE);
-  const glitter = gridMesh("hellenaGlitter", scene, 24, 24, (i, j) => {
-    const u = -60 + (j / 24) * 900;
-    const v = -500 + (i / 24) * 1000;
-    const p = fromUV(u, v);
-    return { x: p.x, y: SEA_Y + 0.1, z: p.z, tu: j / 24, tv: i / 24 };
-  }, Vector3.Up());
-  const gp = glitter.getVerticesData("position")!;
-  const gc: number[] = [];
-  for (let k = 0; k < gp.length; k += 3) {
-    const { u, v } = toUV(gp[k], gp[k + 2]);
-    const road = Math.exp(-(((v + u * 0.12) / (40 + u * 0.35)) ** 2)) * smooth(10, 120, u);
-    const g = 0.5 * road; // only on the sun's road (all over, it washes the sea out white)
-    gc.push(g, g, g, 1);
-  }
-  glitter.setVerticesData("color", gc);
-  glitter.material = gm;
-  glitter.parent = root;
-  noGlow.push(glitter);
-  ticks.push((dt) => {
-    sparkle.uOffset += dt * 0.004;
-    sparkle.vOffset += dt * 0.0015;
-    tex.uOffset -= dt * 0.002; // the swell rolling in
-  });
+  ticks.push(makeWater(sea, HELLENA_WATER));
   noGlow.push(sea);
 
   // The prison, far out (PS1): one enormous raw rock rising from the sea like a broken tooth,

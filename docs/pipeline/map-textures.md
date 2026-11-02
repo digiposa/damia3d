@@ -33,3 +33,13 @@ pixels de sol. Au-delà, la différence ne se voit plus au zoom ×1.
   en décor lointain.
 - Seles : pente peinte à 20 ; sol du village à 20 (tuile de 128 px pour 6,4 unités). Les
   murs (texture de pierre sur des boîtes) ne suivent pas encore la règle.
+
+## Eau (kit/water.ts)
+
+Mer ou lac réutilisable : `makeWater(mesh, options)` sur un maillage plat, puis appeler le
+`tick(dt)` renvoyé à chaque image. Un seul passage de shader, sans rendu de reflet (mobile) :
+vagues animées par pixel (le détail s'estompe au loin), reflet du dégradé du ciel selon l'angle
+(Fresnel), reflet du soleil, fondu vers la couleur d'horizon. Options : couleur de l'eau, ciel à
+l'horizon et au zénith, direction et couleur du soleil, force du reflet (`glint`), taille des
+vagues, fondu. Vue de dessus (iso), mettre `glint` bas (~0,1) : sinon chaque vague éblouit.
+Exclure le maillage de la couche de glow.
