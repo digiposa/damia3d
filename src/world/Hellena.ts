@@ -82,6 +82,7 @@ const COAST_NET = new TrailNet([
     { u: 20, v: -0.3, w: 3.4 },
     { u: 34, v: 0.4, w: 3.2 },
     { u: 48, v: 0, w: 3 },
+    { u: 72, v: -1.5, w: 2.6 }, // on along the spit (seen, not walked: the section ends at 44)
   ],
 ]);
 let NET = GATE_NET;
@@ -119,10 +120,11 @@ export function hellenaCoastWorld(scene: Scene): World {
   const rand = mulberry32(0xc0a57);
   const root = new TransformNode("hellenaCoast", scene);
   const rock = rockMaterial(scene, rand);
-  const grounds = buildGround(scene, root, rand, -12, 50, [[-12, 50]]);
-  buildCliffFaces(scene, root, rand, rock, [[-14, 52]], false);
-  buildRightRocks(scene, root, rand, rock, -12, 52, true);
+  const grounds = buildGround(scene, root, rand, -12, 70, [[-12, 70]]);
+  buildCliffFaces(scene, root, rand, rock, [[-14, 72]], false);
+  buildRightRocks(scene, root, rand, rock, -12, 70, true);
   deadTree(scene, root, rand, fromUV(26, 3.8));
+  buildSpit(scene, root, rand, rock);
   const noGlow = buildHorizon(scene, root, rand);
   let glowChecked = false;
   obstacles.index();
@@ -132,7 +134,7 @@ export function hellenaCoastWorld(scene: Scene): World {
   }
   return {
     clamp: clampToHellena,
-    preset: LIGHTING_PRESETS.hellenaDusk,
+    preset: LIGHTING_PRESETS.hellenaCoast,
     framing: 0,
     view: { beta: 1.32, fov: 0.85, radius: 11, lift: 1.4 },
     shadowReceivers: grounds,
@@ -410,6 +412,76 @@ function deadTree(scene: Scene, root: TransformNode, rand: () => number, at: Vec
     tree.parent = root;
   }
   obstacles.add(at.x, at.z, 0.6);
+}
+
+/**
+ * Past the walkable end of the coastal path the land runs on to the prison (PS1: a long dark spit
+ * of rock between the sea and the sky, the prison at its end): a ridge narrowing and sinking towards
+ * the sea, sheer sides down to the water, boulders along its back, the path's line on it. Seen only
+ * from afar (fog darkens it into a silhouette), so plain tiled rock, no painting.
+ */
+function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial): void {
+  const U0 = 68;
+  const U1 = 292;
+  const N = 60;
+  const at = (j: number): { u: number; t: number; left: number; right: number; y: number } => {
+    const u = U0 + (j / N) * (U1 - U0);
+    const t = (u - U0) / (U1 - U0);
+    const centre = -12 * smooth(0.2, 1, t); // drifting left, towards the prison
+    const half = 2.6 + 4 * (1 - t) + 1.2 * Math.sin(u * 0.09);
+    const left = Math.min(coastEdge(u), centre - half) * (1 - smooth(0, 0.1, t)) + (centre - half) * smooth(0, 0.1, t);
+    const right = (17 * (1 - smooth(0, 0.25, t)) + (centre + half) * smooth(0, 0.25, t));
+    const y = (SEA_Y + 5) * smooth(0.08, 1, t) ** 0.8;
+    return { u, t, left, right, y };
+  };
+  const top = gridMesh("hellenaSpitTop", scene, 6, N, (i, j) => {
+    const a = at(j);
+    const f = i / 6;
+    const v = a.left + (a.right - a.left) * f;
+    const p = fromUV(a.u, v);
+    // Its back humped either side of the path's line (low near the path's end, so it doesn't wall the view).
+    const side = Math.abs(f - 0.45) * 2;
+    const bump = side * 1.6 * smooth(0.02, 0.3, a.t) * (0.6 + 0.4 * Math.sin(a.u * 0.4 + f * 5));
+    return { x: p.x, y: a.y + bump, z: p.z, tu: a.u / 4, tv: v / 4 };
+  }, Vector3.Up());
+  top.material = rock;
+  top.parent = root;
+  // The path's line carries on along it, paler than the rock either side.
+  const tc: number[] = [];
+  const tp = top.getVerticesData("position")!;
+  for (let k = 0, n = 0; k < tp.length; k += 3, n++) {
+    const i = Math.floor(n / (N + 1));
+    const onPath = 1 - Math.min(1, Math.abs(i / 6 - 0.45) * 5);
+    const c = 0.62 + 0.3 * onPath;
+    tc.push(c, c, c * 1.12, 1);
+  }
+  top.setVerticesData("color", tc);
+  for (const side of [0, 1]) {
+    const wall = gridMesh(`hellenaSpitSide${side}`, scene, 3, N, (i, j) => {
+      const a = at(j);
+      const v = side === 0 ? a.left : a.right;
+      const out = (i / 3) * 3 * (side === 0 ? -1 : 1);
+      const p = fromUV(a.u, v + out + (i > 0 && i < 3 ? (rand() - 0.5) : 0));
+      return { x: p.x, y: a.y + (SEA_Y - a.y) * (i / 3), z: p.z, tu: a.u / 4, tv: i };
+    }, side === 0 ? fromUV(0, -1) : fromUV(0, 1));
+    wall.material = rock;
+    wall.parent = root;
+    wall.convertToFlatShadedMesh();
+  }
+  // Boulders along its back, thinning out towards the prison.
+  for (let j = 2; j < N - 4; j += 1) {
+    const a = at(j);
+    if (rand() > 0.85 - a.t * 0.5) continue;
+    const r = (1 + rand() * 2.2) * (1 - a.t * 0.6);
+    const v = a.left + (a.right - a.left) * (0.55 + rand() * 0.4);
+    const p = fromUV(a.u + (rand() - 0.5) * 3, v);
+    const lump = MeshBuilder.CreateIcoSphere("hellenaSpitRock", { radius: r, subdivisions: 1 }, scene);
+    lump.scaling.y = 0.7 + rand() * 0.5;
+    lump.position.set(p.x, a.y + r * 0.3, p.z);
+    jitter(lump, 0.2 * r, rand);
+    lump.material = rock;
+    lump.parent = root;
+  }
 }
 
 // --- The horizon (scenic section) -----------------------------------------------------------------
