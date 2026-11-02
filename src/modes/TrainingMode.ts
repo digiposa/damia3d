@@ -490,6 +490,13 @@ export abstract class ArenaCombatMode extends GameMode {
     return startingItems();
   }
 
+  /** Put the camera in the view {@link cameraView} asks for (at entry, and when Config changes it). */
+  protected applyCameraView(): void {
+    const view = this.cameraView();
+    if (view) this.camera.scenic(view);
+    else this.camera.iso();
+  }
+
   /** The camera for this place: a perspective shot (World.view), or undefined for the iso view. */
   protected cameraView(): World["view"] {
     return this.world.view;
@@ -510,8 +517,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
     this.camera.framing = this.world.framing;
-    const view = this.cameraView();
-    if (view) this.camera.scenic(view);
+    this.applyCameraView();
     // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.

@@ -65,6 +65,20 @@ export class IsoCamera {
     this.applyTarget();
   }
 
+  /** Back to the plain orthographic iso view (undoes {@link scenic}). */
+  iso(): void {
+    if (!this.view) return;
+    this.view = undefined;
+    this.camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
+    this.camera.alpha = ISO_ALPHA;
+    this.camera.beta = this.tilt = ISO_BETA;
+    this.camera.radius = 40;
+    this.camera.minZ = 1;
+    this._groundForward = this._groundRight = undefined;
+    this.lastAspect = -1; // recompute the ortho bounds
+    this.applyTarget();
+  }
+
   // --- Framed "moments" (a map's set pieces: a cliff edge, a boss arena) -------------------
 
   /** Current shot: zoom multiplier on the player's zoom setting, and a ground offset of the target. */
@@ -168,9 +182,10 @@ export class IsoCamera {
   /** Forward direction (into the screen) projected onto the ground plane. */
   get groundForward(): Vector3 {
     if (!this._groundForward) {
-      const fwd = this.camera.target.subtract(this.camera.position);
-      fwd.y = 0;
-      this._groundForward = fwd.normalize();
+      // From the heading itself, not from target − position: the camera's position only catches up
+      // with a new heading at the next render, and a stale one inverted the controls (Seles).
+      const a = this.camera.alpha;
+      this._groundForward = new Vector3(-Math.cos(a), 0, -Math.sin(a));
     }
     return this._groundForward;
   }

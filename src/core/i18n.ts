@@ -119,7 +119,7 @@ const en: Dict = {
   "config.camera": "Camera",
   "config.camera.iso": "ISO",
   "config.camera.cinema": "3rd person",
-  "config.camera.note": "ISO: seen from above. 3rd person: behind the character, at eye level (Story maps; applies on the next map).",
+  "config.camera.note": "ISO: seen from above. 3rd person: behind the character, at eye level (Story maps).",
   "config.language": "Language",
 
   // Character menu
@@ -438,7 +438,7 @@ const fr: Dict = {
   "config.camera": "Caméra",
   "config.camera.iso": "ISO",
   "config.camera.cinema": "3e personne",
-  "config.camera.note": "ISO : vue de dessus. 3e personne : derrière le personnage, à hauteur d'homme (cartes de l'Histoire ; s'applique à la carte suivante).",
+  "config.camera.note": "ISO : vue de dessus. 3e personne : derrière le personnage, à hauteur d'homme (cartes de l'Histoire).",
   "config.language": "Langue",
 
   "char.title": "Personnage",

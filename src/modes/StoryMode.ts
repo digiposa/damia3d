@@ -160,7 +160,14 @@ export class StoryMode extends ArenaCombatMode {
 
   // --- Frame ---------------------------------------------------------------------------------
 
+  /** Config → Camera as it was last applied (switched live when the player changes it). */
+  private appliedCamera = settings.cameraStyle;
+
   override update(dt: number): void {
+    if (settings.cameraStyle !== this.appliedCamera) {
+      this.appliedCamera = settings.cameraStyle;
+      this.applyCameraView();
+    }
     // Dialogue: Space / Enter / E finish or close the line (taps are handled by the box).
     if (this.dialogue?.isOpen && ["Space", "Enter", "KeyE"].some((k) => this.input.wasPressed(k))) this.dialogue.advance();
     super.update(dt);
