@@ -586,24 +586,75 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
     starMesh.material = m;
     starMesh.parent = root;
   }
-  // Long dark clouds low over the horizon, their bellies lit by the sunset.
-  const cloudMat = unlit("hellenaCloudMat");
-  for (let k = 0; k < 9; k++) {
-    const a = Math.atan2(toSun.z, toSun.x) + (rand() - 0.5) * 2.2;
-    const e = 0.05 + rand() * 0.16;
-    const c = MeshBuilder.CreateSphere("hellenaCloud", { diameter: 2, segments: 8 }, scene);
-    c.scaling.set(90 + rand() * 120, 6 + rand() * 6, 30);
-    c.position.set(Math.cos(a) * Math.cos(e) * 700, Math.sin(e) * 700, Math.sin(a) * Math.cos(e) * 700);
-    c.rotation.y = -a + Math.PI / 2;
-    c.infiniteDistance = true;
-    const cp = c.getVerticesData("position")!;
-    const cc: number[] = [];
-    for (let i = 0; i < cp.length; i += 3) {
-      const under = cp[i + 1] < 0 ? 1 : 0;
-      cc.push(0.16 + 0.4 * under, 0.09 + 0.18 * under, 0.16 + 0.1 * under, 1);
+  // Clouds: soft painted banks (sprites), dark violet above and lit rose-orange from beneath by
+  // the sun below the horizon; long low banks towards the sunset, a few thin wisps higher up.
+  const cloudTex = (name: string, seed: number): DynamicTexture => {
+    const r2 = mulberry32(seed);
+    const W = 256;
+    const H = 64;
+    const tex = new DynamicTexture(name, { width: W, height: H }, scene, true);
+    const ctx = tex.getContext() as CanvasRenderingContext2D;
+    ctx.clearRect(0, 0, W, H);
+    // Puffs along a long, flat-bottomed bank.
+    for (let k = 0; k < 26; k++) {
+      const x = W * (0.08 + r2() * 0.84);
+      const edge = 1 - Math.abs(x / W - 0.5) * 2; // thinner towards the ends
+      const ry = H * (0.12 + 0.28 * edge * r2());
+      const rx = ry * (1.6 + r2() * 1.6);
+      const y = H * 0.72 - ry * 0.6;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
+      g.addColorStop(0, "rgba(255,255,255,0.55)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1, ry / rx);
+      ctx.translate(-x, -y);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, rx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
-    c.setVerticesData("color", cc);
-    c.material = cloudMat;
+    // Colour by height: lit belly, dark top (kept in the alpha the puffs laid down).
+    const img = ctx.getImageData(0, 0, W, H);
+    for (let y = 0; y < H; y++) {
+      const f = y / H; // 0 top … 1 bottom
+      const lit = smooth(0.45, 0.85, f);
+      for (let x = 0; x < W; x++) {
+        const o = (y * W + x) * 4;
+        img.data[o] = 60 + 190 * lit;
+        img.data[o + 1] = 34 + 92 * lit;
+        img.data[o + 2] = 64 + 40 * lit;
+        img.data[o + 3] = Math.min(255, img.data[o + 3] * 1.4);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    tex.update();
+    tex.hasAlpha = true;
+    return tex;
+  };
+  const cloudMats = [0, 1, 2].map((k) => {
+    const m = unlit(`hellenaCloudMat${k}`);
+    const tex = cloudTex(`hellenaCloudTex${k}`, 0xc10d + k * 977);
+    m.emissiveTexture = tex;
+    m.opacityTexture = tex;
+    m.emissiveColor = new Color3(0.62, 0.42, 0.46); // dimmed: dusk clouds, not white puffs
+    m.backFaceCulling = false;
+    return m;
+  });
+  const sunAz = Math.atan2(toSun.z, toSun.x);
+  for (let k = 0; k < 16; k++) {
+    const high = k >= 12;
+    const a = sunAz + (rand() - 0.5) * (high ? 1.6 : 2.4);
+    const e = high ? 0.22 + rand() * 0.15 : 0.03 + rand() * 0.12;
+    const w = high ? 160 + rand() * 120 : 140 + rand() * 200;
+    const c = MeshBuilder.CreatePlane("hellenaCloud", { width: w, height: w * (high ? 0.12 : 0.22) }, scene);
+    c.position.set(Math.cos(a) * Math.cos(e) * 700, Math.sin(e) * 700, Math.sin(a) * Math.cos(e) * 700);
+    c.lookAt(new Vector3(0, c.position.y, 0)); // facing the viewer, upright
+    c.rotation.y += Math.PI;
+    c.infiniteDistance = true;
+    c.material = cloudMats[k % 3];
+    c.alphaIndex = 1;
     c.parent = root;
     noGlow.push(c);
   }
@@ -647,42 +698,145 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
   sea.parent = root;
   noGlow.push(sea);
 
-  // The prison, far out: a great rock leaning to the right, a smaller one at its foot, lit windows.
+  // The prison, far out (PS1): a great spire of rock leaning to the left over the sea, built up
+  // in tiers — walls with rows of lit windows, turrets on its ledges, a broken crown of walls on
+  // top — a smaller rock at its foot, its lights trailing on the water.
+  const node = new TransformNode("hellenaFarPrison", scene);
+  node.parent = root;
   const P = fromUV(300, -36); // a little left of the path: in frame on a phone too
-  const rockMat = unlit("hellenaFarRockMat");
-  const lean = (name: string, at: Vector3, h: number, r: number, tilt: number): Mesh => {
-    const m = MeshBuilder.CreateCylinder(name, { height: h, diameterTop: r * 1.3, diameterBottom: r * 2, tessellation: 10, subdivisions: 6 }, scene);
-    jitter(m, r * 0.12, rand);
-    m.position.set(at.x, SEA_Y + h * 0.42, at.z);
-    m.rotation.set(0, 0, 0);
-    m.rotate(fromUV(0, 1).normalize().cross(Vector3.Up()).normalize(), tilt);
-    m.material = rockMat;
-    m.parent = root;
-    const mp = m.getVerticesData("position")!;
-    const mc: number[] = [];
-    for (let k = 0; k < mp.length; k += 3) {
-      const t = (mp[k + 1] + h / 2) / h;
-      // Dark violet silhouette, its sunward edge catching a rim of rose light.
-      const rim = Math.max(0, -(mp[k] * 0.7 + mp[k + 2] * 0.7) / r) * 0.5;
-      mc.push(0.1 + 0.08 * t + 0.35 * rim, 0.06 + 0.04 * t + 0.14 * rim, 0.12 + 0.06 * t + 0.1 * rim, 1);
-    }
-    m.setVerticesData("color", mc);
-    noGlow.push(m);
-    return m;
-  };
-  lean("hellenaFarPrison", P, 64, 12, -0.32);
-  lean("hellenaFarFoot", fromUV(296, -22), 18, 9, 0.1);
-  const win = unlit("hellenaFarWindow");
-  win.emissiveColor = new Color3(1, 0.7, 0.3);
-  for (let k = 0; k < 14; k++) {
-    const y = SEA_Y + 4 + rand() * 30;
-    const q = fromUV(300 - 13, -36 + (rand() - 0.5) * 16 + (y + 14) * 0.25);
-    const w = MeshBuilder.CreatePlane("hellenaFarLight", { width: 1.6, height: 2.2 }, scene);
-    w.position.set(q.x, y, q.z);
-    w.rotation.y = Math.atan2(-fromUV(1, 0).x, -fromUV(1, 0).z) + Math.PI; // facing back down the path
-    w.material = win;
-    w.parent = root;
+  node.position.set(P.x, SEA_Y, P.z);
+  node.rotation.y = -Math.PI / 4; // local -z faces back down the path (the camera), +x is screen right
+  const lean = new TransformNode("hellenaFarLean", scene);
+  lean.parent = node;
+  lean.rotation.z = 0.26; // leaning left
+  const silhouette = unlit("hellenaFarRockMat");
+  const H = 44;
+  const radius = (t: number): number => 12 * (1 - 0.45 * t) * (1 + 0.18 * Math.sin(t * 9)) + (t < 0.12 ? (0.12 - t) * 30 : 0);
+  const spire = MeshBuilder.CreateCylinder("hellenaFarSpire", { height: H, diameter: 2, tessellation: 16, subdivisions: 14 }, scene);
+  const sp2 = spire.getVerticesData("position")!;
+  for (let k = 0; k < sp2.length; k += 3) {
+    const t = (sp2[k + 1] + H / 2) / H;
+    const r = radius(t) * (0.85 + 0.3 * hash01(Math.round(sp2[k] * 7), Math.round(sp2[k + 1] * 3)));
+    sp2[k] *= r;
+    sp2[k + 2] *= r * 0.8;
+    sp2[k + 1] += H / 2;
   }
+  spire.setVerticesData("position", sp2);
+  spire.createNormals(false);
+  const shade = (m: Mesh, rimSide: number): void => {
+    const p = m.getVerticesData("position")!;
+    const c: number[] = [];
+    for (let k = 0; k < p.length; k += 3) {
+      const t = Math.max(0, p[k + 1]) / H;
+      // Dark violet, a rose rim on the side towards the sun (left), the top catching the light.
+      const rim = Math.max(0, (-p[k] * rimSide) / 12) * 0.5 + 0.25 * t;
+      c.push(0.08 + 0.06 * t + 0.4 * rim, 0.05 + 0.03 * t + 0.16 * rim, 0.1 + 0.05 * t + 0.12 * rim, 1);
+    }
+    m.setVerticesData("color", c);
+  };
+  shade(spire, 1);
+  spire.material = silhouette;
+  spire.parent = lean;
+  noGlow.push(spire);
+  const foot = MeshBuilder.CreateCylinder("hellenaFarFoot", { height: 18, diameterTop: 10, diameterBottom: 22, tessellation: 10, subdivisions: 4 }, scene);
+  jitter(foot, 1.2, rand);
+  foot.position.set(16, 7, 2);
+  shade(foot, 1);
+  foot.material = silhouette;
+  foot.parent = node;
+  noGlow.push(foot);
+
+  // The built tiers on the camera's face: dark walls, rows of lit windows, turrets on ledges.
+  const wallMat = unlit("hellenaFarWallMat");
+  wallMat.emissiveColor = new Color3(0.13, 0.08, 0.12);
+  const winMat = unlit("hellenaFarWindow");
+  winMat.emissiveColor = new Color3(1, 0.68, 0.3);
+  const windows: Mesh[] = [];
+  const tiers: [number, number, number][] = [[0.16, 0.95, 2], [0.38, 0.8, 2], [0.58, 0.7, 1], [0.76, 0.6, 1]];
+  for (const [t, wf, rows] of tiers) {
+    const y = t * H;
+    const r = radius(t);
+    const w = r * 2 * wf;
+    const z = -r * 0.8 - 0.6;
+    const wall = MeshBuilder.CreateBox("hellenaFarTier", { width: w, height: 3.4 * rows + 1, depth: 2.4 }, scene);
+    wall.position.set((rand() - 0.5) * 2, y, z + 0.6);
+    wall.material = wallMat;
+    wall.parent = lean;
+    noGlow.push(wall);
+    // A crenellated top on each tier.
+    for (let x = -w / 2 + 0.6; x < w / 2; x += 1.6) {
+      const merlon = MeshBuilder.CreateBox("hellenaFarMerlon", { width: 0.8, height: 0.9, depth: 2.4 }, scene);
+      merlon.position.set(wall.position.x + x, y + (3.4 * rows + 1) / 2 + 0.45, z + 0.6);
+      merlon.material = wallMat;
+      merlon.parent = lean;
+      noGlow.push(merlon);
+    }
+    for (let row = 0; row < rows; row++)
+      for (let x = -w / 2 + 1.4; x < w / 2 - 1; x += 2.2) {
+        if (rand() < 0.22) continue; // a few dark ones
+        const win = MeshBuilder.CreatePlane("hellenaFarLight", { width: 0.9, height: 1.5 }, scene);
+        win.position.set(wall.position.x + x, y - (3.4 * rows) / 2 + 1.9 + row * 3.4, z - 0.62);
+        windows.push(win); // a plane faces -z: the camera side
+      }
+    if (rand() < 0.7) {
+      // A turret at the tier's end, with its pointed roof.
+      const side = rand() < 0.5 ? -1 : 1;
+      const tx = side * (w / 2 + 0.6);
+      const tower = MeshBuilder.CreateCylinder("hellenaFarTurret", { height: 7, diameter: 2.6, tessellation: 8 }, scene);
+      tower.position.set(tx, y + 2.5, z + 0.5);
+      tower.material = wallMat;
+      tower.parent = lean;
+      const roof = MeshBuilder.CreateCylinder("hellenaFarRoof", { height: 3, diameterTop: 0, diameterBottom: 3.4, tessellation: 8 }, scene);
+      roof.position.set(tx, y + 7.5, z + 0.5);
+      roof.material = wallMat;
+      roof.parent = lean;
+      noGlow.push(tower, roof);
+      const win = MeshBuilder.CreatePlane("hellenaFarLight", { width: 0.6, height: 1 }, scene);
+      win.position.set(tx, y + 3.5, z + 0.5 - 1.32);
+      windows.push(win);
+    }
+  }
+  // The broken crown on top: jagged stumps of wall.
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2;
+    const r = radius(1) * 0.9;
+    const h = 2 + rand() * 6;
+    const stump = MeshBuilder.CreateBox("hellenaFarCrown", { width: 2.2, height: h, depth: 1.2 }, scene);
+    stump.position.set(Math.cos(a) * r, H + h / 2 - 1, Math.sin(a) * r * 0.8);
+    stump.rotation.y = -a;
+    stump.material = wallMat;
+    stump.parent = lean;
+    noGlow.push(stump);
+  }
+  const lit = Mesh.MergeMeshes(windows, true, true);
+  if (lit) {
+    lit.material = winMat;
+    lit.parent = lean;
+  }
+  // The lights trailing on the water below it (additive, a soft vertical streak towards us).
+  const trail = new DynamicTexture("hellenaFarTrailTex", { width: 8, height: 128 }, scene, false);
+  const tctx = trail.getContext();
+  for (let y = 0; y < 128; y++) {
+    const f = y / 127;
+    const a = (1 - f) ** 1.5;
+    for (let x = 0; x < 8; x++) {
+      const flick = (hash01(x, y) > 0.5 ? 1 : 0.4) * a * (1 - Math.abs(x - 3.5) / 4);
+      tctx.fillStyle = `rgb(${Math.round(255 * flick)},${Math.round(150 * flick)},${Math.round(70 * flick)})`;
+      tctx.fillRect(x, y, 1, 1);
+    }
+  }
+  trail.update();
+  const trailMat = unlit("hellenaFarTrailMat");
+  trailMat.emissiveTexture = trail;
+  trailMat.alphaMode = 1; // additive
+  trailMat.emissiveColor = new Color3(0.55, 0.32, 0.18); // warm, faint: it must not read as a pale slab
+  const streak = MeshBuilder.CreateGround("hellenaFarTrail", { width: 6, height: 60 }, scene);
+  const sAt = fromUV(300 - 30 - 13, -36 + 2);
+  streak.position.set(sAt.x, SEA_Y + 0.05, sAt.z);
+  streak.rotation.y = -Math.PI / 4;
+  streak.material = trailMat;
+  streak.parent = root;
+  noGlow.push(streak);
   return noGlow;
 }
 
