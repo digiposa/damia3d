@@ -317,7 +317,7 @@ function buildCliffFaces(scene: Scene, root: TransformNode, rand: () => number, 
       const f = i / 3;
       const q = top(t).add(out(t).scale(f * 2.4 + (rand() - 0.5) * 0.6 * f));
       return { x: q.x, y: f * SEA_Y - 0.02 + (f > 0 && f < 1 ? (rand() - 0.5) * 1.2 : 0), z: q.z, tu: t * n * 0.4, tv: f * 3 };
-    }, new Vector3(-1, 0, 0));
+    }, out(0)); // facing outwards (each face its own way: a fixed one culled the gap's faces)
     m.material = rock;
     m.parent = root;
     m.convertToFlatShadedMesh();
