@@ -23,9 +23,8 @@ export interface GameSettings {
    */
   retroLines: number;
   /**
-   * Camera style in maps that support it: 0 = fixed iso everywhere (combat-first), 1 = "cinema",
-   * where the map sets its own tilt per zone like the PS1's per-screen angles (e.g. lower at a cliff
-   * so the sky shows). Arena modes ignore it.
+   * Camera on Story maps: 0 = ISO (from above, everywhere), 1 = third person (low behind the hero;
+   * the map's own scenic shot where it has one). Arena modes ignore it.
    */
   cameraStyle: number;
 }

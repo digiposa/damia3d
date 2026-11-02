@@ -16,6 +16,7 @@ import { InteractPrompt } from "../ui/InteractPrompt";
 import { SpeechBubble } from "../ui/SpeechBubble";
 import { MAPS } from "../story/maps";
 import { hasFlag, itemDef, saveStory, setFlag, story } from "../story/state";
+import { settings } from "../core/settings";
 import type { BattleUnit, NpcHandle, StoryApi, StoryMap } from "../story/StoryMap";
 import type { World } from "../world/World";
 
@@ -23,6 +24,9 @@ import type { World } from "../world/World";
 const DISTANCE_PER_RATE = 300;
 /** How far from the hero a random formation appears: just past the edge of the view. */
 const SPAWN_DIST = 11;
+
+/** Config → Camera "3rd person", on a map with no scenic shot of its own: low behind the hero. */
+const THIRD_PERSON = { beta: 1.25, fov: 0.9, radius: 10, lift: 1.5 };
 
 interface Trigger {
   at: Vector3;
@@ -101,6 +105,16 @@ export class StoryMode extends ArenaCombatMode {
     this.prompt = new InteractPrompt(this.scene, () => this.offer?.());
     this.meter = new EncounterMeter(this.scene);
     return this.map.world;
+  }
+
+  /**
+   * Config → Camera: ISO everywhere, or third person everywhere — the map's own scenic shot where
+   * it has one (Hellena), else a default one behind the hero. The heading stays the iso one (the
+   * camera never turns), so the controls are the same in both. Applied when a map is entered.
+   */
+  protected override cameraView(): World["view"] {
+    if (settings.cameraStyle !== 1) return undefined;
+    return this.world.view ?? { ...THIRD_PERSON, ...this.world.thirdPerson };
   }
 
   protected override pickParty(): Bearer[] {

@@ -117,9 +117,9 @@ const en: Dict = {
   "config.retro.ps1": "PS1",
   "config.retro.note": "Low-resolution, dithered rendering like the original console. Also lighter to run on phones.",
   "config.camera": "Camera",
-  "config.camera.iso": "Iso",
-  "config.camera.cinema": "Cinema",
-  "config.camera.note": "Cinema: the angle changes with the area, like the PS1 screens (Story maps only).",
+  "config.camera.iso": "ISO",
+  "config.camera.cinema": "3rd person",
+  "config.camera.note": "ISO: seen from above. 3rd person: behind the character, at eye level (Story maps; applies on the next map).",
   "config.language": "Language",
 
   // Character menu
@@ -436,9 +436,9 @@ const fr: Dict = {
   "config.retro.ps1": "PS1",
   "config.retro.note": "Rendu basse résolution et tramé comme sur la console d'origine. Plus léger aussi sur téléphone.",
   "config.camera": "Caméra",
-  "config.camera.iso": "Iso",
-  "config.camera.cinema": "Cinéma",
-  "config.camera.note": "Cinéma : l'angle change selon la zone, comme les écrans PS1 (cartes du mode Histoire).",
+  "config.camera.iso": "ISO",
+  "config.camera.cinema": "3e personne",
+  "config.camera.note": "ISO : vue de dessus. 3e personne : derrière le personnage, à hauteur d'homme (cartes de l'Histoire ; s'applique à la carte suivante).",
   "config.language": "Langue",
 
   "char.title": "Personnage",

@@ -42,7 +42,7 @@ export const HELLENA_SPOTS = {
   // The coastal path (scenic section).
   coastStart: { u: 2, v: 0 },
   coastBack: { u: -2.5, v: 0 }, // back to the Forest
-  coastEnd: { u: 44, v: 0 }, // on to the guard post
+  coastEnd: { u: 70, v: 0 }, // on to the guard post (a long walk: the view is the point)
   // The guard post (iso section).
   fromCoast: { u: 33, v: 0 },
   backToCoast: { u: 29.5, v: 0 },
@@ -87,8 +87,8 @@ const TRAILS: Knot[][] = [
     { u: 53.5, v: 0.4, w: 4.4 }, // the guard post's landing
     { u: 58.5, v: 1, w: 6.2 },
   ],
-  // To the lookout tower's stairs, at the cliff edge before the drawbridge (PS1).
-  [{ u: 35.5, v: -0.5, w: 2.4 }, { u: 37, v: -3.2, w: 2 }],
+  // To the lookout tower's stairs, on the right before the drawbridge (PS1).
+  [{ u: 35.5, v: 1, w: 2.4 }, { u: 37, v: 3.8, w: 2 }],
 ];
 const GATE_NET = new TrailNet(TRAILS);
 /** The coastal path, straight on towards the prison. */
@@ -99,7 +99,9 @@ const COAST_NET = new TrailNet([
     { u: 20, v: -0.3, w: 3.4 },
     { u: 34, v: 0.4, w: 3.2 },
     { u: 48, v: 0, w: 3 },
-    { u: 72, v: -1.5, w: 2.6 }, // on along the spit (seen, not walked: the section ends at 44)
+    { u: 62, v: 0.5, w: 3.2 },
+    { u: 76, v: -0.3, w: 3 },
+    { u: 98, v: -1.5, w: 2.6 }, // on along the spit (seen, not walked: the section ends at 70)
   ],
 ]);
 let NET = GATE_NET;
@@ -137,9 +139,10 @@ export function hellenaCoastWorld(scene: Scene): World {
   const rand = mulberry32(0xc0a57);
   const root = new TransformNode("hellenaCoast", scene);
   const rock = rockMaterial(scene, rand);
-  const grounds = buildGround(scene, root, rand, -12, 70, [[-12, 70]]);
-  buildCliffFaces(scene, root, rand, rock, [[-14, 72]], false);
-  const tufts = buildRightRocks(scene, root, rand, rock, -12, 70, true);
+  // Two painted pieces: one would be wider than MAX_TEX at the standard density.
+  const grounds = [...buildGround(scene, root, rand, -12, 42, [[-12, 42]]), ...buildGround(scene, root, rand, 42, 96, [[42, 96]])];
+  buildCliffFaces(scene, root, rand, rock, [[-14, 98]], false);
+  const tufts = buildRightRocks(scene, root, rand, rock, -12, 96, true);
   deadTree(scene, root, rand, fromUV(26, 3.8));
   buildSpit(scene, root, rand, rock);
   const ticks: ((dt: number) => void)[] = [];
@@ -185,7 +188,7 @@ export function hellenaWorld(scene: Scene): World {
 
   const grounds = buildGround(scene, root, rand, 24, WALL_U + 1, [[24, BRIDGE_U0], [BRIDGE_U1, WALL_U + 1]]);
   buildCliffFaces(scene, root, rand, rock, [[22, BRIDGE_U0], [BRIDGE_U1, WALL_U + 2]], true);
-  buildRightRocks(scene, root, rand, rock, 24, WALL_U - 1, true);
+  // No rocks on the right here (PS1): the lookout stands there.
   const ticks = buildPrison(scene, root, rand, rock, wood);
   buildDrawbridge(scene, root, rand, wood);
   const noGlow = buildHorizon(scene, root, rand, ticks, false);
@@ -422,7 +425,7 @@ function deadTree(scene: Scene, root: TransformNode, rand: () => number, at: Vec
  * from afar (fog darkens it into a silhouette), so plain tiled rock, no painting.
  */
 function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial): void {
-  const U0 = 69.5; // overlapping the painted ground's far edge (70)
+  const U0 = 95.5; // overlapping the painted ground's far edge (96)
   const U1 = 292;
   const N = 80;
   const COLS = 16;
@@ -1059,7 +1062,7 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
   }
 
   // The lookout tower at the cliff's edge, its stairs coming down to the landing.
-  const T = fromUV(40.6, -4.2); // before the drawbridge, on the cliff edge (PS1)
+  const T = fromUV(40.6, 5.2); // before the drawbridge, on the right (PS1)
   const TH = 4.6;
   for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
     const post = MeshBuilder.CreateBox("hellenaTowerPost", { width: 0.22, height: TH + 1, depth: 0.22 }, scene);
@@ -1087,8 +1090,8 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
     x.parent = root;
   }
   // The stairs: steps climbing from the landing to the tower's deck.
-  const S0 = fromUV(36.6, -3.6);
-  const S1 = fromUV(39.4, -4);
+  const S0 = fromUV(36.6, 4.2);
+  const S1 = fromUV(39.4, 4.6);
   for (let k = 0; k < 10; k++) {
     const f = k / 9;
     const step = MeshBuilder.CreateBox("hellenaStep", { width: 1.1, height: 0.12, depth: 0.4 }, scene);
@@ -1101,7 +1104,7 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
   obstacles.add(T.x, T.z, 1.8);
 
   // Torches either side of the gate and at the tower's foot; a lamp on the drawbridge's far post.
-  for (const at of [onWall(G.v - 2.6, 2.6, 0.4), onWall(G.v + 2.6, 2.6, 0.4), fromUV(37.4, -1.8).add(new Vector3(0, 1.6, 0)), fromUV(BRIDGE_U1 + 0.3, 1.8).add(new Vector3(0, 1.8, 0)), new Vector3(T.x + 1.1, TH + 1.1, T.z - 1.1)]) {
+  for (const at of [onWall(G.v - 2.6, 2.6, 0.4), onWall(G.v + 2.6, 2.6, 0.4), fromUV(37.4, 2.6).add(new Vector3(0, 1.6, 0)), fromUV(BRIDGE_U1 + 0.3, 1.8).add(new Vector3(0, 1.8, 0)), new Vector3(T.x + 1.1, TH + 1.1, T.z - 1.1)]) {
     ticks.push(torch(scene, root, rand, at, wood));
   }
   return ticks;

@@ -31,7 +31,10 @@ export interface World {
    * horizon in frame) instead of the iso view: tilt from vertical, vertical field of view, distance
    * from the followed point, and how high above the feet it aims. Same heading as the iso view.
    */
-  view?: { beta: number; fov: number; radius: number; lift: number };
+  view?: { beta: number; fov: number; radius: number; lift: number; heading?: number };
+  /** Third-person camera only: this map's adjustments to the default shot — e.g. a turned heading
+   *  (radians from the iso one) for a map walked down the screen, a steeper tilt over tall cover. */
+  thirdPerson?: Partial<{ beta: number; radius: number; lift: number; heading: number }>;
   /** Ground height at a point, for maps with relief (a hillside); flat (y = 0) when absent. */
   heightAt?(x: number, z: number): number;
   /** Per-frame upkeep around the controlled character (e.g. animated props), if any. */

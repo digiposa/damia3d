@@ -490,6 +490,11 @@ export abstract class ArenaCombatMode extends GameMode {
     return startingItems();
   }
 
+  /** The camera for this place: a perspective shot (World.view), or undefined for the iso view. */
+  protected cameraView(): World["view"] {
+    return this.world.view;
+  }
+
   /** The place this mode fights in. The Lohan arena by default; Story maps override. */
   protected createWorld(): World {
     return arenaWorld(this.scene);
@@ -505,7 +510,8 @@ export abstract class ArenaCombatMode extends GameMode {
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
     this.camera.framing = this.world.framing;
-    if (this.world.view) this.camera.scenic(this.world.view);
+    const view = this.cameraView();
+    if (view) this.camera.scenic(view);
     // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.

@@ -61,7 +61,7 @@ type Tick = (dt: number, focus: Vector3) => void;
 
 /** Story spots (u, v), for the map's script. */
 export const SELES_SPOTS = {
-  start: { u: -29, v: -6.9 }, // the top of the steep path, under the ledge Dart jumps from
+  start: { u: -26, v: -6.3 }, // the top of the steep path, below the ledge Dart jumps from (clear of its lip: the third-person camera must see him)
   slideTo: { u: -22, v: -5.4 }, // where his slide down the loose earth stops
   slopeFoot: { u: -14, v: -4 },
   fence: { u: -11.5, v: -3.5 },
@@ -260,6 +260,9 @@ export function selesWorld(scene: Scene): SelesWorld {
     framing: 2,
     shadowReceivers: [ground, hill, paths],
     heightAt: selesHeight,
+    // Walked down the screen: in third person the camera looks that way, and from higher up (it
+    // would sit in the hilltop's tall grass behind the hero).
+    thirdPerson: { heading: Math.PI, beta: 0.78, radius: 10, lift: 1.2 },
     ownFill: [],
     shotAt: chapelShot,
     update: (focus, dt) => {
@@ -1673,6 +1676,7 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number): M
     place(src, root, x, z, s, rand() * Math.PI * 2).position.y = selesHeight(x, z);
   };
   const STEP = 1.7;
+  const startAt = selesPoint(SELES_SPOTS.start);
   for (let gu = U0; gu < U1; gu += STEP)
     for (let gv = V0; gv < V1; gv += STEP) {
       const u = gu + (rand() - 0.5) * STEP * 0.9;
@@ -1685,10 +1689,12 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number): M
       const roll = rand();
       if (depth > LEDGE_D + 1) {
         // Up on the ledge: tall grass everywhere, pines here and there (none over the path's top).
-        if (roll < 0.12 && !NET.occludes(x, z, 12, 2.5)) {
+        if (roll < 0.12 && !NET.occludes(x, z, 12, 2.5) && Math.hypot(x - startAt.x, z - startAt.z) > 12) {
           at(pine, x, z, 0.8 + rand() * 0.5);
         } else if (roll < 0.16) at(rock, x, z, 0.6 + rand() * 0.8);
-        for (let k = 0; k < 3; k++) at(grass, x + (rand() - 0.5) * STEP, z + (rand() - 0.5) * STEP, 1 + rand() * 0.6);
+        // Short grass just behind the path's top: the third-person camera looks down over it.
+        const behind = Math.hypot(x - startAt.x, z - startAt.z) < 12;
+        for (let k = 0; k < 3; k++) at(grass, x + (rand() - 0.5) * STEP, z + (rand() - 0.5) * STEP, behind ? 0.45 + rand() * 0.2 : 1 + rand() * 0.6);
         continue;
       }
       if (depth > LEDGE_D - 1.2) {

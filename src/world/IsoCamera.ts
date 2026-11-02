@@ -50,11 +50,13 @@ export class IsoCamera {
 
   // --- Scenic sections (a perspective shot, see World.view) -------------------------------
 
-  private view?: { beta: number; fov: number; radius: number; lift: number };
+  private view?: { beta: number; fov: number; radius: number; lift: number; heading?: number };
 
   /** Switch to a scenic perspective shot for this map (kept until the camera is rebuilt). */
-  scenic(view: { beta: number; fov: number; radius: number; lift: number }): void {
+  scenic(view: { beta: number; fov: number; radius: number; lift: number; heading?: number }): void {
     this.view = view;
+    this.camera.alpha = ISO_ALPHA + (view.heading ?? 0);
+    this._groundForward = this._groundRight = undefined; // the ground basis follows the heading
     this.camera.mode = Camera.PERSPECTIVE_CAMERA;
     this.camera.fov = view.fov;
     this.camera.beta = this.tilt = view.beta;
