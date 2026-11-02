@@ -22,6 +22,7 @@ import { AreaLight } from "./kit/areaLight";
 import { FWD, SIDE, TAN_BETA, fromUV, toUV } from "./kit/frame";
 import { chestProp, type ChestProp } from "./kit/chest";
 import { hash01 } from "./kit/noise";
+import { makeWater } from "./kit/water";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU, MAX_TEX } from "./kit/texels";
 import { TrailNet, type Knot, type TrailSample } from "./kit/trails";
@@ -331,7 +332,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   buildUndergrowth(scene, root, rand);
   shadeGround([...floors, ...track], trees);
   buildSunShafts(scene, root, rand);
-  buildSky(scene, fixed);
+  const seaTick = buildSky(scene, fixed);
   buildRavineMist(scene, fixed);
   buildPollen(scene);
 
@@ -354,6 +355,7 @@ export function forestWorld(scene: Scene): ForestWorld {
     presetAt: (p) => light.at(toUV(p.x, p.z).u),
     shotAt: (p) => forestShotAt(toUV(p.x, p.z)),
     update: (_focus, dt) => {
+      seaTick(dt);
       for (const c of chests.values()) c.tick(dt);
     },
     chests: new Map([...chests].map(([id, c]) => [id, c.at])),
@@ -1272,72 +1274,28 @@ function buildSignpost(scene: Scene, root: TransformNode): void {
  * catching the sunset, a band of sun glitter, slow swell. It lies under the whole map, so only
  * lines of sight that drop over the edge reach it — solid ground hides it everywhere else.
  */
-function buildSky(scene: Scene, parent: TransformNode): void {
+function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   const rand = mulberry32(0x5ea);
-  const tex = pixelTexture("forestSeaTex", scene, 64, 64, (ctx, w, h) => {
-    // Deep evening water: blue-violet, in long slow bands (texture x runs up the screen once laid
-    // on the map, so a swell — sideways on screen — is a vertical band here).
-    for (let x = 0; x < w; x++) {
-      const band = 0.88 + 0.12 * Math.sin((x / w) * Math.PI * 6);
-      for (let y = 0; y < h; y++) {
-        const k = band * (0.94 + rand() * 0.08);
-        ctx.fillStyle = rgb(52 * k, 66 * k, 112 * k);
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
-    for (let i = 0; i < 70; i++) {
-      // Swell crests: long pale strokes catching the sunset, a dark trough line beside each.
-      const x = (rand() * w) | 0;
-      const y = (rand() * h) | 0;
-      const len = 4 + ((rand() * 8) | 0);
-      ctx.fillStyle = rand() < 0.4 ? rgb(196, 150, 160) : rgb(120, 136, 186);
-      ctx.fillRect(x, y, 1, len);
-      ctx.fillStyle = rgb(34, 42, 80);
-      ctx.fillRect(x + 1, y + 1, 1, len - 1);
-    }
-  });
-  // Sun glitter: a warm streak across the water, in its own (additive) layer over the swell.
-  const glitter = pixelTexture("forestGlitterTex", scene, 64, 64, (ctx, w, h) => {
-    ctx.fillStyle = "rgb(0,0,0)";
-    ctx.fillRect(0, 0, w, h);
-    for (let i = 0; i < 160; i++) {
-      const x = (rand() * w) | 0;
-      const y = (rand() * h) | 0;
-      ctx.fillStyle = rand() < 0.6 ? rgb(255, 196, 130) : rgb(255, 236, 200);
-      ctx.fillRect(x, y, 1, 2 + ((rand() * 3) | 0));
-    }
-  });
-  const mat = new StandardMaterial("forestSeaMat", scene);
-  mat.emissiveTexture = tex;
-  mat.diffuseColor = Color3.Black();
-  mat.specularColor = Color3.Black();
-  mat.disableLighting = true;
-  mat.fogEnabled = false;
   const SEA_Y = -26;
-  const centre = forestPoint(100, 60);
-  const sea = MeshBuilder.CreateGround("forestSea", { width: 160, height: 120 }, scene);
-  sea.rotation.y = Math.atan2(FWD.x, FWD.z) - Math.PI / 2; // width along u, depth along v
-  sea.position.set(centre.x, SEA_Y, centre.z);
-  sea.material = mat;
+  // The sea (kit water): deep blue-violet, the rose sunset sky reflected towards the open sea, the
+  // swell moving. Seen from above (iso): only a faint sheen of the sun.
+  const sea = gridMesh("forestSea", scene, 12, 16, (i, j) => {
+    const p = forestPoint(20 + (j / 16) * 160, -10 + (i / 12) * 120);
+    return { x: p.x, y: SEA_Y, z: p.z, tu: j / 16, tv: i / 12 };
+  }, Vector3.Up());
   sea.parent = parent;
-  tex.uScale = 14;
-  tex.vScale = 11;
-
-  const gmat = new StandardMaterial("forestGlitterMat", scene);
-  gmat.emissiveTexture = glitter;
-  gmat.diffuseColor = Color3.Black();
-  gmat.specularColor = Color3.Black();
-  gmat.disableLighting = true;
-  gmat.fogEnabled = false;
-  gmat.alphaMode = Constants.ALPHA_ADD;
-  gmat.alpha = 0.8;
-  const glint = MeshBuilder.CreateGround("forestGlitter", { width: 160, height: 120 }, scene);
-  glint.rotation.y = sea.rotation.y;
-  glint.position.set(centre.x, SEA_Y + 0.05, centre.z);
-  glint.material = gmat;
-  glint.parent = parent;
-  glitter.uScale = 14;
-  glitter.vScale = 11;
+  const tick = makeWater(sea, {
+    deep: new Color3(0.1, 0.12, 0.24),
+    skyHorizon: new Color3(0.8, 0.5, 0.56),
+    skyZenith: new Color3(0.3, 0.32, 0.55),
+    sun: new Vector3(0.5, 0.25, 0.4),
+    sunColor: new Color3(1, 0.7, 0.45),
+    glint: 0.12,
+    waveScale: 3.5,
+    fogColor: new Color3(0.5, 0.4, 0.5),
+    fogStart: 400,
+    fogEnd: 900,
+  });
 
   // Surf breaking along the cliff's foot: a ragged white band where rock meets water.
   const foamTex = pixelTexture("forestFoamTex", scene, 64, 16, (ctx, w, h) => {
@@ -1371,34 +1329,6 @@ function buildSky(scene: Scene, parent: TransformNode): void {
   foam.parent = parent;
   foamTex.uScale = 1;
 
-  // The sunset on the water: an additive wash, dark at the cliff's foot and burning rose-orange
-  // towards the open sea — the horizon the camera can't see, felt through its reflection.
-  const glowTex = new DynamicTexture("forestSeaGlowTex", { width: 4, height: 256 }, scene, false);
-  const gctx = glowTex.getContext();
-  for (let y = 0; y < 256; y++) {
-    const f = y / 255; // 0 = at the cliff … 1 = far out
-    const a = Math.pow(f, 1.6);
-    gctx.fillStyle = `rgb(${Math.round(255 * a)},${Math.round(130 * a)},${Math.round(90 * a)})`;
-    gctx.fillRect(0, y, 4, 1);
-  }
-  glowTex.update();
-  const glowMat = new StandardMaterial("forestSeaGlowMat", scene);
-  glowMat.emissiveTexture = glowTex;
-  glowMat.diffuseColor = Color3.Black();
-  glowMat.specularColor = Color3.Black();
-  glowMat.disableLighting = true;
-  glowMat.fogEnabled = false;
-  glowMat.alphaMode = Constants.ALPHA_ADD;
-  const SEA_V0 = 8;
-  const SEA_V1 = 70;
-  const seaGlow = gridMesh("forestSeaGlow", scene, 8, 8, (i, j) => {
-    const v = SEA_V0 + (SEA_V1 - SEA_V0) * (i / 8);
-    const p = forestPoint(20 + 120 * (j / 8), v);
-    return { x: p.x, y: SEA_Y + 0.12, z: p.z, tu: 0.5, tv: i / 8 };
-  }, Vector3.Up());
-  seaGlow.material = glowMat;
-  seaGlow.parent = parent;
-
   // Sea stacks off the coast: dark rock pillars with surf at their feet, for scale and distance.
   const stackMat = scene.getMaterialByName("forestStrataMat") as StandardMaterial | null;
   const stackRand = mulberry32(0x57ac);
@@ -1421,20 +1351,19 @@ function buildSky(scene: Scene, parent: TransformNode): void {
     surf.parent = parent;
   }
 
-  // Emissive, so keep both out of the mode's glow layer (created after the world: first frame),
-  // then let the swell drift and the glitter shimmer.
+  // Unlit, so keep the sea and the surf out of the mode's glow layer (created after the world:
+  // first frame), then let the surf wash in and out.
   let t = 0;
   let excluded = false;
   scene.onBeforeRenderObservable.add(() => {
     if (!excluded) {
       excluded = true;
-      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, glint, foam, seaGlow]) layer.addExcludedMesh(m);
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, foam]) layer.addExcludedMesh(m);
     }
     t += scene.getEngine().getDeltaTime() / 1000;
-    tex.vOffset = t * 0.01;
-    glitter.vOffset = Math.floor(t * 3) * 0.37; // jumps, like light flickering on water
     foamTex.uOffset = Math.sin(t * 0.6) * 0.03; // the surf washing in and out
   });
+  return tick;
 }
 
 /**
