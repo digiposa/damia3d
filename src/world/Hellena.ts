@@ -196,10 +196,11 @@ export function hellenaWorld(scene: Scene): World {
 
   const grounds = buildGround(scene, root, rand, 24, WALL_U + 1, [[24, BRIDGE_U0], [BRIDGE_U1, WALL_U + 1]]);
   buildCliffFaces(scene, root, rand, rock, [[22, BRIDGE_U0], [BRIDGE_U1, WALL_U + 2]], true);
-  const seaTick = buildSea(scene, root, rand);
-  buildRightRocks(scene, root, rand, rock, 24, WALL_U - 1, false);
+  buildRightRocks(scene, root, rand, rock, 24, WALL_U - 1, true);
   const ticks = buildPrison(scene, root, rand, rock, wood);
   buildDrawbridge(scene, root, rand, wood);
+  const noGlow = buildHorizon(scene, root, rand, ticks, false);
+  let glowChecked = false;
 
   obstacles.index();
   for (const m of root.getChildMeshes()) {
@@ -208,19 +209,17 @@ export function hellenaWorld(scene: Scene): World {
   }
   return {
     clamp: clampToHellena,
-    preset: LIGHTING_PRESETS.hellenaDusk,
-    framing: 2,
+    preset: LIGHTING_PRESETS.hellenaCoast,
+    framing: 0,
+    // Scenic, like the coast (PS1: a low shot of the guard post under its overhang of rock).
+    view: { beta: 1.3, fov: 0.9, radius: 12, lift: 2.2 },
     shadowReceivers: grounds,
     ownFill: [],
-    // Nearing the drawbridge the view pulls back and up: the prison rises over the frame.
-    shotAt: (p) => {
-      const { u } = toUV(p.x, p.z);
-      const k = smooth(30, 44, u);
-      return k > 0 ? { zoom: 1 - 0.28 * k, offset: fromUV(4 * k, 0) } : null;
-    },
     update: (_focus, dt) => {
-      seaTick(dt);
       for (const t of ticks) t(dt);
+      if (glowChecked) return;
+      glowChecked = true; // the mode's glow layer is created after the world
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of noGlow) layer.addExcludedMesh(m);
     },
   };
 }
@@ -345,30 +344,6 @@ function buildCliffFaces(scene: Scene, root: TransformNode, rand: () => number, 
   strip("hellenaGapFar", 30, (t) => fromUV(BRIDGE_U1, coastEdge(BRIDGE_U1) + t * 24), () => down);
 }
 
-/** The sea below the cliffs at dusk: violet near, burning rose-orange towards the open sea up the
- *  screen (the sunset behind the prison), a slow swell, sea stacks. Unlit, out of the fog. */
-function buildSea(scene: Scene, root: TransformNode, rand: () => number): (dt: number) => void {
-  const sea = gridMesh("hellenaSea", scene, 16, 24, (i, j) => {
-    const u = -40 + (j / 24) * 200;
-    const v = -90 + (i / 16) * 140;
-    const p = fromUV(u, v);
-    return { x: p.x, y: SEA_Y, z: p.z, tu: j / 24, tv: i / 16 };
-  }, Vector3.Up());
-  sea.parent = root;
-  // Seen from above, the sun would glint off every wave: just a faint sheen here.
-  const tick = makeWater(sea, { ...HELLENA_WATER, waveScale: 3.5, glint: 0.12, fogStart: 400, fogEnd: 900 });
-  // Sea stacks off the coast, foam at their feet.
-  const stackMat = matte("hellenaStack", scene, undefined, new Color3(0.22, 0.2, 0.26));
-  for (const [u, v, h, r] of [[8, -18, 9, 2.4], [26, -24, 12, 3], [40, -15, 7, 1.8], [20, -34, 14, 3.6]] as const) {
-    const at = fromUV(u, v);
-    const stack = MeshBuilder.CreateCylinder("hellenaSeaStack", { height: h, diameterTop: r * 0.8, diameterBottom: r * 2, tessellation: 8, subdivisions: 4 }, scene);
-    jitter(stack, 0.5, rand);
-    stack.position.set(at.x, SEA_Y + h / 2 - 0.5, at.z);
-    stack.material = stackMat;
-    stack.parent = root;
-  }
-  return tick;
-}
 
 /** Rocks heaped along the right of the path, rising into a rough wall (the PS1 cliff on the right). */
 function buildRightRocks(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial, u0: number, u1: number, tall: boolean): InstancedMesh[] {
@@ -575,7 +550,7 @@ function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: 
  * horizon catching the sunset, and the prison: a great leaning rock far out on the water, its
  * windows lit. All unlit and out of the fog (the colour is all emissive, tinted per vertex).
  */
-function buildHorizon(scene: Scene, root: TransformNode, rand: () => number, ticks: ((dt: number) => void)[]): Mesh[] {
+function buildHorizon(scene: Scene, root: TransformNode, rand: () => number, ticks: ((dt: number) => void)[], farPrison = true): Mesh[] {
   const noGlow: Mesh[] = []; // big unlit surfaces: kept out of the glow layer (it would bloom them white)
   const unlit = (name: string): StandardMaterial => {
     const m = new StandardMaterial(name, scene);
@@ -706,8 +681,11 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number, tic
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 24, tv: i / 24 };
   }, Vector3.Up());
   sea.parent = root;
-  ticks.push(makeWater(sea, HELLENA_WATER));
+  // Close below the guard post the sun would glint off every wave: just a sheen there.
+  ticks.push(makeWater(sea, farPrison ? HELLENA_WATER : { ...HELLENA_WATER, glint: 0.15 }));
   noGlow.push(sea);
+
+  if (!farPrison) return noGlow; // at the guard post we stand at its foot
 
   // The prison, far out (PS1): one enormous raw rock rising from the sea like a broken tooth,
   // leaning to the left, broad at its foot, its top snapped off jagged. Rough works cling to its
@@ -937,119 +915,158 @@ function spray(scene: Scene): (dt: number) => void {
 // --- The prison ------------------------------------------------------------------------------------
 
 /**
- * The prison rock and its guard post (PS1): a great dark rock rising over the landing, its front a
- * wall of rock with windows burning orange and wooden balconies up it, the gate at its foot; a
- * wooden lookout tower and its stairs at the cliff's edge; torches.
+ * The guard post at the prison rock's foot (PS1): the landing sheltered under a huge overhang of
+ * rock hung with stalactites; the rock face behind with arched openings glowing gold behind their
+ * grilles and the barred iron gate; wooden walkways and lanterns clinging to the rock above; a
+ * lookout on stilts at the cliff's edge with its stairs; torches.
  */
 function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial, wood: StandardMaterial): ((dt: number) => void)[] {
   const ticks: ((dt: number) => void)[] = [];
-  const glow = new StandardMaterial("hellenaWindowGlow", scene);
-  glow.disableLighting = true;
-  glow.emissiveColor = new Color3(1, 0.62, 0.26);
-  const dark = matte("hellenaDark", scene, undefined, new Color3(0.03, 0.02, 0.03));
 
-  // The rock mass: lumps rising behind and above the front wall, leaning over it a little.
-  for (const [du, dv, rv, ru, h] of [[6, 0, 16, 9, 30], [10, -12, 9, 7, 22], [9, 13, 10, 8, 20], [3, 4, 9, 4, 26], [14, 2, 14, 10, 34]] as const) {
-    const at = fromUV(WALL_U + du, dv);
-    const lump = MeshBuilder.CreateSphere("hellenaRockMass", { diameter: 2, segments: 12 }, scene);
-    lump.scaling.set(rv, h / 2, ru);
-    lump.rotation.y = Math.atan2(-1, 1);
-    lump.position.set(at.x, h * 0.35, at.z);
-    jitter(lump, 0.08, rand);
-    lump.material = rock;
-    lump.parent = root;
-    gradeColors(lump, [0.7, 0.66, 0.78], [1.3, 1.22, 1.3]);
-  }
-  // The front wall over the landing.
-  const wallAt = fromUV(WALL_U, 0);
-  const wall = MeshBuilder.CreateBox("hellenaFrontWall", { width: 30, height: 14, depth: 2.4 }, scene);
-  wall.position.set(wallAt.x, 7, wallAt.z);
-  wall.rotation.y = -Math.PI / 4; // along v, facing down the screen
-  wall.material = rock;
-  wall.parent = root;
-  obstacles.addBox(wallAt.x, wallAt.z, 15, 1.4, -Math.PI / 4);
-
-  /** A point on the wall's face: `v` along it, `y` up; `out` in front of it. */
+  /** A point on the rock face: `v` along it, `y` up; `out` in front of it. */
   const onWall = (v: number, y: number, out = 0): Vector3 => fromUV(WALL_U - 1.25 - out, v).add(new Vector3(0, y, 0));
   const facing = -Math.PI / 4;
-
-  // The gate: a dark arched opening, a stone frame, its doors standing open.
   const G = HELLENA_SPOTS.gate;
-  const gate = MeshBuilder.CreatePlane("hellenaGate", { width: 3, height: 4 }, scene);
-  gate.position.copyFrom(onWall(G.v, 2, 0.02));
-  gate.rotation.y = facing;
-  gate.material = dark;
-  gate.parent = root;
-  for (let k = 0; k <= 8; k++) {
-    const a = (k / 8) * Math.PI;
-    const stone = MeshBuilder.CreateBox("hellenaGateArch", { width: 0.5, height: 0.4, depth: 0.5 }, scene);
-    stone.position.copyFrom(onWall(G.v + Math.cos(a) * 1.7, 3.2 + Math.sin(a) * 1.4, 0.1));
-    stone.rotation.set(0, facing, 0);
-    stone.material = rock;
-    stone.parent = root;
+
+  /** A craggy lump of rock (flattened icosphere, knobbly, flat-shaded, a cold rim on top). */
+  const crag = (name: string, at: Vector3, r: number, sy: number, sx = 1): Mesh => {
+    const m = MeshBuilder.CreateIcoSphere(name, { radius: r, subdivisions: 3 }, scene);
+    const p = m.getVerticesData("position")!;
+    for (let k = 0; k < p.length; k += 3) {
+      const n = 1 + 0.22 * (noise2(p[k] * 0.5 + at.x, p[k + 2] * 0.5 + p[k + 1] * 0.7) - 0.5) * 2;
+      p[k] *= n * sx;
+      p[k + 1] *= n * sy;
+      p[k + 2] *= n * sx;
+    }
+    m.setVerticesData("position", p);
+    m.convertToFlatShadedMesh();
+    m.position.copyFrom(at);
+    m.material = rock;
+    m.parent = root;
+    gradeColors(m, [0.42, 0.42, 0.5], [1, 1.06, 1.25]);
+    return m;
+  };
+
+  // The rock face behind the landing: big crags shoulder to shoulder, rising into the prison rock.
+  for (let v = -12; v <= 16; v += 3.2) {
+    crag("hellenaFace", fromUV(WALL_U + 1.6 + rand() * 1.4, v).add(new Vector3(0, 3 + rand() * 2, 0)), 3.6 + rand() * 1.4, 1.6);
+    crag("hellenaFaceHigh", fromUV(WALL_U + 4 + rand() * 2, v + 1.6).add(new Vector3(0, 11 + rand() * 4, 0)), 4.4 + rand() * 1.6, 1.2);
   }
-  for (const s of [-1, 1]) {
-    const jamb = MeshBuilder.CreateBox("hellenaGateJamb", { width: 0.5, height: 3.4, depth: 0.5 }, scene);
-    jamb.position.copyFrom(onWall(G.v + s * 1.7, 1.7, 0.1));
-    jamb.rotation.y = facing;
-    jamb.material = rock;
-    jamb.parent = root;
-    const door = MeshBuilder.CreateBox("hellenaGateDoor", { width: 1.4, height: 3.4, depth: 0.15 }, scene);
-    const hinge = onWall(G.v + s * 1.5, 1.7, 0.6);
-    door.position.copyFrom(hinge);
-    door.rotation.y = facing + s * 1.2;
-    door.material = wood;
-    door.parent = root;
+  obstacles.addBox(fromUV(WALL_U + 1, 2).x, fromUV(WALL_U + 1, 2).z, 15, 1.4, facing);
+
+  // The overhang: a great lip of rock jutting out over the landing, high up, its underside hung
+  // with stalactites (PS1: the guard post sits in the mouth of a cave).
+  const lip: Vector3[] = [];
+  for (let v = -14; v <= 14; v += 2.6) {
+    const reach = 5 + 2.5 * Math.cos(v * 0.12) + rand() * 1.5; // furthest out in the middle
+    const at = fromUV(WALL_U - reach * 0.55, v).add(new Vector3(0, 10.5 + rand() * 1.5, 0));
+    crag("hellenaOverhang", at, 3.2 + rand() * 1.2, 0.55, 1.4);
+    lip.push(at);
+  }
+  for (let k = 0; k < 26; k++) {
+    const a = lip[(rand() * lip.length) | 0];
+    const h = 1.2 + rand() * 2.6;
+    const st = MeshBuilder.CreateCylinder("hellenaStalactite", { height: h, diameterTop: 0.9 + rand() * 0.6, diameterBottom: 0, tessellation: 5 }, scene);
+    st.position.set(a.x + (rand() - 0.5) * 4, a.y - 1.4 - h / 2, a.z + (rand() - 0.5) * 4);
+    st.material = rock;
+    st.parent = root;
+    gradeColors(st, [0.4, 0.4, 0.48], [0.8, 0.82, 0.95]);
   }
 
-  // Windows burning orange, round-topped, up the rock (bloom catches them).
-  for (const [v, y, w] of [[-8, 4.5, 1.2], [-4.5, 3, 1.6], [8.5, 3.6, 1.6], [11, 7.5, 1.2], [-10, 9.5, 1], [2, 10.5, 1.4], [6, 12.5, 1]] as const) {
-    const win = MeshBuilder.CreatePlane("hellenaWindow", { width: w, height: w * 1.1 }, scene);
-    win.position.copyFrom(onWall(v, y, 0.03));
-    win.rotation.y = facing;
-    win.material = glow;
-    win.parent = root;
-    const top = MeshBuilder.CreateDisc("hellenaWindowTop", { radius: w / 2, tessellation: 12, arc: 0.5 }, scene);
-    top.position.copyFrom(onWall(v, y + w * 0.55, 0.03));
+  // Arched openings in the face, glowing gold behind their grilles (PS1), and the barred iron gate.
+  const glow = new StandardMaterial("hellenaWindowGlow", scene);
+  glow.disableLighting = true;
+  glow.emissiveColor = new Color3(0.78, 0.46, 0.16); // warm, not blown out by the bloom
+  const dark = matte("hellenaDark", scene, undefined, new Color3(0.03, 0.02, 0.03));
+  const iron = matte("hellenaGateIron", scene, undefined, new Color3(0.14, 0.13, 0.15));
+  const arched = (v: number, y: number, w: number, h: number, mat: StandardMaterial): void => {
+    const pane = MeshBuilder.CreatePlane("hellenaOpening", { width: w, height: h }, scene);
+    pane.position.copyFrom(onWall(v, y + h / 2, 0.05));
+    pane.rotation.y = facing;
+    pane.material = mat;
+    pane.parent = root;
+    const top = MeshBuilder.CreateDisc("hellenaOpeningTop", { radius: w / 2, tessellation: 14, arc: 0.5 }, scene);
+    top.position.copyFrom(onWall(v, y + h, 0.05));
     top.rotation.y = facing;
-    top.material = glow;
+    top.material = mat;
     top.parent = root;
-    // Bars.
-    for (let k = -1; k <= 1; k++) {
-      const bar = MeshBuilder.CreateBox("hellenaWindowBar", { width: 0.06, height: w * 1.4, depth: 0.06 }, scene);
-      bar.position.copyFrom(onWall(v + k * w * 0.28, y + w * 0.1, 0.08));
+    // A frame of dressed stone round it.
+    for (let k = 0; k <= 8; k++) {
+      const a = (k / 8) * Math.PI;
+      const stone = MeshBuilder.CreateBox("hellenaArchStone", { width: 0.4, height: 0.32, depth: 0.5 }, scene);
+      stone.position.copyFrom(onWall(v + Math.cos(a) * (w / 2 + 0.2), y + h + Math.sin(a) * (w / 2 + 0.2), 0.1));
+      stone.rotation.set(0, facing, 0);
+      stone.material = rock;
+      stone.parent = root;
+    }
+  };
+  const grille = (v: number, y: number, w: number, h: number): void => {
+    for (let x = -w / 2 + 0.3; x < w / 2; x += 0.45) {
+      const bar = MeshBuilder.CreateBox("hellenaBar", { width: 0.07, height: h + w * 0.4, depth: 0.07 }, scene);
+      bar.position.copyFrom(onWall(v + x, y + (h + w * 0.4) / 2, 0.12));
       bar.rotation.y = facing;
-      bar.material = dark;
+      bar.material = iron;
       bar.parent = root;
     }
+    for (const yy of [y + h * 0.35, y + h * 0.8]) {
+      const rail = MeshBuilder.CreateBox("hellenaBarRail", { width: w, height: 0.08, depth: 0.08 }, scene);
+      rail.position.copyFrom(onWall(v, yy, 0.12));
+      rail.rotation.y = facing;
+      rail.material = iron;
+      rail.parent = root;
+    }
+  };
+  for (const [v, w] of [[5.4, 2.4], [9, 2.4], [-5.2, 2]] as const) {
+    arched(v, 0.2, w, 1.8, glow);
+    grille(v, 0.2, w, 1.8);
   }
+  // The gate: tall, dark inside, a faint glow far in, a heavy iron portcullis.
+  arched(G.v, 0, 3, 3.6, dark);
+  const deep = MeshBuilder.CreatePlane("hellenaGateGlow", { width: 1.2, height: 1.6 }, scene);
+  deep.position.copyFrom(onWall(G.v + 0.3, 1.2, 0.07));
+  deep.rotation.y = facing;
+  const dg = new StandardMaterial("hellenaGateGlowMat", scene);
+  dg.disableLighting = true;
+  dg.emissiveColor = new Color3(0.35, 0.18, 0.06);
+  deep.material = dg;
+  deep.parent = root;
+  grille(G.v, 0, 3, 3.6);
 
-  // Wooden balconies up the face, on posts and braces, with railings.
-  for (const [v, y, len] of [[-6, 6, 6], [7, 9, 5], [-1, 13, 7]] as const) {
-    const deck = MeshBuilder.CreateBox("hellenaBalcony", { width: len, height: 0.2, depth: 1.6 }, scene);
-    deck.position.copyFrom(onWall(v, y, 0.8));
+  // Wooden walkways clinging to the rock above, with railings and hanging lanterns.
+  const lantern = new StandardMaterial("hellenaLantern", scene);
+  lantern.disableLighting = true;
+  lantern.emissiveColor = new Color3(1, 0.7, 0.32);
+  for (const [v, y, len] of [[-3, 5.4, 7], [8, 7.8, 6], [1, 13.5, 8]] as const) {
+    const deck = MeshBuilder.CreateBox("hellenaWalkway", { width: len, height: 0.2, depth: 1.5 }, scene);
+    deck.position.copyFrom(onWall(v, y, 0.7));
     deck.rotation.y = facing;
     deck.material = wood;
     deck.parent = root;
-    for (let k = 0; k <= len; k += 1.2) {
-      const post = MeshBuilder.CreateBox("hellenaRail", { width: 0.08, height: 0.9, depth: 0.08 }, scene);
-      post.position.copyFrom(onWall(v - len / 2 + k, y + 0.5, 1.55));
+    for (let k = 0; k <= len; k += 1) {
+      const post = MeshBuilder.CreateBox("hellenaWalkPost", { width: 0.08, height: 0.9, depth: 0.08 }, scene);
+      post.position.copyFrom(onWall(v - len / 2 + k, y + 0.5, 1.4));
       post.material = wood;
       post.parent = root;
     }
-    const rail = MeshBuilder.CreateBox("hellenaRailBar", { width: len, height: 0.07, depth: 0.07 }, scene);
-    rail.position.copyFrom(onWall(v, y + 0.95, 1.55));
+    const rail = MeshBuilder.CreateBox("hellenaWalkRail", { width: len, height: 0.07, depth: 0.07 }, scene);
+    rail.position.copyFrom(onWall(v, y + 0.95, 1.4));
     rail.rotation.y = facing;
     rail.material = wood;
     rail.parent = root;
     for (const s of [-1, 1]) {
-      const brace = MeshBuilder.CreateBox("hellenaBrace", { width: 0.12, height: 2, depth: 0.12 }, scene);
-      brace.position.copyFrom(onWall(v + s * (len / 2 - 0.5), y - 0.9, 0.55));
-      brace.rotation.set(0, facing, 0);
+      const brace = MeshBuilder.CreateBox("hellenaWalkBrace", { width: 0.12, height: 1.8, depth: 0.12 }, scene);
+      brace.position.copyFrom(onWall(v + s * (len / 2 - 0.4), y - 0.8, 0.4));
+      brace.rotation.y = facing;
       brace.rotate(new Vector3(1, 0, 1).normalize(), 0.5);
       brace.material = wood;
       brace.parent = root;
     }
+    const lamp = MeshBuilder.CreateSphere("hellenaLanternGlass", { diameter: 0.35, segments: 6 }, scene);
+    lamp.position.copyFrom(onWall(v + len / 2 - 0.6, y - 0.45, 1.3));
+    lamp.material = lantern;
+    lamp.parent = root;
+    // A glowing doorway onto each walkway.
+    arched(v - len / 4, y + 0.1, 1.1, 1.5, glow);
   }
 
   // The lookout tower at the cliff's edge, its stairs coming down to the landing.
@@ -1095,7 +1112,7 @@ function buildPrison(scene: Scene, root: TransformNode, rand: () => number, rock
   obstacles.add(T.x, T.z, 1.8);
 
   // Torches either side of the gate and at the tower's foot; a lamp on the drawbridge's far post.
-  for (const at of [onWall(G.v - 2.6, 2.6, 0.4), onWall(G.v + 2.6, 2.6, 0.4), fromUV(54, -3).add(new Vector3(0, 1.6, 0)), fromUV(BRIDGE_U1 + 0.3, 1.8).add(new Vector3(0, 1.8, 0))]) {
+  for (const at of [onWall(G.v - 2.6, 2.6, 0.4), onWall(G.v + 2.6, 2.6, 0.4), fromUV(54, -3).add(new Vector3(0, 1.6, 0)), fromUV(BRIDGE_U1 + 0.3, 1.8).add(new Vector3(0, 1.8, 0)), new Vector3(T.x + 1.1, TH + 1.1, T.z - 1.1)]) {
     ticks.push(torch(scene, root, rand, at, wood));
   }
   return ticks;

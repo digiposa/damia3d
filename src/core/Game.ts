@@ -164,7 +164,7 @@ export class Game implements GameHost {
         void this.launch((s, i, h) => new StoryMode(s, i, h));
         break;
       case "Explore":
-        startNewStory(at); // a fresh game, dropped on the chosen map
+        startNewStory(at, ["damia"]); // a fresh game on the chosen map, Damia leading (map testing)
         void this.launch((s, i, h) => new StoryMode(s, i, h));
         break;
       case "Survival":
