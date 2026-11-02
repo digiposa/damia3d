@@ -421,63 +421,109 @@ function deadTree(scene: Scene, root: TransformNode, rand: () => number, at: Vec
  * from afar (fog darkens it into a silhouette), so plain tiled rock, no painting.
  */
 function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial): void {
-  const U0 = 68;
+  const U0 = 69.5; // overlapping the painted ground's far edge (70)
   const U1 = 292;
-  const N = 60;
-  const at = (j: number): { u: number; t: number; left: number; right: number; y: number } => {
+  const N = 80;
+  const COLS = 16;
+  const at = (j: number): { u: number; t: number; left: number; right: number; y: number; path: number; pw: number } => {
     const u = U0 + (j / N) * (U1 - U0);
     const t = (u - U0) / (U1 - U0);
     const centre = -12 * smooth(0.2, 1, t); // drifting left, towards the prison
+    // The path's line: where the painted path leaves it (v -1.5), drifting with the spit.
+    const path = centre - 1.5 * (1 - smooth(0, 0.2, t));
     const half = 2.6 + 4 * (1 - t) + 1.2 * Math.sin(u * 0.09);
-    const left = Math.min(coastEdge(u), centre - half) * (1 - smooth(0, 0.1, t)) + (centre - half) * smooth(0, 0.1, t);
-    const right = (17 * (1 - smooth(0, 0.25, t)) + (centre + half) * smooth(0, 0.25, t));
+    const e = smooth(0, 0.1, t);
+    const left = Math.min(coastEdge(u), centre - half) * (1 - e) + (centre - half) * e;
+    const right = 18 * (1 - smooth(0, 0.25, t)) + (centre + half) * smooth(0, 0.25, t);
     const y = (SEA_Y + 5) * smooth(0.08, 1, t) ** 0.8;
-    return { u, t, left, right, y };
+    return { u, t, left, right, y, path, pw: 1.75 * (1 - 0.45 * t) };
   };
-  const top = gridMesh("hellenaSpitTop", scene, 6, N, (i, j) => {
+  /** The spit's back at a point: flat along the path, humped away from it (low near the start). */
+  const lift = (a: ReturnType<typeof at>, v: number): number => {
+    const off = Math.max(0, Math.abs(v - a.path) - a.pw - 0.6);
+    return Math.min(1, off / 4) * 1.6 * smooth(0.02, 0.3, a.t) * (0.6 + 0.4 * Math.sin(a.u * 0.4 + v));
+  };
+  // Its back: the same dark earth as the ground off the path, so the two meet without a seam.
+  const earth = pixelTexture("hellenaSpitEarthTex", scene, 64, 64, (ctx, w, h) => {
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const k = (0.6 + 0.4 * noise2(x / 6, y / 6)) * (0.85 + rand() * 0.25);
+        ctx.fillStyle = rand() < 0.05 ? rgb(104, 92, 70) : rgb(70 * k, 62 * k, 66 * k);
+        ctx.fillRect(x, y, 1, 1);
+      }
+  });
+  earth.wrapU = earth.wrapV = Texture.WRAP_ADDRESSMODE;
+  const top = gridMesh("hellenaSpitTop", scene, COLS, N, (i, j) => {
     const a = at(j);
-    const f = i / 6;
-    const v = a.left + (a.right - a.left) * f;
+    const v = a.left + (a.right - a.left) * (i / COLS);
     const p = fromUV(a.u, v);
-    // Its back humped either side of the path's line (low near the path's end, so it doesn't wall the view).
-    const side = Math.abs(f - 0.45) * 2;
-    const bump = side * 1.6 * smooth(0.02, 0.3, a.t) * (0.6 + 0.4 * Math.sin(a.u * 0.4 + f * 5));
-    return { x: p.x, y: a.y + bump, z: p.z, tu: a.u / 4, tv: v / 4 };
+    return { x: p.x, y: a.y + lift(a, v), z: p.z, tu: a.u / 3.2, tv: v / 3.2 };
   }, Vector3.Up());
-  top.material = rock;
+  top.material = matte("hellenaSpitEarth", scene, earth);
   top.parent = root;
-  // The path's line carries on along it, paler than the rock either side.
-  const tc: number[] = [];
-  const tp = top.getVerticesData("position")!;
-  for (let k = 0, n = 0; k < tp.length; k += 3, n++) {
-    const i = Math.floor(n / (N + 1));
-    const onPath = 1 - Math.min(1, Math.abs(i / 6 - 0.45) * 5);
-    const c = 0.62 + 0.3 * onPath;
-    tc.push(c, c, c * 1.12, 1);
+  // The path itself, carrying on along the spit: the same cobbles, a ribbon on its back.
+  const cobbles = pixelTexture("hellenaCobbleTex", scene, 64, 64, (ctx, w, h) => {
+    const rows = 8;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const row = Math.floor((y / h) * rows);
+        const fv = (y / h) * rows - row;
+        const cu = (x / w) * 7 + (row % 2) * 0.5;
+        const cell = Math.floor(cu);
+        const fu = cu - cell;
+        const joint = fu < 0.1 || fv < 0.12;
+        const k = (0.7 + 0.4 * hash01(cell, row)) * (0.9 + rand() * 0.14) * (fv > 0.7 ? 0.86 : fv < 0.3 ? 1.1 : 1);
+        ctx.fillStyle = joint ? rgb(34, 34, 44) : rgb(92 * k, 94 * k, 112 * k);
+        ctx.fillRect(x, y, 1, 1);
+      }
+  });
+  cobbles.wrapU = cobbles.wrapV = Texture.WRAP_ADDRESSMODE;
+  let along = 0;
+  let prev: Vector3 | undefined;
+  const lens: number[] = [];
+  for (let j = 0; j <= N; j++) {
+    const a = at(j);
+    const p = fromUV(a.u, a.path);
+    if (prev) along += Vector3.Distance(prev, p);
+    lens.push(along);
+    prev = p;
   }
-  top.setVerticesData("color", tc);
+  const ribbon = gridMesh("hellenaSpitPath", scene, 4, N, (i, j) => {
+    const a = at(j);
+    const ragged = i === 0 || i === 4 ? (hash01(j, i) - 0.5) * 0.5 : 0;
+    const v = a.path + (i / 4 - 0.5) * 2 * a.pw + ragged;
+    const p = fromUV(a.u, v);
+    return { x: p.x, y: a.y + lift(a, v) + 0.03, z: p.z, tu: lens[j] / 2.9, tv: (i / 4) * (2 * a.pw) / 2.9 };
+  }, Vector3.Up());
+  const pathMat = matte("hellenaSpitPathMat", scene, cobbles);
+  pathMat.zOffset = -2;
+  ribbon.material = pathMat;
+  ribbon.parent = root;
   for (const side of [0, 1]) {
     const wall = gridMesh(`hellenaSpitSide${side}`, scene, 3, N, (i, j) => {
       const a = at(j);
       const v = side === 0 ? a.left : a.right;
       const out = (i / 3) * 3 * (side === 0 ? -1 : 1);
       const p = fromUV(a.u, v + out + (i > 0 && i < 3 ? (rand() - 0.5) : 0));
-      return { x: p.x, y: a.y + (SEA_Y - a.y) * (i / 3), z: p.z, tu: a.u / 4, tv: i };
+      const yTop = a.y + lift(a, v);
+      return { x: p.x, y: yTop + (SEA_Y - yTop) * (i / 3), z: p.z, tu: a.u / 4, tv: i };
     }, side === 0 ? fromUV(0, -1) : fromUV(0, 1));
     wall.material = rock;
     wall.parent = root;
     wall.convertToFlatShadedMesh();
   }
-  // Boulders along its back, thinning out towards the prison.
+  // Boulders along its back, off the path, thinning out towards the prison.
   for (let j = 2; j < N - 4; j += 1) {
     const a = at(j);
     if (rand() > 0.85 - a.t * 0.5) continue;
     const r = (1 + rand() * 2.2) * (1 - a.t * 0.6);
-    const v = a.left + (a.right - a.left) * (0.55 + rand() * 0.4);
+    const side = rand() < 0.75 ? 1 : -1;
+    const v = side > 0 ? a.path + a.pw + r + rand() * Math.max(0, a.right - a.path - a.pw - 2 * r) : a.path - a.pw - r - rand() * 0.5;
+    if (v < a.left + 0.5 || v > a.right - 0.5) continue;
     const p = fromUV(a.u + (rand() - 0.5) * 3, v);
     const lump = MeshBuilder.CreateIcoSphere("hellenaSpitRock", { radius: r, subdivisions: 1 }, scene);
     lump.scaling.y = 0.7 + rand() * 0.5;
-    lump.position.set(p.x, a.y + r * 0.3, p.z);
+    lump.position.set(p.x, a.y + lift(a, v) + r * 0.3, p.z);
     jitter(lump, 0.2 * r, rand);
     lump.material = rock;
     lump.parent = root;
