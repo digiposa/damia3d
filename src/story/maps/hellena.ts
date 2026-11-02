@@ -14,7 +14,15 @@ export const hellenaCoastMap: MapFactory = (scene) => ({
   world: hellenaCoastWorld(scene),
   entries: { fromForest: P(HELLENA_SPOTS.coastStart), fromGate: P({ u: HELLENA_SPOTS.coastEnd.u - 4, v: 0 }) },
   encounterAt: () => null, // canon: no battles on the coastal path
-  start(api) {
+  start(api, entry) {
+    if (entry === "fromForest") {
+      // The arrival: the view shows the prison first, then comes back to Dart (World.shotAt).
+      void (async () => {
+        api.lock();
+        await api.wait(3.6);
+        api.unlock();
+      })();
+    }
     api.trigger(P(HELLENA_SPOTS.coastBack), 2.2, () => api.goto("forest", "fromHellena"));
     api.trigger(P(HELLENA_SPOTS.coastEnd), 2.6, () => api.goto("hellena", "fromCoast"));
   },

@@ -16,6 +16,7 @@ import { mulberry32, pixelTexture, rgb } from "./paint";
 import { fromUV, toUV } from "./kit/frame";
 import { grassSource, rockSource } from "./kit/flora";
 import { gradeColors, gridMesh, jitter, limb, matte, place } from "./kit/mesh";
+import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { hash01, noise2 } from "./kit/noise";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU } from "./kit/texels";
@@ -122,15 +123,28 @@ export function hellenaCoastWorld(scene: Scene): World {
   const rock = rockMaterial(scene, rand);
   const grounds = buildGround(scene, root, rand, -12, 70, [[-12, 70]]);
   buildCliffFaces(scene, root, rand, rock, [[-14, 72]], false);
-  buildRightRocks(scene, root, rand, rock, -12, 70, true);
+  const tufts = buildRightRocks(scene, root, rand, rock, -12, 70, true);
   deadTree(scene, root, rand, fromUV(26, 3.8));
   buildSpit(scene, root, rand, rock);
-  const noGlow = buildHorizon(scene, root, rand);
+  const ticks: ((dt: number) => void)[] = [];
+  const noGlow = buildHorizon(scene, root, rand, ticks);
+  ticks.push(seaBirds(scene, root, rand), spray(scene));
+  // The wind off the sea: the tufts lean and sway (each its own phase).
+  const phase = tufts.map(() => rand() * 6);
+  let wind = 0;
+  ticks.push((dt) => {
+    wind += dt;
+    tufts.forEach((g, i) => (g.rotation.z = 0.12 + 0.1 * Math.sin(wind * 2.2 + phase[i])));
+  });
+  // The arrival: the view starts out along the path, by the prison, and draws back to Dart (PS1:
+  // the place is shown first).
+  let intro = 0;
+  const INTRO = 4;
   let glowChecked = false;
   obstacles.index();
   for (const m of root.getChildMeshes()) {
     m.isPickable = false;
-    m.freezeWorldMatrix();
+    if (!m.name.startsWith("hellenaGull") && !tufts.includes(m as InstancedMesh)) m.freezeWorldMatrix();
   }
   return {
     clamp: clampToHellena,
@@ -139,7 +153,15 @@ export function hellenaCoastWorld(scene: Scene): World {
     view: { beta: 1.32, fov: 0.85, radius: 11, lift: 1.4 },
     shadowReceivers: grounds,
     ownFill: [],
-    update: () => {
+    shotAt: (p) => {
+      const { u } = toUV(p.x, p.z);
+      if (u > 8 || intro >= INTRO) return null; // only on arriving from the Forest
+      const k = 1 - smooth(0.6, INTRO, intro);
+      return { zoom: 1, offset: fromUV(30 * k, -6 * k) };
+    },
+    update: (_focus, dt) => {
+      intro += dt;
+      for (const t of ticks) t(dt);
       if (glowChecked) return;
       glowChecked = true; // the mode's glow layer is created after the world
       for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of noGlow) layer.addExcludedMesh(m);
@@ -365,7 +387,8 @@ function buildSea(scene: Scene, root: TransformNode, rand: () => number): void {
 }
 
 /** Rocks heaped along the right of the path, rising into a rough wall (the PS1 cliff on the right). */
-function buildRightRocks(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial, u0: number, u1: number, tall: boolean): void {
+function buildRightRocks(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial, u0: number, u1: number, tall: boolean): InstancedMesh[] {
+  const tufts: InstancedMesh[] = [];
   const small = rockSource(scene, rand);
   const grass = grassSource(scene, rand);
   // On the coast (seen low from behind) the rocks rise into a high craggy wall (PS1).
@@ -376,40 +399,70 @@ function buildRightRocks(scene: Scene, root: TransformNode, rand: () => number, 
       const v = 0.5 + dv + (rand() - 0.5) * 1.4;
       const at = fromUV(u + (rand() - 0.5) * 1.6, v);
       const r = (0.9 + rand() * 0.8) * s;
-      const lump = MeshBuilder.CreateIcoSphere("hellenaBoulder", { radius: r, subdivisions: 2 }, scene);
+      // On the coast: lumpier (PS1: a knobbly, crumbly rock face), lit cold blue on its tops.
+      const lump = MeshBuilder.CreateIcoSphere("hellenaBoulder", { radius: r, subdivisions: tall ? 3 : 2 }, scene);
       lump.scaling.y = 0.75 + rand() * 0.6;
       lump.position.set(at.x, r * (tall && dv > 9 ? 0.9 : 0.35), at.z);
-      jitter(lump, 0.25 * r, rand);
+      jitter(lump, (tall ? 0.16 : 0.25) * r, rand);
+      if (tall) {
+        // Knobs: push each vertex out by a little noise of its own.
+        const p = lump.getVerticesData("position")!;
+        for (let k = 0; k < p.length; k += 3) {
+          const n = 1 + 0.18 * (noise2(p[k] * 1.3 + u, p[k + 2] * 1.3 + p[k + 1]) - 0.5) * 2;
+          p[k] *= n;
+          p[k + 1] *= n;
+          p[k + 2] *= n;
+        }
+        lump.setVerticesData("position", p);
+        lump.convertToFlatShadedMesh();
+      }
       lump.material = rock;
       lump.parent = root;
-      gradeColors(lump, [0.5, 0.5, 0.56], [1, 1, 1.05]);
+      if (tall) gradeColors(lump, [0.44, 0.45, 0.52], [1.02, 1.08, 1.28]);
+      else gradeColors(lump, [0.5, 0.5, 0.56], [1, 1, 1.05]);
       if (dv < 6) obstacles.add(at.x, at.z, r * 0.9);
     }
     // Small stones and tufts on the path's verges.
     const sv = (rand() < 0.5 ? -1 : 1) * (2.6 + rand());
     const s = fromUV(u, sv > 0 ? sv : Math.max(coastEdge(u) + 0.6, sv));
     if (rand() < 0.6) place(small, root, s.x, s.z, 0.4 + rand() * 0.4, rand() * 6);
-    else place(grass, root, s.x, s.z, 0.7 + rand() * 0.4, rand() * 3);
+    else tufts.push(place(grass, root, s.x, s.z, 0.7 + rand() * 0.4, rand() * 3));
   }
+  return tufts;
 }
 
 /** The bare dead tree reaching over the path from the rocks (PS1: pale twisted branches). */
 function deadTree(scene: Scene, root: TransformNode, rand: () => number, at: Vector3): void {
-  const bark = matte("hellenaDeadBark", scene, undefined, new Color3(0.42, 0.44, 0.5));
+  // Bleached and gnarled (PS1): a twisting trunk out of the rock, roots gripping it, long branches
+  // reaching over the path and drooping at their tips, forking into thin twigs.
+  const bark = matte("hellenaDeadBark", scene, undefined, new Color3(0.66, 0.68, 0.74));
   const parts: Mesh[] = [];
-  const trunk = [0, 1, 2, 3].map((k) => new Vector3(at.x - k * 0.5, k * 1.6, at.z - k * 0.25));
-  parts.push(limb("hellenaTreeTrunk", scene, trunk, 0.45, 0.12, rand));
-  for (let k = 0; k < 9; k++) {
-    const from = trunk[1 + (k % 3)];
+  const trunk = [0, 1, 2, 3, 4].map((k) => new Vector3(at.x - k * 0.45 + Math.sin(k * 1.7) * 0.3, k * 1.25, at.z - k * 0.2 + Math.cos(k * 1.3) * 0.25));
+  parts.push(limb("hellenaTreeTrunk", scene, trunk, 0.5, 0.1, rand));
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + rand() * 0.5;
+    const len = 1 + rand() * 1.2;
+    parts.push(limb("hellenaTreeRoot", scene, [0, 0.5, 1].map((f) => new Vector3(at.x + Math.cos(a) * len * f, 0.5 * (1 - f) ** 1.5, at.z + Math.sin(a) * len * f)), 0.22, 0.04, rand));
+  }
+  for (let k = 0; k < 10; k++) {
+    const from = trunk[2 + (k % 3)];
     const a = Math.PI + (rand() - 0.5) * 2.4; // mostly reaching over the path (to the left)
-    const len = 1.6 + rand() * 2.4;
-    const pts = [0, 0.4, 0.75, 1].map((f) => new Vector3(from.x + Math.cos(a + f * 0.5) * len * f, from.y + len * 0.35 * f + 0.3 * Math.sin(f * 6), from.z + Math.sin(a + f * 0.5) * len * f * 0.6));
-    parts.push(limb("hellenaTreeBranch", scene, pts, 0.1, 0.02, rand));
+    const len = 2 + rand() * 2.8;
+    const pts = [0, 0.3, 0.6, 0.85, 1].map((f) => new Vector3(
+      from.x + Math.cos(a + f * 0.6) * len * f,
+      from.y + len * (0.45 * f - 0.55 * f * f) + 0.2 * Math.sin(f * 7), // up, then drooping at the tip
+      from.z + Math.sin(a + f * 0.6) * len * f * 0.6,
+    ));
+    parts.push(limb("hellenaTreeBranch", scene, pts, 0.12, 0.015, rand));
+    const mid = pts[2];
+    const b = a + (rand() < 0.5 ? -1 : 1) * 0.8;
+    parts.push(limb("hellenaTreeTwig", scene, [mid, new Vector3(mid.x + Math.cos(b) * 0.7, mid.y + 0.3, mid.z + Math.sin(b) * 0.5), new Vector3(mid.x + Math.cos(b) * 1.3, mid.y + 0.2, mid.z + Math.sin(b) * 0.9)], 0.05, 0.01, rand));
   }
   const tree = Mesh.MergeMeshes(parts, true, true);
   if (tree) {
     tree.material = bark;
     tree.parent = root;
+    gradeColors(tree, [0.45, 0.5, 0.62], [1.1, 1.1, 1.15]);
   }
   obstacles.add(at.x, at.z, 0.6);
 }
@@ -538,7 +591,7 @@ function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: 
  * horizon catching the sunset, and the prison: a great leaning rock far out on the water, its
  * windows lit. All unlit and out of the fog (the colour is all emissive, tinted per vertex).
  */
-function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Mesh[] {
+function buildHorizon(scene: Scene, root: TransformNode, rand: () => number, ticks: ((dt: number) => void)[]): Mesh[] {
   const noGlow: Mesh[] = []; // big unlit surfaces: kept out of the glow layer (it would bloom them white)
   const unlit = (name: string): StandardMaterial => {
     const m = new StandardMaterial(name, scene);
@@ -697,6 +750,46 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
   sea.setVerticesData("color", col);
   sea.material = seaMat;
   sea.parent = root;
+  // Gold glitter on the swell under the sunset (PS1), drifting slowly: an additive layer over the
+  // sea, strongest on the sun's road, its sparkles sliding so the water shimmers.
+  const sparkle = pixelTexture("hellenaGlitterTex", scene, 64, 64, (ctx, w, h) => {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    for (let k = 0; k < 140; k++) {
+      ctx.fillStyle = rand() < 0.6 ? rgb(255, 190, 110) : rgb(255, 232, 190);
+      ctx.fillRect((rand() * w) | 0, (rand() * h) | 0, 1, 2 + ((rand() * 4) | 0));
+    }
+  });
+  sparkle.uScale = 90;
+  sparkle.vScale = 60;
+  const gm = unlit("hellenaGlitterMat");
+  gm.emissiveTexture = sparkle;
+  gm.alphaMode = 1; // additive
+  gm.alpha = 0.99; // below 1: blended, not drawn opaque over the sea
+  sparkle.updateSamplingMode(Texture.NEAREST_SAMPLINGMODE);
+  const glitter = gridMesh("hellenaGlitter", scene, 24, 24, (i, j) => {
+    const u = -60 + (j / 24) * 900;
+    const v = -500 + (i / 24) * 1000;
+    const p = fromUV(u, v);
+    return { x: p.x, y: SEA_Y + 0.1, z: p.z, tu: j / 24, tv: i / 24 };
+  }, Vector3.Up());
+  const gp = glitter.getVerticesData("position")!;
+  const gc: number[] = [];
+  for (let k = 0; k < gp.length; k += 3) {
+    const { u, v } = toUV(gp[k], gp[k + 2]);
+    const road = Math.exp(-(((v + u * 0.12) / (40 + u * 0.35)) ** 2)) * smooth(10, 120, u);
+    const g = 0.5 * road; // only on the sun's road (all over, it washes the sea out white)
+    gc.push(g, g, g, 1);
+  }
+  glitter.setVerticesData("color", gc);
+  glitter.material = gm;
+  glitter.parent = root;
+  noGlow.push(glitter);
+  ticks.push((dt) => {
+    sparkle.uOffset += dt * 0.004;
+    sparkle.vOffset += dt * 0.0015;
+    tex.uOffset -= dt * 0.002; // the swell rolling in
+  });
   noGlow.push(sea);
 
   // The prison, far out (PS1): one enormous raw rock rising from the sea like a broken tooth,
@@ -862,6 +955,66 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
     smoke.start();
   }
   return noGlow;
+}
+
+/** Seabirds wheeling far out by the prison: dark gull shapes beating slowly round wide circles. */
+function seaBirds(scene: Scene, root: TransformNode, rand: () => number): (dt: number) => void {
+  const black = matte("hellenaGullMat", scene, undefined, new Color3(0.05, 0.04, 0.06));
+  black.disableLighting = true;
+  black.fogEnabled = false;
+  const birds = [0, 1, 2, 3].map((k) => {
+    const node = new TransformNode(`hellenaGull${k}`, scene);
+    node.parent = root;
+    const wings = [-1, 1].map((sx) => {
+      const hinge = new TransformNode("hellenaGullHinge", scene);
+      hinge.parent = node;
+      const w = MeshBuilder.CreateBox("hellenaGullWing", { width: 2.4, height: 0.12, depth: 0.7 }, scene);
+      w.position.x = sx * 1.2;
+      w.material = black;
+      w.parent = hinge;
+      return { hinge, sx };
+    });
+    return { node, wings, centre: fromUV(200 + rand() * 80, -30 + rand() * 40), r: 14 + rand() * 18, h: 14 + rand() * 18, a: rand() * 6, speed: 0.12 + rand() * 0.08 };
+  });
+  let t = 0;
+  return (dt) => {
+    t += dt;
+    for (const b of birds) {
+      b.a += dt * b.speed;
+      b.node.position.set(b.centre.x + Math.cos(b.a) * b.r, b.h + Math.sin(t * 0.7 + b.a) * 1.5, b.centre.z + Math.sin(b.a) * b.r);
+      b.node.rotation.y = -b.a;
+      const flap = Math.sin(t * 3 + b.a * 5) * 0.45;
+      for (const w of b.wings) w.hinge.rotation.z = w.sx * flap;
+    }
+  };
+}
+
+/** Spray flung up now and then where the swell breaks below the cliff's edge. */
+function spray(scene: Scene): (dt: number) => void {
+  const ps = new ParticleSystem("hellenaSpray", 60, scene);
+  ps.particleTexture = softDotTexture(scene);
+  const a = fromUV(-6, coastEdge(-6) - 1.5);
+  const b = fromUV(40, coastEdge(40) - 1.5);
+  ps.emitter = new Vector3((a.x + b.x) / 2, SEA_Y + 9, (a.z + b.z) / 2);
+  const half = b.subtract(a).scale(0.5);
+  ps.minEmitBox = new Vector3(-Math.abs(half.x), 0, -Math.abs(half.z));
+  ps.maxEmitBox = new Vector3(Math.abs(half.x), 2, Math.abs(half.z));
+  ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+  ps.color1 = new Color4(0.35, 0.3, 0.35, 0.4);
+  ps.color2 = new Color4(0.45, 0.35, 0.35, 0.3);
+  ps.colorDead = new Color4(0.2, 0.15, 0.2, 0);
+  ps.minSize = 0.2;
+  ps.maxSize = 0.5;
+  ps.minLifeTime = 1.2;
+  ps.maxLifeTime = 2.2;
+  ps.emitRate = 12;
+  ps.direction1 = new Vector3(-0.2, 2.5, -0.2);
+  ps.direction2 = new Vector3(0.2, 4, 0.2);
+  ps.minEmitPower = 1;
+  ps.maxEmitPower = 2;
+  ps.gravity = new Vector3(0, -3, 0);
+  ps.start();
+  return () => undefined;
 }
 
 // --- The prison ------------------------------------------------------------------------------------

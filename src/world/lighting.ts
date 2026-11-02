@@ -85,8 +85,8 @@ export const LIGHTING_PRESETS = {
     clearColor: [0.14, 0.08, 0.12],
     ambientIntensity: 0.62,
     ambientGround: [0.16, 0.12, 0.2],
-    sunIntensity: 0.95,
-    sunColor: [1.0, 0.62, 0.5],
+    sunIntensity: 1.15,
+    sunColor: [1.0, 0.56, 0.48], // the sunset's rose light full on the path and on Dart
     sunDirection: [-0.5, -1, -0.4],
     exposure: 1.15,
     contrast: 1.22,
