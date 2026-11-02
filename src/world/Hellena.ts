@@ -436,8 +436,9 @@ function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: 
     // The path's line: where the painted path leaves it (v -1.5), drifting with the spit.
     const path = centre - 1.5 * (1 - smooth(0, 0.2, t));
     const half = 2.6 + 4 * (1 - t) + 1.2 * Math.sin(u * 0.09);
-    const e = smooth(0, 0.1, t);
-    const left = Math.min(coastEdge(u), centre - half) * (1 - e) + (centre - half) * e;
+    // It starts exactly on the coast's edge (no ledge jutting past the cliff), then narrows.
+    const e = smooth(0, 0.15, t);
+    const left = coastEdge(u) * (1 - e) + Math.max(coastEdge(u), centre - half) * e;
     const right = 18 * (1 - smooth(0, 0.25, t)) + (centre + half) * smooth(0, 0.25, t);
     const y = (SEA_Y + 5) * smooth(0.08, 1, t) ** 0.8;
     return { u, t, left, right, y, path, pw: 1.75 * (1 - 0.45 * t) };
