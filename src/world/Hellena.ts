@@ -829,28 +829,31 @@ function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Me
   causeway.material = works;
   causeway.parent = root;
 
-  // Black smoke trailing off it on the wind (to the left, up into the sunset).
+  // Black smoke (PS1): not from the top — two or three thin columns rising from vents on its right
+  // flank, mid-height, slanting up and to the left on the wind.
   node.computeWorldMatrix(true);
   lean.computeWorldMatrix(true);
-  for (const [t, x] of [[0.85, 2], [0.6, 8]] as const) {
-    const from = Vector3.TransformCoordinates(new Vector3(x, t * H, 0), lean.getWorldMatrix());
-    const smoke = new ParticleSystem("hellenaFarSmoke", 70, scene);
+  for (const [t, ang] of [[0.36, -0.4], [0.5, -0.15], [0.28, 0.1]] as const) {
+    const r = radius(t);
+    const vent = new Vector3(Math.cos(ang) * r, t * H, Math.sin(ang) * r * 0.78);
+    const from = Vector3.TransformCoordinates(vent, lean.getWorldMatrix());
+    const smoke = new ParticleSystem("hellenaFarSmoke", 50, scene);
     smoke.particleTexture = softDotTexture(scene);
     smoke.emitter = from;
-    smoke.minEmitBox = new Vector3(-1.5, 0, -1.5);
-    smoke.maxEmitBox = new Vector3(1.5, 1, 1.5);
+    smoke.minEmitBox = new Vector3(-0.4, 0, -0.4);
+    smoke.maxEmitBox = new Vector3(0.4, 0.4, 0.4);
     smoke.blendMode = ParticleSystem.BLENDMODE_STANDARD;
-    smoke.color1 = new Color4(0.12, 0.07, 0.08, 0.5);
-    smoke.color2 = new Color4(0.18, 0.1, 0.1, 0.4);
+    smoke.color1 = new Color4(0.06, 0.04, 0.05, 0.75);
+    smoke.color2 = new Color4(0.1, 0.06, 0.07, 0.6);
     smoke.colorDead = new Color4(0.2, 0.12, 0.12, 0);
-    smoke.minSize = 6;
-    smoke.maxSize = 12;
+    smoke.minSize = 4;
+    smoke.maxSize = 7;
     smoke.minLifeTime = 10;
     smoke.maxLifeTime = 16;
-    smoke.emitRate = 5;
+    smoke.emitRate = 6;
     const wind = fromUV(0.3, -1).normalize(); // towards screen left, a little away
-    smoke.direction1 = new Vector3(wind.x * 1.5, 1.6, wind.z * 1.5);
-    smoke.direction2 = new Vector3(wind.x * 2.4, 2.4, wind.z * 2.4);
+    smoke.direction1 = new Vector3(wind.x * 1.2, 2.6, wind.z * 1.2); // a narrow column, slanting left
+    smoke.direction2 = new Vector3(wind.x * 1.6, 3, wind.z * 1.6);
     smoke.minEmitPower = 1;
     smoke.maxEmitPower = 1.6;
     smoke.gravity = new Vector3(wind.x * 0.6, 0.3, wind.z * 0.6);
