@@ -35,6 +35,7 @@ export class IsoCamera {
   /** Recompute orthographic bounds from the current aspect ratio — only when the aspect ratio or
    *  zoom actually changed (runs every frame via onBeforeRender, but the bounds rarely move). */
   private applyOrtho(scene: Scene): void {
+    if (this.view) return; // a scenic perspective shot has no ortho bounds
     const aspect = scene.getEngine().getAspectRatio(this.camera);
     const zoom = settings.cameraZoom * this.shotZoom;
     if (aspect === this.lastAspect && zoom === this.lastZoom) return;
@@ -45,6 +46,21 @@ export class IsoCamera {
     this.camera.orthoBottom = -half;
     this.camera.orthoLeft = -half * aspect;
     this.camera.orthoRight = half * aspect;
+  }
+
+  // --- Scenic sections (a perspective shot, see World.view) -------------------------------
+
+  private view?: { beta: number; fov: number; radius: number; lift: number };
+
+  /** Switch to a scenic perspective shot for this map (kept until the camera is rebuilt). */
+  scenic(view: { beta: number; fov: number; radius: number; lift: number }): void {
+    this.view = view;
+    this.camera.mode = Camera.PERSPECTIVE_CAMERA;
+    this.camera.fov = view.fov;
+    this.camera.beta = this.tilt = view.beta;
+    this.camera.radius = view.radius;
+    this.camera.minZ = 0.3;
+    this.applyTarget();
   }
 
   // --- Framed "moments" (a map's set pieces: a cliff edge, a boss arena) -------------------
@@ -129,6 +145,7 @@ export class IsoCamera {
   private applyTarget(): void {
     if (!this.base) return;
     this.camera.target.copyFrom(this.base).addInPlace(this.shotOffset);
+    if (this.view) this.camera.target.y += this.view.lift;
     if (this.framing) {
       const f = this.groundForward;
       this.camera.target.x += f.x * this.framing;

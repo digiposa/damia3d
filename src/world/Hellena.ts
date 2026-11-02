@@ -5,6 +5,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
@@ -30,10 +31,19 @@ import type { World } from "./World";
  * Authored in the iso (u, v) frame: u up the screen, v sideways (+ to the right).
  */
 
-/** Story spots (u, v). */
+/**
+ * Two sections (PS1 does it in two screens too): the coastal path, a scenic section with a low
+ * perspective camera looking along it to the prison far out on the sea under the sunset; then the
+ * guard post at the drawbridge, in the iso view. Story spots (u, v):
+ */
 export const HELLENA_SPOTS = {
-  fromForest: { u: -6, v: 0 },
-  exitForest: { u: -12, v: 0 },
+  // The coastal path (scenic section).
+  coastStart: { u: 2, v: 0 },
+  coastBack: { u: -2.5, v: 0 }, // back to the Forest
+  coastEnd: { u: 44, v: 0 }, // on to the guard post
+  // The guard post (iso section).
+  fromCoast: { u: 33, v: 0 },
+  backToCoast: { u: 29.5, v: 0 },
   bridge: { u: 49, v: 0 },
   landing: { u: 56, v: 1 },
   gate: { u: 60, v: 3 },
@@ -49,12 +59,11 @@ function coastEdge(u: number): number {
   return -5.2 + 1.2 * Math.sin(u * 0.17) + 0.6 * Math.sin(u * 0.53 + 1);
 }
 
+/** The guard post section's ways in from the coast, over the bridge, round the landing. */
 const TRAILS: Knot[][] = [
   [
-    { u: -14, v: 0, w: 3 },
-    { u: 4, v: 0.6, w: 3.4 },
-    { u: 16, v: -0.4, w: 3.6 },
-    { u: 30, v: 0.6, w: 3.4 },
+    { u: 28, v: 0.4, w: 3.2 },
+    { u: 34, v: 0.4, w: 3.4 },
     { u: 44.5, v: 0, w: 3 },
     { u: 46, v: 0, w: 1.3 }, // the drawbridge
     { u: 52, v: 0, w: 1.3 },
@@ -64,7 +73,18 @@ const TRAILS: Knot[][] = [
   // To the lookout tower's stairs, at the cliff edge.
   [{ u: 55, v: -1, w: 2.4 }, { u: 55.6, v: -5.6, w: 2 }],
 ];
-const NET = new TrailNet(TRAILS);
+const GATE_NET = new TrailNet(TRAILS);
+/** The coastal path, straight on towards the prison. */
+const COAST_NET = new TrailNet([
+  [
+    { u: -8, v: 0, w: 2.8 },
+    { u: 8, v: 0.5, w: 3.2 },
+    { u: 20, v: -0.3, w: 3.4 },
+    { u: 34, v: 0.4, w: 3.2 },
+    { u: 48, v: 0, w: 3 },
+  ],
+]);
+let NET = GATE_NET;
 
 let obstacles = new Obstacles();
 function clampToHellena(p: Vector3, margin = 0.4): void {
@@ -88,19 +108,56 @@ const smooth = (a: number, b: number, x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
-/** The Hellena outside world. */
+/**
+ * The coastal path (scenic section): a low perspective shot along the path, the sea to the horizon,
+ * the prison rock far out on it with its windows lit, the sunset sky with its first stars; rocks
+ * and the dead tree framing the right.
+ */
+export function hellenaCoastWorld(scene: Scene): World {
+  obstacles = new Obstacles();
+  NET = COAST_NET;
+  const rand = mulberry32(0xc0a57);
+  const root = new TransformNode("hellenaCoast", scene);
+  const rock = rockMaterial(scene, rand);
+  const grounds = buildGround(scene, root, rand, -12, 50, [[-12, 50]]);
+  buildCliffFaces(scene, root, rand, rock, [[-14, 52]], false);
+  buildRightRocks(scene, root, rand, rock, -12, 52, true);
+  deadTree(scene, root, rand, fromUV(26, 3.8));
+  const noGlow = buildHorizon(scene, root, rand);
+  let glowChecked = false;
+  obstacles.index();
+  for (const m of root.getChildMeshes()) {
+    m.isPickable = false;
+    m.freezeWorldMatrix();
+  }
+  return {
+    clamp: clampToHellena,
+    preset: LIGHTING_PRESETS.hellenaDusk,
+    framing: 0,
+    view: { beta: 1.32, fov: 0.85, radius: 11, lift: 1.4 },
+    shadowReceivers: grounds,
+    ownFill: [],
+    update: () => {
+      if (glowChecked) return;
+      glowChecked = true; // the mode's glow layer is created after the world
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of noGlow) layer.addExcludedMesh(m);
+    },
+  };
+}
+
+/** The Hellena guard post (iso section): the drawbridge, the landing, the prison's front. */
 export function hellenaWorld(scene: Scene): World {
   obstacles = new Obstacles();
+  NET = GATE_NET;
   const rand = mulberry32(0x4e11e4a);
   const root = new TransformNode("hellena", scene);
   const rock = rockMaterial(scene, rand);
   const wood = matte("hellenaWood", scene, undefined, new Color3(0.32, 0.22, 0.15));
 
-  const grounds = buildGround(scene, root, rand);
-  buildCliffFaces(scene, root, rand, rock);
+  const grounds = buildGround(scene, root, rand, 24, WALL_U + 1, [[24, BRIDGE_U0], [BRIDGE_U1, WALL_U + 1]]);
+  buildCliffFaces(scene, root, rand, rock, [[22, BRIDGE_U0], [BRIDGE_U1, WALL_U + 2]], true);
   buildSea(scene, root, rand);
-  buildRightRocks(scene, root, rand, rock);
-  deadTree(scene, root, rand, fromUV(12, 4.4));
+  buildRightRocks(scene, root, rand, rock, 24, WALL_U - 1, false);
   const ticks = buildPrison(scene, root, rand, rock, wood);
   buildDrawbridge(scene, root, rand, wood);
 
@@ -157,14 +214,12 @@ function rockMaterial(scene: Scene, rand: () => number): StandardMaterial {
  * the rest bare rock and earth with a few tufts. Two pieces, either side of the drawbridge's gap;
  * past the cliff edge the vertices fold onto it.
  */
-function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mesh[] {
-  const U0 = -20;
-  const U1 = WALL_U + 1;
+function buildGround(scene: Scene, root: TransformNode, rand: () => number, U0: number, U1: number, pieces: [number, number][]): Mesh[] {
   const V0 = -10;
   const V1 = 18;
   const W = (U1 - U0) * GROUND_PPU;
   const H = (V1 - V0) * GROUND_PPU;
-  const tex = new DynamicTexture("hellenaGroundTex", { width: W, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
+  const tex = new DynamicTexture(`hellenaGroundTex${U0}`, { width: W, height: H }, scene, false, Texture.NEAREST_SAMPLINGMODE);
   tex.wrapU = tex.wrapV = Texture.CLAMP_ADDRESSMODE;
   const ctx = tex.getContext() as CanvasRenderingContext2D;
   const img = ctx.createImageData(W, H);
@@ -209,7 +264,7 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
   }
   ctx.putImageData(img, 0, 0);
   tex.update();
-  const mat = matte("hellenaGroundMat", scene, tex);
+  const mat = matte(`hellenaGroundMat${U0}`, scene, tex);
   const piece = (name: string, a: number, c: number): Mesh => {
     const cols = Math.round((c - a) * 2);
     const m = gridMesh(name, scene, (V1 - V0) * 2, cols, (i, j) => {
@@ -222,11 +277,11 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
     m.parent = root;
     return m;
   };
-  return [piece("hellenaCoast", U0, BRIDGE_U0), piece("hellenaLanding", BRIDGE_U1, U1)];
+  return pieces.map(([a, c]) => piece(`hellenaGround${a}`, a, c));
 }
 
 /** Rock faces dropping to the sea: along the coast's edge, and either side of the drawbridge's gap. */
-function buildCliffFaces(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial): void {
+function buildCliffFaces(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial, coasts: [number, number][], gap: boolean): void {
   const strip = (name: string, n: number, top: (t: number) => Vector3, out: (t: number) => Vector3): void => {
     const m = gridMesh(name, scene, 3, n, (i, j) => {
       const t = j / n;
@@ -240,8 +295,8 @@ function buildCliffFaces(scene: Scene, root: TransformNode, rand: () => number, 
   };
   const left = fromUV(0, -1).subtract(fromUV(0, 0));
   const coast = (a: number, c: number): void => strip(`hellenaCliff${a}`, Math.round((c - a) * 1.5), (t) => fromUV(a + t * (c - a), coastEdge(a + t * (c - a))), () => left);
-  coast(-22, BRIDGE_U0);
-  coast(BRIDGE_U1, WALL_U + 2);
+  for (const [a, c] of coasts) coast(a, c);
+  if (!gap) return;
   // The gap's two faces, across the land.
   const down = fromUV(-1, 0).subtract(fromUV(0, 0));
   const up = down.scale(-1);
@@ -308,18 +363,20 @@ function buildSea(scene: Scene, root: TransformNode, rand: () => number): void {
 }
 
 /** Rocks heaped along the right of the path, rising into a rough wall (the PS1 cliff on the right). */
-function buildRightRocks(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial): void {
+function buildRightRocks(scene: Scene, root: TransformNode, rand: () => number, rock: StandardMaterial, u0: number, u1: number, tall: boolean): void {
   const small = rockSource(scene, rand);
   const grass = grassSource(scene, rand);
-  for (let u = -18; u < WALL_U - 1; u += 2.2) {
+  // On the coast (seen low from behind) the rocks rise into a high craggy wall (PS1).
+  const rows: [number, number][] = tall ? [[4.4, 1], [6.8, 1.8], [9.6, 2.8], [13, 3.8]] : [[4.6, 1], [7, 1.6], [10, 2.3]];
+  for (let u = u0; u < u1; u += 2.2) {
     if (u > BRIDGE_U0 - 1 && u < BRIDGE_U1 + 1) continue;
-    for (const [dv, s] of [[4.6, 1], [7, 1.6], [10, 2.3]] as const) {
+    for (const [dv, s] of rows) {
       const v = 0.5 + dv + (rand() - 0.5) * 1.4;
       const at = fromUV(u + (rand() - 0.5) * 1.6, v);
       const r = (0.9 + rand() * 0.8) * s;
       const lump = MeshBuilder.CreateIcoSphere("hellenaBoulder", { radius: r, subdivisions: 2 }, scene);
       lump.scaling.y = 0.75 + rand() * 0.6;
-      lump.position.set(at.x, r * 0.35, at.z);
+      lump.position.set(at.x, r * (tall && dv > 9 ? 0.9 : 0.35), at.z);
       jitter(lump, 0.25 * r, rand);
       lump.material = rock;
       lump.parent = root;
@@ -353,6 +410,162 @@ function deadTree(scene: Scene, root: TransformNode, rand: () => number, at: Vec
     tree.parent = root;
   }
   obstacles.add(at.x, at.z, 0.6);
+}
+
+// --- The horizon (scenic section) -----------------------------------------------------------------
+
+/**
+ * What the low camera sees beyond the cliff: a sunset sky dome (violet overhead, burning rose and
+ * orange at the horizon behind the prison, first stars), long dark clouds, the sea out to the
+ * horizon catching the sunset, and the prison: a great leaning rock far out on the water, its
+ * windows lit. All unlit and out of the fog (the colour is all emissive, tinted per vertex).
+ */
+function buildHorizon(scene: Scene, root: TransformNode, rand: () => number): Mesh[] {
+  const noGlow: Mesh[] = []; // big unlit surfaces: kept out of the glow layer (it would bloom them white)
+  const unlit = (name: string): StandardMaterial => {
+    const m = new StandardMaterial(name, scene);
+    m.disableLighting = true;
+    m.fogEnabled = false;
+    m.diffuseColor = Color3.Black();
+    m.specularColor = Color3.Black();
+    m.emissiveColor = Color3.White();
+    return m;
+  };
+  const toSun = fromUV(1, -0.25).normalize(); // up the screen, a little left: behind the prison
+  const sky = MeshBuilder.CreateSphere("hellenaSky", { diameter: 1600, segments: 24, sideOrientation: Mesh.BACKSIDE }, scene);
+  sky.infiniteDistance = true;
+  sky.material = unlit("hellenaSkyMat");
+  const sp = sky.getVerticesData("position")!;
+  const sc: number[] = [];
+  for (let k = 0; k < sp.length; k += 3) {
+    const d = new Vector3(sp[k], sp[k + 1], sp[k + 2]).normalize();
+    const e = Math.max(0, d.y); // elevation
+    const sun = Math.max(0, d.x * toSun.x + d.z * toSun.z); // facing the sunset
+    const low = 1 - smooth(0, 0.35, e);
+    const glow = low * (0.35 + 0.65 * sun ** 2);
+    sc.push(0.12 + 0.22 * (1 - e) + 0.85 * glow, 0.08 + 0.08 * (1 - e) + 0.42 * glow, 0.24 + 0.12 * (1 - e) + 0.16 * glow, 1);
+  }
+  sky.setVerticesData("color", sc);
+  sky.parent = root;
+  noGlow.push(sky);
+  // Stars, high up (one merged mesh).
+  const stars: Mesh[] = [];
+  for (let k = 0; k < 140; k++) {
+    const a = rand() * Math.PI * 2;
+    const e = 0.35 + rand() * 1.1;
+    const d = new Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)).scale(760);
+    const st = MeshBuilder.CreateDisc("hellenaStar", { radius: 0.8 + rand() * 1.4, tessellation: 4 }, scene);
+    st.position.copyFrom(d);
+    st.lookAt(Vector3.Zero());
+    stars.push(st);
+  }
+  const starMesh = Mesh.MergeMeshes(stars, true, true);
+  if (starMesh) {
+    starMesh.infiniteDistance = true;
+    const m = unlit("hellenaStarMat");
+    m.emissiveColor = new Color3(0.9, 0.88, 1);
+    m.backFaceCulling = false;
+    starMesh.material = m;
+    starMesh.parent = root;
+  }
+  // Long dark clouds low over the horizon, their bellies lit by the sunset.
+  const cloudMat = unlit("hellenaCloudMat");
+  for (let k = 0; k < 9; k++) {
+    const a = Math.atan2(toSun.z, toSun.x) + (rand() - 0.5) * 2.2;
+    const e = 0.05 + rand() * 0.16;
+    const c = MeshBuilder.CreateSphere("hellenaCloud", { diameter: 2, segments: 8 }, scene);
+    c.scaling.set(90 + rand() * 120, 6 + rand() * 6, 30);
+    c.position.set(Math.cos(a) * Math.cos(e) * 700, Math.sin(e) * 700, Math.sin(a) * Math.cos(e) * 700);
+    c.rotation.y = -a + Math.PI / 2;
+    c.infiniteDistance = true;
+    const cp = c.getVerticesData("position")!;
+    const cc: number[] = [];
+    for (let i = 0; i < cp.length; i += 3) {
+      const under = cp[i + 1] < 0 ? 1 : 0;
+      cc.push(0.16 + 0.4 * under, 0.09 + 0.18 * under, 0.16 + 0.1 * under, 1);
+    }
+    c.setVerticesData("color", cc);
+    c.material = cloudMat;
+    c.parent = root;
+    noGlow.push(c);
+  }
+
+  // The sea to the horizon: violet below the cliff, rose and orange towards the sun, a slow swell.
+  const tex = pixelTexture("hellenaFarSeaTex", scene, 64, 64, (ctx, w, h) => {
+    for (let x = 0; x < w; x++)
+      for (let y = 0; y < h; y++) {
+        const k = (0.86 + 0.14 * Math.sin((x / w) * Math.PI * 6)) * (0.96 + rand() * 0.06);
+        ctx.fillStyle = rgb(200 * k, 200 * k, 210 * k);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    for (let i = 0; i < 70; i++) {
+      const x = (rand() * w) | 0;
+      const y = (rand() * h) | 0;
+      const len = 4 + ((rand() * 8) | 0);
+      ctx.fillStyle = rgb(255, 238, 230);
+      ctx.fillRect(x, y, 1, len);
+    }
+  });
+  tex.uScale = 60;
+  tex.vScale = 40;
+  const seaMat = unlit("hellenaFarSeaMat");
+  seaMat.emissiveTexture = tex;
+  const sea = gridMesh("hellenaFarSea", scene, 24, 24, (i, j) => {
+    const u = -60 + (j / 24) * 900;
+    const v = -500 + (i / 24) * 1000;
+    const p = fromUV(u, v);
+    return { x: p.x, y: SEA_Y, z: p.z, tu: j / 24, tv: i / 24 };
+  }, Vector3.Up());
+  const pos = sea.getVerticesData("position")!;
+  const col: number[] = [];
+  for (let k = 0; k < pos.length; k += 3) {
+    const { u, v } = toUV(pos[k], pos[k + 2]);
+    const far = smooth(0, 320, u);
+    const sun = Math.exp(-(((v + u * 0.25) / (60 + u * 0.4)) ** 2)); // the sun's road on the water
+    col.push(0.2 + 0.55 * far + 0.6 * sun * far, 0.16 + 0.26 * far + 0.32 * sun * far, 0.36 + 0.08 * far, 1);
+  }
+  sea.setVerticesData("color", col);
+  sea.material = seaMat;
+  sea.parent = root;
+  noGlow.push(sea);
+
+  // The prison, far out: a great rock leaning to the right, a smaller one at its foot, lit windows.
+  const P = fromUV(300, -36); // a little left of the path: in frame on a phone too
+  const rockMat = unlit("hellenaFarRockMat");
+  const lean = (name: string, at: Vector3, h: number, r: number, tilt: number): Mesh => {
+    const m = MeshBuilder.CreateCylinder(name, { height: h, diameterTop: r * 1.3, diameterBottom: r * 2, tessellation: 10, subdivisions: 6 }, scene);
+    jitter(m, r * 0.12, rand);
+    m.position.set(at.x, SEA_Y + h * 0.42, at.z);
+    m.rotation.set(0, 0, 0);
+    m.rotate(fromUV(0, 1).normalize().cross(Vector3.Up()).normalize(), tilt);
+    m.material = rockMat;
+    m.parent = root;
+    const mp = m.getVerticesData("position")!;
+    const mc: number[] = [];
+    for (let k = 0; k < mp.length; k += 3) {
+      const t = (mp[k + 1] + h / 2) / h;
+      // Dark violet silhouette, its sunward edge catching a rim of rose light.
+      const rim = Math.max(0, -(mp[k] * 0.7 + mp[k + 2] * 0.7) / r) * 0.5;
+      mc.push(0.1 + 0.08 * t + 0.35 * rim, 0.06 + 0.04 * t + 0.14 * rim, 0.12 + 0.06 * t + 0.1 * rim, 1);
+    }
+    m.setVerticesData("color", mc);
+    noGlow.push(m);
+    return m;
+  };
+  lean("hellenaFarPrison", P, 64, 12, -0.32);
+  lean("hellenaFarFoot", fromUV(296, -22), 18, 9, 0.1);
+  const win = unlit("hellenaFarWindow");
+  win.emissiveColor = new Color3(1, 0.7, 0.3);
+  for (let k = 0; k < 14; k++) {
+    const y = SEA_Y + 4 + rand() * 30;
+    const q = fromUV(300 - 13, -36 + (rand() - 0.5) * 16 + (y + 14) * 0.25);
+    const w = MeshBuilder.CreatePlane("hellenaFarLight", { width: 1.6, height: 2.2 }, scene);
+    w.position.set(q.x, y, q.z);
+    w.rotation.y = Math.atan2(-fromUV(1, 0).x, -fromUV(1, 0).z) + Math.PI; // facing back down the path
+    w.material = win;
+    w.parent = root;
+  }
+  return noGlow;
 }
 
 // --- The prison ------------------------------------------------------------------------------------

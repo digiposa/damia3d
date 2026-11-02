@@ -110,7 +110,7 @@ export const forestMap: MapFactory = (scene) => {
       api.trigger(trackPointAt(MAP_START_U + 0.5), 2.5, () => api.goto("seles", "fromForest"));
       const hellena = forestPoint(MAP_END_U, -9);
       const prairie = forestPoint(MAP_END_U, 10);
-      api.trigger(hellena, 3, () => api.goto("hellena", "fromForest"));
+      api.trigger(hellena, 3, () => api.goto("hellenaCoast", "fromForest"));
       api.sign(prairie, 4, t("story.exit.prairie.title"), t("story.exit.soon"));
     },
   };

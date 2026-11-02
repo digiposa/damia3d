@@ -505,6 +505,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
     this.camera.framing = this.world.framing;
+    if (this.world.view) this.camera.scenic(this.world.view);
     // Dark-fantasy rendering pass (lights + tone map + bloom + glow + fog + shadows + dust),
     // driven by a lighting preset — pure rendering, no assets. Swap the preset (or
     // transitionTo) per zone once the game has bright/dark areas. Register the party as casters.

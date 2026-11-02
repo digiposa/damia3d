@@ -26,6 +26,12 @@ export interface World {
   /** A framed "moment" at this spot (zoom multiplier, ground offset of the view), or null for the
    *  plain follow. Applied outside fights only. */
   shotAt?(p: Vector3): { zoom: number; offset?: Vector3 } | null;
+  /**
+   * A scenic section's camera (PS1: a low, fixed-angle perspective shot looking along the way, the
+   * horizon in frame) instead of the iso view: tilt from vertical, vertical field of view, distance
+   * from the followed point, and how high above the feet it aims. Same heading as the iso view.
+   */
+  view?: { beta: number; fov: number; radius: number; lift: number };
   /** Ground height at a point, for maps with relief (a hillside); flat (y = 0) when absent. */
   heightAt?(x: number, z: number): number;
   /** Per-frame upkeep around the controlled character (e.g. animated props), if any. */
