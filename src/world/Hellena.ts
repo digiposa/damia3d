@@ -152,10 +152,6 @@ export function hellenaCoastWorld(scene: Scene): World {
     wind += dt;
     tufts.forEach((g, i) => (g.rotation.z = 0.12 + 0.1 * Math.sin(wind * 2.2 + phase[i])));
   });
-  // The arrival: the view starts out along the path, by the prison, and draws back to Dart (PS1:
-  // the place is shown first).
-  let intro = 0;
-  const INTRO = 4;
   let glowChecked = false;
   obstacles.index();
   for (const m of root.getChildMeshes()) {
@@ -169,14 +165,7 @@ export function hellenaCoastWorld(scene: Scene): World {
     view: { beta: 1.32, fov: 0.85, radius: 11, lift: 1.4 },
     shadowReceivers: grounds,
     ownFill: [],
-    shotAt: (p) => {
-      const { u } = toUV(p.x, p.z);
-      if (u > 8 || intro >= INTRO) return null; // only on arriving from the Forest
-      const k = 1 - smooth(0.6, INTRO, intro);
-      return { zoom: 1, offset: fromUV(30 * k, -6 * k) };
-    },
     update: (_focus, dt) => {
-      intro += dt;
       for (const t of ticks) t(dt);
       if (glowChecked) return;
       glowChecked = true; // the mode's glow layer is created after the world
