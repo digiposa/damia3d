@@ -252,7 +252,7 @@ export function selesWorld(scene: Scene): SelesWorld {
   obstacles.index();
   for (const m of root.getChildMeshes()) {
     m.isPickable = false;
-    m.freezeWorldMatrix();
+    if (!m.name.startsWith("chestLid")) m.freezeWorldMatrix(); // a chest's lid swings open
   }
   return {
     clamp: clampToSeles,

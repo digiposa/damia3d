@@ -21,7 +21,7 @@ import { LIGHTING_PRESETS, type LightingPreset } from "./lighting";
 import { AreaLight } from "./kit/areaLight";
 import { FWD, SIDE, TAN_BETA, fromUV, toUV } from "./kit/frame";
 import { chestProp, type ChestProp } from "./kit/chest";
-import { hash01 } from "./kit/noise";
+import { hash01, noise2 } from "./kit/noise";
 import { makeWater } from "./kit/water";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU, MAX_TEX } from "./kit/texels";
@@ -183,6 +183,30 @@ function inVoid(u: number, v: number, margin = 0): boolean {
   return v > cliffE(u) - margin;
 }
 
+const smooth = (a: number, b: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Ground height (PS1: the wood's floor is never flat — mounds and banks under the trees): low
+ * swells away from the trails, flat along every trail and its verge (so the walking and the
+ * fights stay level), and dying to 0 near the ravines' lips and the cliff edge (the walls start
+ * at the floor's level).
+ */
+function forestHeight(x: number, z: number): number {
+  const n = nearestOnTrack(x, z);
+  const off = smooth(0.8, 4.5, n.d - n.w);
+  if (off <= 0) return 0;
+  const { u, v } = toUV(x, z);
+  let edge = cliffE(u) - v;
+  for (const r of RAVINES) edge = Math.min(edge, Math.abs(u - ravineC(r, v)) - ravineH(r, v));
+  const keep = smooth(0.6, 4, edge);
+  if (keep <= 0) return 0;
+  const mound = noise2(u * 0.14, v * 0.14) * 0.65 + noise2(u * 0.4 + 5, v * 0.4) * 0.35;
+  return off * keep * 4 * Math.max(0, mound - 0.28);
+}
+
 /** Half-width of the beaten dirt itself (the walkable corridor is wider: grass on both sides). */
 const DIRT_HALF = 2.3; // the reference track is broad: a cart road, not a footpath
 
@@ -342,9 +366,16 @@ export function forestWorld(scene: Scene): ForestWorld {
     const { u, v } = toUV(x, z);
     return mask.walkable(u, v);
   });
+  // Everything set on the ground sits on the mounds (direct children of the decor root: placed
+  // instances, props and the nodes holding the bigger ones).
+  for (const node of root.getChildren()) {
+    const t = node as TransformNode;
+    if (!t.position || Math.abs(t.position.y) > 0.6) continue;
+    t.position.y += forestHeight(t.position.x, t.position.z);
+  }
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
     m.isPickable = false; // decor never swallows clicks
-    if (!m.name.startsWith("forestChestLid")) m.freezeWorldMatrix();
+    if (!m.name.startsWith("chestLid")) m.freezeWorldMatrix(); // a chest's lid swings open
   }
   return {
     clamp: clampToForest,
@@ -352,6 +383,7 @@ export function forestWorld(scene: Scene): ForestWorld {
     framing: 2.5,
     shadowReceivers: [...floors, ...track],
     ownFill: [],
+    heightAt: forestHeight,
     presetAt: (p) => light.at(toUV(p.x, p.z).u),
     shotAt: (p) => forestShotAt(toUV(p.x, p.z)),
     update: (_focus, dt) => {
@@ -460,7 +492,9 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
       gridMesh(`forestFloor${f / 2}`, scene, rows, cols, (i, j) => {
         const v = rowV(i);
         const u = from(v) + (to(v) - from(v)) * (j / cols);
-        return ground(u, Math.min(v, cliffE(u)), 0);
+        const vv = Math.min(v, cliffE(u));
+        const q = forestPoint(u, vv);
+        return ground(u, vv, forestHeight(q.x, q.z));
       }, Vector3.Up()),
     );
   }
@@ -503,12 +537,27 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     }
   });
   const stone = matte("forestStrataMat", scene, strata);
+  /**
+   * How far a wall's rock juts out at depth `y` (< 0) and along `v` (PS1: the walls are banded
+   * sediment, each layer a ledge standing out over the one below, eroded unevenly along the face).
+   * 0 at the lip and at the foot, so the wall meets the floors.
+   */
+  const strataOut = (y: number, v: number, seed: number, scale: number): number => {
+    const band = Math.floor(-y / 1.3);
+    const f = -y / 1.3 - band; // 0 at a band's top … 1 at its foot
+    const base = 0.25 + 0.6 * hash01(band, seed) + 0.35 * (noise2(v * 0.35 + band * 3.1, seed) - 0.5);
+    const ledge = base * (1 - 0.7 * f); // each layer stands out at its top, tucks in below
+    return Math.max(0, ledge) * scale * smooth(0, 1.2, -y) * (1 - smooth(-RAVINE_DEPTH + 2.5, -RAVINE_DEPTH + 0.5, y));
+  };
+  const DEPTH_ROWS = 24;
   const wall = (name: string, r: Ravine, side: 1 | -1, facing: Vector3): Mesh => {
-    const m = gridMesh(name, scene, rows, 1, (i, j) => {
+    const m = gridMesh(name, scene, rows, DEPTH_ROWS, (i, j) => {
       const v = rowV(i);
-      const u = ravineC(r, v) + side * ravineH(r, v);
+      const y = j === 0 ? 0.02 : -RAVINE_DEPTH * (j / DEPTH_ROWS);
+      // Ledges jut into the gorge (towards its centre line).
+      const u = ravineC(r, v) + side * (ravineH(r, v) - strataOut(y, v, side + r.c, 1.05));
       const p = forestPoint(u, Math.min(v, cliffE(u) + 2));
-      return { x: p.x, y: j === 0 ? 0.02 : -RAVINE_DEPTH, z: p.z, tu: v / 4, tv: j === 0 ? 0 : RAVINE_DEPTH / 8 };
+      return { x: p.x, y, z: p.z, tu: v / 4, tv: -y / 8 };
     }, facing);
     // Darker the deeper it goes: the gorge's depth is in this gradient.
     const pos = m.getVerticesData(VertexBuffer.PositionKind)!;
@@ -519,6 +568,7 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
       col.push(k, k * 0.95, k * 0.92, 1);
     }
     m.setVerticesData(VertexBuffer.ColorKind, col);
+    m.convertToFlatShadedMesh(); // facets: each ledge catches the light, the face under it is shaded
     m.material = stone;
     m.parent = parent;
     return m;
@@ -533,7 +583,7 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
   let cu1 = 52;
   while (cu1 < U_MAX && cliffE(cu1) < V_MAX + 2) cu1 += 0.5;
   const cliffCols = 120;
-  const cliff = gridMesh("forestCliffFace", scene, 4, cliffCols, (i, j) => {
+  const cliff = gridMesh("forestCliffFace", scene, 20, cliffCols, (i, j) => {
     const u = cu0 + (cu1 - cu0) * (j / cliffCols);
     const e = cliffE(u);
     // Outward normal of the edge curve v = e(u), in the local (u, v) plane.
@@ -541,11 +591,13 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     const len = Math.hypot(de, 1);
     const nu = -de / len;
     const nv = 1 / len;
-    const f = i / 4; // 0 = the lip … 1 = the foot, in the sea
-    const out = 9 * Math.pow(f, 0.8);
+    const f = i / 20; // 0 = the lip … 1 = the foot, in the sea
+    // Banded strata standing out in ledges, like the ravines' walls.
+    const out = 9 * Math.pow(f, 0.8) - strataOut(-26 * f, u, 7, 1.1) * (1 - f);
     const p = forestPoint(u + nu * out, Math.min(V_MAX + 4, e) + nv * out);
     return { x: p.x, y: f === 0 ? 0.02 : -26 * f, z: p.z, tu: u / 4, tv: f * 3.4 };
   }, new Vector3(SIDE.x, 1, SIDE.z));
+  cliff.convertToFlatShadedMesh();
   cliff.material = stone;
   cliff.parent = parent;
   RAVINES.forEach((r, k) => {
@@ -768,7 +820,7 @@ function buildTrack(scene: Scene, root: TransformNode, rand: () => number): Mesh
         const u = cu0 + j;
         const v = DIRT_V0 + i;
         const p = forestPoint(u, v);
-        return { x: p.x, y: 0.02, z: p.z, tu: (u - cu0) / (cu1 - cu0), tv: (v - DIRT_V0) / (DIRT_V1 - DIRT_V0) };
+        return { x: p.x, y: 0.02 + forestHeight(p.x, p.z), z: p.z, tu: (u - cu0) / (cu1 - cu0), tv: (v - DIRT_V0) / (DIRT_V1 - DIRT_V0) };
       },
       Vector3.Up(),
     );
