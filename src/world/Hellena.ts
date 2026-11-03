@@ -92,16 +92,18 @@ const TRAILS: Knot[][] = [
 ];
 const GATE_NET = new TrailNet(TRAILS);
 /** The coastal path, straight on towards the prison. */
+/** The coastal path's half-width: the same all the way to the prison (it must not narrow). */
+const COAST_W = 3.2;
 const COAST_NET = new TrailNet([
   [
-    { u: -8, v: 0, w: 2.8 },
-    { u: 8, v: 0.5, w: 3.2 },
-    { u: 20, v: -0.3, w: 3.4 },
-    { u: 34, v: 0.4, w: 3.2 },
-    { u: 48, v: 0, w: 3 },
-    { u: 62, v: 0.5, w: 3.2 },
-    { u: 76, v: -0.3, w: 3 },
-    { u: 98, v: -1.5, w: 2.6 }, // on along the spit (seen, not walked: the section ends at 70)
+    { u: -8, v: 0, w: COAST_W },
+    { u: 8, v: 0.5, w: COAST_W },
+    { u: 20, v: -0.3, w: COAST_W },
+    { u: 34, v: 0.4, w: COAST_W },
+    { u: 48, v: 0, w: COAST_W },
+    { u: 62, v: 0.5, w: COAST_W },
+    { u: 76, v: -0.3, w: COAST_W },
+    { u: 98, v: -1.5, w: COAST_W }, // on along the spit (seen, not walked: the section ends at 70)
   ],
 ]);
 let NET = GATE_NET;
@@ -435,13 +437,13 @@ function buildSpit(scene: Scene, root: TransformNode, rand: () => number, rock: 
     const centre = -12 * smooth(0.2, 1, t); // drifting left, towards the prison
     // The path's line: where the painted path leaves it (v -1.5), drifting with the spit.
     const path = centre - 1.5 * (1 - smooth(0, 0.2, t));
-    const half = 2.6 + 4 * (1 - t) + 1.2 * Math.sin(u * 0.09);
+    const half = COAST_W * 0.85 + 1.4 + 4 * (1 - t) + 1.2 * Math.abs(Math.sin(u * 0.09)); // always wider than the path
     // It starts exactly on the coast's edge (no ledge jutting past the cliff), then narrows.
     const e = smooth(0, 0.15, t);
     const left = coastEdge(u) * (1 - e) + Math.max(coastEdge(u), centre - half) * e;
     const right = 18 * (1 - smooth(0, 0.25, t)) + (centre + half) * smooth(0, 0.25, t);
     const y = (SEA_Y + 5) * smooth(0.08, 1, t) ** 0.8;
-    return { u, t, left, right, y, path, pw: 1.75 * (1 - 0.45 * t) };
+    return { u, t, left, right, y, path, pw: COAST_W * 0.85 }; // as wide as the painted path
   };
   /** The spit's back at a point: flat along the path, humped away from it (low near the start). */
   const lift = (a: ReturnType<typeof at>, v: number): number => {
