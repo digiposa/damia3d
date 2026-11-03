@@ -195,16 +195,37 @@ const smooth = (a: number, b: number, x: number): number => {
  * at the floor's level).
  */
 function forestHeight(x: number, z: number): number {
+  const { u, v } = toUV(x, z);
+  const base = level(u, v);
   const n = nearestOnTrack(x, z);
   const off = smooth(0.8, 4.5, n.d - n.w);
-  if (off <= 0) return 0;
-  const { u, v } = toUV(x, z);
+  if (off <= 0) return base;
   let edge = cliffE(u) - v;
   for (const r of RAVINES) edge = Math.min(edge, Math.abs(u - ravineC(r, v)) - ravineH(r, v));
   const keep = smooth(0.6, 4, edge);
-  if (keep <= 0) return 0;
+  if (keep <= 0) return base;
   const mound = noise2(u * 0.14, v * 0.14) * 0.65 + noise2(u * 0.4 + 5, v * 0.4) * 0.35;
-  return off * keep * 4 * Math.max(0, mound - 0.28);
+  return base + off * keep * 4 * Math.max(0, mound - 0.28);
+}
+
+/** How much higher the middle of the wood stands, between the two ravines (PS1). */
+const PLATEAU = 4;
+
+/**
+ * The wood's levels (PS1): past the first ravine the ground stands higher — its fallen trunk climbs
+ * to the far lip — and past the second it comes back down. Over each ravine the level ramps from
+ * lip to lip (the trunk's slope, and the height of anyone walking on it).
+ */
+function level(u: number, v: number): number {
+  const [r0, r1] = RAVINES;
+  const a0 = ravineC(r0, v) - ravineH(r0, v);
+  const b0 = ravineC(r0, v) + ravineH(r0, v);
+  const a1 = ravineC(r1, v) - ravineH(r1, v);
+  const b1 = ravineC(r1, v) + ravineH(r1, v);
+  if (u <= a0 || u >= b1) return 0;
+  if (u < b0) return (PLATEAU * (u - a0)) / (b0 - a0);
+  if (u <= a1) return PLATEAU;
+  return (PLATEAU * (b1 - u)) / (b1 - a1);
 }
 
 /** Half-width of the beaten dirt itself (the walkable corridor is wider: grass on both sides). */
@@ -370,7 +391,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   // instances, props and the nodes holding the bigger ones).
   for (const node of root.getChildren()) {
     const t = node as TransformNode;
-    if (!t.position || Math.abs(t.position.y) > 0.6) continue;
+    if (!t.position || Math.abs(t.position.y) > 0.6 || t.name.startsWith("forestBridge")) continue; // the bridges lie lip to lip already
     t.position.y += forestHeight(t.position.x, t.position.z);
   }
   for (const m of [...root.getChildMeshes(), ...fixed.getChildMeshes()]) {
@@ -553,11 +574,13 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
   const wall = (name: string, r: Ravine, side: 1 | -1, facing: Vector3): Mesh => {
     const m = gridMesh(name, scene, rows, DEPTH_ROWS, (i, j) => {
       const v = rowV(i);
-      const y = j === 0 ? 0.02 : -RAVINE_DEPTH * (j / DEPTH_ROWS);
+      // From the lip's level (the plateau's side stands higher) down to the floor.
+      const top = level(ravineC(r, v) + side * (ravineH(r, v) + 0.001), v);
+      const y = j === 0 ? top + 0.02 : top - (top + RAVINE_DEPTH) * (j / DEPTH_ROWS);
       // Ledges jut into the gorge (towards its centre line).
-      const u = ravineC(r, v) + side * (ravineH(r, v) - strataOut(y, v, side + r.c, 1.05));
+      const u = ravineC(r, v) + side * (ravineH(r, v) - strataOut(y - top, v, side + r.c, 1.05));
       const p = forestPoint(u, Math.min(v, cliffE(u) + 2));
-      return { x: p.x, y, z: p.z, tu: v / 4, tv: -y / 8 };
+      return { x: p.x, y, z: p.z, tu: v / 4, tv: (top - y) / 8 };
     }, facing);
     // Darker the deeper it goes: the gorge's depth is in this gradient.
     const pos = m.getVerticesData(VertexBuffer.PositionKind)!;
@@ -595,7 +618,8 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     // Banded strata standing out in ledges, like the ravines' walls.
     const out = 9 * Math.pow(f, 0.8) - strataOut(-26 * f, u, 7, 1.1) * (1 - f);
     const p = forestPoint(u + nu * out, Math.min(V_MAX + 4, e) + nv * out);
-    return { x: p.x, y: f === 0 ? 0.02 : -26 * f, z: p.z, tu: u / 4, tv: f * 3.4 };
+    const lip = level(u, Math.min(V_MAX + 4, e));
+    return { x: p.x, y: f === 0 ? lip + 0.02 : lip * (1 - f) - 26 * f, z: p.z, tu: u / 4, tv: f * 3.4 };
   }, new Vector3(SIDE.x, 1, SIDE.z));
   cliff.convertToFlatShadedMesh();
   cliff.material = stone;
@@ -999,7 +1023,9 @@ function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number, ra
   for (let t = 0; t <= 1.0001; t += 0.125) {
     const p = forestPoint(from + (to - from) * t, v + Math.sin(t * 5 + k) * 0.12);
     const radius = 0.75 - 0.2 * t;
-    path.push(new Vector3(p.x, 0.08 - radius - 0.12 * Math.sin(Math.PI * t), p.z));
+    // Lying from lip to lip: it climbs to (or down from) the higher middle of the wood.
+    const ground = level(from + (to - from) * t, v);
+    path.push(new Vector3(p.x, ground + 0.08 - radius - 0.12 * Math.sin(Math.PI * t), p.z));
   }
   const log = limb(`forestBridgeLog${k}`, scene, path, 0.75, 0.55, rand);
   log.material = bark;
@@ -1022,7 +1048,7 @@ function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number, ra
   for (let q = 0; q < 5; q++) {
     const a = (q / 5) * Math.PI * 2 + rand();
     const dir = SIDE.scale(Math.cos(a));
-    const pts = [0, 1].map((t) => new Vector3(foot.x + dir.x * (1.1 + 0.6 * t) - FWD.x * 0.4 * t, 0.5 + Math.sin(a) * (1.1 + 0.6 * t), foot.z + dir.z * (1.1 + 0.6 * t) - FWD.z * 0.4 * t));
+    const pts = [0, 1].map((t) => new Vector3(foot.x + dir.x * (1.1 + 0.6 * t) - FWD.x * 0.4 * t, level(from, v) + 0.5 + Math.sin(a) * (1.1 + 0.6 * t), foot.z + dir.z * (1.1 + 0.6 * t) - FWD.z * 0.4 * t));
     const stub = limb(`forestBridgeRoot${k}_${q}`, scene, pts, 0.16, 0.04, rand);
     stub.material = bark;
     stub.parent = root;
@@ -1110,7 +1136,7 @@ function buildGorgeVines(scene: Scene, root: TransformNode, rand: () => number):
     const h = rand() < 0.4 ? 4 + rand() * 7 : 1.5 + rand() * 2;
     const card = MeshBuilder.CreatePlane(`forestIvy${v.toFixed(1)}`, { width: w, height: h }, scene);
     card.rotation.y = Math.atan2(FWD.x, FWD.z); // flat on the wall, facing the camera
-    card.position.set(lip.x - FWD.x * 0.06, 0.25 - h / 2, lip.z - FWD.z * 0.06);
+    card.position.set(lip.x - FWD.x * 0.06, level(u + 0.001, v) + 0.25 - h / 2, lip.z - FWD.z * 0.06);
     card.material = mat;
     card.parent = root;
   }
