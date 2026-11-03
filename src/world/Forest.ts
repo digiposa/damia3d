@@ -59,15 +59,18 @@ import type { World } from "./World";
  */
 const TRACK: Knot[] = [
   // (the road in from Seles, running on out of sight behind the camera — not walkable that far)
-  { u: -34, v: 2.5, w: 3.4 },
-  { u: -20, v: 1.2, w: 3.4 },
-  // 1 — the merchant's cart track (624)
-  { u: -9, v: 0.5, w: 3.4 },
-  { u: 0, v: 0, w: 3.8 },
-  { u: 8, v: 2.6, w: 3.6 },
-  { u: 16, v: 0.8, w: 6.2 }, // clearing — first encounter
-  { u: 24, v: -2.8, w: 3.6 },
-  { u: 32, v: -2.2, w: 4.0 },
+  { u: -34, v: 11, w: 3.4 },
+  { u: -20, v: 8.5, w: 3.4 },
+  // 1 — the merchant's cart track (624, PS1): in at the bottom right, an S — up and over to the
+  // left past the merchant, back across to the right (the footpath to the chest leaves there),
+  // then on up out of the top. Flat ground all the way.
+  { u: -9, v: 6, w: 3.4 },
+  { u: -1, v: 1.5, w: 3.8 },
+  { u: 5, v: -2.5, w: 4.4 }, // the merchant, on the left of the path
+  { u: 12, v: -1.5, w: 4.2 },
+  { u: 19, v: 2.5, w: 5.4 }, // clearing — first encounter; the chest's footpath goes off right
+  { u: 26, v: 1.5, w: 3.8 },
+  { u: 33, v: -1.6, w: 4.0 },
   // 2 — the first ravine: a fallen tree across it, the cliff and the sea on the right
   { u: 40, v: -0.6, w: 3.4 },
   { u: 44.8, v: -0.4, w: 1.0 }, // onto the trunk…
@@ -104,7 +107,8 @@ const BRANCHES: Knot[][] = [
   [{ u: 133, v: 0.4, w: 3.4 }, { u: 140, v: 5.5, w: 3.2 }, { u: 150, v: 9, w: 3.0 }, { u: 162, v: 11, w: 3.0 }, { u: 178, v: 12, w: 3.0 }], // → the Prairie
   // Footpaths to the chests off the main track (the wiki's "upper path" by the merchant, and the
   // one hidden in the trees past the first bridge) — narrow, but always walkable.
-  [{ u: 10, v: 1.6, w: 1.6 }, { u: 10.6, v: -4, w: 1.5 }, { u: 11, v: -7.4, w: 2.2 }],
+  [{ u: 20, v: 4, w: 1.6 }, { u: 22, v: 8.5, w: 1.5 }, { u: 23.4, v: 11.6, w: 2.2 }], // back off to the right
+
   [{ u: 56, v: 0.8, w: 1.6 }, { u: 56.6, v: -4, w: 1.5 }, { u: 57, v: -6.9, w: 2.2 }],
 ];
 
@@ -127,14 +131,14 @@ export const FOREST_ZONES: ForestZone[] = [
 /** The Forest's four chests (wiki: Healing Potion on the merchant's upper path, Charm Potion behind
  *  the trees past the first bridge, 20 G and Burn Out at the maze's right and left lower edges). */
 export const FOREST_CHESTS: { id: string; u: number; v: number }[] = [
-  { id: "healingPotion", u: 11, v: -8.5 },
+  { id: "healingPotion", u: 23.8, v: 12.8 },
   { id: "charmPotion", u: 57, v: -8 },
   { id: "gold20", u: 82.6, v: 14.8 },
   { id: "burnOut", u: 80.6, v: -13.8 },
 ];
 
 /** Where the travelling merchant stands, by his cart (submap 624). */
-export const MERCHANT_SPOT = { u: 6, v: -3.4 };
+export const MERCHANT_SPOT = { u: 5, v: -4.8 };
 
 /** Where Dart's "leave Shana alone" memory plays, just past the gorge (scene to come). */
 export const SHANA_SCENE_SPOT = { u: 118, v: 0.5 };
@@ -202,7 +206,7 @@ function forestHeight(x: number, z: number): number {
   if (off <= 0) return base;
   let edge = cliffE(u) - v;
   for (const r of RAVINES) edge = Math.min(edge, Math.abs(u - ravineC(r, v)) - ravineH(r, v));
-  const keep = smooth(0.6, 4, edge);
+  const keep = smooth(0.6, 4, edge) * smooth(36, 44, u); // the merchant's path is flat (PS1)
   if (keep <= 0) return base;
   const mound = noise2(u * 0.14, v * 0.14) * 0.65 + noise2(u * 0.4 + 5, v * 0.4) * 0.35;
   return base + off * keep * 4 * Math.max(0, mound - 0.28);
@@ -964,7 +968,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
 
 /** The travelling merchant's cart, pulled off the track (submap 624's merchant). */
 function buildCart(scene: Scene, root: TransformNode): void {
-  const at = forestPoint(4, -4.6);
+  const at = forestPoint(4, -8.6); // just off the path, behind the merchant
   const node = new TransformNode("forestCart", scene);
   node.parent = root;
   node.position.copyFrom(at);
@@ -1001,7 +1005,7 @@ function buildCart(scene: Scene, root: TransformNode): void {
 
 /** A moss-covered fallen trunk lying beside the track. */
 function buildFallenLog(scene: Scene, root: TransformNode): void {
-  const at = forestPoint(27, 3.4);
+  const at = forestPoint(29, -6.4);
   const log = MeshBuilder.CreateCylinder("forestLog", { height: 5, diameter: 0.9, tessellation: 8 }, scene);
   log.rotation.z = Math.PI / 2;
   log.rotation.y = Math.atan2(FWD.x, FWD.z) + 1.1;
