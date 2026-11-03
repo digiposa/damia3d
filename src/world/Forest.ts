@@ -210,6 +210,8 @@ function forestHeight(x: number, z: number): number {
 
 /** How much higher the middle of the wood stands, between the two ravines (PS1). */
 const PLATEAU = 4;
+/** What is left of it at the second ravine's lip (see {@link level}). */
+const LAST_STEP = 1.2;
 
 /**
  * The wood's levels (PS1): past the first ravine the ground stands higher — its fallen trunk climbs
@@ -224,8 +226,12 @@ function level(u: number, v: number): number {
   const b1 = ravineC(r1, v) + ravineH(r1, v);
   if (u <= a0 || u >= b1) return 0;
   if (u < b0) return (PLATEAU * (u - a0)) / (b0 - a0);
-  if (u <= a1) return PLATEAU;
-  return (PLATEAU * (b1 - u)) / (b1 - a1);
+  // Coming down: the plateau slopes off before the second ravine, so its lip stands only a little
+  // above the far side — a full drop there would hide the whole gorge and its trunk from the camera
+  // (it looks down from the high side).
+  const lip = PLATEAU - (PLATEAU - LAST_STEP) * smooth(a1 - 22, a1 - 2, u);
+  if (u <= a1) return lip;
+  return (LAST_STEP * (b1 - u)) / (b1 - a1);
 }
 
 /** Half-width of the beaten dirt itself (the walkable corridor is wider: grass on both sides). */
@@ -1048,8 +1054,9 @@ function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number, ra
   for (let q = 0; q < 5; q++) {
     const a = (q / 5) * Math.PI * 2 + rand();
     const dir = SIDE.scale(Math.cos(a));
-    const pts = [0, 1].map((t) => new Vector3(foot.x + dir.x * (1.1 + 0.6 * t) - FWD.x * 0.4 * t, level(from, v) + 0.5 + Math.sin(a) * (1.1 + 0.6 * t), foot.z + dir.z * (1.1 + 0.6 * t) - FWD.z * 0.4 * t));
-    const stub = limb(`forestBridgeRoot${k}_${q}`, scene, pts, 0.16, 0.04, rand);
+    // Short and low (seen from behind in third person, long ones read as spikes round the hero).
+    const pts = [0, 1].map((t) => new Vector3(foot.x + dir.x * (0.6 + 0.35 * t) - FWD.x * 0.5 * t, level(from, v) - 0.2 + Math.sin(a) * (0.5 + 0.3 * t), foot.z + dir.z * (0.6 + 0.35 * t) - FWD.z * 0.5 * t));
+    const stub = limb(`forestBridgeRoot${k}_${q}`, scene, pts, 0.12, 0.03, rand);
     stub.material = bark;
     stub.parent = root;
   }
@@ -1058,8 +1065,8 @@ function buildBridge(scene: Scene, root: TransformNode, r: Ravine, k: number, ra
   for (const [f, side, len] of [[0.3, 1, 1.8], [0.5, -1, 1.4], [0.72, 1, 2.2], [0.86, -1, 1.6]] as const) {
     const p = path[Math.round(f * (path.length - 1))];
     const dir = SIDE.scale(side);
-    const pts = [0, 0.5, 1].map((t) => new Vector3(p.x + dir.x * len * t, p.y + 0.4 + 0.8 * t, p.z + dir.z * len * t));
-    const br = limb(`forestBridgeBranch${k}_${f}`, scene, pts, 0.14, 0.03, rand);
+    const pts = [0, 0.5, 1].map((t) => new Vector3(p.x + dir.x * len * t, p.y + 0.35 + 0.35 * t, p.z + dir.z * len * t));
+    const br = limb(`forestBridgeBranch${k}_${f}`, scene, pts, 0.1, 0.02, rand);
     br.material = bark;
     br.parent = root;
   }
