@@ -374,6 +374,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   const floors = buildTerrain(scene, fixed, rand);
   const track = buildTrack(scene, fixed, rand);
   const trees = buildVegetation(scene, root, rand);
+  trees.push(...buildMerchantWood(scene, root, rand));
   buildCart(scene, root);
   buildFallenLog(scene, root);
   RAVINES.forEach((r, k) => buildBridge(scene, root, r, k, rand));
@@ -965,6 +966,87 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
 }
 
 // --- Props --------------------------------------------------------------------------
+
+/**
+ * The merchant's path is closed in by the wood (PS1): great gnarled trunks either side, their roots
+ * gripping the ground, and round clumps of bushes packed between them right up to the verge, so the
+ * path winds through a tunnel of green. A dead stump and its roots in the foreground at the way in.
+ * Nothing may hide the path. Returns the trunks' shade circles.
+ */
+function buildMerchantWood(scene: Scene, root: TransformNode, rand: () => number): { x: number; z: number; r: number }[] {
+  const bark = scene.getMaterialByName("forestBarkMat") as StandardMaterial;
+  const leaves = scene.getMaterialByName("forestLeafMat") as StandardMaterial;
+  const bush = scene.getMeshByName("forestBush") as Mesh | null;
+  const shade: { x: number; z: number; r: number }[] = [];
+  const gnarled = (x: number, z: number, s: number): void => {
+    const parts: Mesh[] = [];
+    const lean = rand() * Math.PI * 2;
+    const spine = [0, 1, 2, 3, 4].map((k) => new Vector3(x + Math.cos(lean) * Math.sin(k * 0.9) * 0.6 * s, k * 2.2 * s, z + Math.sin(lean) * Math.sin(k * 0.9) * 0.6 * s));
+    parts.push(limb("forestGnarlTrunk", scene, spine, 1.05 * s, 0.45 * s, rand));
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + rand() * 0.6;
+      const len = (1.4 + rand()) * s;
+      parts.push(limb("forestGnarlRoot", scene, [0, 0.5, 1].map((f) => new Vector3(x + Math.cos(a) * len * f, 0.9 * s * (1 - f) ** 1.6, z + Math.sin(a) * len * f)), 0.45 * s, 0.08 * s, rand));
+    }
+    for (let k = 0; k < 4; k++) {
+      const from = spine[3];
+      const a = rand() * Math.PI * 2;
+      const len = (2.2 + rand() * 1.6) * s;
+      parts.push(limb("forestGnarlBough", scene, [0, 0.5, 1].map((f) => new Vector3(from.x + Math.cos(a) * len * f, from.y + len * 0.5 * f, from.z + Math.sin(a) * len * f)), 0.3 * s, 0.08 * s, rand));
+    }
+    const tree = Mesh.MergeMeshes(parts, true, true);
+    if (tree) {
+      tree.material = bark;
+      tree.parent = root;
+      gradeColors(tree, [0.5, 0.48, 0.45], [1, 1, 1]);
+    }
+    // The crown, high up (mostly off the top of the frame).
+    for (let k = 0; k < 4; k++) {
+      const c = MeshBuilder.CreateIcoSphere("forestGnarlCrown", { radius: (2.4 + rand()) * s, subdivisions: 2 }, scene);
+      c.scaling.y = 0.6;
+      c.position.set(spine[4].x + (rand() - 0.5) * 4 * s, spine[4].y + 1 + rand() * 2, spine[4].z + (rand() - 0.5) * 4 * s);
+      jitter(c, 0.3 * s, rand);
+      c.material = leaves;
+      c.parent = root;
+      gradeColors(c, LEAF_SHADE, LEAF_SUN);
+    }
+    obstacles.add(x, z, 1.1 * s);
+    shade.push({ x, z, r: 4 * s });
+  };
+  for (let gu = -14; gu < 38; gu += 1.7)
+    for (let gv = -26; gv < 26; gv += 1.7) {
+      const lu = gu + (rand() - 0.5) * 1.5;
+      const lv = gv + (rand() - 0.5) * 1.5;
+      const { x, z } = forestPoint(lu, lv);
+      if (CLEARINGS.some((c) => Math.hypot(c.x - x, c.z - z) < 3)) continue;
+      const near = nearestOnTrack(x, z);
+      const edge = near.d - near.w;
+      if (edge < 0.7 || edge > 12) continue;
+      const roll = rand();
+      if (edge > 2 && roll < 0.16 && !occludesTrack(x, z, 11, 3.5)) {
+        gnarled(x, z, 0.85 + rand() * 0.35);
+      } else if (bush && roll < 0.55 && !occludesTrack(x, z, 2.4, 1.8)) {
+        // Round clumps packed right up to the verge (knee-to-waist high: they never hide the hero).
+        const sc = edge < 2 ? 1.1 + rand() * 0.5 : 1.6 + rand() * 1.1;
+        place(bush, root, x, z, sc, rand() * 6);
+        canopies.push({ x, z, under: 0.6 * sc, coverFrom: 0, coverTo: 0, coverHalf: 0 });
+      }
+    }
+  // The dead stump in the foreground at the way in, its roots twisting out across the verge.
+  const st = forestPoint(-6, 10.6);
+  const stump = limb("forestStump", scene, [new Vector3(st.x, 0, st.z), new Vector3(st.x + 0.1, 0.8, st.z), new Vector3(st.x + 0.05, 1.3, st.z + 0.1)], 0.7, 0.55, rand);
+  stump.material = bark;
+  stump.parent = root;
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + rand();
+    const len = 1.3 + rand() * 0.9;
+    const r = limb("forestStumpRoot", scene, [0, 0.4, 1].map((f) => new Vector3(st.x + Math.cos(a) * len * f, 0.5 * (1 - f) ** 1.4 + 0.1 * Math.sin(f * 6), st.z + Math.sin(a) * len * f)), 0.25, 0.04, rand);
+    r.material = bark;
+    r.parent = root;
+  }
+  obstacles.add(st.x, st.z, 0.9);
+  return shade;
+}
 
 /** The travelling merchant's cart, pulled off the track (submap 624's merchant). */
 function buildCart(scene: Scene, root: TransformNode): void {
