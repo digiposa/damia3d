@@ -86,6 +86,11 @@ export class IsoCamera {
     this._groundForward = this._groundRight = undefined;
   }
 
+  /** True in a perspective (scenic / third-person) shot. */
+  get isPerspective(): boolean {
+    return !!this.view;
+  }
+
   /** The heading (camera alpha). */
   get heading(): number {
     return this.camera.alpha;

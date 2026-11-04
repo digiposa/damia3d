@@ -991,7 +991,9 @@ export abstract class ArenaCombatMode extends GameMode {
       // Set-piece framing only while exploring: a fight always gets the plain, readable view.
       const p = this.player.position;
       const fighting = this.enemies.some((e) => e.alive && Math.hypot(e.position.x - p.x, e.position.z - p.z) < 14);
-      const shot = fighting ? null : this.world.shotAt(p);
+      // Framed moments are for the fixed ISO view; a perspective (third-person) camera is the
+      // player's own to aim, so it gets none.
+      const shot = fighting || this.camera.isPerspective ? null : this.world.shotAt(p);
       this.camera.setShot(shot?.zoom ?? 1, shot?.offset);
     }
     this.camera.tickShot(dt);
