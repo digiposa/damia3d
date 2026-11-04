@@ -232,6 +232,10 @@ export function selesWorld(scene: Scene): SelesWorld {
   burnedWoodHouse(scene, root, rand, charred, vil(14, -10), 0.4);
   burnedWoodHouse(scene, root, rand, charred, vil(-2, 8.5), -0.2);
   burnedWoodHouse(scene, root, rand, charred, { u: 13.6, v: -27.5 }, 0.9);
+  // Filling the gaps right of the path down to the square (a small village, but not an empty one).
+  ruinHouse(scene, root, rand, stone, charred, { u: 6.5, v: -21 }, 3.8, 3.4, 0.15, 2.4);
+  burnedWoodHouse(scene, root, rand, charred, { u: 6.2, v: -13 }, -0.25);
+  ruinHouse(scene, root, rand, stone, charred, { u: 6.8, v: -35 }, 3, 2.6, -0.1, 1.8); // a shed by the square
 
   ticks.push(buildWell(scene, root, rand, wood, charred, selesPoint(SELES_SPOTS.well)));
   ticks.push(...buildCemetery(scene, root, rand, stone, wood));
