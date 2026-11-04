@@ -15,7 +15,7 @@ import { softDotTexture } from "./atmosphere";
 import { LIGHTING_PRESETS } from "./lighting";
 import { mulberry32, pixelTexture, rgb } from "./paint";
 import { fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
-import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource } from "./kit/flora";
+import { barkTexture, bushSource, fernSource, grassSource, groveSource, leafTexture, rockSource, saplingSource, treeSource as kitTree } from "./kit/flora";
 import { gradeColors, gridMesh, jitter, limb, matte, mergeSource, place } from "./kit/mesh";
 import { chestProp } from "./kit/chest";
 import { farLand, farLandHeight, type FarLandOptions } from "./kit/farLand";
@@ -235,7 +235,6 @@ export function selesWorld(scene: Scene): SelesWorld {
 
   ticks.push(buildWell(scene, root, rand, wood, charred, selesPoint(SELES_SPOTS.well)));
   ticks.push(...buildCemetery(scene, root, rand, stone, wood));
-  buildBackdrop(scene, root, rand);
   buildHorizon(scene, root);
   ticks.push(...buildOutskirts(scene, root, rand, stone, charred, wood));
   buildBrokenLife(scene, root, rand, wood);
@@ -308,7 +307,7 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
     const u = -64 + (96 * j) / 64;
     const v = -66 + (96 * i) / 64;
     const p = fromUV(u, v);
-    return { x: p.x, y: 0, z: p.z, tu: u / tileU, tv: v / tileU };
+    return { x: p.x, y: outskirtsHeight(p.x, p.z), z: p.z, tu: u / tileU, tv: v / tileU };
   }, Vector3.Up());
   ground.material = matte("selesGroundMat", scene, tex);
   ground.parent = root;
@@ -1361,38 +1360,32 @@ function buildBrokenLife(scene: Scene, root: TransformNode, rand: () => number, 
   bucket.rotation.set(Math.PI / 2, 0.4, 0);
 }
 
-/**
- * The hills beyond the village (PS1: low brown hills on the horizon behind the cemetery and the
- * road out): a few great low mounds far up the screen, fading into the morning haze. Cheap: a
- * handful of plain meshes, no texture.
- */
-function buildBackdrop(scene: Scene, root: TransformNode, rand: () => number): void {
-  const earth = matte("selesFarHills", scene, undefined, new Color3(0.3, 0.25, 0.16)); // darker than the village earth: it reads as a slope, not a plate
-  const grass = grassSource(scene, rand);
-  // Just past the cemetery's fence (the camera sees a dozen units up the screen), either side of the
-  // road out, and one closing the far end of the road.
-  for (const [u, v, d, h] of [[-28, -47, 10, 0.6], [-32, -40, 9, 0.55], [-36, -52, 16, 0.5], [-45, -32, 18, 0.45], [-30, -58, 14, 0.5]] as const) {
-    const hill = MeshBuilder.CreateSphere("selesFarHill", { diameter: d, segments: 10 }, scene);
-    const p = fromUV(u, v);
-    hill.position.set(p.x, -d * 0.08, p.z);
-    hill.scaling.set(1.4, h, 1);
-    hill.rotation.y = rand() * Math.PI;
-    jitter(hill, 0.8, rand);
-    gradeColors(hill, [0.45, 0.42, 0.38], [1, 1, 0.9]);
-    hill.material = earth;
-    hill.parent = root;
-    // Dry grass on its slopes.
-    for (let k = 0; k < 40; k++) {
-      const a = rand() * Math.PI * 2;
-      const r = rand() * d * 0.45;
-      place(grass, root, p.x + Math.cos(a) * r, p.z + Math.sin(a) * r, 1 + rand() * 0.6, rand() * 3).position.y = d * h * 0.5 * (1 - (r / (d * 0.5)) ** 2) - d * 0.08;
-    }
-  }
-}
-
 /** How far past the village's own ground (0 inside, 1 a few units out), off the hill. */
 function outside(u: number, v: number): number {
   return smooth(0, 5, Math.max(u - 11, v - 10, -44 - v)) * (1 - clamp01((hillDepth(u, v) + 1) / 2));
+}
+
+/**
+ * The land round the village (off its own ground and the hill): gentle swells in the fields,
+ * rising into banks towards the woods; the trails stay level. 0 on the village ground.
+ */
+function outskirtsHeight(x: number, z: number): number {
+  const { u, v } = selesUV(new Vector3(x, 0, z));
+  const k = outside(u, v);
+  if (k <= 0) return 0;
+  const out = Math.max(u - 11, v - 10, -44 - v);
+  const rise = smooth(8, 34, out); // further out: the banks
+  const n = noise2(u * 0.06 + 3, v * 0.06);
+  const n2 = noise2(u * 0.19, v * 0.19 + 7);
+  let h = k * (0.7 * n + 0.3 * n2) + rise * (1.2 + 4.5 * n);
+  const tr = NET.nearest(x, z);
+  h *= smooth(tr.w + 0.5, tr.w + 7, tr.d); // the roads stay level
+  return h;
+}
+
+/** The ground's height anywhere: the hill, or the outskirts' swells. */
+function groundY(x: number, z: number): number {
+  return Math.max(selesHeight(x, z), outskirtsHeight(x, z));
 }
 
 /** Its fields, in plots of 9 × 7: a colour factor over the scorched earth. */
@@ -1428,6 +1421,7 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
     [-4, -51, 3.8, 3, 0.35, 2.4],
   ];
   for (const [u, v, w, d, rot, h] of ruins) ruinHouse(scene, far, rand, stone, charred, { u, v }, w, d, rot, h);
+  for (const n of far.getChildren() as TransformNode[]) n.position.y = groundY(n.position.x, n.position.z) - 0.1; // on the swell
 
   // Fences along a few of the plots' edges, and burnt haystacks.
   const fenceParts: Mesh[] = [];
@@ -1441,14 +1435,14 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
       if (rand() < 0.12) continue; // a post gone
       const p = Vector3.Lerp(a, b, k / n);
       const post = MeshBuilder.CreateBox("selesFieldPost", { width: 0.14, height: 1.1, depth: 0.14 }, scene);
-      post.position.set(p.x, 0.5, p.z);
+      post.position.set(p.x, groundY(p.x, p.z) + 0.45, p.z);
       post.rotation.set((rand() - 0.5) * 0.15, rand(), (rand() - 0.5) * 0.15);
       fenceParts.push(post);
       if (k === n || rand() < 0.15) continue; // a broken rail
       const q = Vector3.Lerp(a, b, (k + 0.5) / n);
       for (const y of [0.45, 0.85]) {
         const rail = MeshBuilder.CreateBox("selesFieldRail", { width: 0.06, height: 0.08, depth: len / n + 0.1 }, scene);
-        rail.position.set(q.x, y + (rand() - 0.5) * 0.06, q.z);
+        rail.position.set(q.x, groundY(q.x, q.z) + y + (rand() - 0.5) * 0.06, q.z);
         rail.rotation.y = ry;
         fenceParts.push(rail);
       }
@@ -1472,7 +1466,7 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
     const s = MeshBuilder.CreateCylinder("selesHaystack", { height: 1.6, diameterBottom: 2, diameterTop: 0.5, tessellation: 9, subdivisions: 2 }, scene);
     jitter(s, 0.12, rand);
     const p = fromUV(u, v);
-    s.position.set(p.x, 0.75, p.z);
+    s.position.set(p.x, groundY(p.x, p.z) + 0.7, p.z);
     gradeColors(s, [0.5, 0.48, 0.46], [1.5, 1.25, 0.8]); // charred at the foot, the top still straw
     stacks.push(s);
   }
@@ -1498,83 +1492,90 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
   }
   far.dispose();
 
-  // The woods round the valley: a dense edge of full round-topped trees past the fields (a gap
-  // where the road leaves for the forest), then the woods going on over the hills, cheaper trees
-  // the fog turns to a skyline against the lighter sky.
-  const leaf = matte("selesFarLeaf", scene, undefined, new Color3(0.2, 0.23, 0.14));
-  const treeSource = (name: string, blobs: number, sub: number): Mesh => {
-    const parts: Mesh[] = [];
-    const trunk = MeshBuilder.CreateCylinder(`${name}Trunk`, { height: 3, diameterTop: 0.3, diameterBottom: 0.5, tessellation: 5 }, scene);
-    trunk.position.y = 1.5;
-    gradeColors(trunk, [0.38, 0.3, 0.26], [0.42, 0.34, 0.3]);
-    parts.push(trunk);
-    const BLOBS = [[0, 4, 0, 1.9], [0.9, 3.4, 0.5, 1.3], [-0.8, 3.6, -0.4, 1.4], [0.1, 5.2, -0.2, 1.2], [0.6, 4.6, -0.8, 1.1], [-0.5, 4.8, 0.7, 1.1]];
-    for (const [x, y, z, r] of BLOBS.slice(0, blobs)) {
-      const c = MeshBuilder.CreateIcoSphere(`${name}Canopy`, { radius: r * (blobs < 4 ? 1.2 : 1), subdivisions: sub }, scene);
-      jitter(c, 0.18, rand);
-      c.position.set(x, y, z);
-      gradeColors(c, [0.55, 0.6, 0.5], [1.05, 1.08, 0.95]);
-      parts.push(c);
+  // The woods round the valley — the forest's own trees (textured bark and foliage, soft crowns):
+  // the full trees along the wood's edge facing the village, lighter ones behind and over the hills
+  // (the fog takes them); a gap where the road leaves for the forest.
+  const bark = matte("selesWoodBark", scene, barkTexture(scene, rand));
+  const leaves = matte("selesWoodLeaf", scene, leafTexture(scene, rand));
+  const bigTrees = [0, 1, 2].map((i) => kitTree(i + 10, scene, bark, leaves, rand));
+  const grove = groveSource(scene, bark, leaves, rand);
+  const sapling = saplingSource(scene, bark, leaves, rand);
+  const bush = bushSource(scene, leaves, rand);
+  // A light tree for the far woods: a bent trunk under a few soft lumps.
+  const lightTree = (() => {
+    const trunk = limb("selesFarTrunk", scene, [new Vector3(0, 0, 0), new Vector3(0.2, 2.2, 0.1), new Vector3(0, 4.2, 0)], 0.32, 0.12, rand);
+    trunk.material = bark;
+    gradeColors(trunk, [0.6, 0.56, 0.5], [1, 1, 1]);
+    const parts: Mesh[] = [trunk];
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + rand();
+      const d = k === 0 ? 0 : 0.9 + rand() * 0.6;
+      const b = MeshBuilder.CreateIcoSphere(`selesFarCrown${k}`, { radius: 1.3 + rand() * 0.6, subdivisions: 1 }, scene);
+      b.position.set(Math.cos(a) * d, 4.6 + (k === 0 ? 0.9 : rand() * 0.8), Math.sin(a) * d);
+      b.scaling.y = 0.8;
+      jitter(b, 0.3, rand);
+      gradeColors(b, [0.42, 0.46, 0.4], [1, 1.02, 0.92]);
+      b.material = leaves;
+      parts.push(b);
     }
-    const t = mergeSource(name, parts, false);
-    t.material = leaf;
-    return t;
-  };
-  const fullTree = treeSource("selesFarTree", 6, 1); // smooth-shaded: round enough at this range, light on triangles
-  const farTree = treeSource("selesFarTreeLo", 3, 1);
-  const pine = (() => {
-    // A few dark conifers among them, for a less even line.
-    const parts: Mesh[] = [];
-    const trunk = MeshBuilder.CreateCylinder("selesPineTrunk", { height: 2, diameter: 0.35, tessellation: 5 }, scene);
-    trunk.position.y = 1;
-    gradeColors(trunk, [0.38, 0.3, 0.26], [0.42, 0.34, 0.3]);
-    parts.push(trunk);
-    for (const [y, r, h] of [[2.6, 1.8, 3], [4.2, 1.4, 2.6], [5.6, 0.9, 2.2]] as const) {
-      const c = MeshBuilder.CreateCylinder("selesPineCone", { height: h, diameterTop: 0, diameterBottom: r * 2, tessellation: 7 }, scene);
-      jitter(c, 0.12, rand);
-      c.position.y = y;
-      gradeColors(c, [0.45, 0.55, 0.5], [0.8, 0.9, 0.75]);
-      parts.push(c);
-    }
-    const t = mergeSource("selesPine", parts);
-    t.material = leaf;
-    return t;
+    return mergeSource("selesFarTree", parts, false);
   })();
   const center = SELES_FAR.center;
   const exitDir = Math.atan2(fromUV(-40, -30).z - center.z, fromUV(-40, -30).x - center.x);
-  const plant = (src: Mesh, r: number, a: number, s: number): void => {
-    const x = center.x + Math.cos(a) * r;
-    const z = center.z + Math.sin(a) * r;
+  const plantAt = (src: Mesh, x: number, z: number, s: number): void => {
     const t = place(src, root, x, z, s, rand() * 6);
-    t.position.y = farLandHeight(SELES_FAR, x, z) - 0.15;
-    t.scaling.y *= 0.85 + rand() * 0.45;
+    t.position.y = farLandHeight(SELES_FAR, x, z) - 0.05;
+    t.scaling.y *= 0.85 + rand() * 0.35;
   };
-  // The wood's edge: close-packed, in two staggered rows.
-  for (let k = 0; k < 240; k++) {
+  const plant = (src: Mesh, r: number, a: number, s: number): void => plantAt(src, center.x + Math.cos(a) * r, center.z + Math.sin(a) * r, s);
+  // The wood's edge: the forest's trees, groves and saplings in front.
+  for (let k = 0; k < 150; k++) {
     const a = rand() * Math.PI * 2;
     const da = Math.atan2(Math.sin(a - exitDir), Math.cos(a - exitDir));
-    const r = WOOD_R0 + 1 + rand() * 10;
+    const r = WOOD_R0 - 2 + rand() * 9;
     if (Math.abs(da) < 0.12 * (60 / r)) continue; // the road out
-    plant(rand() < 0.18 ? pine : fullTree, r, a, 1.1 + rand() * 0.9);
+    const roll = rand();
+    if (roll < 0.45) plant(bigTrees[k % 3], r + 2, a, 0.6 + rand() * 0.35);
+    else if (roll < 0.75) plant(grove, r, a, 1.1 + rand() * 0.5);
+    else if (roll < 0.9) plant(sapling, r - 2, a, 1.4 + rand() * 0.8);
+    else plant(bush, r - 3, a, 1.4 + rand() * 1);
   }
   // Behind the hill (where Dart comes from): the wood comes right up to the ledge, off the path.
-  for (let k = 0, n = 0; k < 2000 && n < 220; k++) {
+  for (let k = 0, n = 0; k < 2000 && n < 150; k++) {
     const u = -64 + rand() * 40;
     const v = -60 + rand() * 88;
     if (hillDepth(u, v) < 7) continue;
     const p = fromUV(u, v);
     const tr = NET.nearest(p.x, p.z);
     if (tr.d < tr.w + 3.5 || Math.hypot(p.x - center.x, p.z - center.z) > WOOD_R0 + 1) continue;
-    const t = place(rand() < 0.2 ? pine : n % 3 ? farTree : fullTree, root, p.x, p.z, 1.1 + rand() * 0.9, rand() * 6);
-    t.position.y = farLandHeight(SELES_FAR, p.x, p.z) + 0.12 - 0.15; // on the hill (farLand sits 0.12 under it)
-    t.scaling.y *= 0.85 + rand() * 0.45;
+    plantAt(n % 3 === 0 ? bigTrees[n % 2] : n % 3 === 1 ? grove : lightTree, p.x, p.z, n % 3 === 0 ? 0.6 + rand() * 0.3 : 1 + rand() * 0.5);
     n++;
   }
-  // Beyond, over the hills: cheap trees, the fog does the rest.
+  // Beyond, over the hills: light trees, the fog does the rest.
   for (let k = 0; k < 520; k++) {
     const a = rand() * Math.PI * 2;
-    const r = WOOD_R0 + 10 + (WOOD_R1 - WOOD_R0 - 10) * Math.sqrt(rand());
-    plant(rand() < 0.25 ? pine : farTree, r, a, 1.4 + rand() * 1.1);
+    const r = WOOD_R0 + 7 + (WOOD_R1 - WOOD_R0 - 7) * Math.sqrt(rand());
+    plant(lightTree, r, a, 1.1 + rand() * 0.9);
+  }
+
+  // The open land between the village and the wood: bushes along the fences and field edges,
+  // tufts of dry grass, stones, a few young trees — so no bare plate shows.
+  const grass = grassSource(scene, rand);
+  const rock = rockSource(scene, rand);
+  for (let k = 0, n = 0; k < 6000 && n < 520; k++) {
+    const u = -64 + rand() * 96;
+    const v = -66 + rand() * 96;
+    if (outside(u, v) < 0.6) continue;
+    const p = fromUV(u, v);
+    if (Math.hypot(p.x - center.x, p.z - center.z) > WOOD_R0) continue;
+    const tr = NET.nearest(p.x, p.z);
+    if (tr.d < tr.w + 1) continue; // off the roads
+    const roll = rand();
+    const src = roll < 0.62 ? grass : roll < 0.8 ? bush : roll < 0.92 ? rock : sapling;
+    const s = src === grass ? 1 + rand() * 0.8 : src === bush ? 0.9 + rand() * 0.9 : src === rock ? 0.6 + rand() * 0.9 : 1.2 + rand() * 0.8;
+    const t = place(src, root, p.x, p.z, s, rand() * 6);
+    t.position.y = groundY(p.x, p.z) - (src === rock ? 0.1 : 0.02);
+    n++;
   }
 
   // The mountains far round the valley, grey-blue in the smoky haze.
@@ -1601,7 +1602,7 @@ const SELES_FAR: FarLandOptions = {
   near: new Color3(0.32, 0.25, 0.17),
   far: new Color3(0.3, 0.27, 0.23),
   seed: 5,
-  lift: (x, z) => selesHeight(x, z), // the hill's grassy plateau runs on off the map
+  lift: (x, z) => groundY(x, z), // the hill's plateau and the outskirts' banks run on off the map
   // The woods' dark floor (so no light ground shows between the trunks).
   colorAt: (_x, _z, r, c) => {
     const w = smooth(WOOD_R0 - 3, WOOD_R0 + 2, r);

@@ -299,7 +299,7 @@ export class StoryMode extends ArenaCombatMode {
     if (/Sky|FarLand|Sea|Water|Shaft|Cloud|Haze|Glow|Pool|Mist|Foam|Ivy|Fern|Grass|Flower/i.test(m.name)) return false;
     const mat = m.material;
     if (mat && (mat.alpha < 1 || mat.needAlphaBlending() || mat.needAlphaTesting())) return false;
-    return m.getBoundingInfo().boundingSphere.radiusWorld > 0.9;
+    return m.getBoundingInfo().boundingSphere.radiusWorld > 0.45; // planks and beams too
   }
 
   override update(dt: number): void {
