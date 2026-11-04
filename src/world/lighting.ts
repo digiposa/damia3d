@@ -191,8 +191,8 @@ export const LIGHTING_PRESETS = {
     contrast: 1.22,
     vignetteWeight: 1.4,
     bloomWeight: 0.4,
-    fogStart: 70,
-    fogEnd: 320,
+    fogStart: 90,
+    fogEnd: 560,
     fogColor: [0.62, 0.44, 0.38],
   },
   /** Training arena — the dark-fantasy palette but clearly lit and readable (more fill, softer

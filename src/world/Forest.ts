@@ -113,7 +113,7 @@ const BRANCHES: Knot[][] = [
   [{ u: 56, v: 0.8, w: 1.6 }, { u: 56.6, v: -4, w: 1.5 }, { u: 57, v: -6.9, w: 2.2 }],
   // The road back to Seles, on out of the wood (seen, not walked: the map ends at its start) — the
   // wood stands back from it, so Seles' ruins show at its end.
-  [{ u: -34, v: 11, w: 3.4 }, { u: -60, v: 15, w: 3.2 }, { u: -100, v: 18, w: 3 }, { u: -150, v: 20, w: 3 }, { u: -190, v: 21, w: 3 }],
+  [{ u: -34, v: 11, w: 3.4 }, { u: -60, v: 15, w: 3.2 }, { u: -100, v: 18, w: 3 }, { u: -200, v: 22, w: 3 }, { u: -340, v: 26, w: 3 }],
 ];
 
 /** A stretch of the Forest: one of the console's screens, here an area of the seamless map. */
@@ -481,7 +481,7 @@ function forestShotAt({ u, v }: { u: number; v: number }): { zoom: number; offse
 }
 
 /** Extent of the terrain in the local frame (well past what the camera can see). */
-const U_MIN = -230;
+const U_MIN = -380;
 
 /** Where the wood begins: before it, the open plain the road crosses from Seles. */
 const PLAIN_U = -16; // well past both ends: with a free camera the wood must go on in every direction
@@ -1014,11 +1014,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       const lu = gu + (rand() - 0.5) * 5;
       const lv = gv + (rand() - 0.5) * 5;
       if (inVoid(lu, lv, 3)) continue;
-      if (lu < PLAIN_U) {
-        // The plain: a lone tree here and there, far apart.
-        if (rand() < 0.04 && !occludesTrack(forestPoint(lu, lv).x, forestPoint(lu, lv).z, 15, 4.4)) place(trees[(rand() * trees.length) | 0], root, forestPoint(lu, lv).x, forestPoint(lu, lv).z, 1 + rand() * 0.4, rand() * 6);
-        continue;
-      }
+      if (lu < PLAIN_U) continue; // the plain is open: the wood starts at its edge
       const { x, z } = forestPoint(lu, lv);
       const near = nearestOnTrack(x, z);
       if (near.d < near.w + REACH + 1) continue; // the dressed band has its own
@@ -1125,17 +1121,17 @@ function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): 
   const char = matte("forestSelesChar", scene, undefined, new Color3(0.12, 0.09, 0.07));
   const wall = (u: number, v: number, w: number, h: number, rot: number): void => {
     const at = forestPoint(u, v);
-    for (let k = 0; k < Math.round(w / 0.9); k++) {
+    for (let k = 0; k < Math.round(w / 1.45); k++) {
       const hh = h * (0.4 + rand() * 0.6);
-      const seg = MeshBuilder.CreateBox("forestSelesWall", { width: 0.92, height: hh, depth: 0.45 }, scene);
-      const off = (k - w / 1.8) * 0.9;
+      const seg = MeshBuilder.CreateBox("forestSelesWall", { width: 1.5, height: hh, depth: 0.8 }, scene);
+      const off = (k - w / 1.8) * 1.45;
       seg.position.set(at.x + Math.cos(rot) * off, hh / 2, at.z - Math.sin(rot) * off);
       seg.rotation.y = rot;
       seg.material = stone;
       seg.parent = root;
     }
   };
-  const houses: [number, number, number, number][] = [[-196, 12, 9, 5], [-204, 26, 8, 4.4], [-192, 32, 6, 3.6], [-210, 16, 10, 5.6], [-200, 2, 8, 4]];
+  const houses: [number, number, number, number][] = [[-346, 14, 14, 8], [-358, 34, 12, 7], [-340, 44, 9, 6], [-366, 20, 16, 9], [-352, 0, 12, 6.5]];
   for (const [u, v, w, h] of houses) {
     const rot = rand() * Math.PI;
     wall(u, v - w / 3, w, h, rot);
@@ -1149,16 +1145,16 @@ function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): 
     beam.parent = root;
   }
   // The chapel's tower stump, the tallest thing standing.
-  const t = forestPoint(-212, 24);
-  const tower = MeshBuilder.CreateBox("forestSelesTower", { width: 4.5, height: 16, depth: 4.5 }, scene);
-  tower.position.set(t.x, 8, t.z);
+  const t = forestPoint(-368, 32);
+  const tower = MeshBuilder.CreateBox("forestSelesTower", { width: 7, height: 26, depth: 7 }, scene);
+  tower.position.set(t.x, 13, t.z);
   tower.rotation.y = 0.3;
   jitter(tower, 0.15, rand);
   tower.material = stone;
   tower.parent = root;
   // Smoke still rising from the ruins.
   const dot = softDotTexture(scene);
-  for (const [u, v] of [[-196, 12], [-210, 16], [-204, 26]] as const) {
+  for (const [u, v] of [[-346, 14], [-366, 20], [-358, 34]] as const) {
     const at = forestPoint(u, v);
     const ps = new ParticleSystem("forestSelesSmoke", 40, scene);
     ps.particleTexture = dot;
@@ -1169,8 +1165,8 @@ function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): 
     ps.color1 = new Color4(0.3, 0.27, 0.26, 0.45);
     ps.color2 = new Color4(0.4, 0.36, 0.34, 0.35);
     ps.colorDead = new Color4(0.4, 0.37, 0.35, 0);
-    ps.minSize = 4;
-    ps.maxSize = 9;
+    ps.minSize = 7;
+    ps.maxSize = 15;
     ps.minLifeTime = 10;
     ps.maxLifeTime = 16;
     ps.emitRate = 5;
