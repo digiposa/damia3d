@@ -19,6 +19,7 @@ import { hasFlag, itemDef, saveStory, setFlag, story } from "../story/state";
 import { settings } from "../core/settings";
 import type { BattleUnit, NpcHandle, StoryApi, StoryMap } from "../story/StoryMap";
 import type { World } from "../world/World";
+import { ExitMarker } from "../ui/ExitMarker";
 
 /** Average distance walked between encounters = DISTANCE_PER_RATE / rate (rate 14 → ~21 units). */
 const DISTANCE_PER_RATE = 300;
@@ -82,6 +83,7 @@ export class StoryMode extends ArenaCombatMode {
   private triggers: Trigger[] = [];
   private interactables: Interactable[] = [];
   private signs: Sign[] = [];
+  private exits: { at: Vector3; marker: ExitMarker }[] = [];
   private npcs: Npc[] = [];
   private staged: Enemy[] = [];
   private waits: { until: () => boolean; done: () => void }[] = [];
@@ -246,6 +248,8 @@ export class StoryMode extends ArenaCombatMode {
     }
     this.updateInteract(dt);
     this.updateSigns();
+    const hp = this.player.position;
+    for (const x of this.exits) x.marker.update(dt, Math.hypot(hp.x - x.at.x, hp.z - x.at.z) < 28);
   }
 
   private runTriggers(): void {
@@ -449,6 +453,12 @@ export class StoryMode extends ArenaCombatMode {
         this.lock();
       },
       trigger: (at, radius, run, when) => this.triggers.push({ at, radius, run, when, done: false }),
+      exit: (at, radius, map, entry) => {
+        this.triggers.push({ at, radius, run: () => this.gotoMap(map, entry), done: false });
+        const y = this.world.heightAt?.(at.x, at.z) ?? 0;
+        const mark = new Vector3(at.x, y + 1.1, at.z);
+        this.exits.push({ at, marker: new ExitMarker(this.scene, mark) });
+      },
       interact: (at, label, act, when, reach = 2.2) => this.interactables.push({ at, label, act, when, reach }),
       chest: (id, at, loot, onOpen) => {
         const flag = `chest:${this.mapId}:${id}`;
@@ -581,6 +591,7 @@ export class StoryMode extends ArenaCombatMode {
     this.bubble?.dispose();
     this.prompt?.dispose();
     this.meter?.dispose();
+    for (const x of this.exits) x.marker.dispose();
     super.dispose();
   }
 }

@@ -57,7 +57,7 @@ export const selesMap: MapFactory = (scene) => {
         // Plos, lying before the chapel (set dressing for the scene's composition).
         api.npc("plos", P(SELES_SPOTS.plos), { color: [0.36, 0.42, 0.3], hair: "elder" }).setLying(true);
         openChest(api, world);
-        api.trigger(P(SELES_SPOTS.exitForest), 3, () => api.goto("forest", "fromSeles"));
+        api.exit(P(SELES_SPOTS.exitForest), 3, "forest", "fromSeles");
         return;
       }
       const dart = t("story.dart");

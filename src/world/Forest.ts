@@ -399,6 +399,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   buildRavineMist(scene, fixed);
   buildPollen(scene);
   buildSelesAfar(scene, root, rand);
+  buildMountains(scene, root, rand);
 
   obstacles.index();
   buildMask();
@@ -610,11 +611,17 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     const m = gridMesh(name, scene, rows, DEPTH_ROWS, (i, j) => {
       const v = rowV(i);
       // From the lip's level (the plateau's side stands higher) down to the floor.
-      const top = level(ravineC(r, v) + side * (ravineH(r, v) + 0.001), v);
+      // Past the cliff's edge the wall runs on a little, its top crumbling down into the sea (no
+      // flat cut where the gorge opens onto the water).
+      const u0 = ravineC(r, v) + side * ravineH(r, v);
+      const vv = Math.min(v, cliffE(u0) + 5);
+      const over = Math.max(0, vv - cliffE(u0));
+      const lip = level(ravineC(r, v) + side * (ravineH(r, v) + 0.001), Math.min(vv, cliffE(u0)));
+      const top = lip - (lip - SEA_Y) * smooth(0, 5, over) - Math.sin(over * 2.3) * 0.6 * Math.min(1, over);
       const y = j === 0 ? top + 0.02 : top - (top + RAVINE_DEPTH) * (j / DEPTH_ROWS);
-      // Ledges jut into the gorge (towards its centre line).
-      const u = ravineC(r, v) + side * (ravineH(r, v) - strataOut(y - top, v, side + r.c, 1.05));
-      const p = forestPoint(u, Math.min(v, cliffE(u))); // ends at the cliff's edge
+      // Ledges jut into the gorge (towards its centre line), and spread out at the foot by the sea.
+      const u = ravineC(r, v) + side * (ravineH(r, v) - strataOut(y - top, v, side + r.c, 1.05) + over * 0.5);
+      const p = forestPoint(u, vv);
       return { x: p.x, y, z: p.z, tu: v / 4, tv: (top - y) / 8 };
     }, facing);
     // Darker the deeper it goes: the gorge's depth is in this gradient.
@@ -996,6 +1003,21 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       // Ferns along the corridor's own grass verge too (walk-through, no collision).
       if (edge > -1.6 && edge < 0 && rand() < 0.35) place(fern, root, x, z, 0.6 + rand() * 0.4, rot);
     }
+  // The wood's edge reaches a little out onto the plain either side of the road, framing the view
+  // back to Seles (trees close by, the plain open between them).
+  for (let k = 0; k < 26; k++) {
+    const lu = PLAIN_U - 1 - rand() * 14;
+    const side = rand() < 0.5 ? -1 : 1;
+    const { x: rx, z: rz } = trackPointAt(lu);
+    const rv = forestUV(new Vector3(rx, 0, rz)).v;
+    const lv = rv + side * (5.5 + rand() * 9 + (PLAIN_U - lu) * 0.4);
+    const { x, z } = forestPoint(lu, lv);
+    if (occludesTrack(x, z, 15, 4.4)) continue;
+    const s = 0.9 + rand() * 0.4;
+    place(trees[(rand() * trees.length) | 0], root, x, z, s, rand() * Math.PI * 2);
+    obstacles.add(x, z, 0.75 * s);
+    place(bush, root, x + (rand() - 0.5) * 3, z + (rand() - 0.5) * 3, 1.4 + rand(), rand() * 6);
+  }
   // The plain's grass: tufts and flowers scattered over it (cheap instances).
   const grassSrc = scene.getMeshByName("forestGrass") as Mesh | null;
   const flowerSrc = scene.getMeshByName("forestFlowers") as Mesh | null;
@@ -1111,6 +1133,57 @@ function buildMerchantWood(scene: Scene, root: TransformNode, rand: () => number
 }
 
 /** The travelling merchant's cart, pulled off the track (submap 624's merchant). */
+/**
+ * Mountains far beyond the plain (and round the wood): long ridges of peaks on the horizon, dark
+ * slate with lighter tops, melting into the plain's haze. Big cheap cones, merged into one mesh.
+ */
+function buildMountains(scene: Scene, root: TransformNode, rand: () => number): void {
+  const parts: Mesh[] = [];
+  const ridge = (u0: number, v0: number, u1: number, v1: number, n: number, h: number): void => {
+    for (let k = 0; k < n; k++) {
+      const f = k / (n - 1);
+      const at = forestPoint(u0 + (u1 - u0) * f + (rand() - 0.5) * 30, v0 + (v1 - v0) * f + (rand() - 0.5) * 30);
+      const hh = h * (0.55 + rand() * 0.6);
+      const peak = MeshBuilder.CreateCylinder("forestPeak", { height: hh, diameterTop: hh * 0.08, diameterBottom: hh * (1.6 + rand()), tessellation: 7, subdivisions: 3 }, scene);
+      jitter(peak, hh * 0.06, rand);
+      peak.position.set(at.x, hh / 2 - 4, at.z);
+      peak.rotation.y = rand() * 6;
+      gradeColors(peak, [0.42, 0.4, 0.48], [1.15, 1.1, 1.15]);
+      parts.push(peak);
+    }
+  };
+  ridge(-560, -380, -560, 400, 24, 70); // beyond the plain, behind Seles
+  ridge(-480, -380, 220, -400, 18, 60); // along the left
+  ridge(-480, 380, -40, 420, 12, 55); // along the right
+  const range = Mesh.MergeMeshes(parts, true, true);
+  if (range) {
+    // Far off: hazy blue-violet, lighter at the foot (the haze over the plain), out of the fog.
+    const m = new StandardMaterial("forestMountainMat", scene);
+    m.disableLighting = true;
+    m.fogEnabled = false;
+    m.diffuseColor = Color3.Black();
+    m.specularColor = Color3.Black();
+    m.emissiveColor = Color3.White();
+    range.material = m;
+    range.convertToFlatShadedMesh();
+    const p = range.getVerticesData("position")!;
+    const n = range.getVerticesData("normal")!;
+    const c: number[] = [];
+    for (let k = 0; k < p.length; k += 3) {
+      const t = Math.min(1, Math.max(0, p[k + 1] / 90));
+      const lit = 0.06 * Math.max(0, n[k + 1]) + 0.05 * Math.max(0, -n[k]);
+      c.push(0.34 - 0.1 * t + lit, 0.26 - 0.08 * t + lit, 0.32 - 0.06 * t + lit, 1);
+    }
+    range.setVerticesData("color", c);
+    range.parent = root;
+    // Unlit: keep it out of the mode's glow layer (made after the world), or it blooms white.
+    const once = scene.onBeforeRenderObservable.add(() => {
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) layer.addExcludedMesh(range);
+      scene.onBeforeRenderObservable.remove(once);
+    });
+  }
+}
+
 /**
  * Seles in the distance, at the end of the road out of the wood (looking back in third person): the
  * village's broken stone walls and the chapel's tower stump, charred beams, smoke still rising.
@@ -1644,16 +1717,12 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   const stackRand = mulberry32(0x57ac);
   for (const [u, v, h, r] of [[44, 22, 6, 2.2], [58, 30, 8, 3], [70, 24, 5, 1.6], [50, 38, 7, 2.6]] as const) {
     const at = forestPoint(u, v);
-    const stack = MeshBuilder.CreateCylinder(`forestSeaStack${u}`, { height: h, diameterTop: r * 0.9, diameterBottom: r * 2, tessellation: 8, subdivisions: 4 }, scene);
-    jitter(stack, 0.5, stackRand);
+    const stack = MeshBuilder.CreateCylinder(`forestSeaStack${u}`, { height: h, diameterTop: r * 0.45, diameterBottom: r * 2.2, tessellation: 9, subdivisions: 6 }, scene);
+    jitter(stack, 0.35 * r, stackRand); // craggy, weathered
+    stack.convertToFlatShadedMesh();
     stack.position.set(at.x, SEA_Y + h / 2 - 0.5, at.z);
     if (stackMat) stack.material = stackMat;
     stack.parent = parent;
-    const cap = MeshBuilder.CreateIcoSphere(`forestSeaStackCap${u}`, { radius: r * 0.6, subdivisions: 2, flat: false }, scene);
-    cap.scaling.y = 0.5;
-    cap.position.set(at.x, SEA_Y + h - 0.3, at.z);
-    cap.material = scene.getMaterialByName("forestLeafMat");
-    cap.parent = parent;
     const surf = MeshBuilder.CreateTorus(`forestSeaStackSurf${u}`, { diameter: r * 2.3, thickness: 0.35, tessellation: 20 }, scene);
     surf.position.set(at.x, SEA_Y + 0.1, at.z);
     surf.scaling.y = 0.2;

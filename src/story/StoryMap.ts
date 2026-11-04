@@ -74,6 +74,8 @@ export interface StoryApi {
   chest(id: string, at: Vector3, loot: { item?: ItemDef; gold?: number }, onOpen?: () => void): void;
   /** A signpost bubble over the hero while they stand within `radius` of `at`. */
   sign(at: Vector3, radius: number, title: string, text: string): void;
+  /** A way out to another map: marked by a small green triangle (PS1), taken on reaching it. */
+  exit(at: Vector3, radius: number, map: string, entry: string): void;
   /** Leave for another map (fade, save, rebuild). */
   goto(map: string, entry: string): Promise<void>;
   hasFlag(id: string): boolean;
