@@ -158,6 +158,11 @@ export class StoryMode extends ArenaCombatMode {
       m.position.copyFrom(p);
     });
     this.camera.follow(this.player.position, 1);
+    const look = this.map.facing?.[this.entry];
+    if (look) {
+      this.party.forEach((m) => m.avatar.face(look));
+      if (settings.cameraStyle === 1) this.camera.turn(Math.atan2(-look.z, -look.x) - this.camera.heading);
+    }
   }
 
   protected override onAssetsReady(): void {
@@ -235,6 +240,11 @@ export class StoryMode extends ArenaCombatMode {
     if (settings.cameraStyle !== this.appliedCamera) {
       this.appliedCamera = settings.cameraStyle;
       this.applyCameraView();
+      if (settings.cameraStyle === 1) {
+        // Into third person: start out behind the hero, looking where they look.
+        const r = this.player.facingAngle;
+        this.camera.turn(Math.atan2(-Math.cos(r), -Math.sin(r)) - this.camera.heading);
+      }
     }
     this.updateFreeCamera(dt);
     // Dialogue: Space / Enter / E finish or close the line (taps are handled by the box).

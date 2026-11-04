@@ -57,6 +57,10 @@ export const forestMap: MapFactory = (scene) => {
       fromSeles: trackPointAt(MAP_START_U + 3),
       fromHellena: trackPointAt(MAP_END_U - 4),
     },
+    facing: {
+      fromSeles: trackPointAt(MAP_START_U + 12).subtract(trackPointAt(MAP_START_U + 3)),
+      fromHellena: trackPointAt(MAP_END_U - 14).subtract(trackPointAt(MAP_END_U - 4)),
+    },
     models: ["berserk_mouse", "assassin_cock", "goblin", "trent"],
     encounterAt: (p) => {
       const { u } = forestUV(p);

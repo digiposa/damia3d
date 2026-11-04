@@ -32,6 +32,10 @@ export const selesMap: MapFactory = (scene) => {
       fromForest: P(SELES_SPOTS.fromForest),
       savePoint: P({ u: SELES_SPOTS.savePoint.u + 1.4, v: SELES_SPOTS.savePoint.v + 0.6 }), // beside the column
     },
+    facing: {
+      start: P(SELES_SPOTS.slopeFoot).subtract(P(SELES_SPOTS.start)), // down the path
+      fromForest: P(SELES_SPOTS.square).subtract(P(SELES_SPOTS.fromForest)), // into the village
+    },
     models: SCENES ? ["knight_sandora", "kos_sword", "commander", "commander_sword"] : [],
     encounterAt: () => null, // a town: scripted fights only
     start(api, entry) {

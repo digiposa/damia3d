@@ -15,6 +15,9 @@ export interface StoryMap {
   world: World;
   /** Named spawn points (e.g. "start", "fromForest"). */
   entries: Record<string, Vector3>;
+  /** Which way to look on arriving at an entry (a ground direction): the hero turns that way, and
+   *  the third-person camera with them — down the road, not off into the trees. */
+  facing?: Record<string, Vector3>;
   /** Random encounters at this spot (canon distance counter), or null for none (towns). */
   encounterAt?(p: Vector3): { rate: number; formations: EnemyDef[][] } | null;
   /** Models to preload with the party (the map's enemies and props). */
