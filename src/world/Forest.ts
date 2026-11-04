@@ -1007,12 +1007,14 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
     }
   // The wood's edge reaches a little out onto the plain either side of the road, framing the view
   // back to Seles (trees close by, the plain open between them).
-  for (let k = 0; k < 26; k++) {
-    const lu = PLAIN_U - 1 - rand() * 14;
+  // The wood thins out into the plain gradually (dense at its edge, the odd tree far out), never on
+  // the road: Seles stays in view down it.
+  for (let k = 0; k < 120; k++) {
+    const lu = PLAIN_U - 1 - 70 * rand() ** 2.2;
     const side = rand() < 0.5 ? -1 : 1;
-    const { x: rx, z: rz } = trackPointAt(lu);
-    const rv = forestUV(new Vector3(rx, 0, rz)).v;
-    const lv = rv + side * (5.5 + rand() * 9 + (PLAIN_U - lu) * 0.4);
+    const { x: rx, z: rz } = trackPointAt(Math.max(lu, -34));
+    const rv = forestUV(new Vector3(rx, 0, rz)).v + (lu < -34 ? (lu + 34) * -0.12 : 0);
+    const lv = rv + side * (4.5 + rand() * 30);
     const { x, z } = forestPoint(lu, lv);
     if (occludesTrack(x, z, 15, 4.4)) continue;
     const s = 0.9 + rand() * 0.4;
@@ -1666,7 +1668,9 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   // swell moving. Seen from above (iso): only a faint sheen of the sun.
   // Out to the horizon (the third-person view looks over the cliff to the open sea).
   const sea = gridMesh("forestSea", scene, 16, 20, (i, j) => {
-    const p = forestPoint(10 + (j / 20) * 900, 4 + (i / 16) * 800); // from the cliff out (not under the wood or past its ends)
+    // Far out in every direction along the coast: its edges sink into the horizon haze, never in
+    // view (the wood's floor, above it, hides the part under the land).
+    const p = forestPoint(-1400 + (j / 20) * 2800, 4 + (i / 16) * 1400);
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 16, tv: i / 12 };
   }, Vector3.Up());
   sea.parent = parent;
