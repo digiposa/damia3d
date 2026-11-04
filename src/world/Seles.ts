@@ -1364,6 +1364,80 @@ function buildBrokenLife(scene: Scene, root: TransformNode, rand: () => number, 
   bucket.rotation.set(Math.PI / 2, 0.4, 0);
 }
 
+/**
+ * The road out, past the village's own trails: across the open plain towards the forest (far off:
+ * the forest map sees Seles at the end of a long plain), winding a little. Visual only (the exit
+ * is at the village's edge).
+ */
+const ROAD = new TrailNet([[
+  { u: -24, v: -30.45, w: 2.4 }, { u: -36, v: -31.05, w: 2.3 }, { u: -50, v: -32.6, w: 2.3 }, { u: -66, v: -31.2, w: 2.2 },
+  { u: -86, v: -28.4, w: 2.2 }, { u: -110, v: -30, w: 2.1 }, { u: -140, v: -34.2, w: 2.1 }, { u: -180, v: -33, w: 2 },
+  { u: -230, v: -28.6, w: 2 }, { u: -300, v: -31, w: 2 }, { u: -420, v: -34, w: 2 },
+]].map((t) => t.map((k) => ({ ...k, u: -k.u })))); // Seles' frame is mirrored (see NET)
+
+/** The open plain either side of the road out, widening away from the village (0..1). */
+function plainK(u: number, v: number): number {
+  const along = -28 - u;
+  if (along <= 0) return 0;
+  const p = fromUV(u, v);
+  const n = ROAD.nearest(p.x, p.z);
+  const half = 7 + along * 0.5;
+  return (1 - smooth(half * 0.6, half, n.d)) * smooth(0, 10, along);
+}
+
+/** The road out past the ground's edge: a ribbon of trodden earth over the far land, to the haze. */
+function buildRoadOut(scene: Scene, root: TransformNode, rand: () => number): void {
+  const pts: { u: number; v: number; w: number }[] = [];
+  const knots = [
+    { u: -60, v: -32.1 }, { u: -66, v: -31.2 }, { u: -86, v: -28.4 }, { u: -110, v: -30 }, { u: -140, v: -34.2 },
+    { u: -180, v: -33 }, { u: -230, v: -28.6 }, { u: -300, v: -31 }, { u: -420, v: -34 },
+  ];
+  for (let k = 0; k < knots.length - 1; k++) {
+    const a = knots[k];
+    const b = knots[k + 1];
+    const n = Math.max(2, Math.round(Math.abs(b.u - a.u) / 3));
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      const s = t * t * (3 - 2 * t); // ease the bends
+      pts.push({ u: a.u + (b.u - a.u) * t, v: a.v + (b.v - a.v) * s, w: 2.1 });
+    }
+  }
+  pts.push({ ...knots[knots.length - 1], w: 2 });
+  const COLS = 4;
+  const col: number[] = [];
+  const mesh = gridMesh("selesRoadOut", scene, pts.length - 1, COLS, (i, j) => {
+    const p = pts[i];
+    const q = pts[Math.min(i + 1, pts.length - 1)];
+    const o = pts[Math.max(i - 1, 0)];
+    const du = q.u - o.u;
+    const dv = q.v - o.v;
+    const l = Math.hypot(du, dv) || 1;
+    const side = (j / COLS - 0.5) * 2 * p.w * (1 + (rand() - 0.5) * 0.15);
+    const u = p.u - (dv / l) * side;
+    const v = p.v + (du / l) * side;
+    const w = fromUV(u, v);
+    const y = (u < -63 ? farLandHeight(SELES_FAR, w.x, w.z) + 0.16 : groundY(w.x, w.z) + 0.04);
+    // Trodden earth in the middle, greener at the rims (it fades into the grass), two ruts.
+    const rim = Math.abs(j / COLS - 0.5) * 2;
+    const k = (0.85 + rand() * 0.2) * (rim > 0.9 ? 0.82 : rim < 0.6 && rim > 0.4 ? 0.9 : 1);
+    col.push(0.58 * k * (1 - 0.15 * rim), 0.45 * k, 0.31 * k * (1 + 0.1 * rim), 1);
+    return { x: w.x, y, z: w.z, tu: u / 6, tv: v / 6 };
+  }, Vector3.Up());
+  mesh.setVerticesData("color", col);
+  const mat = matte("selesRoadOutMat", scene, undefined, new Color3(0.9, 0.85, 0.8));
+  mat.zOffset = -2;
+  mesh.material = mat;
+  mesh.parent = root;
+  mesh.isPickable = false;
+}
+
+/** The nearer of the village's trails and the road out. */
+function nearestWay(x: number, z: number): { d: number; w: number } {
+  const a = NET.nearest(x, z);
+  const b = ROAD.nearest(x, z);
+  return a.d - a.w < b.d - b.w ? a : b;
+}
+
 /** How far past the village's own ground (0 inside, 1 a few units out), off the hill. */
 function outside(u: number, v: number): number {
   return smooth(0, 5, Math.max(u - 11, v - 10, -44 - v)) * (1 - clamp01((hillDepth(u, v) + 1) / 2));
@@ -1381,8 +1455,8 @@ function outskirtsHeight(x: number, z: number): number {
   const rise = smooth(8, 34, out); // further out: the banks
   const n = noise2(u * 0.06 + 3, v * 0.06);
   const n2 = noise2(u * 0.19, v * 0.19 + 7);
-  let h = k * (0.7 * n + 0.3 * n2) + rise * (1.2 + 4.5 * n);
-  const tr = NET.nearest(x, z);
+  let h = k * (0.7 * n + 0.3 * n2) + rise * (1 - 0.85 * plainK(u, v)) * (1.2 + 4.5 * n);
+  const tr = nearestWay(x, z);
   h *= smooth(tr.w + 0.5, tr.w + 7, tr.d); // the roads stay level
   return h;
 }
@@ -1525,8 +1599,10 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
     return mergeSource("selesFarTree", parts, false);
   })();
   const center = SELES_FAR.center;
-  const exitDir = Math.atan2(fromUV(-40, -30).z - center.z, fromUV(-40, -30).x - center.x);
   const plantAt = (src: Mesh, x: number, z: number, s: number): void => {
+    const { u, v } = selesUV(new Vector3(x, 0, z));
+    if (plainK(u, v) > 0.15 && rand() > 0.03) return; // the plain the road crosses: a lone tree at most
+    if (ROAD.nearest(x, z).d < 4) return;
     const t = place(src, root, x, z, s, rand() * 6);
     t.position.y = farLandHeight(SELES_FAR, x, z) - 0.05;
     t.scaling.y *= 0.85 + rand() * 0.35;
@@ -1535,9 +1611,7 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
   // The wood's edge: the forest's trees, groves and saplings in front.
   for (let k = 0; k < 150; k++) {
     const a = rand() * Math.PI * 2;
-    const da = Math.atan2(Math.sin(a - exitDir), Math.cos(a - exitDir));
     const r = WOOD_R0 - 2 + rand() * 9;
-    if (Math.abs(da) < 0.12 * (60 / r)) continue; // the road out
     const roll = rand();
     if (roll < 0.45) plant(bigTrees[k % 3], r + 2, a, 0.6 + rand() * 0.35);
     else if (roll < 0.75) plant(grove, r, a, 1.1 + rand() * 0.5);
@@ -1562,23 +1636,27 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
     plant(lightTree, r, a, 1.1 + rand() * 0.9);
   }
 
+  // The road out, on across the plain past the village's ground (its painted part ends there).
+  buildRoadOut(scene, root, rand);
+
   // The open land between the village and the wood: bushes along the fences and field edges,
   // tufts of dry grass, stones, a few young trees — so no bare plate shows.
   const grass = grassSource(scene, rand);
   const rock = rockSource(scene, rand);
-  for (let k = 0, n = 0; k < 6000 && n < 520; k++) {
-    const u = -64 + rand() * 96;
+  for (let k = 0, n = 0; k < 9000 && n < 760; k++) {
+    const u = -110 + rand() * 142;
     const v = -66 + rand() * 96;
-    if (outside(u, v) < 0.6) continue;
+    const inPlain = plainK(u, v) > 0.3;
+    if (outside(u, v) < 0.6 && !inPlain) continue;
     const p = fromUV(u, v);
-    if (Math.hypot(p.x - center.x, p.z - center.z) > WOOD_R0) continue;
-    const tr = NET.nearest(p.x, p.z);
+    if (Math.hypot(p.x - center.x, p.z - center.z) > (inPlain ? WOOD_R0 + 40 : WOOD_R0)) continue;
+    const tr = nearestWay(p.x, p.z);
     if (tr.d < tr.w + 1) continue; // off the roads
     const roll = rand();
     const src = roll < 0.62 ? grass : roll < 0.8 ? bush : roll < 0.92 ? rock : sapling;
     const s = src === grass ? 1 + rand() * 0.8 : src === bush ? 0.9 + rand() * 0.9 : src === rock ? 0.6 + rand() * 0.9 : 1.2 + rand() * 0.8;
     const t = place(src, root, p.x, p.z, s, rand() * 6);
-    t.position.y = groundY(p.x, p.z) - (src === rock ? 0.1 : 0.02);
+    t.position.y = (u < -63 ? farLandHeight(SELES_FAR, p.x, p.z) + 0.1 : groundY(p.x, p.z)) - (src === rock ? 0.1 : 0.02);
     n++;
   }
 
@@ -1606,10 +1684,17 @@ const SELES_FAR: FarLandOptions = {
   near: new Color3(0.32, 0.25, 0.17),
   far: new Color3(0.3, 0.27, 0.23),
   seed: 5,
+  relief: (x, z) => {
+    const { u, v } = selesUV(new Vector3(x, 0, z));
+    return 1 - 0.9 * plainK(u, v);
+  },
   lift: (x, z) => groundY(x, z), // the hill's plateau and the outskirts' banks run on off the map
   // The woods' dark floor (so no light ground shows between the trunks).
-  colorAt: (_x, _z, r, c) => {
-    const w = smooth(WOOD_R0 - 3, WOOD_R0 + 2, r);
+  colorAt: (x, z, r, c) => {
+    const { u, v } = selesUV(new Vector3(x, 0, z));
+    const pk = plainK(u, v);
+    if (pk > 0) c = [c[0] + (0.36 - c[0]) * pk, c[1] + (0.31 - c[1]) * pk, c[2] + (0.19 - c[2]) * pk]; // the plain's dry grass
+    const w = smooth(WOOD_R0 - 3, WOOD_R0 + 2, r) * (1 - pk);
     return [c[0] + (0.15 - c[0]) * w, c[1] + (0.16 - c[1]) * w, c[2] + (0.09 - c[2]) * w];
   },
 };
@@ -1942,6 +2027,7 @@ function buildHillside(scene: Scene, root: TransformNode, rand: () => number): M
       const v = gv + (rand() - 0.5) * STEP * 0.9;
       const depth = hillDepth(u, v);
       if (depth < 0.5) continue;
+      if (plainK(u, v) > 0.1) continue; // the open plain the road out crosses
       const { x, z } = fromUV(u, v);
       const near = NET.nearest(x, z);
       const edge = near.d - near.w;
@@ -2078,7 +2164,7 @@ function paintHillside(scene: Scene, rand: () => number, U0: number, U1: number,
  * tree shadows carried across it. Stops where the hill starts (the hill paints its own path).
  */
 function buildVillagePaths(scene: Scene, root: TransformNode, rand: () => number): Mesh {
-  const U0 = -40;
+  const U0 = -64; // to the ground's edge: the road out runs on
   const U1 = 12;
   const V0 = -52;
   const V1 = 2;
@@ -2094,9 +2180,9 @@ function buildVillagePaths(scene: Scene, root: TransformNode, rand: () => number
     const v = V1 - (y + 0.5) / GROUND_PPU;
     for (let x = 0; x < W; x++) {
       const u = U0 + (x + 0.5) / GROUND_PPU;
-      if (hillDepth(u, v) > 0.2) continue;
+      if (hillDepth(u, v) > 0.2 && v > -30) continue; // the hill (left of the chapel it is flat)
       const p = fromUV(u, v);
-      const n = NET.nearest(p.x, p.z);
+      const n = nearestWay(p.x, p.z);
       const edge = n.d - n.w * 0.8 + (noise2(u * 1.1, v * 1.1) - 0.5) * 1.2;
       if (edge > 0) continue;
       if (edge > -0.5 && rand() < 0.4) continue; // ragged rim

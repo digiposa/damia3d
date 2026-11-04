@@ -30,6 +30,8 @@ export interface FarLandOptions {
   /** How many rings / segments (default 28 × 72). */
   rings?: number;
   segments?: number;
+  /** Scale the rolling hills at a point (0: flat, e.g. a plain kept open; default 1). */
+  relief?: (x: number, z: number) => number;
   /** Raise the land by the map's own relief there (e.g. a plateau running off the map). */
   lift?: (x: number, z: number) => number;
   /** Repaint the ground colour (0..1 rgb) at a point, e.g. a wood's dark floor in a band. */
@@ -45,7 +47,8 @@ export function farLandHeight(o: FarLandOptions, x: number, z: number): number {
   const rise = k * k * (3 - 2 * k);
   const hills = 0.55 * noise2(x * 0.012 + seed, z * 0.012) + 0.45 * noise2(x * 0.035, z * 0.035 + seed);
   const l = o.land ? o.land(x, z) : 1;
-  return (y0 + rise * o.height * (0.35 + hills)) * l + (o.sink ?? y0) * (1 - l) + (o.lift ? o.lift(x, z) : 0);
+  const rel = o.relief ? o.relief(x, z) : 1;
+  return (y0 + rise * rel * o.height * (0.35 + hills)) * l + (o.sink ?? y0) * (1 - l) + (o.lift ? o.lift(x, z) : 0);
 }
 
 /**
