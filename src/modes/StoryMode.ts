@@ -25,6 +25,9 @@ const DISTANCE_PER_RATE = 300;
 /** How far from the hero a random formation appears: just past the edge of the view. */
 const SPAWN_DIST = 11;
 
+/** Random encounters — off while the maps are being built (scripted fights still run). */
+const ENCOUNTERS = false;
+
 /** Config → Camera "3rd person", on a map with no scenic shot of its own: low behind the hero. */
 const THIRD_PERSON = { beta: 1.25, fov: 0.9, radius: 10, lift: 1.5 };
 
@@ -275,7 +278,7 @@ export class StoryMode extends ArenaCombatMode {
 
   private updateEncounters(dt: number): void {
     const p = this.player.position;
-    const table = this.map.encounterAt?.(p);
+    const table = ENCOUNTERS ? this.map.encounterAt?.(p) : null;
     const fighting = this.enemies.some((e) => e.alive);
     if (!table) {
       this.meter?.update(dt, meterAnchor(p), null);
