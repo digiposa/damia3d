@@ -111,6 +111,9 @@ const BRANCHES: Knot[][] = [
   [{ u: 20, v: 4, w: 1.6 }, { u: 22, v: 8.5, w: 1.5 }, { u: 23.4, v: 11.6, w: 2.2 }], // back off to the right
 
   [{ u: 56, v: 0.8, w: 1.6 }, { u: 56.6, v: -4, w: 1.5 }, { u: 57, v: -6.9, w: 2.2 }],
+  // The road back to Seles, on out of the wood (seen, not walked: the map ends at its start) — the
+  // wood stands back from it, so Seles' ruins show at its end.
+  [{ u: -34, v: 11, w: 3.4 }, { u: -42, v: 13, w: 4 }, { u: -52, v: 14, w: 9 }, { u: -62, v: 15, w: 11 }],
 ];
 
 /** A stretch of the Forest: one of the console's screens, here an area of the seamless map. */
@@ -395,6 +398,7 @@ export function forestWorld(scene: Scene): ForestWorld {
   const seaTick = buildSky(scene, fixed);
   buildRavineMist(scene, fixed);
   buildPollen(scene);
+  buildSelesAfar(scene, root, rand);
 
   obstacles.index();
   buildMask();
@@ -1083,6 +1087,75 @@ function buildMerchantWood(scene: Scene, root: TransformNode, rand: () => number
 }
 
 /** The travelling merchant's cart, pulled off the track (submap 624's merchant). */
+/**
+ * Seles in the distance, at the end of the road out of the wood (looking back in third person): the
+ * village's broken stone walls and the chapel's tower stump, charred beams, smoke still rising.
+ * Simple shapes: the fog softens them into a silhouette.
+ */
+function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): void {
+  const stone = matte("forestSelesStone", scene, undefined, new Color3(0.42, 0.38, 0.34));
+  const char = matte("forestSelesChar", scene, undefined, new Color3(0.12, 0.09, 0.07));
+  const wall = (u: number, v: number, w: number, h: number, rot: number): void => {
+    const at = forestPoint(u, v);
+    for (let k = 0; k < Math.round(w / 0.9); k++) {
+      const hh = h * (0.4 + rand() * 0.6);
+      const seg = MeshBuilder.CreateBox("forestSelesWall", { width: 0.92, height: hh, depth: 0.45 }, scene);
+      const off = (k - w / 1.8) * 0.9;
+      seg.position.set(at.x + Math.cos(rot) * off, hh / 2, at.z - Math.sin(rot) * off);
+      seg.rotation.y = rot;
+      seg.material = stone;
+      seg.parent = root;
+    }
+  };
+  const houses: [number, number, number, number][] = [[-50, 10, 6, 3.4], [-56, 19, 5, 3], [-48, 23, 4, 2.6], [-60, 12, 7, 3.8], [-54, 4, 5, 2.8]];
+  for (const [u, v, w, h] of houses) {
+    const rot = rand() * Math.PI;
+    wall(u, v - w / 3, w, h, rot);
+    wall(u + 1.5, v + w / 3, w * 0.8, h * 0.8, rot + 0.1);
+    // A charred beam fallen across.
+    const at = forestPoint(u, v);
+    const beam = MeshBuilder.CreateBox("forestSelesBeam", { width: w * 0.9, height: 0.25, depth: 0.25 }, scene);
+    beam.position.set(at.x, h * 0.5, at.z);
+    beam.rotation.set(0, rot + 0.6, 0.35);
+    beam.material = char;
+    beam.parent = root;
+  }
+  // The chapel's tower stump, the tallest thing standing.
+  const t = forestPoint(-62, 17);
+  const tower = MeshBuilder.CreateBox("forestSelesTower", { width: 3, height: 11, depth: 3 }, scene);
+  tower.position.set(t.x, 5.5, t.z);
+  tower.rotation.y = 0.3;
+  jitter(tower, 0.15, rand);
+  tower.material = stone;
+  tower.parent = root;
+  // Smoke still rising from the ruins.
+  const dot = softDotTexture(scene);
+  for (const [u, v] of [[-50, 10], [-60, 12], [-56, 20]] as const) {
+    const at = forestPoint(u, v);
+    const ps = new ParticleSystem("forestSelesSmoke", 40, scene);
+    ps.particleTexture = dot;
+    ps.emitter = new Vector3(at.x, 2, at.z);
+    ps.minEmitBox = new Vector3(-1, 0, -1);
+    ps.maxEmitBox = new Vector3(1, 0.5, 1);
+    ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    ps.color1 = new Color4(0.3, 0.27, 0.26, 0.45);
+    ps.color2 = new Color4(0.4, 0.36, 0.34, 0.35);
+    ps.colorDead = new Color4(0.4, 0.37, 0.35, 0);
+    ps.minSize = 2;
+    ps.maxSize = 4.5;
+    ps.minLifeTime = 7;
+    ps.maxLifeTime = 11;
+    ps.emitRate = 5;
+    ps.direction1 = new Vector3(-0.1, 1, -0.1);
+    ps.direction2 = new Vector3(0.2, 1.4, 0.2);
+    ps.minEmitPower = 0.5;
+    ps.maxEmitPower = 0.8;
+    ps.gravity = new Vector3(0.2, 0.2, 0.1);
+    ps.preWarmCycles = 300;
+    ps.start();
+  }
+}
+
 function buildCart(scene: Scene, root: TransformNode): void {
   const at = forestPoint(4, -8.6); // just off the path, behind the merchant
   const node = new TransformNode("forestCart", scene);
