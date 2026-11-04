@@ -76,9 +76,11 @@ const TRACK: Knot[] = [
   { u: 40, v: -0.6, w: 3.4 },
   { u: 44.8, v: -0.4, w: 1.0 }, // onto the trunk…
   { u: 48, v: -0.3, w: 0.7 },
-  { u: 51.4, v: -0.2, w: 1.0 }, // …and off it
-  { u: 55, v: 0.6, w: 3.2 },
-  { u: 60, v: 1.2, w: 4.6 }, // cliff-top clearing
+  { u: 51.4, v: -0.2, w: 1.0 }, // …and off it: at the top the path turns away left (PS1)
+  { u: 54, v: -1.8, w: 3.2 },
+  { u: 57.5, v: -5, w: 3.8 },
+  { u: 61.5, v: -6.6, w: 4.6 }, // cliff-top clearing
+  { u: 65.5, v: -4.5, w: 3.4 },
   // 3 — the maze: crossing trails in dense wood ({@link BRANCHES} are its dead ends)
   { u: 68, v: -1, w: 3.2 },
   { u: 73, v: -4, w: 3.4 },
@@ -110,7 +112,7 @@ const BRANCHES: Knot[][] = [
   // one hidden in the trees past the first bridge) — narrow, but always walkable.
   [{ u: 20, v: 4, w: 1.6 }, { u: 22, v: 8.5, w: 1.5 }, { u: 23.4, v: 11.6, w: 2.2 }], // back off to the right
 
-  [{ u: 56, v: 0.8, w: 1.6 }, { u: 56.6, v: -4, w: 1.5 }, { u: 57, v: -6.9, w: 2.2 }],
+  [{ u: 57.5, v: -5, w: 1.6 }, { u: 58.6, v: -0.6, w: 1.5 }, { u: 59.6, v: 3, w: 2.2 }], // out to the cliff's edge
   // The road back to Seles, on out of the wood (seen, not walked: the map ends at its start) — the
   // wood stands back from it, so Seles' ruins show at its end.
   [{ u: -34, v: 11, w: 3.4 }, { u: -60, v: 15, w: 3.2 }, { u: -100, v: 18, w: 3 }, { u: -200, v: 22, w: 3 }, { u: -340, v: 26, w: 3 }],
@@ -136,7 +138,7 @@ export const FOREST_ZONES: ForestZone[] = [
  *  the trees past the first bridge, 20 G and Burn Out at the maze's right and left lower edges). */
 export const FOREST_CHESTS: { id: string; u: number; v: number }[] = [
   { id: "healingPotion", u: 23.8, v: 12.8 },
-  { id: "charmPotion", u: 57, v: -8 },
+  { id: "charmPotion", u: 60, v: 4 },
   { id: "gold20", u: 82.6, v: 14.8 },
   { id: "burnOut", u: 80.6, v: -13.8 },
 ];
