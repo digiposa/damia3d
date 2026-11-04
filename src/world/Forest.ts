@@ -604,9 +604,11 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     const f = -y / 1.3 - band; // 0 at a band's top … 1 at its foot
     const base = 0.25 + 0.6 * hash01(band, seed) + 0.35 * (noise2(v * 0.35 + band * 3.1, seed) - 0.5);
     const ledge = base * (1 - 0.7 * f); // each layer stands out at its top, tucks in below
-    return Math.max(0, ledge) * scale * smooth(0, 1.2, -y) * (1 - smooth(-RAVINE_DEPTH + 2.5, -RAVINE_DEPTH + 0.5, y));
+    // Weathering: the face swells and hollows irregularly, so the layers aren't ruled lines.
+    const erosion = 0.55 * (noise2(v * 0.22 + seed, y * 0.3) - 0.5) + 0.3 * (noise2(v * 0.9, y * 0.8 + seed) - 0.5);
+    return Math.max(0, ledge + erosion) * scale * smooth(0, 1.2, -y) * (1 - smooth(-RAVINE_DEPTH + 2.5, -RAVINE_DEPTH + 0.5, y));
   };
-  const DEPTH_ROWS = 24;
+  const DEPTH_ROWS = 32;
   const wall = (name: string, r: Ravine, side: 1 | -1, facing: Vector3): Mesh => {
     const m = gridMesh(name, scene, rows, DEPTH_ROWS, (i, j) => {
       const v = rowV(i);
@@ -633,7 +635,7 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
       col.push(k, k * 0.95, k * 0.92, 1);
     }
     m.setVerticesData(VertexBuffer.ColorKind, col);
-    m.convertToFlatShadedMesh(); // facets: each ledge catches the light, the face under it is shaded
+    m.createNormals(true); // smooth: weathered rock, not cut facets
     m.material = stone;
     m.parent = parent;
     return m;
@@ -667,7 +669,7 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     const lip = mouth ? SEA_Y - 1 : level(u, ve);
     return { x: p.x, y: f === 0 ? lip + 0.02 : lip * (1 - f) + (SEA_Y - 1) * f, z: p.z, tu: u / 4, tv: f * 1.6 };
   }, new Vector3(SIDE.x, 1, SIDE.z));
-  cliff.convertToFlatShadedMesh();
+  cliff.createNormals(true);
   cliff.material = stone;
   cliff.parent = parent;
   RAVINES.forEach((r, k) => {
@@ -1392,6 +1394,7 @@ function buildCliffRim(scene: Scene, root: TransformNode, rand: () => number): v
   const grass = scene.getMeshByName("forestGrass") as Mesh | null;
   for (let u = 42; u < 64; u += 0.7 + rand() * 0.9) {
     const v = cliffE(u) - 0.3 - rand() * 0.6;
+    if (inVoid(u, v - 1, 0.6)) continue; // not over the ravine's mouth (they'd float over the gorge)
     const { x, z } = forestPoint(u, v);
     const pick = rand();
     if (pick < 0.45 && grass) place(grass, root, x, z, 0.8 + rand() * 0.5, rand() * Math.PI);

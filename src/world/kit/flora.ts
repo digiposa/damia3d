@@ -129,7 +129,7 @@ export function treeSource(i: number, scene: Scene, bark: StandardMaterial, leav
   const blobs = 9 + ((rand() * 3) | 0);
   for (let k = 0; k < blobs; k++) {
     const c = centres[k % centres.length];
-    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.2 + rand() * 0.7, subdivisions: 1, flat: false }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`t${i}leaf${k}`, { radius: 1.2 + rand() * 0.7, subdivisions: 2, flat: false }, scene);
     const a = rand() * Math.PI * 2;
     const d = rand() * 1.8;
     b.position.set(c.x + Math.cos(a) * d, c.y + 0.6 + rand() * 1.2, c.z + Math.sin(a) * d);
@@ -158,7 +158,7 @@ export function groveSource(scene: Scene, bark: StandardMaterial, leaves: Standa
   for (let k = 0; k < 9; k++) {
     const a = rand() * Math.PI * 2;
     const d = Math.sqrt(rand()) * 1.9;
-    const b = MeshBuilder.CreateIcoSphere(`groveLeaf${k}`, { radius: 1.0 + rand() * 0.5, subdivisions: 1, flat: false }, scene);
+    const b = MeshBuilder.CreateIcoSphere(`groveLeaf${k}`, { radius: 1.0 + rand() * 0.5, subdivisions: 2, flat: false }, scene);
     b.position.set(Math.cos(a) * d, 3 + (1 - d / 1.9) * 0.9 + rand() * 0.4, Math.sin(a) * d);
     b.scaling.y = 0.8;
     jitter(b, 0.2, rand);
@@ -193,9 +193,10 @@ export function saplingSource(scene: Scene, bark: StandardMaterial, leaves: Stan
 export function bushSource(scene: Scene, leaves: StandardMaterial, rand: () => number): Mesh {
   // A clump of small lumps (not three big ones): the rounded, bubbly bushes of the reference shots.
   const parts: Mesh[] = [];
-  for (let k = 0; k < 7; k++) {
-    const r = 0.32 + rand() * 0.22;
-    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 1, flat: false }, scene);
+  // Rounder lumps (subdivided: no facets in the silhouette), a few fewer of them.
+  for (let k = 0; k < 5; k++) {
+    const r = 0.36 + rand() * 0.24;
+    const b = MeshBuilder.CreateIcoSphere(`bush${k}`, { radius: r, subdivisions: 2, flat: false }, scene);
     const a = rand() * Math.PI * 2;
     const d = k === 0 ? 0 : 0.35 + rand() * 0.4;
     b.position.set(Math.cos(a) * d, r * 0.8 + (k === 0 ? 0.25 : rand() * 0.15), Math.sin(a) * d);
@@ -218,12 +219,12 @@ export function rockSource(scene: Scene, rand: () => number): Mesh {
         ctx.fillRect(x, y, 2, 2);
       }
   });
-  const rock = MeshBuilder.CreateIcoSphere("rock", { radius: 0.7, subdivisions: 1 }, scene);
+  const rock = MeshBuilder.CreateIcoSphere("rock", { radius: 0.7, subdivisions: 2 }, scene);
   rock.scaling.set(1.2, 0.65, 1);
   rock.bakeCurrentTransformIntoVertices();
   jitter(rock, 0.3, rand);
   rock.material = matte("forestRockMat", scene, tex);
-  return mergeSource("forestRock", [rock]);
+  return mergeSource("forestRock", [rock], false); // smooth: a weathered stone, not a cut gem
 }
 
 export function fernSource(scene: Scene, rand: () => number): Mesh {
