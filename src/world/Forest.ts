@@ -23,6 +23,7 @@ import { FWD, SIDE, TAN_BETA, fromUV, toUV } from "./kit/frame";
 import { chestProp, type ChestProp } from "./kit/chest";
 import { hash01, noise2 } from "./kit/noise";
 import { makeWater } from "./kit/water";
+import { skyDome } from "./kit/sky";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU, MAX_TEX } from "./kit/texels";
 import { TrailNet, type Knot, type TrailSample } from "./kit/trails";
@@ -416,6 +417,9 @@ export function forestWorld(scene: Scene): ForestWorld {
     shadowReceivers: [...floors, ...track],
     ownFill: [],
     heightAt: forestHeight,
+    // Third person (PS1: the ravine seen across, from above): turned to the right and higher up,
+    // so the far lip and the sea side are in frame.
+    thirdPerson: { heading: -0.8, beta: 1.15, radius: 11, lift: 1.4 },
     presetAt: (p) => light.at(toUV(p.x, p.z).u),
     shotAt: (p) => forestShotAt(toUV(p.x, p.z)),
     update: (_focus, dt) => {
@@ -451,7 +455,9 @@ const LIGHT_KEYS: [number, LightingPreset][] = [
  */
 function forestShotAt({ u, v }: { u: number; v: number }): { zoom: number; offset?: Vector3 } | null {
   // On a bridge: closer, the drop on both sides.
-  for (const r of RAVINES) if (Math.abs(u - ravineC(r, v)) < ravineH(r, v) + 1.5 && Math.abs(v - r.bridgeV) < 2) return { zoom: 1.18 };
+  for (const r of RAVINES)
+    if (Math.abs(u - ravineC(r, v)) < ravineH(r, v) + 1.5 && Math.abs(v - r.bridgeV) < 2)
+      return { zoom: 1.18 };
   // The cliff top: wider, the view shifted out over the sea.
   if (u > 50 && u < 64 && v > 0) return { zoom: 0.82, offset: SIDE.scale(4).addInPlace(FWD.scale(1)) };
   // The fork: wider, looking up both roads.
@@ -899,6 +905,11 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       // Open ground — scattered trees, more rock and grass: the cliff top past the first ravine,
       // and the last stretch before the fork (the reference screens).
       const r0 = RAVINES[0];
+      // The first ravine's sea side (right of the track): kept low, the view out to the sea (PS1).
+      if (lv > 2 && lu > 32 && lu < 66 && near.d > near.w + 0.9) {
+        if (rand() < 0.3) place(fern, root, x, z, 0.7 + rand() * 0.5, rand() * 6);
+        continue;
+      }
       const open = (lu > ravineC(r0, lv) + ravineH(r0, lv) && lu < 64) || lu > 124;
       const meadow = lu > 124; // the last stretch: open grassland, a few trees
       // The maze is the opposite: wood packed tight between its trails.
@@ -1022,6 +1033,7 @@ function buildMerchantWood(scene: Scene, root: TransformNode, rand: () => number
       const near = nearestOnTrack(x, z);
       const edge = near.d - near.w;
       if (edge < 0.7 || edge > 12) continue;
+      if (lu > 32 && lv > 2) continue; // the sea side by the first ravine stays open
       const roll = rand();
       if (edge > 2 && roll < 0.16 && !occludesTrack(x, z, 11, 3.5)) {
         gnarled(x, z, 0.85 + rand() * 0.35);
@@ -1448,24 +1460,33 @@ function buildSignpost(scene: Scene, root: TransformNode): void {
 function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   const rand = mulberry32(0x5ea);
   const SEA_Y = -26;
+  // The sunset sky over the sea (to the right of the wood, PS1), seen in third person.
+  const sunDir = forestPoint(0.6, 1);
+  const sky = skyDome(scene, parent, {
+    zenith: new Color3(0.2, 0.18, 0.32),
+    horizon: new Color3(0.78, 0.5, 0.5),
+    glow: new Color3(0.4, 0.22, 0.08),
+    sun: sunDir,
+  });
   // The sea (kit water): deep blue-violet, the rose sunset sky reflected towards the open sea, the
   // swell moving. Seen from above (iso): only a faint sheen of the sun.
-  const sea = gridMesh("forestSea", scene, 12, 16, (i, j) => {
-    const p = forestPoint(20 + (j / 16) * 160, -10 + (i / 12) * 120);
+  // Out to the horizon (the third-person view looks over the cliff to the open sea).
+  const sea = gridMesh("forestSea", scene, 16, 20, (i, j) => {
+    const p = forestPoint(-200 + (j / 20) * 1100, -10 + (i / 16) * 800);
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 16, tv: i / 12 };
   }, Vector3.Up());
   sea.parent = parent;
   const tick = makeWater(sea, {
     deep: new Color3(0.1, 0.12, 0.24),
-    skyHorizon: new Color3(0.8, 0.5, 0.56),
+    skyHorizon: new Color3(0.78, 0.5, 0.5),
     skyZenith: new Color3(0.3, 0.32, 0.55),
     sun: new Vector3(0.5, 0.25, 0.4),
     sunColor: new Color3(1, 0.7, 0.45),
     glint: 0.12,
     waveScale: 3.5,
-    fogColor: new Color3(0.5, 0.4, 0.5),
-    fogStart: 400,
-    fogEnd: 900,
+    fogColor: new Color3(0.78, 0.5, 0.5), // into the sky's horizon colour
+    fogStart: 120,
+    fogEnd: 700,
   });
 
   // Surf breaking along the cliff's foot: a ragged white band where rock meets water.
@@ -1529,7 +1550,7 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   scene.onBeforeRenderObservable.add(() => {
     if (!excluded) {
       excluded = true;
-      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, foam]) layer.addExcludedMesh(m);
+      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) for (const m of [sea, foam, sky]) layer.addExcludedMesh(m);
     }
     t += scene.getEngine().getDeltaTime() / 1000;
     foamTex.uOffset = Math.sin(t * 0.6) * 0.03; // the surf washing in and out
