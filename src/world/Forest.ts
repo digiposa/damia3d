@@ -22,6 +22,7 @@ import { AreaLight } from "./kit/areaLight";
 import { FWD, SIDE, TAN_BETA, fromUV, toUV } from "./kit/frame";
 import { chestProp, type ChestProp } from "./kit/chest";
 import { hash01, noise2 } from "./kit/noise";
+import { mountainRange, type Ridge } from "./kit/mountains";
 import { makeWater } from "./kit/water";
 import { skyDome } from "./kit/sky";
 import { Obstacles } from "./kit/obstacles";
@@ -1144,50 +1145,13 @@ function buildMerchantWood(scene: Scene, root: TransformNode, rand: () => number
  * slate with lighter tops, melting into the plain's haze. Big cheap cones, merged into one mesh.
  */
 function buildMountains(scene: Scene, root: TransformNode, rand: () => number): void {
-  const parts: Mesh[] = [];
-  const ridge = (u0: number, v0: number, u1: number, v1: number, n: number, h: number): void => {
-    for (let k = 0; k < n; k++) {
-      const f = k / (n - 1);
-      const at = forestPoint(u0 + (u1 - u0) * f + (rand() - 0.5) * 30, v0 + (v1 - v0) * f + (rand() - 0.5) * 30);
-      const hh = h * (0.55 + rand() * 0.6);
-      const peak = MeshBuilder.CreateCylinder("forestPeak", { height: hh, diameterTop: hh * 0.08, diameterBottom: hh * (1.6 + rand()), tessellation: 7, subdivisions: 3 }, scene);
-      jitter(peak, hh * 0.06, rand);
-      peak.position.set(at.x, hh / 2 - 4, at.z);
-      peak.rotation.y = rand() * 6;
-      gradeColors(peak, [0.42, 0.4, 0.48], [1.15, 1.1, 1.15]);
-      parts.push(peak);
-    }
-  };
-  ridge(-560, -380, -560, 400, 24, 70); // beyond the plain, behind Seles
-  ridge(-480, -380, 220, -400, 18, 60); // along the left
-  ridge(-480, 380, -40, 420, 12, 55); // along the right
-  const range = Mesh.MergeMeshes(parts, true, true);
-  if (range) {
-    // Far off: hazy blue-violet, lighter at the foot (the haze over the plain), out of the fog.
-    const m = new StandardMaterial("forestMountainMat", scene);
-    m.disableLighting = true;
-    m.fogEnabled = false;
-    m.diffuseColor = Color3.Black();
-    m.specularColor = Color3.Black();
-    m.emissiveColor = Color3.White();
-    range.material = m;
-    range.convertToFlatShadedMesh();
-    const p = range.getVerticesData("position")!;
-    const n = range.getVerticesData("normal")!;
-    const c: number[] = [];
-    for (let k = 0; k < p.length; k += 3) {
-      const t = Math.min(1, Math.max(0, p[k + 1] / 90));
-      const lit = 0.06 * Math.max(0, n[k + 1]) + 0.05 * Math.max(0, -n[k]);
-      c.push(0.34 - 0.1 * t + lit, 0.26 - 0.08 * t + lit, 0.32 - 0.06 * t + lit, 1);
-    }
-    range.setVerticesData("color", c);
-    range.parent = root;
-    // Unlit: keep it out of the mode's glow layer (made after the world), or it blooms white.
-    const once = scene.onBeforeRenderObservable.add(() => {
-      for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) layer.addExcludedMesh(range);
-      scene.onBeforeRenderObservable.remove(once);
-    });
-  }
+  const ridge = (u0: number, v0: number, u1: number, v1: number, n: number, h: number): Ridge => ({ from: forestPoint(u0, v0), to: forestPoint(u1, v1), n, h });
+  // Far off: hazy blue-violet, lighter at the foot (the haze over the plain), out of the fog.
+  mountainRange(scene, root, rand, [
+    ridge(-560, -380, -560, 400, 24, 70), // beyond the plain, behind Seles
+    ridge(-480, -380, 220, -400, 18, 60), // along the left
+    ridge(-480, 380, -40, 420, 12, 55), // along the right
+  ], { foot: new Color3(0.34, 0.26, 0.32), top: new Color3(0.24, 0.18, 0.26) });
 }
 
 /**

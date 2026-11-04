@@ -20,6 +20,7 @@ import { gradeColors, gridMesh, jitter, limb, matte, mergeSource, place } from "
 import { chestProp } from "./kit/chest";
 import { farLand } from "./kit/farLand";
 import { skyDome } from "./kit/sky";
+import { mountainRange } from "./kit/mountains";
 import { hash01, noise2 } from "./kit/noise";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU } from "./kit/texels";
@@ -236,6 +237,7 @@ export function selesWorld(scene: Scene): SelesWorld {
   ticks.push(...buildCemetery(scene, root, rand, stone, wood));
   buildBackdrop(scene, root, rand);
   buildHorizon(scene, root);
+  ticks.push(...buildOutskirts(scene, root, rand, stone, charred, wood));
   buildBrokenLife(scene, root, rand, wood);
   ticks.push(sunShafts(scene, root, rand));
   ticks.push(emberPulse(scene));
@@ -327,7 +329,9 @@ function buildGround(scene: Scene, root: TransformNode, rand: () => number): Mes
     const shade = noise2(u * 0.22 - v * 0.3 + 3, v * 0.12 + u * 0.05);
     c *= 1 - 0.45 * smooth(0.52, 0.62, shade);
     c *= 1 + 0.16 * (1 - smooth(4, 9, Math.hypot(u + 6.5, v + 2.5)));
-    col.push(c * (1 - 0.45 * g), c * (0.95 + 0.05 * g), c * (0.88 - 0.45 * g), 1);
+    // Past the village: its fields (dry grass, ploughed earth, burnt stubble, fallow).
+    const [fr, fg, fb] = fieldTint(u, v);
+    col.push(c * (1 - 0.45 * g) * fr, c * (0.95 + 0.05 * g) * fg, c * (0.88 - 0.45 * g) * fb, 1);
   }
   ground.setVerticesData("color", col);
   return ground;
@@ -1386,6 +1390,157 @@ function buildBackdrop(scene: Scene, root: TransformNode, rand: () => number): v
   }
 }
 
+/** How far past the village's own ground (0 inside, 1 a few units out), off the hill. */
+function outside(u: number, v: number): number {
+  return smooth(0, 5, Math.max(u - 11, v - 10, -44 - v)) * (1 - clamp01((hillDepth(u, v) + 1) / 2));
+}
+
+/** Its fields, in plots of 9 × 7: a colour factor over the scorched earth. */
+const FIELD_PLOT = { u0: 13.5, du: 9, v0: -1, dv: 7 };
+function fieldTint(u: number, v: number): [number, number, number] {
+  const k = outside(u, v);
+  if (k <= 0) return [1, 1, 1];
+  const h = hash01(Math.floor((u - FIELD_PLOT.u0) / FIELD_PLOT.du) + 50, Math.floor((v - FIELD_PLOT.v0) / FIELD_PLOT.dv) + 50);
+  const n = 0.92 + 0.16 * noise2(u * 0.4, v * 0.4);
+  const t: [number, number, number] =
+    h < 0.35 ? [1.18, 1.12, 0.66] // dry grass, gone gold
+      : h < 0.6 ? [0.78, 0.7, 0.62] // ploughed
+        : h < 0.8 ? [0.5, 0.46, 0.44] // burnt stubble
+          : [0.98, 1.06, 0.64]; // fallow, a little green
+  return t.map((x) => (1 + (x * n - 1) * k)) as [number, number, number];
+}
+
+/**
+ * Seles past its own ground, for the free third-person camera (a small village: only a few houses
+ * more): the last ruined houses among the fields, smoke still rising from them; the fields with
+ * their fences and burnt haystacks; a ring of woods; far mountains under the smoky sky. All merged
+ * and shadowless; the fog takes most of it.
+ */
+function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, stone: StandardMaterial, charred: StandardMaterial, wood: StandardMaterial): Tick[] {
+  // The last houses (five), out among the fields — merged per material once built.
+  const far = new TransformNode("selesOutskirts", scene);
+  far.parent = root;
+  const ruins: [number, number, number, number, number, number][] = [
+    [17, -3, 4, 3.4, 0.25, 2.6],
+    [21, 7.5, 3.6, 3, -0.4, 2],
+    [21, -27, 4.4, 3.6, 0.6, 3],
+    [3, 15, 4, 3.2, -0.15, 2.2],
+    [-4, -51, 3.8, 3, 0.35, 2.4],
+  ];
+  for (const [u, v, w, d, rot, h] of ruins) ruinHouse(scene, far, rand, stone, charred, { u, v }, w, d, rot, h);
+
+  // Fences along a few of the plots' edges, and burnt haystacks.
+  const fenceParts: Mesh[] = [];
+  const fence = (u0: number, v0: number, u1: number, v1: number): void => {
+    const a = fromUV(u0, v0);
+    const b = fromUV(u1, v1);
+    const len = Vector3.Distance(a, b);
+    const n = Math.max(2, Math.round(len / 2.2));
+    const ry = Math.atan2(b.x - a.x, b.z - a.z);
+    for (let k = 0; k <= n; k++) {
+      if (rand() < 0.12) continue; // a post gone
+      const p = Vector3.Lerp(a, b, k / n);
+      const post = MeshBuilder.CreateBox("selesFieldPost", { width: 0.14, height: 1.1, depth: 0.14 }, scene);
+      post.position.set(p.x, 0.5, p.z);
+      post.rotation.set((rand() - 0.5) * 0.15, rand(), (rand() - 0.5) * 0.15);
+      fenceParts.push(post);
+      if (k === n || rand() < 0.15) continue; // a broken rail
+      const q = Vector3.Lerp(a, b, (k + 0.5) / n);
+      for (const y of [0.45, 0.85]) {
+        const rail = MeshBuilder.CreateBox("selesFieldRail", { width: 0.06, height: 0.08, depth: len / n + 0.1 }, scene);
+        rail.position.set(q.x, y + (rand() - 0.5) * 0.06, q.z);
+        rail.rotation.y = ry;
+        fenceParts.push(rail);
+      }
+    }
+  };
+  fence(13.5, -15, 13.5, 6);
+  fence(22.5, -20, 22.5, 13);
+  fence(14, 6, 31, 6);
+  fence(16, -15, 30, -15);
+  fence(-12, 13, 8, 13);
+  fence(-14, -46, 6, -46);
+  const fences = Mesh.MergeMeshes(fenceParts, true, true);
+  if (fences) {
+    fences.name = "selesFieldFences";
+    fences.material = wood;
+    fences.parent = root;
+  }
+  const hay = matte("selesHay", scene, undefined, new Color3(0.2, 0.15, 0.1));
+  const stacks: Mesh[] = [];
+  for (const [u, v] of [[18, 2], [27, -9], [26, 10], [-6, 18], [9, -50]] as const) {
+    const s = MeshBuilder.CreateCylinder("selesHaystack", { height: 1.6, diameterBottom: 2, diameterTop: 0.5, tessellation: 9, subdivisions: 2 }, scene);
+    jitter(s, 0.12, rand);
+    const p = fromUV(u, v);
+    s.position.set(p.x, 0.75, p.z);
+    gradeColors(s, [0.5, 0.48, 0.46], [1.5, 1.25, 0.8]); // charred at the foot, the top still straw
+    stacks.push(s);
+  }
+  const haystacks = Mesh.MergeMeshes(stacks, true, true);
+  if (haystacks) {
+    haystacks.material = hay;
+    haystacks.parent = root;
+  }
+  // Merge the ruins, per material (one draw each).
+  const byMat = new Map<StandardMaterial, Mesh[]>();
+  for (const m of far.getChildMeshes() as Mesh[]) {
+    const mat = m.material as StandardMaterial;
+    if (!byMat.has(mat)) byMat.set(mat, []);
+    byMat.get(mat)!.push(m);
+  }
+  for (const [mat, parts] of byMat) {
+    const merged = Mesh.MergeMeshes(parts, true, true);
+    if (merged) {
+      merged.name = "selesFarRuins";
+      merged.material = mat;
+      merged.parent = root;
+    }
+  }
+  far.dispose();
+
+  // The woods round the valley: a ring of dark round-topped trees past the fields (a gap where
+  // the road leaves for the forest).
+  const leaf = matte("selesFarLeaf", scene, undefined, new Color3(0.2, 0.23, 0.14));
+  const treeParts: Mesh[] = [];
+  const trunk = MeshBuilder.CreateCylinder("selesFarTrunk", { height: 3, diameterTop: 0.3, diameterBottom: 0.5, tessellation: 6 }, scene);
+  trunk.position.y = 1.5;
+  gradeColors(trunk, [0.38, 0.3, 0.26], [0.42, 0.34, 0.3]);
+  treeParts.push(trunk);
+  for (const [x, y, z, r] of [[0, 4, 0, 1.9], [0.9, 3.4, 0.5, 1.3], [-0.8, 3.6, -0.4, 1.4], [0.1, 5.2, -0.2, 1.2], [0.6, 4.6, -0.8, 1.1], [-0.5, 4.8, 0.7, 1.1]] as const) {
+    const c = MeshBuilder.CreateIcoSphere("selesFarCanopy", { radius: r, subdivisions: 2 }, scene);
+    jitter(c, 0.18, rand);
+    c.position.set(x, y, z);
+    gradeColors(c, [0.55, 0.6, 0.5], [1.05, 1.08, 0.95]);
+    treeParts.push(c);
+  }
+  const tree = mergeSource("selesFarTree", treeParts, false);
+  tree.material = leaf;
+  const center = fromUV(-16, -18);
+  const exitDir = Math.atan2(fromUV(-40, -30).z - center.z, fromUV(-40, -30).x - center.x);
+  for (let k = 0; k < 130; k++) {
+    const a = rand() * Math.PI * 2;
+    const da = Math.atan2(Math.sin(a - exitDir), Math.cos(a - exitDir));
+    if (Math.abs(da) < 0.14) continue; // the road out
+    const r = 51 + rand() * 9;
+    const x = center.x + Math.cos(a) * r;
+    const z = center.z + Math.sin(a) * r;
+    const t = place(tree, root, x, z, 1 + rand() * 0.8, rand() * 6);
+    t.position.y = -0.1;
+    t.scaling.y *= 0.85 + rand() * 0.4;
+  }
+
+  // The mountains far round the valley, grey-blue in the smoky haze.
+  const ridge = (u0: number, v0: number, u1: number, v1: number, n: number, h: number) => ({ from: fromUV(u0, v0), to: fromUV(u1, v1), n, h });
+  mountainRange(scene, root, rand, [
+    ridge(260, -320, 260, 300, 22, 80), // down the screen, past the fields
+    ridge(-300, 280, 240, 300, 16, 70), // to the right
+    ridge(-300, -340, 240, -340, 16, 75), // to the left, beyond the road out
+    ridge(-320, -320, -320, 280, 18, 95), // behind the hill
+  ], { foot: new Color3(0.36, 0.33, 0.33), top: new Color3(0.27, 0.26, 0.3), y: -6 });
+
+  return [];
+}
+
 /**
  * What lies past the map, for the free third-person camera: a smoky morning sky and the land
  * rolling on into low hills, lost in the haze (the fog's colour on the horizon) — instead of the
@@ -1973,7 +2128,10 @@ function buildSmoke(scene: Scene, rand: () => number): void {
   spots.push(fromUV(-5.4, -24.6), fromUV(-4.4, -20.6), fromUV(-8.8, -21.4)); // inside the chapel, its tower
   // The yard's wrecks, and the houses below it.
   spots.push(fromUV(-6.4, 3.6), fromUV(-4.6, 6), fromUV(2.2, -3.6), fromUV(3.4, 2.4), fromUV(3.6, -8.4), fromUV(8.6, 5.4), fromUV(7.8, -1.8), fromUV(8.4, -10.6));
-  for (const at of spots) {
+  // The last houses out among the fields (see buildOutskirts): tall columns, seen from afar.
+  const farSpots = [fromUV(17, -3), fromUV(21, -27), fromUV(3, 15), fromUV(-4, -51)];
+  for (const at of [...spots, ...farSpots]) {
+    const farOff = farSpots.includes(at);
     const ps = new ParticleSystem("selesSmoke", 70, scene);
     ps.particleTexture = dot;
     ps.emitter = new Vector3(at.x, 1.5, at.z);
@@ -1984,12 +2142,12 @@ function buildSmoke(scene: Scene, rand: () => number): void {
     ps.color1 = new Color4(0.4, 0.37, 0.35, 0.4);
     ps.color2 = new Color4(0.5, 0.47, 0.44, 0.3);
     ps.colorDead = new Color4(0.5, 0.48, 0.46, 0);
-    ps.minSize = 1.2;
-    ps.maxSize = 3;
-    ps.minLifeTime = 6;
-    ps.maxLifeTime = 10;
-    ps.emitRate = 6 + rand() * 4;
-    ps.gravity = new Vector3(0.15, 0.35, 0.1);
+    ps.minSize = farOff ? 2.5 : 1.2;
+    ps.maxSize = farOff ? 6 : 3;
+    ps.minLifeTime = farOff ? 10 : 6;
+    ps.maxLifeTime = farOff ? 16 : 10;
+    ps.emitRate = farOff ? 3 + rand() * 1.5 : 6 + rand() * 4; // fewer, bigger puffs far off
+    ps.gravity = farOff ? new Vector3(0.25, 0.5, 0.15) : new Vector3(0.15, 0.35, 0.1);
     ps.direction1 = new Vector3(-0.1, 0.5, -0.1);
     ps.direction2 = new Vector3(0.1, 0.8, 0.1);
     ps.minEmitPower = 0.3;
