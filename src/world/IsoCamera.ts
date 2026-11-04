@@ -86,6 +86,11 @@ export class IsoCamera {
     this._groundForward = this._groundRight = undefined;
   }
 
+  /** The perspective shot's own distance from the followed point (before any pull-in). */
+  get viewRadius(): number {
+    return this.view?.radius ?? this.camera.radius;
+  }
+
   /** True in a perspective (scenic / third-person) shot. */
   get isPerspective(): boolean {
     return !!this.view;

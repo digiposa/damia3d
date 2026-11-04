@@ -20,6 +20,9 @@ import { settings } from "../core/settings";
 import type { BattleUnit, NpcHandle, StoryApi, StoryMap } from "../story/StoryMap";
 import type { World } from "../world/World";
 import { ExitMarker } from "../ui/ExitMarker";
+import { Ray } from "@babylonjs/core/Culling/ray";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 
 /** Average distance walked between encounters = DISTANCE_PER_RATE / rate (rate 14 → ~21 units). */
 const DISTANCE_PER_RATE = 300;
@@ -197,8 +200,9 @@ export class StoryMode extends ArenaCombatMode {
   private onCamMove = (e: PointerEvent): void => {
     if (e.pointerId !== this.dragId) return;
     this.camera.turn(-(e.clientX - this.dragX) * 0.008);
-    // Drag up: look from lower down (towards the horizon); drag down: from higher up.
-    this.pitch = Math.max(-0.6, Math.min(0.35, this.pitch - (e.clientY - this.dragY) * 0.004));
+    // Drag down: look from higher up; drag up: back to the map's own angle — never lower, the
+    // maps are dressed for their angle and looking towards the horizon shows their edges.
+    this.pitch = Math.max(-0.6, Math.min(0, this.pitch - (e.clientY - this.dragY) * 0.004));
     this.dragX = e.clientX;
     this.dragY = e.clientY;
     this.manualT = 0;
@@ -236,7 +240,71 @@ export class StoryMode extends ArenaCombatMode {
     this.camera.turn(d * Math.min(1, dt * 1.1) * Math.min(1, ax.y));
   }
 
+  /**
+   * Third person: when a wall, a tree or the slope stands between the camera and the hero, the
+   * camera pulls in in front of it (fast), and eases back out once the view is clear (slowly).
+   * A ray from the hero to the camera, against the big solid things only, every other frame.
+   */
+  private camFrame = 0;
+  private camHit = Infinity;
+  private updateCameraPull(dt: number): void {
+    if (!this.camera.isPerspective || settings.cameraStyle !== 1) return;
+    const cam = this.camera.camera;
+    const full = this.camera.viewRadius;
+    if (this.camFrame++ % 2 === 0) {
+      // From the hero's chest to where the camera would sit at its full distance.
+      const from = this.player.position.add(new Vector3(0, 1.1, 0));
+      const r0 = Math.max(cam.radius, 1e-3);
+      const to = cam.target.add(cam.position.subtract(cam.target).scale(full / r0));
+      const dir = to.subtract(from);
+      const len = dir.length();
+      this.camHit = Infinity;
+      if (len > 1.2) {
+        dir.scaleInPlace(1 / len);
+        const start = from.add(dir.scale(0.8)); // clear of the hero's own body
+        const ray = new Ray(start, dir, len - 0.8);
+        let best = Infinity;
+        for (const m of this.cameraBlockers()) {
+          if (!m.isEnabled() || !m.isVisible) continue;
+          // Cheap reject first: the bounding sphere must come near the segment.
+          const bs = m.getBoundingInfo().boundingSphere;
+          const c = bs.centerWorld.subtract(start);
+          const along = Math.max(0, Math.min(len - 0.8, Vector3.Dot(c, dir)));
+          if (c.subtract(dir.scale(along)).lengthSquared() > bs.radiusWorld * bs.radiusWorld) continue;
+          const hit = ray.intersectsMesh(m as Mesh, false);
+          if (hit.hit && hit.distance < best) best = hit.distance;
+        }
+        // The hit as a fraction of the full distance, turned into a radius.
+        if (best < Infinity) this.camHit = (full * (best + 0.8 - 0.6)) / len;
+      }
+    }
+    const want = Math.max(3 + Math.max(0, this.camera.framing), Math.min(full, this.camHit)); // never inside the hero
+    const r = cam.radius;
+    cam.radius = want < r ? r + (want - r) * Math.min(1, dt * 12) : r + (want - r) * Math.min(1, dt * 2);
+  }
+
+  /** The meshes that can stand in the camera's way, listed once (again if the scene grows). */
+  private blockers: AbstractMesh[] = [];
+  private blockersOf = -1;
+  private cameraBlockers(): AbstractMesh[] {
+    if (this.blockersOf !== this.scene.meshes.length) {
+      this.blockersOf = this.scene.meshes.length;
+      this.blockers = this.scene.meshes.filter((m) => this.blocksCamera(m));
+    }
+    return this.blockers;
+  }
+
+  /** Solid enough to stand in the camera's way (not grass cards, particles, sky, water, glows). */
+  private blocksCamera(m: AbstractMesh): boolean {
+    if (m.infiniteDistance || m.getTotalVertices() === 0 || m.skeleton) return false; // not the people
+    if (/Sky|Sea|Water|Shaft|Cloud|Haze|Glow|Pool|Mist|Foam|Ivy|Fern|Grass|Flower/i.test(m.name)) return false;
+    const mat = m.material;
+    if (mat && (mat.alpha < 1 || mat.needAlphaBlending() || mat.needAlphaTesting())) return false;
+    return m.getBoundingInfo().boundingSphere.radiusWorld > 0.9;
+  }
+
   override update(dt: number): void {
+    this.updateCameraPull(dt);
     if (settings.cameraStyle !== this.appliedCamera) {
       this.appliedCamera = settings.cameraStyle;
       this.applyCameraView();
