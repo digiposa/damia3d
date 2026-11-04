@@ -18,6 +18,8 @@ import { fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
 import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource } from "./kit/flora";
 import { gradeColors, gridMesh, jitter, limb, matte, mergeSource, place } from "./kit/mesh";
 import { chestProp } from "./kit/chest";
+import { farLand } from "./kit/farLand";
+import { skyDome } from "./kit/sky";
 import { hash01, noise2 } from "./kit/noise";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU } from "./kit/texels";
@@ -233,6 +235,7 @@ export function selesWorld(scene: Scene): SelesWorld {
   ticks.push(buildWell(scene, root, rand, wood, charred, selesPoint(SELES_SPOTS.well)));
   ticks.push(...buildCemetery(scene, root, rand, stone, wood));
   buildBackdrop(scene, root, rand);
+  buildHorizon(scene, root);
   buildBrokenLife(scene, root, rand, wood);
   ticks.push(sunShafts(scene, root, rand));
   ticks.push(emberPulse(scene));
@@ -1381,6 +1384,35 @@ function buildBackdrop(scene: Scene, root: TransformNode, rand: () => number): v
       place(grass, root, p.x + Math.cos(a) * r, p.z + Math.sin(a) * r, 1 + rand() * 0.6, rand() * 3).position.y = d * h * 0.5 * (1 - (r / (d * 0.5)) ** 2) - d * 0.08;
     }
   }
+}
+
+/**
+ * What lies past the map, for the free third-person camera: a smoky morning sky and the land
+ * rolling on into low hills, lost in the haze (the fog's colour on the horizon) — instead of the
+ * end of the ground plate against the clear colour.
+ */
+function buildHorizon(scene: Scene, root: TransformNode): void {
+  farLand(scene, root, {
+    center: fromUV(-16, -18),
+    inner: 44, // under the village's own ground (96 × 96)
+    outer: 700,
+    flat: 58,
+    height: 46,
+    near: new Color3(0.32, 0.25, 0.17),
+    far: new Color3(0.3, 0.27, 0.23),
+    seed: 5,
+  });
+  const sky = skyDome(scene, root, {
+    zenith: new Color3(0.36, 0.34, 0.33),
+    horizon: new Color3(0.34, 0.3, 0.27), // = the fog: the hills melt into it
+    glow: new Color3(0.14, 0.08, 0.03),
+    sun: new Vector3(0.5, 0, 0.4),
+  });
+  // Unlit: out of the mode's glow layer (created after the world: first frame).
+  const once = scene.onBeforeRenderObservable.add(() => {
+    for (const layer of scene.effectLayers) if (layer instanceof GlowLayer) layer.addExcludedMesh(sky);
+    scene.onBeforeRenderObservable.remove(once);
+  });
 }
 
 /** The village well: a stone ring, a little roof frame and its bucket. */

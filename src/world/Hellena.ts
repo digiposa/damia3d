@@ -19,6 +19,7 @@ import { gradeColors, gridMesh, jitter, limb, matte, place } from "./kit/mesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { hash01, noise2 } from "./kit/noise";
 import { makeWater, type WaterOptions } from "./kit/water";
+import { farLand } from "./kit/farLand";
 import { Obstacles } from "./kit/obstacles";
 import { GROUND_PPU } from "./kit/texels";
 import { TrailNet, type Knot } from "./kit/trails";
@@ -194,6 +195,27 @@ export function hellenaWorld(scene: Scene): World {
   const ticks = buildPrison(scene, root, rand, rock, wood);
   buildDrawbridge(scene, root, rand, wood);
   const noGlow = buildHorizon(scene, root, rand, ticks, false);
+  // The land going on past the guard post's ground, behind and to the right (the free camera
+  // looks that way): the rock rising into dark hills; the sea on the left and the drawbridge's gap
+  // stay open.
+  farLand(scene, root, {
+    center: fromUV(42, 4),
+    inner: 12,
+    outer: 600,
+    flat: 22,
+    height: 60,
+    near: new Color3(0.27, 0.24, 0.26),
+    far: new Color3(0.2, 0.17, 0.22),
+    seed: 3,
+    land: (x, z) => {
+      const { u, v } = hellenaUV(new Vector3(x, 0, z));
+      const gap = smooth(BRIDGE_U0 - 0.2, BRIDGE_U0 + 0.8, u) * (1 - smooth(BRIDGE_U1 - 0.8, BRIDGE_U1 + 0.2, u));
+      return smooth(coastEdge(u) + 0.6, coastEdge(u) + 4, v) * (1 - gap);
+    },
+    sink: SEA_Y - 3,
+    rings: 36,
+    segments: 96,
+  });
   let glowChecked = false;
 
   obstacles.index();

@@ -200,9 +200,8 @@ export class StoryMode extends ArenaCombatMode {
   private onCamMove = (e: PointerEvent): void => {
     if (e.pointerId !== this.dragId) return;
     this.camera.turn(-(e.clientX - this.dragX) * 0.008);
-    // Drag down: look from higher up; drag up: back to the map's own angle — never lower, the
-    // maps are dressed for their angle and looking towards the horizon shows their edges.
-    this.pitch = Math.max(-0.6, Math.min(0, this.pitch - (e.clientY - this.dragY) * 0.004));
+    // Drag up: look from lower down (towards the horizon); drag down: from higher up.
+    this.pitch = Math.max(-0.6, Math.min(0.35, this.pitch - (e.clientY - this.dragY) * 0.004));
     this.dragX = e.clientX;
     this.dragY = e.clientY;
     this.manualT = 0;
@@ -297,7 +296,7 @@ export class StoryMode extends ArenaCombatMode {
   /** Solid enough to stand in the camera's way (not grass cards, particles, sky, water, glows). */
   private blocksCamera(m: AbstractMesh): boolean {
     if (m.infiniteDistance || m.getTotalVertices() === 0 || m.skeleton) return false; // not the people
-    if (/Sky|Sea|Water|Shaft|Cloud|Haze|Glow|Pool|Mist|Foam|Ivy|Fern|Grass|Flower/i.test(m.name)) return false;
+    if (/Sky|FarLand|Sea|Water|Shaft|Cloud|Haze|Glow|Pool|Mist|Foam|Ivy|Fern|Grass|Flower/i.test(m.name)) return false;
     const mat = m.material;
     if (mat && (mat.alpha < 1 || mat.needAlphaBlending() || mat.needAlphaTesting())) return false;
     return m.getBoundingInfo().boundingSphere.radiusWorld > 0.9;
