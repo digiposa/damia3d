@@ -599,7 +599,7 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
       const y = j === 0 ? top + 0.02 : top - (top + RAVINE_DEPTH) * (j / DEPTH_ROWS);
       // Ledges jut into the gorge (towards its centre line).
       const u = ravineC(r, v) + side * (ravineH(r, v) - strataOut(y - top, v, side + r.c, 1.05));
-      const p = forestPoint(u, Math.min(v, cliffE(u) + 2));
+      const p = forestPoint(u, Math.min(v, cliffE(u))); // ends at the cliff's edge
       return { x: p.x, y, z: p.z, tu: v / 4, tv: (top - y) / 8 };
     }, facing);
     // Darker the deeper it goes: the gorge's depth is in this gradient.
@@ -639,7 +639,10 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     // A near-sheer drop to the water (a long slope would fill the view and hide the sea).
     const out = 2.6 * Math.pow(f, 0.8) - strataOut(SEA_Y * f, u, 7, 0.6) * (1 - f);
     const p = forestPoint(u + nu * out, Math.min(V_MAX + 4, e) + nv * out);
-    const lip = level(u, Math.min(V_MAX + 4, e));
+    // Where a ravine opens onto the sea there is no cliff top: the face sinks to the water there.
+    const ve = Math.min(V_MAX + 4, e);
+    const mouth = RAVINES.some((r) => Math.abs(u - ravineC(r, ve)) < ravineH(r, ve) + 0.05);
+    const lip = mouth ? SEA_Y - 1 : level(u, ve);
     return { x: p.x, y: f === 0 ? lip + 0.02 : lip * (1 - f) + (SEA_Y - 1) * f, z: p.z, tu: u / 4, tv: f * 1.6 };
   }, new Vector3(SIDE.x, 1, SIDE.z));
   cliff.convertToFlatShadedMesh();
@@ -1475,7 +1478,7 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   // swell moving. Seen from above (iso): only a faint sheen of the sun.
   // Out to the horizon (the third-person view looks over the cliff to the open sea).
   const sea = gridMesh("forestSea", scene, 16, 20, (i, j) => {
-    const p = forestPoint(-200 + (j / 20) * 1100, -10 + (i / 16) * 800);
+    const p = forestPoint(-200 + (j / 20) * 1100, 4 + (i / 16) * 800); // from the cliff out (not under the wood)
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 16, tv: i / 12 };
   }, Vector3.Up());
   sea.parent = parent;

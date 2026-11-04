@@ -664,6 +664,11 @@ export class Player {
    * @param dir non-normalized desired direction on the XZ plane
    * @param dt  seconds since last frame
    */
+  /** Which way the avatar faces (yaw, radians: 0 = +z). */
+  get facingAngle(): number {
+    return this.root.rotation.y;
+  }
+
   move(dir: Vector3, dt: number, running = true): void {
     if (dir.lengthSquared() < 1e-4) return;
     const step = dir.normalize().scale((running ? RUN_SPEED : WALK_SPEED) * dt);

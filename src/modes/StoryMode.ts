@@ -143,6 +143,11 @@ export class StoryMode extends ArenaCombatMode {
 
   override enter(): void {
     super.enter();
+    window.addEventListener("pointerdown", this.onCamDown);
+    window.addEventListener("pointermove", this.onCamMove);
+    window.addEventListener("pointerup", this.onCamUp);
+    window.addEventListener("pointercancel", this.onCamUp);
+    window.addEventListener("contextmenu", this.noMenu);
     // Stand the party at the map's entry point.
     const at = this.map.entries[this.entry] ?? Object.values(this.map.entries)[0] ?? Vector3.Zero();
     this.party.forEach((m, i) => {
@@ -166,11 +171,56 @@ export class StoryMode extends ArenaCombatMode {
   /** Config → Camera as it was last applied (switched live when the player changes it). */
   private appliedCamera = settings.cameraStyle;
 
+  // --- Free third-person camera ----------------------------------------------------------------
+  /** Drag on the screen (outside the joystick and the buttons), right-drag, or Z / C: turn the view. */
+  private dragId: number | null = null;
+  private dragX = 0;
+  private manualT = 0; // seconds since the player last turned it by hand
+  private onCamDown = (e: PointerEvent): void => {
+    if (settings.cameraStyle !== 1 || this.dragId !== null) return;
+    const stickZone = e.pointerType === "touch" && e.clientX < window.innerWidth * 0.5 && e.clientY > window.innerHeight * 0.34;
+    if (stickZone || (e.pointerType === "mouse" && e.button !== 2)) return; // the stick; left click = move
+    this.dragId = e.pointerId;
+    this.dragX = e.clientX;
+  };
+  private onCamMove = (e: PointerEvent): void => {
+    if (e.pointerId !== this.dragId) return;
+    this.camera.turn(-(e.clientX - this.dragX) * 0.008);
+    this.dragX = e.clientX;
+    this.manualT = 0;
+  };
+  private onCamUp = (e: PointerEvent): void => {
+    if (e.pointerId === this.dragId) this.dragId = null;
+  };
+  private noMenu = (e: Event): void => {
+    if (settings.cameraStyle === 1) e.preventDefault(); // right-drag turns the camera
+  };
+
+  /** Turn the view by hand, and when the player has let it be, swing it slowly behind the hero as
+   *  they walk forward (never while strafing or backing up, so it doesn't spin). */
+  private updateFreeCamera(dt: number): void {
+    if (settings.cameraStyle !== 1) return;
+    const keys = (this.input.isDown("KeyC") ? 1 : 0) - (this.input.isDown("KeyZ") ? 1 : 0); // E is "interact"
+    if (keys) {
+      this.camera.turn(keys * 1.8 * dt);
+      this.manualT = 0;
+    }
+    this.manualT += dt;
+    const ax = this.input.axis();
+    if (this.manualT < 1.5 || this.dragId !== null || ax.y < 0.4 || this.inputLocked) return;
+    const r = this.player.facingAngle;
+    const want = Math.atan2(-Math.cos(r), -Math.sin(r)); // alpha with the view along the facing
+    let d = want - this.camera.heading;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.camera.turn(d * Math.min(1, dt * 1.1) * Math.min(1, ax.y));
+  }
+
   override update(dt: number): void {
     if (settings.cameraStyle !== this.appliedCamera) {
       this.appliedCamera = settings.cameraStyle;
       this.applyCameraView();
     }
+    this.updateFreeCamera(dt);
     // Dialogue: Space / Enter / E finish or close the line (taps are handled by the box).
     if (this.dialogue?.isOpen && ["Space", "Enter", "KeyE"].some((k) => this.input.wasPressed(k))) this.dialogue.advance();
     super.update(dt);
@@ -513,6 +563,11 @@ export class StoryMode extends ArenaCombatMode {
   }
 
   override dispose(): void {
+    window.removeEventListener("pointerdown", this.onCamDown);
+    window.removeEventListener("pointermove", this.onCamMove);
+    window.removeEventListener("pointerup", this.onCamUp);
+    window.removeEventListener("pointercancel", this.onCamUp);
+    window.removeEventListener("contextmenu", this.noMenu);
     this.syncState();
     saveStory();
     this.dialogue?.dispose();
