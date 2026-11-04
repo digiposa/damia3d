@@ -15,12 +15,13 @@ export class ExitMarker {
     this.el = document.createElement("div");
     Object.assign(this.el.style, {
       position: "fixed",
-      width: "0",
-      height: "0",
-      borderLeft: "6px solid transparent",
-      borderRight: "6px solid transparent",
-      borderTop: "9px solid #3dff6a",
-      filter: "drop-shadow(0 0 2px rgba(0,0,0,0.9))",
+      // PS1: a translucent emerald-teal triangle, pale at the top and deep green at its point.
+      width: "13px",
+      height: "15px",
+      clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+      background: "linear-gradient(180deg, #9ff2d2 0%, #2fc08a 45%, #0c7a52 100%)",
+      opacity: "0.88",
+      filter: "drop-shadow(0 0 3px rgba(60,230,170,0.55))",
       pointerEvents: "none",
       zIndex: "16",
       display: "none",
