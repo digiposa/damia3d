@@ -79,14 +79,14 @@ export class IsoCamera {
     this.applyTarget();
   }
 
-  /** Third person only: turn the view about the followed point (free camera). */
+  /** Turn the view about the followed point (free camera, Story maps: either view). */
   turn(delta: number): void {
-    if (!this.view || !delta) return;
+    if (!delta) return;
     this.camera.alpha += delta;
     this._groundForward = this._groundRight = undefined;
   }
 
-  /** Third person only: the heading (camera alpha). */
+  /** The heading (camera alpha). */
   get heading(): number {
     return this.camera.alpha;
   }

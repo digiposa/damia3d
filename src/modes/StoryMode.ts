@@ -177,7 +177,7 @@ export class StoryMode extends ArenaCombatMode {
   private dragX = 0;
   private manualT = 0; // seconds since the player last turned it by hand
   private onCamDown = (e: PointerEvent): void => {
-    if (settings.cameraStyle !== 1 || this.dragId !== null) return;
+    if (settings.cameraStyle !== 1 || this.dragId !== null) return; // ISO stays fixed (see updateFreeCamera)
     const stickZone = e.pointerType === "touch" && e.clientX < window.innerWidth * 0.5 && e.clientY > window.innerHeight * 0.34;
     if (stickZone || (e.pointerType === "mouse" && e.button !== 2)) return; // the stick; left click = move
     this.dragId = e.pointerId;
@@ -199,6 +199,8 @@ export class StoryMode extends ArenaCombatMode {
   /** Turn the view by hand, and when the player has let it be, swing it slowly behind the hero as
    *  they walk forward (never while strafing or backing up, so it doesn't spin). */
   private updateFreeCamera(dt: number): void {
+    // Third person only: the maps are dressed for the fixed ISO angle (nothing tall between the
+    // camera and the path); turned, the ISO view looks straight through the canopy at a wall of leaves.
     if (settings.cameraStyle !== 1) return;
     const keys = (this.input.isDown("KeyC") ? 1 : 0) - (this.input.isDown("KeyZ") ? 1 : 0); // E is "interact"
     if (keys) {
@@ -207,7 +209,8 @@ export class StoryMode extends ArenaCombatMode {
     }
     this.manualT += dt;
     const ax = this.input.axis();
-    if (this.manualT < 1.5 || this.dragId !== null || ax.y < 0.4 || this.inputLocked) return;
+    // Swinging back behind the hero: third person only (in ISO the view stays where it was put).
+    if (settings.cameraStyle !== 1 || this.manualT < 1.5 || this.dragId !== null || ax.y < 0.4 || this.inputLocked) return;
     const r = this.player.facingAngle;
     const want = Math.atan2(-Math.cos(r), -Math.sin(r)); // alpha with the view along the facing
     let d = want - this.camera.heading;

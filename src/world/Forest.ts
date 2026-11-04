@@ -469,13 +469,13 @@ function forestShotAt({ u, v }: { u: number; v: number }): { zoom: number; offse
 }
 
 /** Extent of the terrain in the local frame (well past what the camera can see). */
-const U_MIN = -50;
+const U_MIN = -120; // well past both ends: with a free camera the wood must go on in every direction
 
-const U_MAX = 200;
+const U_MAX = 260;
 
-const V_MIN = -60;
+const V_MIN = -130;
 
-const V_MAX = 60;
+const V_MAX = 130;
 
 /**
  * The ground: the wood's floor up to the ravine, the floor beyond it up to the cliff edge, the
@@ -980,6 +980,21 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       // Ferns along the corridor's own grass verge too (walk-through, no collision).
       if (edge > -1.6 && edge < 0 && rand() < 0.35) place(fern, root, x, z, 0.6 + rand() * 0.4, rot);
     }
+  // The wood beyond (a free camera can look anywhere): big trees spaced out all round, past the
+  // dressed band, to the edges of the ground — no bare floor running into the sky at the ends.
+  for (let gu = U_MIN + 4; gu < U_MAX - 4; gu += 6)
+    for (let gv = V_MIN + 4; gv < V_MAX - 4; gv += 6) {
+      const lu = gu + (rand() - 0.5) * 5;
+      const lv = gv + (rand() - 0.5) * 5;
+      if (inVoid(lu, lv, 3)) continue;
+      const { x, z } = forestPoint(lu, lv);
+      const near = nearestOnTrack(x, z);
+      if (near.d < near.w + REACH + 1) continue; // the dressed band has its own
+      if (occludesTrack(x, z, 15, 4.4)) continue;
+      const s = 0.9 + rand() * 0.5;
+      place(trees[(rand() * trees.length) | 0], root, x, z, s, rand() * Math.PI * 2);
+      if (rand() < 0.5) place(bush, root, x + 2, z + 1, 1.6 + rand(), rand() * 6);
+    }
   return shade;
 }
 
@@ -1478,7 +1493,7 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   // swell moving. Seen from above (iso): only a faint sheen of the sun.
   // Out to the horizon (the third-person view looks over the cliff to the open sea).
   const sea = gridMesh("forestSea", scene, 16, 20, (i, j) => {
-    const p = forestPoint(-200 + (j / 20) * 1100, 4 + (i / 16) * 800); // from the cliff out (not under the wood)
+    const p = forestPoint(10 + (j / 20) * 900, 4 + (i / 16) * 800); // from the cliff out (not under the wood or past its ends)
     return { x: p.x, y: SEA_Y, z: p.z, tu: j / 16, tv: i / 12 };
   }, Vector3.Up());
   sea.parent = parent;
