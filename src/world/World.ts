@@ -34,6 +34,9 @@ export interface World {
   view?: { beta: number; fov: number; radius: number; lift: number; heading?: number };
   /** Third-person camera only: this map's adjustments to the default shot — e.g. a turned heading
    *  (radians from the iso one) for a map walked down the screen, a steeper tilt over tall cover. */
+  /** Third person: the camera's tilt here (radians from vertical), eased in — lower over open
+   *  country so the horizon shows. Undefined: the map's usual tilt. */
+  thirdPersonTiltAt?(p: Vector3): number | undefined;
   thirdPerson?: Partial<{ beta: number; radius: number; lift: number; heading: number }>;
   /** Ground height at a point, for maps with relief (a hillside); flat (y = 0) when absent. */
   heightAt?(x: number, z: number): number;

@@ -113,7 +113,7 @@ const BRANCHES: Knot[][] = [
   [{ u: 56, v: 0.8, w: 1.6 }, { u: 56.6, v: -4, w: 1.5 }, { u: 57, v: -6.9, w: 2.2 }],
   // The road back to Seles, on out of the wood (seen, not walked: the map ends at its start) — the
   // wood stands back from it, so Seles' ruins show at its end.
-  [{ u: -34, v: 11, w: 3.4 }, { u: -42, v: 13, w: 4 }, { u: -52, v: 14, w: 9 }, { u: -62, v: 15, w: 11 }],
+  [{ u: -34, v: 11, w: 3.4 }, { u: -60, v: 15, w: 3.2 }, { u: -100, v: 18, w: 3 }, { u: -150, v: 20, w: 3 }, { u: -190, v: 21, w: 3 }],
 ];
 
 /** A stretch of the Forest: one of the console's screens, here an area of the seamless map. */
@@ -427,6 +427,12 @@ export function forestWorld(scene: Scene): ForestWorld {
     // Third person (PS1: the ravine seen across, from above): turned to the right and higher up,
     // so the far lip and the sea side are in frame.
     thirdPerson: { heading: -0.8, beta: 1.15, radius: 11, lift: 1.4 },
+    // At the wood's edge, by the plain, the view lifts to the horizon (Seles' ruins far off).
+    thirdPersonTiltAt: (p) => {
+      const { u } = toUV(p.x, p.z);
+      const k = 1 - smooth(-4, 6, u);
+      return k > 0 ? 1.15 + (1.42 - 1.15) * k : undefined;
+    },
     presetAt: (p) => light.at(toUV(p.x, p.z).u),
     shotAt: (p) => forestShotAt(toUV(p.x, p.z)),
     update: (_focus, dt) => {
@@ -444,7 +450,9 @@ export function forestWorld(scene: Scene): ForestWorld {
  * cliff, deep and green in the maze, full sun on the meadow — blended as you walk (no cut).
  */
 const LIGHT_KEYS: [number, LightingPreset][] = [
-  [-50, LIGHTING_PRESETS.forestDay],
+  [-200, LIGHTING_PRESETS.forestPlain], // the plain from Seles: open, the ruins far off
+  [-22, LIGHTING_PRESETS.forestPlain],
+  [-8, LIGHTING_PRESETS.forestDay],
   [32, LIGHTING_PRESETS.forestDay],
   [44, LIGHTING_PRESETS.forestCliff],
   [62, LIGHTING_PRESETS.forestCliff],
@@ -473,7 +481,10 @@ function forestShotAt({ u, v }: { u: number; v: number }): { zoom: number; offse
 }
 
 /** Extent of the terrain in the local frame (well past what the camera can see). */
-const U_MIN = -120; // well past both ends: with a free camera the wood must go on in every direction
+const U_MIN = -230;
+
+/** Where the wood begins: before it, the open plain the road crosses from Seles. */
+const PLAIN_U = -16; // well past both ends: with a free camera the wood must go on in every direction
 
 const U_MAX = 260;
 
@@ -700,7 +711,7 @@ function shadeGround(meshes: Mesh[], trees: { x: number; z: number; r: number }[
 // --- The track -------------------------------------------------------------------
 
 /** Extent and resolution of the painted dirt layer (local u, v; pixels per unit). */
-const DIRT_U0 = -42;
+const DIRT_U0 = -90; // the road on across the plain
 
 const DIRT_U1 = 186;
 
@@ -910,6 +921,7 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       const lu = gu + (rand() - 0.5) * STEP * 0.9;
       const lv = gv + (rand() - 0.5) * STEP * 0.9;
       if (inVoid(lu, lv, 0.9)) continue; // nothing grows in thin air
+      if (lu < PLAIN_U) continue; // the open plain before the wood
       const { x, z } = forestPoint(lu, lv);
       if (CLEARINGS.some((c) => Math.hypot(c.x - x, c.z - z) < 3.2)) continue; // keep chests/NPCs free
       const near = nearestOnTrack(x, z);
@@ -984,6 +996,17 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       // Ferns along the corridor's own grass verge too (walk-through, no collision).
       if (edge > -1.6 && edge < 0 && rand() < 0.35) place(fern, root, x, z, 0.6 + rand() * 0.4, rot);
     }
+  // The plain's grass: tufts and flowers scattered over it (cheap instances).
+  const grassSrc = scene.getMeshByName("forestGrass") as Mesh | null;
+  const flowerSrc = scene.getMeshByName("forestFlowers") as Mesh | null;
+  for (let gu = U_MIN + 4; gu < PLAIN_U + 2; gu += 3.2)
+    for (let gv = -70; gv < 80; gv += 3.2) {
+      const { x, z } = forestPoint(gu + (rand() - 0.5) * 3, gv + (rand() - 0.5) * 3);
+      const n = nearestOnTrack(x, z);
+      if (n.d < n.w + 0.4) continue;
+      const src = rand() < 0.2 ? flowerSrc : grassSrc;
+      if (src) place(src, root, x, z, 0.9 + rand() * 0.7, rand() * 6);
+    }
   // The wood beyond (a free camera can look anywhere): big trees spaced out all round, past the
   // dressed band, to the edges of the ground — no bare floor running into the sky at the ends.
   for (let gu = U_MIN + 4; gu < U_MAX - 4; gu += 6)
@@ -991,6 +1014,11 @@ function buildVegetation(scene: Scene, root: TransformNode, rand: () => number):
       const lu = gu + (rand() - 0.5) * 5;
       const lv = gv + (rand() - 0.5) * 5;
       if (inVoid(lu, lv, 3)) continue;
+      if (lu < PLAIN_U) {
+        // The plain: a lone tree here and there, far apart.
+        if (rand() < 0.04 && !occludesTrack(forestPoint(lu, lv).x, forestPoint(lu, lv).z, 15, 4.4)) place(trees[(rand() * trees.length) | 0], root, forestPoint(lu, lv).x, forestPoint(lu, lv).z, 1 + rand() * 0.4, rand() * 6);
+        continue;
+      }
       const { x, z } = forestPoint(lu, lv);
       const near = nearestOnTrack(x, z);
       if (near.d < near.w + REACH + 1) continue; // the dressed band has its own
@@ -1107,7 +1135,7 @@ function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): 
       seg.parent = root;
     }
   };
-  const houses: [number, number, number, number][] = [[-50, 10, 6, 3.4], [-56, 19, 5, 3], [-48, 23, 4, 2.6], [-60, 12, 7, 3.8], [-54, 4, 5, 2.8]];
+  const houses: [number, number, number, number][] = [[-196, 12, 9, 5], [-204, 26, 8, 4.4], [-192, 32, 6, 3.6], [-210, 16, 10, 5.6], [-200, 2, 8, 4]];
   for (const [u, v, w, h] of houses) {
     const rot = rand() * Math.PI;
     wall(u, v - w / 3, w, h, rot);
@@ -1121,16 +1149,16 @@ function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): 
     beam.parent = root;
   }
   // The chapel's tower stump, the tallest thing standing.
-  const t = forestPoint(-62, 17);
-  const tower = MeshBuilder.CreateBox("forestSelesTower", { width: 3, height: 11, depth: 3 }, scene);
-  tower.position.set(t.x, 5.5, t.z);
+  const t = forestPoint(-212, 24);
+  const tower = MeshBuilder.CreateBox("forestSelesTower", { width: 4.5, height: 16, depth: 4.5 }, scene);
+  tower.position.set(t.x, 8, t.z);
   tower.rotation.y = 0.3;
   jitter(tower, 0.15, rand);
   tower.material = stone;
   tower.parent = root;
   // Smoke still rising from the ruins.
   const dot = softDotTexture(scene);
-  for (const [u, v] of [[-50, 10], [-60, 12], [-56, 20]] as const) {
+  for (const [u, v] of [[-196, 12], [-210, 16], [-204, 26]] as const) {
     const at = forestPoint(u, v);
     const ps = new ParticleSystem("forestSelesSmoke", 40, scene);
     ps.particleTexture = dot;
@@ -1141,10 +1169,10 @@ function buildSelesAfar(scene: Scene, root: TransformNode, rand: () => number): 
     ps.color1 = new Color4(0.3, 0.27, 0.26, 0.45);
     ps.color2 = new Color4(0.4, 0.36, 0.34, 0.35);
     ps.colorDead = new Color4(0.4, 0.37, 0.35, 0);
-    ps.minSize = 2;
-    ps.maxSize = 4.5;
-    ps.minLifeTime = 7;
-    ps.maxLifeTime = 11;
+    ps.minSize = 4;
+    ps.maxSize = 9;
+    ps.minLifeTime = 10;
+    ps.maxLifeTime = 16;
     ps.emitRate = 5;
     ps.direction1 = new Vector3(-0.1, 1, -0.1);
     ps.direction2 = new Vector3(0.2, 1.4, 0.2);

@@ -178,6 +178,23 @@ export const LIGHTING_PRESETS = {
     fogEnd: 95,
     fogColor: [0.2, 0.16, 0.1],
   },
+  /** The plain between Seles and the Forest: open sky, long sight lines (Seles' ruins far off), the
+   *  distance melting into a warm haze instead of the wood's dark. */
+  forestPlain: {
+    clearColor: [0.5, 0.36, 0.32],
+    ambientIntensity: 0.84,
+    ambientGround: [0.26, 0.2, 0.12],
+    sunIntensity: 1.45,
+    sunColor: [1.0, 0.82, 0.6],
+    sunDirection: [-0.5, -1, -0.4],
+    exposure: 1.26,
+    contrast: 1.22,
+    vignetteWeight: 1.4,
+    bloomWeight: 0.4,
+    fogStart: 70,
+    fogEnd: 320,
+    fogColor: [0.62, 0.44, 0.38],
+  },
   /** Training arena — the dark-fantasy palette but clearly lit and readable (more fill, softer
    *  vignette/fog, less crushed shadows) so you can see the fight and the decor. */
   trainingArena: {

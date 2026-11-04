@@ -202,6 +202,9 @@ export class StoryMode extends ArenaCombatMode {
     // Third person only: the maps are dressed for the fixed ISO angle (nothing tall between the
     // camera and the path); turned, the ISO view looks straight through the canopy at a wall of leaves.
     if (settings.cameraStyle !== 1) return;
+    const base = this.world.thirdPerson?.beta ?? THIRD_PERSON.beta;
+    this.camera.tilt = this.world.thirdPersonTiltAt?.(this.player.position) ?? base;
+    this.camera.tickTilt(dt);
     const keys = (this.input.isDown("KeyC") ? 1 : 0) - (this.input.isDown("KeyZ") ? 1 : 0); // E is "interact"
     if (keys) {
       this.camera.turn(keys * 1.8 * dt);
