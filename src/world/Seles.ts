@@ -18,7 +18,7 @@ import { fromUV as kitFromUV, toUV as kitToUV } from "./kit/frame";
 import { barkTexture, bushSource, fernSource, grassSource, leafTexture, rockSource, saplingSource } from "./kit/flora";
 import { gradeColors, gridMesh, jitter, limb, matte, mergeSource, place } from "./kit/mesh";
 import { chestProp } from "./kit/chest";
-import { farLand } from "./kit/farLand";
+import { farLand, farLandHeight, type FarLandOptions } from "./kit/farLand";
 import { skyDome } from "./kit/sky";
 import { mountainRange } from "./kit/mountains";
 import { hash01, noise2 } from "./kit/noise";
@@ -1498,35 +1498,83 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
   }
   far.dispose();
 
-  // The woods round the valley: a ring of dark round-topped trees past the fields (a gap where
-  // the road leaves for the forest).
+  // The woods round the valley: a dense edge of full round-topped trees past the fields (a gap
+  // where the road leaves for the forest), then the woods going on over the hills, cheaper trees
+  // the fog turns to a skyline against the lighter sky.
   const leaf = matte("selesFarLeaf", scene, undefined, new Color3(0.2, 0.23, 0.14));
-  const treeParts: Mesh[] = [];
-  const trunk = MeshBuilder.CreateCylinder("selesFarTrunk", { height: 3, diameterTop: 0.3, diameterBottom: 0.5, tessellation: 6 }, scene);
-  trunk.position.y = 1.5;
-  gradeColors(trunk, [0.38, 0.3, 0.26], [0.42, 0.34, 0.3]);
-  treeParts.push(trunk);
-  for (const [x, y, z, r] of [[0, 4, 0, 1.9], [0.9, 3.4, 0.5, 1.3], [-0.8, 3.6, -0.4, 1.4], [0.1, 5.2, -0.2, 1.2], [0.6, 4.6, -0.8, 1.1], [-0.5, 4.8, 0.7, 1.1]] as const) {
-    const c = MeshBuilder.CreateIcoSphere("selesFarCanopy", { radius: r, subdivisions: 2 }, scene);
-    jitter(c, 0.18, rand);
-    c.position.set(x, y, z);
-    gradeColors(c, [0.55, 0.6, 0.5], [1.05, 1.08, 0.95]);
-    treeParts.push(c);
-  }
-  const tree = mergeSource("selesFarTree", treeParts, false);
-  tree.material = leaf;
-  const center = fromUV(-16, -18);
+  const treeSource = (name: string, blobs: number, sub: number): Mesh => {
+    const parts: Mesh[] = [];
+    const trunk = MeshBuilder.CreateCylinder(`${name}Trunk`, { height: 3, diameterTop: 0.3, diameterBottom: 0.5, tessellation: 5 }, scene);
+    trunk.position.y = 1.5;
+    gradeColors(trunk, [0.38, 0.3, 0.26], [0.42, 0.34, 0.3]);
+    parts.push(trunk);
+    const BLOBS = [[0, 4, 0, 1.9], [0.9, 3.4, 0.5, 1.3], [-0.8, 3.6, -0.4, 1.4], [0.1, 5.2, -0.2, 1.2], [0.6, 4.6, -0.8, 1.1], [-0.5, 4.8, 0.7, 1.1]];
+    for (const [x, y, z, r] of BLOBS.slice(0, blobs)) {
+      const c = MeshBuilder.CreateIcoSphere(`${name}Canopy`, { radius: r * (blobs < 4 ? 1.2 : 1), subdivisions: sub }, scene);
+      jitter(c, 0.18, rand);
+      c.position.set(x, y, z);
+      gradeColors(c, [0.55, 0.6, 0.5], [1.05, 1.08, 0.95]);
+      parts.push(c);
+    }
+    const t = mergeSource(name, parts, false);
+    t.material = leaf;
+    return t;
+  };
+  const fullTree = treeSource("selesFarTree", 6, 1); // smooth-shaded: round enough at this range, light on triangles
+  const farTree = treeSource("selesFarTreeLo", 3, 1);
+  const pine = (() => {
+    // A few dark conifers among them, for a less even line.
+    const parts: Mesh[] = [];
+    const trunk = MeshBuilder.CreateCylinder("selesPineTrunk", { height: 2, diameter: 0.35, tessellation: 5 }, scene);
+    trunk.position.y = 1;
+    gradeColors(trunk, [0.38, 0.3, 0.26], [0.42, 0.34, 0.3]);
+    parts.push(trunk);
+    for (const [y, r, h] of [[2.6, 1.8, 3], [4.2, 1.4, 2.6], [5.6, 0.9, 2.2]] as const) {
+      const c = MeshBuilder.CreateCylinder("selesPineCone", { height: h, diameterTop: 0, diameterBottom: r * 2, tessellation: 7 }, scene);
+      jitter(c, 0.12, rand);
+      c.position.y = y;
+      gradeColors(c, [0.45, 0.55, 0.5], [0.8, 0.9, 0.75]);
+      parts.push(c);
+    }
+    const t = mergeSource("selesPine", parts);
+    t.material = leaf;
+    return t;
+  })();
+  const center = SELES_FAR.center;
   const exitDir = Math.atan2(fromUV(-40, -30).z - center.z, fromUV(-40, -30).x - center.x);
-  for (let k = 0; k < 130; k++) {
-    const a = rand() * Math.PI * 2;
-    const da = Math.atan2(Math.sin(a - exitDir), Math.cos(a - exitDir));
-    if (Math.abs(da) < 0.14) continue; // the road out
-    const r = 51 + rand() * 9;
+  const plant = (src: Mesh, r: number, a: number, s: number): void => {
     const x = center.x + Math.cos(a) * r;
     const z = center.z + Math.sin(a) * r;
-    const t = place(tree, root, x, z, 1 + rand() * 0.8, rand() * 6);
-    t.position.y = -0.1;
-    t.scaling.y *= 0.85 + rand() * 0.4;
+    const t = place(src, root, x, z, s, rand() * 6);
+    t.position.y = farLandHeight(SELES_FAR, x, z) - 0.15;
+    t.scaling.y *= 0.85 + rand() * 0.45;
+  };
+  // The wood's edge: close-packed, in two staggered rows.
+  for (let k = 0; k < 240; k++) {
+    const a = rand() * Math.PI * 2;
+    const da = Math.atan2(Math.sin(a - exitDir), Math.cos(a - exitDir));
+    const r = WOOD_R0 + 1 + rand() * 10;
+    if (Math.abs(da) < 0.12 * (60 / r)) continue; // the road out
+    plant(rand() < 0.18 ? pine : fullTree, r, a, 1.1 + rand() * 0.9);
+  }
+  // Behind the hill (where Dart comes from): the wood comes right up to the ledge, off the path.
+  for (let k = 0, n = 0; k < 2000 && n < 220; k++) {
+    const u = -64 + rand() * 40;
+    const v = -60 + rand() * 88;
+    if (hillDepth(u, v) < 7) continue;
+    const p = fromUV(u, v);
+    const tr = NET.nearest(p.x, p.z);
+    if (tr.d < tr.w + 3.5 || Math.hypot(p.x - center.x, p.z - center.z) > WOOD_R0 + 1) continue;
+    const t = place(rand() < 0.2 ? pine : n % 3 ? farTree : fullTree, root, p.x, p.z, 1.1 + rand() * 0.9, rand() * 6);
+    t.position.y = farLandHeight(SELES_FAR, p.x, p.z) + 0.12 - 0.15; // on the hill (farLand sits 0.12 under it)
+    t.scaling.y *= 0.85 + rand() * 0.45;
+    n++;
+  }
+  // Beyond, over the hills: cheap trees, the fog does the rest.
+  for (let k = 0; k < 520; k++) {
+    const a = rand() * Math.PI * 2;
+    const r = WOOD_R0 + 10 + (WOOD_R1 - WOOD_R0 - 10) * Math.sqrt(rand());
+    plant(rand() < 0.25 ? pine : farTree, r, a, 1.4 + rand() * 1.1);
   }
 
   // The mountains far round the valley, grey-blue in the smoky haze.
@@ -1536,10 +1584,30 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
     ridge(-300, 280, 240, 300, 16, 70), // to the right
     ridge(-300, -340, 240, -340, 16, 75), // to the left, beyond the road out
     ridge(-320, -320, -320, 280, 18, 95), // behind the hill
-  ], { foot: new Color3(0.36, 0.33, 0.33), top: new Color3(0.27, 0.26, 0.3), y: -6 });
+  ], { foot: new Color3(0.42, 0.39, 0.37), top: new Color3(0.33, 0.32, 0.36), y: -6 });
 
   return [];
 }
+
+/** The land round the valley: flat past the fields, then wooded hills rising to the horizon. */
+const WOOD_R0 = 50;
+const WOOD_R1 = 150;
+const SELES_FAR: FarLandOptions = {
+  center: fromUV(-16, -18),
+  inner: 44, // under the village's own ground (96 × 96)
+  outer: 700,
+  flat: 58,
+  height: 46,
+  near: new Color3(0.32, 0.25, 0.17),
+  far: new Color3(0.3, 0.27, 0.23),
+  seed: 5,
+  lift: (x, z) => selesHeight(x, z), // the hill's grassy plateau runs on off the map
+  // The woods' dark floor (so no light ground shows between the trunks).
+  colorAt: (_x, _z, r, c) => {
+    const w = smooth(WOOD_R0 - 3, WOOD_R0 + 2, r);
+    return [c[0] + (0.15 - c[0]) * w, c[1] + (0.16 - c[1]) * w, c[2] + (0.09 - c[2]) * w];
+  },
+};
 
 /**
  * What lies past the map, for the free third-person camera: a smoky morning sky and the land
@@ -1547,20 +1615,12 @@ function buildOutskirts(scene: Scene, root: TransformNode, rand: () => number, s
  * end of the ground plate against the clear colour.
  */
 function buildHorizon(scene: Scene, root: TransformNode): void {
-  farLand(scene, root, {
-    center: fromUV(-16, -18),
-    inner: 44, // under the village's own ground (96 × 96)
-    outer: 700,
-    flat: 58,
-    height: 46,
-    near: new Color3(0.32, 0.25, 0.17),
-    far: new Color3(0.3, 0.27, 0.23),
-    seed: 5,
-  });
+  farLand(scene, root, SELES_FAR);
   const sky = skyDome(scene, root, {
-    zenith: new Color3(0.36, 0.34, 0.33),
-    horizon: new Color3(0.34, 0.3, 0.27), // = the fog: the hills melt into it
-    glow: new Color3(0.14, 0.08, 0.03),
+    zenith: new Color3(0.3, 0.3, 0.33),
+    // Lighter than the fog: the fogged woods and hills stand out against it as a skyline.
+    horizon: new Color3(0.5, 0.45, 0.4),
+    glow: new Color3(0.24, 0.14, 0.05), // the low morning sun through the smoke
     sun: new Vector3(0.5, 0, 0.4),
   });
   // Unlit: out of the mode's glow layer (created after the world: first frame).

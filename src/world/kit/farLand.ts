@@ -30,6 +30,22 @@ export interface FarLandOptions {
   /** How many rings / segments (default 28 × 72). */
   rings?: number;
   segments?: number;
+  /** Raise the land by the map's own relief there (e.g. a plateau running off the map). */
+  lift?: (x: number, z: number) => number;
+  /** Repaint the ground colour (0..1 rgb) at a point, e.g. a wood's dark floor in a band. */
+  colorAt?: (x: number, z: number, r: number, base: [number, number, number]) => [number, number, number];
+}
+
+/** The ring's ground height at a point (to stand trees and the like on it). */
+export function farLandHeight(o: FarLandOptions, x: number, z: number): number {
+  const seed = o.seed ?? 0;
+  const y0 = o.y ?? -0.12;
+  const r = Math.hypot(x - o.center.x, z - o.center.z);
+  const k = Math.max(0, Math.min(1, (r - o.flat) / (o.outer * 0.5 - o.flat)));
+  const rise = k * k * (3 - 2 * k);
+  const hills = 0.55 * noise2(x * 0.012 + seed, z * 0.012) + 0.45 * noise2(x * 0.035, z * 0.035 + seed);
+  const l = o.land ? o.land(x, z) : 1;
+  return (y0 + rise * o.height * (0.35 + hills)) * l + (o.sink ?? y0) * (1 - l) + (o.lift ? o.lift(x, z) : 0);
 }
 
 /**
@@ -42,7 +58,6 @@ export function farLand(scene: Scene, parent: TransformNode, o: FarLandOptions):
   const RINGS = o.rings ?? 28;
   const SEGS = o.segments ?? 72;
   const seed = o.seed ?? 0;
-  const y0 = o.y ?? -0.12;
   const col: number[] = [];
   const ring = gridMesh("kitFarLand", scene, RINGS, SEGS, (i, j) => {
     const t = i / RINGS;
@@ -50,13 +65,12 @@ export function farLand(scene: Scene, parent: TransformNode, o: FarLandOptions):
     const a = (j / SEGS) * Math.PI * 2;
     const x = o.center.x + Math.cos(a) * r;
     const z = o.center.z + Math.sin(a) * r;
-    const k = Math.max(0, Math.min(1, (r - o.flat) / (o.outer * 0.5 - o.flat)));
-    const rise = k * k * (3 - 2 * k);
     const hills = 0.55 * noise2(x * 0.012 + seed, z * 0.012) + 0.45 * noise2(x * 0.035, z * 0.035 + seed);
-    const l = o.land ? o.land(x, z) : 1;
-    const y = (y0 + rise * o.height * (0.35 + hills)) * l + (o.sink ?? y0) * (1 - l);
+    const y = farLandHeight(o, x, z);
     const m = Math.min(1, t * 1.6);
-    col.push(...[o.near.r + (o.far.r - o.near.r) * m, o.near.g + (o.far.g - o.near.g) * m, o.near.b + (o.far.b - o.near.b) * m].map((c) => c * (0.85 + 0.3 * hills)), 1);
+    let c: [number, number, number] = [o.near.r + (o.far.r - o.near.r) * m, o.near.g + (o.far.g - o.near.g) * m, o.near.b + (o.far.b - o.near.b) * m];
+    if (o.colorAt) c = o.colorAt(x, z, r, c);
+    col.push(...c.map((v) => v * (0.85 + 0.3 * hills)), 1);
     return { x, y, z, tu: 0, tv: 0 };
   }, Vector3.Up());
   ring.setVerticesData("color", col);
