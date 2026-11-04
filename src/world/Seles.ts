@@ -262,7 +262,14 @@ export function selesWorld(scene: Scene): SelesWorld {
     heightAt: selesHeight,
     // Walked down the screen: in third person the camera looks that way, and from higher up (it
     // would sit in the hilltop's tall grass behind the hero).
-    thirdPerson: { heading: Math.PI, beta: 0.78, radius: 10, lift: 1.2 },
+    thirdPerson: { heading: Math.PI, beta: 1.2, radius: 10, lift: 1.3 },
+    // Coming down the hill the view looks down from higher up (over the ledge's tall grass);
+    // in the village it comes back to eye level.
+    thirdPersonTiltAt: (p) => {
+      const { u, v } = selesUV(p);
+      const k = smooth(-1, 3, hillDepth(u, v));
+      return k > 0 ? 1.2 + (0.78 - 1.2) * k : undefined;
+    },
     ownFill: [],
     shotAt: chapelShot,
     update: (focus, dt) => {

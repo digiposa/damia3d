@@ -177,6 +177,9 @@ export class StoryMode extends ArenaCombatMode {
   /** Drag on the screen (outside the joystick and the buttons), right-drag, or Z / C: turn the view. */
   private dragId: number | null = null;
   private dragX = 0;
+  private dragY = 0;
+  /** The player's own tilt on top of the map's (drag up / down), radians. */
+  private pitch = 0;
   private manualT = 0; // seconds since the player last turned it by hand
   private onCamDown = (e: PointerEvent): void => {
     if (settings.cameraStyle !== 1 || this.dragId !== null) return; // ISO stays fixed (see updateFreeCamera)
@@ -184,11 +187,15 @@ export class StoryMode extends ArenaCombatMode {
     if (stickZone || (e.pointerType === "mouse" && e.button !== 2)) return; // the stick; left click = move
     this.dragId = e.pointerId;
     this.dragX = e.clientX;
+    this.dragY = e.clientY;
   };
   private onCamMove = (e: PointerEvent): void => {
     if (e.pointerId !== this.dragId) return;
     this.camera.turn(-(e.clientX - this.dragX) * 0.008);
+    // Drag up: look from lower down (towards the horizon); drag down: from higher up.
+    this.pitch = Math.max(-0.6, Math.min(0.35, this.pitch - (e.clientY - this.dragY) * 0.004));
     this.dragX = e.clientX;
+    this.dragY = e.clientY;
     this.manualT = 0;
   };
   private onCamUp = (e: PointerEvent): void => {
@@ -205,7 +212,8 @@ export class StoryMode extends ArenaCombatMode {
     // camera and the path); turned, the ISO view looks straight through the canopy at a wall of leaves.
     if (settings.cameraStyle !== 1) return;
     const base = this.world.thirdPerson?.beta ?? THIRD_PERSON.beta;
-    this.camera.tilt = this.world.thirdPersonTiltAt?.(this.player.position) ?? base;
+    const tilt = (this.world.thirdPersonTiltAt?.(this.player.position) ?? base) + this.pitch;
+    this.camera.tilt = Math.max(0.5, Math.min(1.5, tilt));
     this.camera.tickTilt(dt);
     const keys = (this.input.isDown("KeyC") ? 1 : 0) - (this.input.isDown("KeyZ") ? 1 : 0); // E is "interact"
     if (keys) {
