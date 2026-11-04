@@ -177,6 +177,9 @@ const cliffE = (u: number): number =>
 /** Depth of the ravine floors. */
 const RAVINE_DEPTH = 16;
 
+/** The sea, below the cliff: near enough under the edge to be in view past it (PS1). */
+const SEA_Y = -9;
+
 /** Local (u, v) of a world position: u along the wood, v sideways. */
 export function forestUV(p: Vector3): { u: number; v: number } {
   return toUV(p.x, p.z);
@@ -633,10 +636,11 @@ function buildTerrain(scene: Scene, parent: TransformNode, rand: () => number): 
     const nv = 1 / len;
     const f = i / 20; // 0 = the lip … 1 = the foot, in the sea
     // Banded strata standing out in ledges, like the ravines' walls.
-    const out = 9 * Math.pow(f, 0.8) - strataOut(-26 * f, u, 7, 1.1) * (1 - f);
+    // A near-sheer drop to the water (a long slope would fill the view and hide the sea).
+    const out = 2.6 * Math.pow(f, 0.8) - strataOut(SEA_Y * f, u, 7, 0.6) * (1 - f);
     const p = forestPoint(u + nu * out, Math.min(V_MAX + 4, e) + nv * out);
     const lip = level(u, Math.min(V_MAX + 4, e));
-    return { x: p.x, y: f === 0 ? lip + 0.02 : lip * (1 - f) - 26 * f, z: p.z, tu: u / 4, tv: f * 3.4 };
+    return { x: p.x, y: f === 0 ? lip + 0.02 : lip * (1 - f) + (SEA_Y - 1) * f, z: p.z, tu: u / 4, tv: f * 1.6 };
   }, new Vector3(SIDE.x, 1, SIDE.z));
   cliff.convertToFlatShadedMesh();
   cliff.material = stone;
@@ -1459,7 +1463,6 @@ function buildSignpost(scene: Scene, root: TransformNode): void {
  */
 function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   const rand = mulberry32(0x5ea);
-  const SEA_Y = -26;
   // The sunset sky over the sea (to the right of the wood, PS1), seen in third person.
   const sunDir = forestPoint(0.6, 1);
   const sky = skyDome(scene, parent, {
@@ -1513,7 +1516,7 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
     const u = 36 + (68 - 36) * (j / 60);
     const de = (cliffE(u + 0.05) - cliffE(u - 0.05)) / 0.1;
     const len = Math.hypot(de, 1);
-    const out = 9 + i * 2.2;
+    const out = 2.4 + i * 1.8; // at the cliff's foot
     const p = forestPoint(u - (de / len) * out, Math.min(V_MAX + 4, cliffE(u)) + out / len);
     return { x: p.x, y: SEA_Y + 0.08, z: p.z, tu: u / 4, tv: i };
   }, Vector3.Up());
@@ -1524,7 +1527,7 @@ function buildSky(scene: Scene, parent: TransformNode): (dt: number) => void {
   // Sea stacks off the coast: dark rock pillars with surf at their feet, for scale and distance.
   const stackMat = scene.getMaterialByName("forestStrataMat") as StandardMaterial | null;
   const stackRand = mulberry32(0x57ac);
-  for (const [u, v, h, r] of [[44, 22, 9, 2.2], [58, 30, 13, 3], [70, 24, 7, 1.6], [50, 38, 10, 2.6]] as const) {
+  for (const [u, v, h, r] of [[44, 22, 6, 2.2], [58, 30, 8, 3], [70, 24, 5, 1.6], [50, 38, 7, 2.6]] as const) {
     const at = forestPoint(u, v);
     const stack = MeshBuilder.CreateCylinder(`forestSeaStack${u}`, { height: h, diameterTop: r * 0.9, diameterBottom: r * 2, tessellation: 8, subdivisions: 4 }, scene);
     jitter(stack, 0.5, stackRand);
