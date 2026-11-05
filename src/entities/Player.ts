@@ -42,8 +42,8 @@ const DRAGOON_HOVER = {
   kneeR: 0.42, // …the right knee folded a little more (PS1)
   footYawL: 0.84, // turn of each foot about the vertical, toward parallel (tuned by measurement)
   footYawR: -1.25,
-  wingLift: 0.35, // the left wing raised from the T-pose bind…
-  wingLiftR: -0.35, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
+  wingLift: -0.6, // the wings spread upward (PS1), ~30° above the shoulders: the left…
+  wingLiftR: -1.4, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
   wingBackL: 0, // sweep back about the vertical, per side
   wingBackR: -0.3,
   wing: 0.1, // …beating about that
