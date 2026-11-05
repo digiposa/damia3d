@@ -910,6 +910,7 @@ export class Player {
     this.modelAnims.run = g.find((a) => has(a, "run") && !combatOf(a)) ?? g.find((a) => has(a, "run"));
     this.modelAnims.draw = g.find((a) => has(a, "draw", "unsheath"));
     this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
+    this.modelAnims.death = g.find((a) => has(a, "death", "dying")); // a separate deathAnim GLB overrides it
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 
