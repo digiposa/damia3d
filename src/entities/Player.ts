@@ -895,9 +895,14 @@ export class Player {
     L.subtractToRef(R, y);
     if (y.length() < 0.36) y.normalize(); // both hands on it: length axis through the fists
     else if (g.hang) {
-      // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs on from the
-      // fingers, tip to the ground, instead of lying across the palm.
-      y.copyFrom(f).scaleInPlace(-1);
+      // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs tip down and a
+      // little forward of him (PS1), whatever the hand does — a fixed direction in his own frame,
+      // brought into the socket's.
+      this.root.computeWorldMatrix(true);
+      const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
+      const tipW = fwdW.scale(0.45).subtractInPlace(Vector3.Up().scale(0.9)).normalize();
+      Vector3.TransformNormalToRef(tipW, m, y);
+      y.normalize().scaleInPlace(-1); // y = tip → pommel
     } else {
       // One-handed: the thumb-side axis across the palm (pommel on the pinky side).
       at(g.RP, t);
@@ -905,6 +910,12 @@ export class Player {
       y.subtractInPlace(f.scale(Vector3.Dot(y, f))).normalize().scaleInPlace(-1);
     }
     f.subtractToRef(y.scale(Vector3.Dot(f, y)), x);
+    if (x.lengthSquared() < 1e-4) {
+      // The length axis runs along the fingers (the hanging grip): take the guard across the palm.
+      at(g.RP, t);
+      at(g.RT, x).subtractInPlace(t);
+      x.subtractInPlace(y.scale(Vector3.Dot(x, y)));
+    }
     x.normalize();
     Vector3.CrossToRef(x, y, z);
     z.normalize();
