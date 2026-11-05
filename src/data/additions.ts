@@ -62,8 +62,9 @@ export const DART_ADDITIONS = {
     spMax: 35,
     acquireLevel: 1,
     // A downward cut (the press lands on it), then a left-to-right one. Impacts measured on the
-    // clips' right-hand path (speed peak / lowest point); the first clip is slow as authored.
-    choreo: [{ clip: "doubleSlash1", speed: 1.6, impact: 0.73 }, { clip: "doubleSlash2", speed: 1.0, impact: 0.44 }],
+    // clips' right-hand path (blade at chest height on the way down); the first clip had its two
+    // dead holds (overhead, then low) cut out at graft time.
+    choreo: [{ clip: "doubleSlash1", impact: 0.58 }, { clip: "doubleSlash2", impact: 0.44 }],
   },
   volcano: {
     name: "Volcano",
