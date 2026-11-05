@@ -138,7 +138,7 @@ export class AdditionRunner {
    * Press the attack button with the equipped Addition. Begins the Addition when
    * idle (auto hit 1), or evaluates the current timing sight when active.
    */
-  press(def: AdditionDef): AttackResult {
+  press(def: AdditionDef, blowRemaining?: number): AttackResult {
     if (!this.active) {
       const multiHit = additionPresses(def) > 0;
       // A multi-hit Addition needs a charged gauge; the gauge is its cadence.
@@ -165,9 +165,10 @@ export class AdditionRunner {
       return { kind: "miss" };
     }
 
-    // The blow just validated plays out before the next one starts: hold the next sight that long.
+    // The blow just validated plays out before the next one starts: hold the next sight that long
+    // (what the owner measures on the playing clip, else what the choreography says is left).
     const blow = this.def!.choreo?.[this.hits - 1];
-    const hold = blow?.length !== undefined ? Math.max(0, blow.length - this.sightTimer) : 0;
+    const hold = blowRemaining ?? (blow?.length !== undefined ? Math.max(0, blow.length - this.sightTimer) : 0);
     this.hits += 1;
     this.presses += 1;
     this.armWindow(this.hits, hold); // the next press falls on the blow that follows

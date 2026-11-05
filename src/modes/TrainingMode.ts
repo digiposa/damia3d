@@ -1836,7 +1836,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const target = this.comboTarget;
     const dragoon = this.comboIsDragoon;
     const add = dragoon ? this.player.dragoonAttackDef : this.player.addition;
-    const res = this.runner.press(add);
+    const res = this.runner.press(add, add.choreo ? this.player.blowRemaining() : undefined);
 
     if (res.kind === "miss") {
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);

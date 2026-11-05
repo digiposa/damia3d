@@ -78,7 +78,9 @@ export const DART_ADDITIONS = {
     multiplier: [100, 105, 110, 115, 125],
     spMax: 36,
     acquireLevel: 2,
-    choreo: [DART_CUT, { clip: "volcano2" }, { clip: "volcano3" }, { clip: "volcano4" }],
+    // PS1: the cut, a horizontal, a full spin into a second horizontal, then an upward cut in the
+    // same momentum. Blows 2–4 are three consecutive pieces of one Mixamo animation (continuous).
+    choreo: [DART_CUT, { clip: "volcano2", impact: 0.56, length: 0.97 }, { clip: "volcano3", impact: 0.42, length: 0.96 }, { clip: "volcano4", impact: 0.45, length: 0.9 }],
   },
   burningRush: {
     name: "Burning Rush",

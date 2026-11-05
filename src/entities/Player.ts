@@ -828,17 +828,26 @@ export class Player {
     Quaternion.SlerpToRef(rq, q, 0.5, rq);
   }
 
-  /** Chain an Addition blow right at the end of the one now playing (or at once if none is):
-   *  the swing starts the frame the previous ends, with no idle in between. */
+  /** Addition blows waiting their turn: each starts the frame the previous one ends. */
+  private blowQueue: { clip: string; speed: number }[] = [];
+
+  /** Chain an Addition blow after the one now playing and any already queued (or at once if no
+   *  blow is playing): the swing starts the frame the previous ends, with no idle in between. */
   queueStrike(clip: string, speed = 1): void {
-    const cur = this.modelCurrent;
-    if (!this.modelRoot || !this.modelAttacking || !cur) {
+    if (!this.modelRoot || !this.modelAttacking || !this.modelCurrent) {
       this.strike(clip, speed);
       return;
     }
-    cur.onAnimationGroupEndObservable.addOnce(() => {
-      if (this.modelCurrent === cur) this.strike(clip, speed); // not if something else took over
-    });
+    this.blowQueue.push({ clip, speed });
+  }
+
+  /** Seconds left in the blow now playing (undefined when no clip-driven blow is on). */
+  blowRemaining(): number | undefined {
+    const a = this.modelCurrent;
+    if (!this.modelRoot || !this.modelAttacking || !a) return undefined;
+    const frame = a.animatables[0]?.masterFrame;
+    if (frame === undefined) return undefined;
+    return Math.max(0, (a.to - frame) / 60 / Math.max(0.01, a.speedRatio)); // glTF clips run at 60 fps
   }
 
   /** Play a one-shot strike animation (call when a blow lands). `clip` names an Addition hit's own
@@ -860,7 +869,10 @@ export class Player {
         prev?.stop();
         own.start(false, speed, own.from, own.to);
         own.onAnimationGroupEndObservable.addOnce(() => {
-          if (this.modelCurrent === own) this.modelAttacking = false;
+          if (this.modelCurrent !== own) return; // something else took over
+          const next = this.blowQueue.shift();
+          if (next) this.strike(next.clip, next.speed); // the chain goes on, same frame
+          else this.modelAttacking = false;
         });
         return;
       }
@@ -887,6 +899,7 @@ export class Player {
   /** Loop/replace the model's current animation group (no-op if already playing it). */
   private playModel(group: AnimationGroup | undefined, loop: boolean): void {
     if (!group || group === this.modelCurrent) return;
+    this.blowQueue.length = 0; // locomotion takes over: nothing left to chain
     this.modelCurrent?.stop();
     this.modelCurrent = group;
     group.start(loop, 1, group.from, group.to);
