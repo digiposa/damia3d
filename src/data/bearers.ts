@@ -189,7 +189,7 @@ export const BEARERS: Bearer[] = [
   // Dart's sword is held two-handed (his combat clips): the grip axis runs through both fists
   // (solved from the bones in the combat idle), scale 1.3 so the handle spans them, right fist just
   // under the guard (grip 0.83), left at the pommel. Back seat solved for that length.
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", dragoonModel: "dart_dragoon", dragoonModelYaw: 0, weaponModel: "dart_sword", weaponGrip: 0.83, weaponScale: 1.3, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponBackRotation: [-4.3, 92.4, 162.4], weaponBackOffset: [-0.258, 0.876, -0.194], weaponBackScale: 1.297, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", dragoonModel: "dart_dragoon", dragoonModelYaw: -Math.PI / 2, weaponModel: "dart_sword", weaponGrip: 0.83, weaponScale: 1.3, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponBackRotation: [-4.3, 92.4, 162.4], weaponBackOffset: [-0.258, 0.876, -0.194], weaponBackScale: 1.297, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, model: "rose", modelYaw: -Math.PI / 2, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
   // Jade (Wind) — spears

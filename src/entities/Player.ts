@@ -32,7 +32,7 @@ const MODEL_YAW = 0;
 /** Target on-screen height (world units) any imported bearer model is auto-fit to. */
 const MODEL_TARGET_H = 1.8;
 /** The Dragoon's hover pose (radians / world units): see {@link Player.hoverDragoon}. */
-const DRAGOON_HOVER = { height: 0.7, bob: 0.06, beatHz: 0.55, lean: 0.3, thigh: 0.55, knee: 0.9, wing: 0.12 };
+const DRAGOON_HOVER = { height: 0.7, bob: 0.06, beatHz: 0.55, lean: 0.3, thigh: -0.55, knee: -0.9, wing: 0.12 };
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
 const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
@@ -883,20 +883,36 @@ export class Player {
     if (!h || !this.dragoonActive || !this.modelCurrent?.isPlaying) return;
     h.t += dt;
     const beat = Math.sin(h.t * DRAGOON_HOVER.beatHz * Math.PI * 2);
-    const k = 1 / Math.max(1e-3, h.pose.parent instanceof TransformNode ? h.pose.parent.scaling.y : 1); // the root is scaled to fit
+    const root = h.pose.parent as TransformNode;
+    const k = 1 / Math.max(1e-3, root.scaling.y); // the root is scaled to fit the figure's height
     h.pose.position.y = (DRAGOON_HOVER.height + DRAGOON_HOVER.bob * beat) * k;
-    h.pose.rotation.x = DRAGOON_HOVER.lean; // +x: nose down (forward is +z)
-    const add = (n: TransformNode | undefined, axis: Vector3, angle: number): void => {
-      if (!n) return;
-      const q = n.rotationQuaternion ?? (n.rotationQuaternion = Quaternion.FromEulerVector(n.rotation));
-      q.multiplyInPlace(Quaternion.RotationAxis(axis, angle));
+    // The mesh's own forward/right in the root's frame (the root carries the model's yaw fix).
+    const yawFix = this.bearer.dragoonModelYaw ?? Math.PI / 2;
+    const unyaw = Matrix.RotationY(-yawFix);
+    const fwdL = Vector3.TransformNormal(Vector3.Forward(), unyaw);
+    const rightL = Vector3.TransformNormal(Vector3.Right(), unyaw);
+    h.pose.rotationQuaternion = Quaternion.RotationAxis(rightL, DRAGOON_HOVER.lean); // nose down
+    h.pose.computeWorldMatrix(true);
+    const wm = h.pose.getWorldMatrix();
+    const fwdW = Vector3.TransformNormal(fwdL, wm).normalize();
+    const rightW = Vector3.TransformNormal(rightL, wm).normalize();
+    // Rotate a bone about a WORLD axis (so both legs, mirrored rigs or not, swing the same way),
+    // with P the parent's world rotation.
+    const addWorld = (n: TransformNode | undefined, axis: Vector3, angle: number): void => {
+      if (!n || !(n.parent instanceof TransformNode)) return;
+      n.parent.computeWorldMatrix(true);
+      const P = n.parent.absoluteRotationQuaternion;
+      const L = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
+      // Babylon composes world = P.multiply(L) (quaternion order is the reverse of the matrix
+      // order), so the local that yields world·R is P⁻¹ · R · P · L.
+      n.rotationQuaternion = Quaternion.Inverse(P).multiply(Quaternion.RotationAxis(axis, angle)).multiply(P).multiply(L);
     };
-    add(h.bones.lThigh, Vector3.Right(), DRAGOON_HOVER.thigh);
-    add(h.bones.rThigh, Vector3.Right(), DRAGOON_HOVER.thigh);
-    add(h.bones.lKnee, Vector3.Right(), DRAGOON_HOVER.knee);
-    add(h.bones.rKnee, Vector3.Right(), DRAGOON_HOVER.knee);
-    add(h.bones.lWing, Vector3.Forward(), DRAGOON_HOVER.wing * beat);
-    add(h.bones.rWing, Vector3.Forward(), -DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.lThigh, rightW, DRAGOON_HOVER.thigh);
+    addWorld(h.bones.rThigh, rightW, DRAGOON_HOVER.thigh);
+    addWorld(h.bones.lKnee, rightW, DRAGOON_HOVER.knee);
+    addWorld(h.bones.rKnee, rightW, DRAGOON_HOVER.knee);
+    addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.rWing, fwdW, -DRAGOON_HOVER.wing * beat);
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
