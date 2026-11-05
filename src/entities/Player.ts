@@ -188,7 +188,7 @@ export class Player {
   private weaponSheathed?: boolean;
   /** Live two-handed grip (per-rig hand mount): the fist node whose orientation follows the hands,
    *  and the bones it reads — right/left hand, their middle fingers, the right thumb and pinky. */
-  private grip?: { fist: TransformNode; socket: TransformNode; R: TransformNode; L: TransformNode; RM: TransformNode; LM: TransformNode; RT: TransformNode; RP: TransformNode };
+  private grip?: { fist: TransformNode; socket: TransformNode; R: TransformNode; L: TransformNode; RM: TransformNode; LM: TransformNode; RT: TransformNode; RP: TransformNode; hang?: boolean };
   private weaponTransition?: "draw" | "sheathe";
   /** Pending draw/sheathe reparent timer id, cleared on dispose so it can't fire on dead nodes. */
   private weaponTimer?: number;
@@ -894,7 +894,11 @@ export class Player {
     L.addInPlace(y.scale(0.07));
     L.subtractToRef(R, y);
     if (y.length() < 0.36) y.normalize(); // both hands on it: length axis through the fists
-    else {
+    else if (g.hang) {
+      // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs on from the
+      // fingers, tip to the ground, instead of lying across the palm.
+      y.copyFrom(f).scaleInPlace(-1);
+    } else {
       // One-handed: the thumb-side axis across the palm (pommel on the pinky side).
       at(g.RP, t);
       at(g.RT, y).subtractInPlace(t);
@@ -1128,7 +1132,7 @@ export class Player {
       socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
       const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, this.bearer.weaponGrip ?? WEAPON_GRIP_Y);
       this.dragoonWeaponMount = built.mount;
-      this.dragoonGrip = built.grip;
+      this.dragoonGrip = built.grip ? { ...built.grip, hang: true } : undefined;
     }
     this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
     dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
