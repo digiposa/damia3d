@@ -22,7 +22,6 @@ import { flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import { instantiateModel } from "../core/AssetService";
 import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
-import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 
 const WALK_SPEED = 3.2; // world units per second (gentle joystick / combat pace)
@@ -43,18 +42,11 @@ const DRAGOON_HOVER = {
   kneeR: 0.42, // …the right knee folded a little more (PS1)
   footYawL: 0.84, // turn of each foot about the vertical, toward parallel (tuned by measurement)
   footYawR: -1.25,
-  // Where each wing points (dedicated wing joints), in the figure's frame: out to the side, up, back.
-  wingSide: 0.8,
-  wingUp: 0.55,
-  wingBack: 0.35,
-  // Fallback for a Dragoon rig whose wings share the shoulder (clavicle) bones: a turn per side.
-  wingLift: -0.6, // the left…
+  wingLift: 0.35, // the left wing raised from the T-pose bind…
   wingLiftR: -0.35, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
   wingBackL: 0, // sweep back about the vertical, per side
   wingBackR: -0.3,
   wing: 0.1, // …beating about that
-  elbow: 0.25, // forearms straightened (the idle's hands sit in front of the belly; a normal hang)
-  armOut: -0.12, // upper arms eased away from the torso
 };
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
@@ -165,7 +157,7 @@ export class Player {
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
   private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup } = {};
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "rArm" | "lFore" | "rFore", TransformNode | undefined>; wingDirs?: { l?: Vector3; r?: Vector3 }; meshes: AbstractMesh[]; skeleton?: Skeleton; obs: Observer<Scene>; t: number };
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "rArm", TransformNode | undefined>; obs: Observer<Scene>; t: number };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -1038,55 +1030,18 @@ export class Player {
     const upW = Vector3.TransformNormal(Vector3.Up(), wm).normalize();
     addWorld(h.bones.lFoot, upW, DRAGOON_HOVER.footYawL);
     addWorld(h.bones.rFoot, upW, DRAGOON_HOVER.footYawR);
-    // The wings have their own joints (children of the shoulders, see the asset pipeline's
-    // wingbone step). Without them they fall back to the shoulder (clavicle) bones, whose children
-    // are the arms: each turn of a wing is then undone on the arm below it, so the arm keeps the
-    // pose the clip gave it (the shoulder pads still tilt in that case).
-    const ownWings = !!h.skeleton && !!h.bones.lWing && h.bones.lWing !== h.bones.lArm?.parent;
-    if (ownWings && !h.wingDirs) {
-      // Dedicated wing joints (the asset pipeline's wingbone step), first frame: each wing's own
-      // direction in its joint's frame, from the skinned mesh as it stands (the joints still at
-      // their bind pose), so the hover can point the wings where it wants.
-      h.wingDirs = { l: wingDirection(h.meshes, h.skeleton!, "mixamorig:LeftWing"), r: wingDirection(h.meshes, h.skeleton!, "mixamorig:RightWing") };
-    }
-    if (h.wingDirs) {
-      // Point each wing at the set direction (side, up, back in the figure's frame) with the one
-      // turn that takes its bind direction there — the same on both sides by construction,
-      // mirrored bone chain or not. The beat rocks the lift. No clip animates these joints, so
-      // each starts from its bind pose (identity) every frame.
-      const up = DRAGOON_HOVER.wingUp + DRAGOON_HOVER.wing * beat;
-      const aim = (w: TransformNode | undefined, dir: Vector3 | undefined, side: number): void => {
-        if (!w || !dir) return;
-        w.rotationQuaternion = Quaternion.Identity();
-        w.computeWorldMatrix(true);
-        const d0 = Vector3.TransformNormal(dir, w.getWorldMatrix()).normalize();
-        const t = rightW.scale(side * DRAGOON_HOVER.wingSide).addInPlace(upW.scale(up)).subtractInPlace(fwdW.scale(DRAGOON_HOVER.wingBack)).normalize();
-        const axis = Vector3.Cross(d0, t);
-        const len = axis.length();
-        if (len < 1e-4) return;
-        addWorld(w, axis.scaleInPlace(1 / len), Math.atan2(len, Vector3.Dot(d0, t)));
-      };
-      aim(h.bones.lWing, h.wingDirs.l, -1);
-      aim(h.bones.rWing, h.wingDirs.r, 1);
-    } else {
-      const lLift = DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat;
-      const rLift = -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat);
-      addWorld(h.bones.lWing, fwdW, lLift);
-      addWorld(h.bones.rWing, fwdW, rLift);
-      addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
-      addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
-      // The wings share the shoulder (clavicle) bones, whose children are the arms: each turn of a
-      // wing is undone on the arm below it, so the arm keeps the pose the clip gave it.
-      addWorld(h.bones.lArm, upW, -DRAGOON_HOVER.wingBackL);
-      addWorld(h.bones.rArm, upW, DRAGOON_HOVER.wingBackR);
-      addWorld(h.bones.lArm, fwdW, -lLift);
-      addWorld(h.bones.rArm, fwdW, -rLift);
-    }
-    // A relaxed hang: upper arms a touch out from the body, elbows nearly straight.
-    addWorld(h.bones.lArm, fwdW, DRAGOON_HOVER.armOut);
-    addWorld(h.bones.rArm, fwdW, -DRAGOON_HOVER.armOut);
-    addWorld(h.bones.lFore, rightW, DRAGOON_HOVER.elbow);
-    addWorld(h.bones.rFore, rightW, DRAGOON_HOVER.elbow);
+    // The wings are bound to the shoulder (clavicle) bones, whose children are the arms: each turn
+    // of a wing is undone on the arm below it, so the arm keeps the pose the clip gave it.
+    const lLift = DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat;
+    const rLift = -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.lWing, fwdW, lLift);
+    addWorld(h.bones.rWing, fwdW, rLift);
+    addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
+    addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
+    addWorld(h.bones.lArm, upW, -DRAGOON_HOVER.wingBackL);
+    addWorld(h.bones.rArm, upW, DRAGOON_HOVER.wingBackR);
+    addWorld(h.bones.lArm, fwdW, -lLift);
+    addWorld(h.bones.rArm, fwdW, -rLift);
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
@@ -1207,9 +1162,9 @@ export class Player {
     // after the animations have written the bones (so the pose adds to the clip, not under it).
     const sk = res.skeletons[0];
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
-    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftWing") ?? bone("LeftShoulder"), rWing: bone("RightWing") ?? bone("RightShoulder"), lArm: bone("LeftArm"), rArm: bone("RightArm"), lFore: bone("LeftForeArm"), rFore: bone("RightForeArm") };
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder"), lArm: bone("LeftArm"), rArm: bone("RightArm") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
-    this.dragoonHover = { pose, bones, meshes: res.meshes, skeleton: sk, obs, t: 0 };
+    this.dragoonHover = { pose, bones, obs, t: 0 };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
     const hand = bone("RightHand");
     if (hand && this.bearer.weaponModel && this.bearer.weaponHandRotation) {
@@ -1528,38 +1483,4 @@ export class Player {
   recordAddition(def: AdditionDef): void {
     this.additionPerf.set(def.name, (this.additionPerf.get(def.name) ?? 0) + 1);
   }
-}
-
-/**
- * A dedicated wing joint's wing direction in its own frame: the centroid of the vertices the joint
- * drives, skinned as the mesh stands now (the joint at its bind pose), taken back into the joint's
- * frame. Read once; the hover then aims the wing with it.
- */
-function wingDirection(meshes: AbstractMesh[], skeleton: Skeleton, boneName: string): Vector3 | undefined {
-  const bone = skeleton.bones.find((b) => b.name === boneName);
-  const node = bone?.getTransformNode();
-  if (!bone || !node) return undefined;
-  const joint = bone.getIndex();
-  const sum = Vector3.Zero();
-  let n = 0;
-  for (const m of meshes) {
-    if (m.skeleton !== skeleton) continue;
-    const ji = m.getVerticesData(VertexBuffer.MatricesIndicesKind);
-    const jw = m.getVerticesData(VertexBuffer.MatricesWeightsKind);
-    const pos = m.getPositionData(true, true);
-    if (!pos || !ji || !jw) continue;
-    m.computeWorldMatrix(true);
-    const wm = m.getWorldMatrix();
-    for (let i = 0; i < ji.length / 4; i++) {
-      let k = 0;
-      for (let q = 1; q < 4; q++) if (jw[i * 4 + q] > jw[i * 4 + k]) k = q;
-      if (ji[i * 4 + k] !== joint) continue;
-      sum.addInPlace(Vector3.TransformCoordinates(new Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]), wm));
-      n++;
-    }
-  }
-  if (!n) return undefined;
-  node.computeWorldMatrix(true);
-  const d = sum.scaleInPlace(1 / n).subtractInPlace(node.getAbsolutePosition());
-  return Vector3.TransformNormal(d, node.getWorldMatrix().clone().invert()).normalize();
 }
