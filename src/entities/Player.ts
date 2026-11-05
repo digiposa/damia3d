@@ -37,12 +37,13 @@ const DRAGOON_HOVER = {
   bob: 0.03,
   beatHz: 0.55,
   lean: 0.1, // a slight forward lean, not a dive
-  thigh: -0.12, // legs hanging, drawn back a touch…
-  kneeL: -0.06,
-  kneeR: -0.42, // …the right knee folded a little more (PS1)
-  footOut: 0.15, // toes a touch outward (radians), both feet near parallel
+  thigh: 0.12, // legs hanging, drawn back a touch…
+  kneeL: 0.06,
+  kneeR: 0.42, // …the right knee folded a little more (PS1)
+  footYawL: 0.84, // turn of each foot about the vertical, toward parallel (tuned by measurement)
+  footYawR: -1.25,
   wingLift: 0.35, // the left wing raised from the T-pose bind…
-  wingLiftR: 0.65, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
+  wingLiftR: -0.35, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
   wingBackL: 0, // sweep back about the vertical, per side
   wingBackR: -0.3,
   wing: 0.1, // …beating about that
@@ -152,7 +153,7 @@ export class Player {
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
   private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number; footFix: { L: number; R: number } };
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -900,7 +901,7 @@ export class Player {
       // brought into the socket's.
       this.root.computeWorldMatrix(true);
       const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
-      const tipW = fwdW.scale(0.45).subtractInPlace(Vector3.Up().scale(0.9)).normalize();
+      const tipW = fwdW.scale(0.7).subtractInPlace(Vector3.Up().scale(0.72)).normalize(); // ~45° down, ahead of him
       Vector3.TransformNormalToRef(tipW, m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
     } else {
@@ -965,39 +966,32 @@ export class Player {
     const wm = h.pose.getWorldMatrix();
     const fwdW = Vector3.TransformNormal(fwdL, wm).normalize();
     const rightW = Vector3.TransformNormal(rightL, wm).normalize();
-    // Rotate a bone about a WORLD axis (so both legs, mirrored rigs or not, swing the same way),
-    // with P the parent's world rotation.
+    // Rotate a bone about a WORLD axis through its own origin (so both legs, mirrored rigs or not,
+    // swing the same way). Done with matrices, not quaternions: the Tripo rigs carry mirrored scale
+    // down one side's bone chain, which a quaternion of the parent's rotation cannot express —
+    // world' = world · R, so local' = local · P · R · P⁻¹ (row-major, child = local · parent).
     const addWorld = (n: TransformNode | undefined, axis: Vector3, angle: number): void => {
-      if (!n || !(n.parent instanceof TransformNode)) return;
+      if (!n || !(n.parent instanceof TransformNode) || !angle) return;
       n.parent.computeWorldMatrix(true);
-      const P = n.parent.absoluteRotationQuaternion;
-      const L = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
-      // Babylon composes world = P.multiply(L) (quaternion order is the reverse of the matrix
-      // order), so the local that yields world·R is P⁻¹ · R · P · L.
-      n.rotationQuaternion = Quaternion.Inverse(P).multiply(Quaternion.RotationAxis(axis, angle)).multiply(P).multiply(L);
+      n.computeWorldMatrix(true);
+      const W = n.getWorldMatrix();
+      const o = W.getTranslation();
+      const R = Matrix.Translation(-o.x, -o.y, -o.z).multiply(Matrix.RotationAxis(axis, angle)).multiply(Matrix.Translation(o.x, o.y, o.z));
+      const L = W.multiply(R).multiply(n.parent.getWorldMatrix().clone().invert());
+      const q = new Quaternion();
+      L.decompose(undefined, q, undefined);
+      n.rotationQuaternion = q;
     };
     addWorld(h.bones.lThigh, rightW, DRAGOON_HOVER.thigh);
     addWorld(h.bones.rThigh, rightW, DRAGOON_HOVER.thigh);
     addWorld(h.bones.lKnee, rightW, DRAGOON_HOVER.kneeL);
     addWorld(h.bones.rKnee, rightW, DRAGOON_HOVER.kneeR);
-    // Feet near parallel (the rig's rest pose splays them): turn each about the vertical until the
-    // toes point a set angle off the forward direction. The turn is settled over a few frames by
-    // feedback (the bone chain carries mirrored scale, so an angle doesn't map 1:1 onto the heading).
+    // Feet near parallel (the rig's rest pose splays them): a set turn of each foot about the
+    // vertical, tuned per side (the right leg's bone chain is mirrored, so the same angle doesn't
+    // give the same heading; a feedback loop on the toes' heading shivered on that side).
     const upW = Vector3.TransformNormal(Vector3.Up(), wm).normalize();
-    const heading = (foot: TransformNode, toe: TransformNode): number => {
-      foot.computeWorldMatrix(true);
-      toe.computeWorldMatrix(true);
-      const d = toe.getAbsolutePosition().subtract(foot.getAbsolutePosition());
-      return Math.atan2(Vector3.Dot(d, rightW), Vector3.Dot(d, fwdW)); // +: toes to the right
-    };
-    const level = (foot: TransformNode | undefined, toe: TransformNode | undefined, side: "L" | "R", target: number): void => {
-      if (!foot || !toe) return;
-      addWorld(foot, upW, h.footFix[side]);
-      const err = target - heading(foot, toe);
-      h.footFix[side] = Math.max(-1.6, Math.min(1.6, h.footFix[side] + 0.35 * err));
-    };
-    level(h.bones.lFoot, h.bones.lToe, "L", -DRAGOON_HOVER.footOut);
-    level(h.bones.rFoot, h.bones.rToe, "R", DRAGOON_HOVER.footOut);
+    addWorld(h.bones.lFoot, upW, DRAGOON_HOVER.footYawL);
+    addWorld(h.bones.rFoot, upW, DRAGOON_HOVER.footYawR);
     addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
     addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
     addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
@@ -1131,7 +1125,7 @@ export class Player {
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
     const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
-    this.dragoonHover = { pose, bones, obs, t: 0, footFix: { L: 0, R: 0 } };
+    this.dragoonHover = { pose, bones, obs, t: 0 };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
     const hand = bone("RightHand");
     if (hand && this.bearer.weaponModel && this.bearer.weaponHandRotation) {
@@ -1141,7 +1135,8 @@ export class Player {
       const socket = new TransformNode(`dragoonWeaponSocket:${this.bearer.id}`, scene);
       socket.parent = hand;
       socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
-      const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, this.bearer.weaponGrip ?? WEAPON_GRIP_Y);
+      // Held in one hand, the fist sits on the handle itself (nearer the pommel than the two-handed grip).
+      const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, Math.min(0.95, (this.bearer.weaponGrip ?? WEAPON_GRIP_Y) + 0.07));
       this.dragoonWeaponMount = built.mount;
       this.dragoonGrip = built.grip ? { ...built.grip, hang: true } : undefined;
     }
