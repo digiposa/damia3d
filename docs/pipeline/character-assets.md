@@ -234,14 +234,6 @@ GLBs are binary and inflate the git repo + the Pages download. Keep meshes **low
 the WebP + meshopt optimization, and if the roster grows large, switch to lazy-loading / Git LFS so
 mobile page-load stays fast.
 
-## Dragoon clips — adding one to an existing GLB
-
-`graftadd.mjs base.glb out.glb clip.glb:name` keeps the base's clips and textures (no
-re-compression), unlike `graftonly.mjs`. Dart's Dragoon carries `idle`, `attack`, `cast` (Flame
-Shot: the hand thrusts out at 1.45 s) and `cast2` (Explosion: the ground slam lands at 1.74 s).
-The wings are bound to the shoulder (clavicle) bones; `Player.hoverDragoon` turns those a set
-amount per side and undoes the turn on the arms below them.
-
 ## Non-humanoid enemies (quadrupeds, winged creatures) — procedural stop-gap ⚠️ DEBT
 
 Mixamo can only auto-rig humanoids, so non-humanoid mobs (the Forest's Berserk Mouse — a winged

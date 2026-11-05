@@ -37,13 +37,12 @@ const DRAGOON_HOVER = {
   bob: 0.03,
   beatHz: 0.55,
   lean: 0.1, // a slight forward lean, not a dive
-  thigh: 0.12, // legs hanging, drawn back a touch…
-  kneeL: 0.06,
-  kneeR: 0.42, // …the right knee folded a little more (PS1)
-  footYawL: 0.84, // turn of each foot about the vertical, toward parallel (tuned by measurement)
-  footYawR: -1.25,
+  thigh: -0.12, // legs hanging, drawn back a touch…
+  kneeL: -0.06,
+  kneeR: -0.42, // …the right knee folded a little more (PS1)
+  footOut: 0.15, // toes a touch outward (radians), both feet near parallel
   wingLift: 0.35, // the left wing raised from the T-pose bind…
-  wingLiftR: -0.35, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
+  wingLiftR: 0.65, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
   wingBackL: 0, // sweep back about the vertical, per side
   wingBackR: -0.3,
   wing: 0.1, // …beating about that
@@ -66,10 +65,6 @@ const BACK_GRIP = 0.5;
 const WEAPON_SCALE = 0.9;
 /** Where in the throw clip the item leaves the hand (arm at the top of its arc). */
 const THROW_RELEASE = 0.58;
-/** Second the Dragoon's cast gesture lets the spell go (the hand thrust out, see the cast clip). */
-const DRAGOON_CAST_RELEASE = 1.45;
-/** Second the Dragoon's ground-slam cast hits the ground (see the cast2 clip). */
-const DRAGOON_CAST_GROUND_RELEASE = 1.74;
 /** Where in the helpful-item clip the item is tossed up (hand at the top of its arc). */
 const THROW_HEAL_RELEASE = 0.6;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
@@ -155,9 +150,9 @@ export class Player {
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
-  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup } = {};
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "rArm", TransformNode | undefined>; obs: Observer<Scene>; t: number };
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number; footFix: { L: number; R: number } };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -905,10 +900,9 @@ export class Player {
       // brought into the socket's.
       this.root.computeWorldMatrix(true);
       const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
-      const tipW = fwdW.scale(0.7).subtractInPlace(Vector3.Up().scale(0.72)).normalize(); // ~45° down, ahead of him
+      const tipW = fwdW.scale(0.45).subtractInPlace(Vector3.Up().scale(0.9)).normalize();
       Vector3.TransformNormalToRef(tipW, m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
-      g.fist.position.copyFrom(R); // and the handle sits in the fist itself (its centre, as measured)
     } else {
       // One-handed: the thumb-side axis across the palm (pommel on the pinky side).
       at(g.RP, t);
@@ -929,39 +923,6 @@ export class Player {
     Quaternion.FromRotationMatrixToRef(m, q);
     const rq = g.fist.rotationQuaternion!;
     Quaternion.SlerpToRef(rq, q, 0.5, rq);
-  }
-
-  /** One of the Dragoon GLB's one-shot clips (attack, cast): plays it over the hover and flags the
-   *  figure busy until it ends. */
-  private playDragoonOneShot(a: AnimationGroup | undefined, speed = 1): void {
-    if (!a || (this.modelAttacking && this.modelCurrent === a)) return;
-    const prev = this.modelCurrent;
-    this.modelCurrent = a;
-    this.modelAttacking = true;
-    prev?.stop();
-    a.start(false, speed, a.from, a.to);
-    a.onAnimationGroupEndObservable.addOnce(() => {
-      if (this.modelCurrent === a) this.modelAttacking = false;
-    });
-  }
-
-  /** The Dragoon's spell-casting gesture, when its model has one: `shot` thrusts a hand out (a
-   *  bolt leaves it), `ground` slams the ground. Returns the second the spell goes off inside that
-   *  motion (0 = no gesture: the spell resolves at once). */
-  castGesture(form: "shot" | "ground" = "shot"): number {
-    const a = this.dragoonActive && this.dragoonModelRoot ? (form === "ground" ? this.dragoonAnims.cast2 : this.dragoonAnims.cast) : undefined;
-    if (!a) {
-      this.strike();
-      return 0;
-    }
-    this.playDragoonOneShot(a);
-    return form === "ground" ? DRAGOON_CAST_GROUND_RELEASE : DRAGOON_CAST_RELEASE;
-  }
-
-  /** How long the cast gesture lasts in all (seconds), 0 without one. */
-  castGestureLength(form: "shot" | "ground" = "shot"): number {
-    const a = form === "ground" ? this.dragoonAnims.cast2 : this.dragoonAnims.cast;
-    return a ? (a.to - a.from) / 60 : 0;
   }
 
   /** Throw an item: the throw clip when the model has one (the generic strike otherwise). Returns
@@ -1004,44 +965,43 @@ export class Player {
     const wm = h.pose.getWorldMatrix();
     const fwdW = Vector3.TransformNormal(fwdL, wm).normalize();
     const rightW = Vector3.TransformNormal(rightL, wm).normalize();
-    // Rotate a bone about a WORLD axis through its own origin (so both legs, mirrored rigs or not,
-    // swing the same way). Done with matrices, not quaternions: the Tripo rigs carry mirrored scale
-    // down one side's bone chain, which a quaternion of the parent's rotation cannot express —
-    // world' = world · R, so local' = local · P · R · P⁻¹ (row-major, child = local · parent).
+    // Rotate a bone about a WORLD axis (so both legs, mirrored rigs or not, swing the same way),
+    // with P the parent's world rotation.
     const addWorld = (n: TransformNode | undefined, axis: Vector3, angle: number): void => {
-      if (!n || !(n.parent instanceof TransformNode) || !angle) return;
+      if (!n || !(n.parent instanceof TransformNode)) return;
       n.parent.computeWorldMatrix(true);
-      n.computeWorldMatrix(true);
-      const W = n.getWorldMatrix();
-      const o = W.getTranslation();
-      const R = Matrix.Translation(-o.x, -o.y, -o.z).multiply(Matrix.RotationAxis(axis, angle)).multiply(Matrix.Translation(o.x, o.y, o.z));
-      const L = W.multiply(R).multiply(n.parent.getWorldMatrix().clone().invert());
-      const q = new Quaternion();
-      L.decompose(undefined, q, undefined);
-      n.rotationQuaternion = q;
+      const P = n.parent.absoluteRotationQuaternion;
+      const L = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
+      // Babylon composes world = P.multiply(L) (quaternion order is the reverse of the matrix
+      // order), so the local that yields world·R is P⁻¹ · R · P · L.
+      n.rotationQuaternion = Quaternion.Inverse(P).multiply(Quaternion.RotationAxis(axis, angle)).multiply(P).multiply(L);
     };
     addWorld(h.bones.lThigh, rightW, DRAGOON_HOVER.thigh);
     addWorld(h.bones.rThigh, rightW, DRAGOON_HOVER.thigh);
     addWorld(h.bones.lKnee, rightW, DRAGOON_HOVER.kneeL);
     addWorld(h.bones.rKnee, rightW, DRAGOON_HOVER.kneeR);
-    // Feet near parallel (the rig's rest pose splays them): a set turn of each foot about the
-    // vertical, tuned per side (the right leg's bone chain is mirrored, so the same angle doesn't
-    // give the same heading; a feedback loop on the toes' heading shivered on that side).
+    // Feet near parallel (the rig's rest pose splays them): turn each about the vertical until the
+    // toes point a set angle off the forward direction. The turn is settled over a few frames by
+    // feedback (the bone chain carries mirrored scale, so an angle doesn't map 1:1 onto the heading).
     const upW = Vector3.TransformNormal(Vector3.Up(), wm).normalize();
-    addWorld(h.bones.lFoot, upW, DRAGOON_HOVER.footYawL);
-    addWorld(h.bones.rFoot, upW, DRAGOON_HOVER.footYawR);
-    // The wings are bound to the shoulder (clavicle) bones, whose children are the arms: each turn
-    // of a wing is undone on the arm below it, so the arm keeps the pose the clip gave it.
-    const lLift = DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat;
-    const rLift = -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat);
-    addWorld(h.bones.lWing, fwdW, lLift);
-    addWorld(h.bones.rWing, fwdW, rLift);
+    const heading = (foot: TransformNode, toe: TransformNode): number => {
+      foot.computeWorldMatrix(true);
+      toe.computeWorldMatrix(true);
+      const d = toe.getAbsolutePosition().subtract(foot.getAbsolutePosition());
+      return Math.atan2(Vector3.Dot(d, rightW), Vector3.Dot(d, fwdW)); // +: toes to the right
+    };
+    const level = (foot: TransformNode | undefined, toe: TransformNode | undefined, side: "L" | "R", target: number): void => {
+      if (!foot || !toe) return;
+      addWorld(foot, upW, h.footFix[side]);
+      const err = target - heading(foot, toe);
+      h.footFix[side] = Math.max(-1.6, Math.min(1.6, h.footFix[side] + 0.35 * err));
+    };
+    level(h.bones.lFoot, h.bones.lToe, "L", -DRAGOON_HOVER.footOut);
+    level(h.bones.rFoot, h.bones.rToe, "R", DRAGOON_HOVER.footOut);
+    addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
     addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
     addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
-    addWorld(h.bones.lArm, upW, -DRAGOON_HOVER.wingBackL);
-    addWorld(h.bones.rArm, upW, DRAGOON_HOVER.wingBackR);
-    addWorld(h.bones.lArm, fwdW, -lLift);
-    addWorld(h.bones.rArm, fwdW, -rLift);
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
@@ -1072,7 +1032,16 @@ export class Player {
       return;
     }
     if (this.dragoonActive && this.dragoonModelRoot) {
-      this.playDragoonOneShot(this.dragoonAnims.attack, speed);
+      const a = this.dragoonAnims.attack;
+      if (!a || (this.modelAttacking && this.modelCurrent === a)) return;
+      const prev = this.modelCurrent;
+      this.modelCurrent = a;
+      this.modelAttacking = true;
+      prev?.stop();
+      a.start(false, speed, a.from, a.to);
+      a.onAnimationGroupEndObservable.addOnce(() => {
+        if (this.modelCurrent === a) this.modelAttacking = false;
+      });
       return;
     }
     if (this.modelRoot) {
@@ -1155,16 +1124,14 @@ export class Player {
     }
     const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
     this.dragoonAnims.attack = res.animationGroups.find((a) => has(a, "attack", "slash"));
-    this.dragoonAnims.cast = res.animationGroups.find((a) => a.name.toLowerCase() === "cast" || has(a, "spell1", "cast1"));
-    this.dragoonAnims.cast2 = res.animationGroups.find((a) => has(a, "cast2", "spell2", "slam"));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
     // PS1 hover: leaning forward, legs trailing back, wings beating — laid over whatever clip plays,
     // after the animations have written the bones (so the pose adds to the clip, not under it).
     const sk = res.skeletons[0];
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
-    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder"), lArm: bone("LeftArm"), rArm: bone("RightArm") };
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
-    this.dragoonHover = { pose, bones, obs, t: 0 };
+    this.dragoonHover = { pose, bones, obs, t: 0, footFix: { L: 0, R: 0 } };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
     const hand = bone("RightHand");
     if (hand && this.bearer.weaponModel && this.bearer.weaponHandRotation) {
@@ -1174,8 +1141,7 @@ export class Player {
       const socket = new TransformNode(`dragoonWeaponSocket:${this.bearer.id}`, scene);
       socket.parent = hand;
       socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
-      // Held in one hand, the fist sits on the handle itself (nearer the pommel than the two-handed grip).
-      const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, Math.min(0.95, (this.bearer.weaponGrip ?? WEAPON_GRIP_Y) + 0.07));
+      const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, this.bearer.weaponGrip ?? WEAPON_GRIP_Y);
       this.dragoonWeaponMount = built.mount;
       this.dragoonGrip = built.grip ? { ...built.grip, hang: true } : undefined;
     }

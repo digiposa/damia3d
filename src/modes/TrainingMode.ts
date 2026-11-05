@@ -135,11 +135,6 @@ const ACQUIRE_RANGE = 20;
 
 /** Arrow flight speed (world units / second). */
 const ARROW_SPEED = 26;
-/** A Dragoon's Flame Shot crosses the arena in well under a second. */
-const FIREBALL_SPEED = 14;
-/** Explosion: how fast the fire line races along the ground, and how wide the blast lands. */
-const FIRE_TRAIL_SPEED = 9;
-const EXPLOSION_RADIUS = 3.5;
 /** VFX power of an attack item at the BOTTOM of its mash range (one QTE step). The player's Burn Out
  *  scales from here up to ~1.9 on a perfect mash; an enemy's cast has no QTE, so it lands at this
  *  floor — same spell, same flame column, just the un-mashed version. */
@@ -1491,81 +1486,9 @@ export abstract class ArenaCombatMode extends GameMode {
     const primary =
       this.aimedEnemy();
     if (primary) this.player.face(primary.position.subtract(this.player.position));
+    this.castSpell(p, spell, primary, this.party.map((m) => m.avatar));
     this.runner.gauge.spend(); // a cast costs the ATB action…
     p.tickDragoon(); // …and one Dragoon turn
-    const allies = (): Player[] => this.party.map((m) => m.avatar);
-    if (spell.target === "allEnemies" && primary) {
-      const release = p.castGesture("ground");
-      if (release > 0) {
-        // The Dragoon slams the ground (rooted through it): a line of fire races to the aimed foe
-        // and goes off there, catching every enemy within the blast.
-        p.mp = Math.max(0, p.mp - spell.mp);
-        this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("ground"));
-        this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
-        const target = primary;
-        this.comboTimers.push({
-          t: release,
-          fn: () => {
-            const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
-            const start = p.position.add(fwd.scale(0.7));
-            this.spellFx?.burst(spell.element, start, 0.7); // the slam splits the ground
-            this.camera.shake(0.12, 0.25);
-            const at = target.position.clone();
-            this.spellFx?.fireTrail(start, at, Vector3.Distance(start, at) / FIRE_TRAIL_SPEED, () => {
-              this.spellFx?.burst(spell.element, at, 2.2);
-              this.camera.shake(0.3, 0.4);
-              const caught = this.enemies.filter((e) => e.alive && Vector3.Distance(e.position, at) <= EXPLOSION_RADIUS);
-              this.castSpell(p, spell, target, allies(), false, caught);
-              this.finishAction();
-              this.refreshHud();
-            });
-          },
-        });
-        this.refreshHud();
-        return;
-      }
-      this.castSpell(p, spell, primary, allies());
-      this.finishAction();
-      this.refreshHud();
-      return;
-    }
-    const release = p.castGesture();
-    if (release > 0 && spell.target === "enemy" && primary) {
-      // The Dragoon casts in a gesture (rooted through it): the spell flies as a ball of its
-      // element from the hand once the arm thrusts out, and lands when it reaches the foe.
-      p.mp = Math.max(0, p.mp - spell.mp);
-      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength());
-      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
-      const target = primary;
-      const torso = (): Vector3 => target.position.add(new Vector3(0, 1.2, 0));
-      this.comboTimers.push({
-        t: release,
-        fn: () => {
-          const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
-          const from = p.position.add(fwd.scale(0.6)).add(new Vector3(0, 1.35, 0));
-          this.spellFx?.powerUp(p.position, 0.5, new Color3(1, 0.5, 0.15));
-          this.arrows.push(
-            new Arrow(this.scene, {
-              from,
-              to: torso(),
-              speed: FIREBALL_SPEED,
-              follow: torso,
-              kind: "fireball",
-              color: Color3.FromHexString(ELEMENT_COLOR[spell.element] ?? "#ff6b4a"),
-              onHit: () => {
-                this.spellFx?.burst(spell.element, target.position, 1.6);
-                this.castSpell(p, spell, target, this.party.map((m) => m.avatar), false);
-                this.finishAction(); // the cast resolved → breather + revert if it was the last turn
-                this.refreshHud();
-              },
-            }),
-          );
-        },
-      });
-      this.refreshHud();
-      return;
-    }
-    this.castSpell(p, spell, primary, this.party.map((m) => m.avatar));
     this.finishAction(); // cast resolves at once → breather + revert if it was the last turn
     this.refreshHud();
   }
@@ -1574,22 +1497,19 @@ export abstract class ArenaCombatMode extends GameMode {
    * Resolve a Dragoon spell: magic damage to enemy target(s), status ailments, recovery /
    * buffs to ally target(s). Shared by the player and AI casts.
    */
-  private castSpell(caster: Player, spell: DragoonSpell, primaryEnemy: Enemy | undefined, allies: Player[], announce = true, foesOverride?: Enemy[]): void {
-    if (announce) {
-      caster.mp = Math.max(0, caster.mp - spell.mp);
-      caster.strike();
-      this.announceSkill(
-        () => caster.position.add(new Vector3(0, 2.6, 0)),
-        caster.bearer.name,
-        spell.name,
-        ELEMENT_COLOR[spell.element] ?? "#c8a6ff",
-      );
-    }
+  private castSpell(caster: Player, spell: DragoonSpell, primaryEnemy: Enemy | undefined, allies: Player[]): void {
+    caster.mp = Math.max(0, caster.mp - spell.mp);
+    caster.strike();
+    this.announceSkill(
+      () => caster.position.add(new Vector3(0, 2.6, 0)),
+      caster.bearer.name,
+      spell.name,
+      ELEMENT_COLOR[spell.element] ?? "#c8a6ff",
+    );
 
     // Foe target set (used for damage, status and instant-death alike).
-    const foes = foesOverride
-      ? foesOverride.filter((e) => e.alive)
-      : spell.target === "allEnemies"
+    const foes =
+      spell.target === "allEnemies"
         ? this.enemies.filter((e) => e.alive)
         : spell.target === "enemy" && primaryEnemy && primaryEnemy.alive
           ? [primaryEnemy]
