@@ -46,6 +46,8 @@ const BACK_POS = new Vector3(0.05, 0.6, -0.14); // centred on the spine, dropped
 const BACK_GRIP = 0.5;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
+/** Where in the throw clip the item leaves the hand (arm at the top of its arc). */
+const THROW_RELEASE = 0.58;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
 const WEAPON_GRIP_Y = 0.6;
 /** Uniform world scale of a back-strapped item (Shana's quiver) when the bearer gives no override. */
@@ -54,6 +56,7 @@ const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
 const GUARD_DURATION = 2; // seconds the stance lasts
+const GUARD_HIT_SECONDS = 0.6; // the jolt of a blow taken on the guard (then the stance resumes); no replay sooner
 const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activation)
 const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
 
@@ -119,7 +122,6 @@ export class Player {
   /** Charm Potion in battle: seconds left of dodging every enemy attack. */
   evadeT = 0;
   private guardCdTimer = 0;
-  private guardShield!: Mesh;
   /** Remaining actions of the active Dragoon transformation (0 = human form). */
   private dragoonTurns = 0;
   private dragoonAura!: Mesh;
@@ -141,6 +143,11 @@ export class Player {
     draw?: AnimationGroup;
     sheathe?: AnimationGroup;
     death?: AnimationGroup;
+    /** Throwing an item (attack items, and healing ones until they get their own). */
+    throw?: AnimationGroup;
+    /** The braced guard stance (looped while guarding), and the jolt of a blow taken on it. */
+    guard?: AnimationGroup;
+    guardHit?: AnimationGroup;
     /** Every clip by (lower-case) name: the Additions' per-hit swings live here. */
     byName: Map<string, AnimationGroup>;
   } = { byName: new Map() };
@@ -217,19 +224,6 @@ export class Player {
       this.dragoonForm.rig.parent = this.root;
       this.dragoonForm.setEnabled(false);
     }
-
-    // Translucent barrier shown while guarding.
-    this.guardShield = MeshBuilder.CreateSphere("guardShield", { diameter: 2.3, segments: 12 }, scene);
-    this.guardShield.position.y = 0.9;
-    const shieldMat = new StandardMaterial("guardShieldMat", scene);
-    shieldMat.diffuseColor = new Color3(0.4, 0.7, 1);
-    shieldMat.emissiveColor = new Color3(0.2, 0.5, 0.9);
-    shieldMat.alpha = 0.22;
-    shieldMat.backFaceCulling = false;
-    this.guardShield.material = shieldMat;
-    this.guardShield.isVisible = false;
-    this.guardShield.isPickable = false;
-    this.guardShield.parent = this.root;
 
     // Golden aura shown while transformed into Dragoon form.
     this.dragoonAura = MeshBuilder.CreateSphere("dragoonAura", { diameter: 2.6, segments: 12 }, scene);
@@ -412,11 +406,24 @@ export class Player {
     return GUARD_COOLDOWN > 0 ? Math.max(0, this.guardCdTimer / GUARD_COOLDOWN) : 0;
   }
 
+  /** Seconds the guard-impact jolt still owns the body (0 = none); also its replay cooldown. */
+  private guardHitT = 0;
+
+  /** A blow taken on the guard: the jolt, unless one is already playing (several enemies striking
+   *  at once don't restart it over and over). */
+  guardImpact(): void {
+    const a = this.modelAnims.guardHit;
+    if (!a || !this.guardActive || this.guardHitT > 0) return;
+    this.guardHitT = GUARD_HIT_SECONDS;
+    this.modelCurrent?.stop();
+    this.modelCurrent = a;
+    a.start(false, 1, a.from, a.to);
+  }
+
   /** Begin guarding: heal 10% max HP and halve incoming damage for the duration. Returns HP healed. */
   startGuard(): number {
     this.guardTimer = GUARD_DURATION;
     this.guardCdTimer = GUARD_COOLDOWN;
-    this.guardShield.isVisible = true;
     const heal = Math.floor(this.maxHp * GUARD_HEAL_FRACTION);
     this.hp = Math.min(this.maxHp, this.hp + heal);
     return heal;
@@ -435,8 +442,8 @@ export class Player {
   tickGuard(dt: number): void {
     if (this.guardTimer > 0) {
       this.guardTimer = Math.max(0, this.guardTimer - dt);
-      if (this.guardTimer === 0) this.guardShield.isVisible = false;
     }
+    if (this.guardHitT > 0) this.guardHitT = Math.max(0, this.guardHitT - dt);
     if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
     if (this.damageHalveTimer > 0) this.damageHalveTimer = Math.max(0, this.damageHalveTimer - dt);
   }
@@ -716,6 +723,13 @@ export class Player {
           if (this.modelAnims.idleCombat) this.playModel(this.modelAnims.idleCombat, true);
           return; // else: hold the current (post-strike) pose — don't override to idle
         }
+        // Guarding: braced, rooted, the stance looped for the whole guard (a blow taken on it
+        // plays its jolt, then the stance resumes).
+        if (this.guardActive && this.modelAnims.guard) {
+          if (this.guardHitT > 0) return; // the jolt owns the body
+          this.playModel(this.modelAnims.guard, true);
+          return;
+        }
         const idle = (this.combat && this.modelAnims.idleCombat) || this.modelAnims.idle;
         const walk = (this.combat && this.modelAnims.walkCombat) || this.modelAnims.walk;
         const run = (this.combat && this.modelAnims.runCombat) || this.modelAnims.run;
@@ -826,6 +840,18 @@ export class Player {
     Quaternion.FromRotationMatrixToRef(m, q);
     const rq = g.fist.rotationQuaternion!;
     Quaternion.SlerpToRef(rq, q, 0.5, rq);
+  }
+
+  /** Throw an item: the throw clip when the model has one (the generic strike otherwise). Returns
+   *  the second the item leaves the hand inside that motion (0 = at once), so the caller can time
+   *  the item's effect to the release. */
+  throwItem(): number {
+    if (this.modelRoot && this.modelAnims.throw) {
+      this.strike("throw");
+      return THROW_RELEASE;
+    }
+    this.strike();
+    return 0;
   }
 
   /** Addition blows waiting their turn: each starts the frame the previous one ends. */
@@ -1002,6 +1028,9 @@ export class Player {
     this.modelAnims.draw = g.find((a) => has(a, "draw", "unsheath"));
     this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
     this.modelAnims.death = g.find((a) => has(a, "death", "dying")); // a separate deathAnim GLB overrides it
+    this.modelAnims.throw = g.find((a) => has(a, "throw", "cast"));
+    this.modelAnims.guardHit = g.find((a) => has(a, "guardhit", "guard_impact", "guardimpact"));
+    this.modelAnims.guard = g.find((a) => has(a, "guard", "block") && a !== this.modelAnims.guardHit);
     this.modelAnims.byName = new Map(g.map((a) => [a.name.toLowerCase(), a]));
     // Every clip blends in from the pose it finds (a few frames): a chain of Addition blows reads
     // as one movement, and the return to idle after the last doesn't pop.

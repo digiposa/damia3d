@@ -1248,7 +1248,7 @@ export abstract class ArenaCombatMode extends GameMode {
             this.aimedEnemy(),
           ].filter((e): e is Enemy => !!e);
     if (targets.length === 0) return false;
-    m.avatar.strike(); // throw motion
+    const release = m.avatar.throwItem(); // the throw motion; the item leaves the hand `release` s in
     this.announceSkill(
       () => m.position.add(new Vector3(0, 2.6, 0)),
       m.avatar.bearer.name,
@@ -1260,18 +1260,25 @@ export abstract class ArenaCombatMode extends GameMode {
     const mat = m.avatar.baseMat;
     const lv = m.avatar.level;
     stock.count -= 1; // committed once thrown
-    if (atk.multi) {
-      // "Multi" items carry the mashing QTE — start it; damage resolves in resolveMash().
-      this.startMash(m, targets, atk.element, atk.bid, mat, lv, field, t(stock.def.nameKey));
-    } else {
-      // "Powerful" / Detonate Rock: no QTE, resolve immediately (with a strong burst on each target).
-      for (const foe of targets) {
-        this.spellFx?.burst(atk.element, foe.position, 1.5);
-        const element = elementMultiplier(atk.element, foe.def.element);
-        const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
-        this.landDamage(foe, Math.max(1, dmg), m === this.controlled);
+    const effect = (): void => {
+      if (atk.multi) {
+        // "Multi" items carry the mashing QTE — start it; damage resolves in resolveMash().
+        this.startMash(m, targets, atk.element, atk.bid, mat, lv, field, t(stock.def.nameKey));
+      } else {
+        // "Powerful" / Detonate Rock: no QTE, resolve immediately (with a strong burst on each target).
+        for (const foe of targets) {
+          if (!foe.alive) continue;
+          this.spellFx?.burst(atk.element, foe.position, 1.5);
+          const element = elementMultiplier(atk.element, foe.def.element);
+          const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
+          this.landDamage(foe, Math.max(1, dmg), m === this.controlled);
+        }
       }
-    }
+    };
+    if (release > 0) {
+      this.attackAnimT = Math.max(this.attackAnimT, release + 0.3); // rooted through the throw
+      this.comboTimers.push({ t: release, fn: effect });
+    } else effect();
     return true;
   }
 
@@ -2120,6 +2127,12 @@ export abstract class ArenaCombatMode extends GameMode {
       // Aimed at the enemy's HEAD, not its feet: from a head-height anchor, feet project almost
       // straight down, which would make the lean vertical — and vertical tells you nothing.
       this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `${amount}`, TEXT.damage, false, enemy.bodyPosition);
+      // Blocked (guarding, damage halved): a spark off the guard, and the word.
+      if (guard < 1) {
+        this.player.guardImpact();
+        this.atmosphere?.spark(this.player.position.add(new Vector3(0, 1.2, 0)));
+        this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y + 0.7, 0)), t("combat.guard"), TEXT.hp);
+      }
       if (this.player.hp === 0) {
         const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)
