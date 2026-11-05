@@ -41,7 +41,10 @@ const DRAGOON_HOVER = {
   kneeL: -0.06,
   kneeR: -0.42, // …the right knee folded a little more (PS1)
   footOut: 0.15, // toes a touch outward (radians), both feet near parallel
-  wingLift: 0.35, // wings raised from the T-pose bind…
+  wingLift: 0.35, // the left wing raised from the T-pose bind…
+  wingLiftR: 0.65, // …and the right (its own value: the mirrored bone chain doesn't map 1:1)
+  wingBackL: 0, // sweep back about the vertical, per side
+  wingBackR: -0.3,
   wing: 0.1, // …beating about that
 };
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
@@ -981,7 +984,9 @@ export class Player {
     level(h.bones.lFoot, h.bones.lToe, "L", -DRAGOON_HOVER.footOut);
     level(h.bones.rFoot, h.bones.rToe, "R", DRAGOON_HOVER.footOut);
     addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
-    addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat));
+    addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
+    addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
+    addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
