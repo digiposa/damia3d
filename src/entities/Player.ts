@@ -22,6 +22,7 @@ import { flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
 import { instantiateModel } from "../core/AssetService";
 import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
+import type { Observer } from "@babylonjs/core/Misc/observable";
 
 const WALK_SPEED = 3.2; // world units per second (gentle joystick / combat pace)
 const RUN_SPEED = 6.5; // world units per second (full joystick / desktop click-to-move)
@@ -30,6 +31,8 @@ const RUN_SPEED = 6.5; // world units per second (full joystick / desktop click-
 const MODEL_YAW = 0;
 /** Target on-screen height (world units) any imported bearer model is auto-fit to. */
 const MODEL_TARGET_H = 1.8;
+/** The Dragoon's hover pose (radians / world units): see {@link Player.hoverDragoon}. */
+const DRAGOON_HOVER = { height: 0.7, bob: 0.06, beatHz: 0.55, lean: 0.3, thigh: 0.55, knee: 0.9, wing: 0.12 };
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
 const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
@@ -134,6 +137,8 @@ export class Player {
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
   private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
+  /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -868,6 +873,32 @@ export class Player {
   /** Addition blows waiting their turn: each starts the frame the previous one ends. */
   private blowQueue: { clip: string; speed: number }[] = [];
 
+  /**
+   * The Dragoon's hover (PS1): the whole figure floats a little above the ground and bobs, leaning
+   * forward; the thighs swing back and the knees fold so the legs trail; the wings (bound to the
+   * shoulder bones) beat slowly. Added on top of the playing clip each frame.
+   */
+  private hoverDragoon(dt: number): void {
+    const h = this.dragoonHover;
+    if (!h || !this.dragoonActive || !this.modelCurrent?.isPlaying) return;
+    h.t += dt;
+    const beat = Math.sin(h.t * DRAGOON_HOVER.beatHz * Math.PI * 2);
+    const k = 1 / Math.max(1e-3, h.pose.parent instanceof TransformNode ? h.pose.parent.scaling.y : 1); // the root is scaled to fit
+    h.pose.position.y = (DRAGOON_HOVER.height + DRAGOON_HOVER.bob * beat) * k;
+    h.pose.rotation.x = DRAGOON_HOVER.lean; // +x: nose down (forward is +z)
+    const add = (n: TransformNode | undefined, axis: Vector3, angle: number): void => {
+      if (!n) return;
+      const q = n.rotationQuaternion ?? (n.rotationQuaternion = Quaternion.FromEulerVector(n.rotation));
+      q.multiplyInPlace(Quaternion.RotationAxis(axis, angle));
+    };
+    add(h.bones.lThigh, Vector3.Right(), DRAGOON_HOVER.thigh);
+    add(h.bones.rThigh, Vector3.Right(), DRAGOON_HOVER.thigh);
+    add(h.bones.lKnee, Vector3.Right(), DRAGOON_HOVER.knee);
+    add(h.bones.rKnee, Vector3.Right(), DRAGOON_HOVER.knee);
+    add(h.bones.lWing, Vector3.Forward(), DRAGOON_HOVER.wing * beat);
+    add(h.bones.rWing, Vector3.Forward(), -DRAGOON_HOVER.wing * beat);
+  }
+
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
    *  blow is playing): the swing starts the frame the previous ends, with no idle in between. */
   queueStrike(clip: string, speed = 1): void {
@@ -968,8 +999,11 @@ export class Player {
     }
     this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
     const dragoonRoot = new TransformNode(`dragoonModel:${this.bearer.id}`, scene);
+    // Between the yawed root and the meshes: the hover pose (lean + height), driven per frame.
+    const pose = new TransformNode(`dragoonPose:${this.bearer.id}`, scene);
+    pose.parent = dragoonRoot;
     for (const mesh of res.meshes) {
-      if (!mesh.parent) mesh.parent = dragoonRoot;
+      if (!mesh.parent) mesh.parent = pose;
       mesh.isPickable = false;
     }
     flattenCellShaded(res.meshes);
@@ -986,6 +1020,14 @@ export class Player {
     const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
     this.dragoonAnims.attack = res.animationGroups.find((a) => has(a, "attack", "slash"));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
+    // PS1 hover: leaning forward, legs trailing back, wings beating — laid over whatever clip plays,
+    // after the animations have written the bones (so the pose adds to the clip, not under it).
+    const sk = res.skeletons[0];
+    const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
+    const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
+    this.dragoonHover = { pose, bones, obs, t: 0 };
+    this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
     dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
     this.dragoonModelRoot = dragoonRoot;
   }
