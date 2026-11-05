@@ -88,7 +88,8 @@ export const DART_ADDITIONS = {
     multiplier: [100, 100, 100, 100, 100],
     spMax: 102,
     acquireLevel: 8,
-    choreo: [DART_CUT, { clip: "burningRush2" }, { clip: "burningRush3" }],
+    // PS1: the cut, a kick (its impact measured on the kicking foot), then an upward cut.
+    choreo: [DART_CUT, { clip: "burningRush2", impact: 0.47, length: 0.8 }, { clip: "burningRush3", impact: 0.57, length: 1.0 }],
   },
   crushDance: {
     name: "Crush Dance",
