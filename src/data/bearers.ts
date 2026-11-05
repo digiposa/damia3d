@@ -119,6 +119,9 @@ export interface Bearer {
    *  slung-on-the-back pose while still drawing to the hand in combat. */
   weaponBackRotation?: [number, number, number];
   weaponBackOffset?: [number, number, number];
+  /** Where the sheathed weapon sits along its length on the default back seat (mesh units, like
+   *  the grip): shifts it up or down the back. Default tuned for the hammers. */
+  weaponBackGrip?: number;
   /** Uniform world scale of the sheathed weapon. Default: the hand-held {@link weaponScale}. */
   weaponBackScale?: number;
   /** Optional GLB permanently strapped to the model's spine bone (e.g. Shana's quiver). Unlike
@@ -174,7 +177,7 @@ const C_EARTH: [number, number, number] = [0.78, 0.6, 0.26];
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
   { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "mane", outfit: "fullplate", color: C_FIRE, storyPlayable: false },
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", weaponModel: "dart_sword", weaponGrip: 0.88, weaponScale: 1.0, weaponBackGrip: 0.15, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, model: "rose", modelYaw: -Math.PI / 2, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
   // Jade (Wind) — spears

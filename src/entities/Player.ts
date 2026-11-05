@@ -1089,7 +1089,7 @@ export class Player {
         const backMount = new TransformNode(`weaponBackAlign:${this.bearer.id}`, scene);
         backMount.parent = backWeapon;
         backMount.rotation.x = 0; // no flip → head/mass hangs DOWN, handle up (unlike the hand's PI)
-        backMount.position.y = BACK_GRIP; // back seat is independent of the hand grip
+        backMount.position.y = this.bearer.weaponBackGrip ?? BACK_GRIP; // back seat is independent of the hand grip
         this.weaponBackMount = backMount;
       }
     }
