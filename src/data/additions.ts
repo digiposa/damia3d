@@ -16,6 +16,8 @@
  */
 export interface AdditionHitChoreo {
   clip?: string;
+  /** Playback speed of the clip (1 = as authored); `impact` is in played seconds. */
+  speed?: number;
   impact?: number;
   window?: number;
 }
@@ -59,7 +61,9 @@ export const DART_ADDITIONS = {
     multiplier: [100, 105, 110, 120, 135],
     spMax: 35,
     acquireLevel: 1,
-    choreo: [{ clip: "doubleSlash1" }, { clip: "doubleSlash2" }], // a downward cut (the press), then a left-to-right one
+    // A downward cut (the press lands on it), then a left-to-right one. Impacts measured on the
+    // clips' right-hand path (speed peak / lowest point); the first clip is slow as authored.
+    choreo: [{ clip: "doubleSlash1", speed: 1.6, impact: 0.73 }, { clip: "doubleSlash2", speed: 1.0, impact: 0.44 }],
   },
   volcano: {
     name: "Volcano",

@@ -1867,7 +1867,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // The hit's own swing (its Addition's choreography), else the generic strike.
     const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
     const step = def.choreo?.[k - 1];
-    this.player.strike(step?.clip);
+    this.player.strike(step?.clip, step?.speed);
     const df = target.def.stats.df;
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
     const element = elementMultiplier(this.player.attackElement, target.def.element);

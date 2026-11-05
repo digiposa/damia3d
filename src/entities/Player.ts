@@ -785,7 +785,7 @@ export class Player {
   /** Play a one-shot strike animation (call when a blow lands). `clip` names an Addition hit's own
    *  swing (restarted from its first frame even mid-swing: each hit is its own move); without one,
    *  or if the model lacks it, the generic attack swing plays. */
-  strike(clip?: string): void {
+  strike(clip?: string, speed = 1): void {
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.strike();
       return;
@@ -796,7 +796,7 @@ export class Player {
         this.modelAttacking = true;
         this.modelCurrent?.stop();
         this.modelCurrent = own;
-        own.start(false, 1, own.from, own.to);
+        own.start(false, speed, own.from, own.to);
         own.onAnimationGroupEndObservable.addOnce(() => {
           if (this.modelCurrent === own) this.modelAttacking = false;
         });
@@ -927,6 +927,10 @@ export class Player {
     this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
     this.modelAnims.death = g.find((a) => has(a, "death", "dying")); // a separate deathAnim GLB overrides it
     this.modelAnims.byName = new Map(g.map((a) => [a.name.toLowerCase(), a]));
+    // The Additions' per-hit swings cut from one to the next mid-motion: blend each in from the
+    // pose it finds (a few frames), so a chain reads as one movement.
+    const roles = new Set(Object.values(this.modelAnims).filter((v): v is AnimationGroup => v instanceof AnimationGroup));
+    for (const a of g) if (!roles.has(a)) { a.enableBlending = true; a.blendingSpeed = 0.25; }
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 
