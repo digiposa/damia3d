@@ -71,3 +71,31 @@ describe("AdditionRunner (timing sight)", () => {
     expect(r.press(ds)).toEqual({ kind: "none" });
   });
 });
+
+describe("AdditionRunner (choreographed windows)", () => {
+  const choreo = {
+    ...volcano,
+    choreo: [{ clip: "a" }, { clip: "b", window: 0.4 }, { clip: "c", window: 1.2 }, { clip: "d" }],
+  };
+
+  it("collapses each sight over its hit's own window, the default where none is given", () => {
+    const r = new AdditionRunner(0.7);
+    r.press(choreo); // hit 1 free → the sight for hit 2 is armed
+    expect(r.windowSeconds).toBe(0.4);
+    tickToProgress(r, 0.95);
+    expect(r.press(choreo)).toMatchObject({ kind: "hit", hits: 2 });
+    expect(r.windowSeconds).toBe(1.2); // hit 3's window
+    r.tick(0.6); // 0.5 of 1.2: not yet in the window (would be past it at the default 0.7)
+    expect(r.inWindow).toBe(false);
+    r.tick(0.55);
+    expect(r.inWindow).toBe(true);
+    expect(r.press(choreo)).toMatchObject({ kind: "hit", hits: 3 });
+    expect(r.windowSeconds).toBe(0.7); // hit 4: no window given → default
+  });
+
+  it("keeps the default window for Additions without a choreography", () => {
+    const r = new AdditionRunner(0.7);
+    r.press({ ...volcano, choreo: undefined });
+    expect(r.windowSeconds).toBe(0.7);
+  });
+});

@@ -141,7 +141,9 @@ export class Player {
     draw?: AnimationGroup;
     sheathe?: AnimationGroup;
     death?: AnimationGroup;
-  } = {};
+    /** Every clip by (lower-case) name: the Additions' per-hit swings live here. */
+    byName: Map<string, AnimationGroup>;
+  } = { byName: new Map() };
   private modelCurrent?: AnimationGroup;
   private modelAttacking = false;
   /** True once the death collapse has been triggered (KO); cleared by {@link animate} on revive. */
@@ -780,13 +782,26 @@ export class Player {
     this.weaponSheathed = sheathed;
   }
 
-  /** Play a one-shot strike animation (call when a blow lands). */
-  strike(): void {
+  /** Play a one-shot strike animation (call when a blow lands). `clip` names an Addition hit's own
+   *  swing (restarted from its first frame even mid-swing: each hit is its own move); without one,
+   *  or if the model lacks it, the generic attack swing plays. */
+  strike(clip?: string): void {
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.strike();
       return;
     }
     if (this.modelRoot) {
+      const own = clip ? this.modelAnims.byName.get(clip.toLowerCase()) : undefined;
+      if (own) {
+        this.modelAttacking = true;
+        this.modelCurrent?.stop();
+        this.modelCurrent = own;
+        own.start(false, 1, own.from, own.to);
+        own.onAnimationGroupEndObservable.addOnce(() => {
+          if (this.modelCurrent === own) this.modelAttacking = false;
+        });
+        return;
+      }
       const a = this.modelAnims.attack;
       if (!a) return; // no attack clip yet — stay in the current loop
       // These strike clips are a full 1–2s swing (neutral → hit → neutral). An Addition calls
@@ -911,6 +926,7 @@ export class Player {
     this.modelAnims.draw = g.find((a) => has(a, "draw", "unsheath"));
     this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
     this.modelAnims.death = g.find((a) => has(a, "death", "dying")); // a separate deathAnim GLB overrides it
+    this.modelAnims.byName = new Map(g.map((a) => [a.name.toLowerCase(), a]));
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 

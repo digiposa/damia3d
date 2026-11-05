@@ -118,6 +118,18 @@ Meru vs ~0 % for Miranda) predicts how much of this you'll see. Always render id
 `pose.html` before committing, and keep the original model as a backup so a bad transfer is a one-file
 rollback.
 
+## Addition choreography — one clip per hit
+
+An Addition can carry a `choreo` (`src/data/additions.ts`): per hit, the clip to play, the second
+at which the blade connects (`impact`, the spark waits for it) and how long the timing sight takes
+to collapse before that hit (`window`, seconds from the previous press). The runner arms each
+sight with its hit's window; `Player.strike(clip)` restarts that hit's own swing. Clips are grafted
+onto the character's GLB like any other and looked up by name: upload names
+`Char__<Addition>_<hit>.fbx` (e.g. `Dart__DoubleSlash_1.fbx`, `Dart__Volcano_3.fbx`) become clips
+`doubleSlash1`, `volcano3`. Every hit should be an "In Place" Mixamo export; Claude measures the
+impact frames and sets the windows once the clips are in. Dart (Double Slash, Volcano, Burning
+Rush) is the pilot.
+
 ## Polygon budget — ~20 k triangles per character
 
 Characters ship at **~20–22 k triangles** (the detail is in the painted texture, not the mesh; the

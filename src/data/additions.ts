@@ -5,6 +5,19 @@
  *
  * Currently Dart's set; other party members can be added with the same shape.
  */
+/**
+ * How one hit of an Addition looks: the clip the character plays when the hit lands, when the
+ * blade actually connects inside it (seconds — the impact spark waits for it), and how long the
+ * timing sight takes to collapse before this hit (seconds from the previous hit's press; hit 1
+ * is free so its `window` is unused). A missing clip falls back to the character's generic
+ * attack swing; a missing window to the runner's default.
+ */
+export interface AdditionHitChoreo {
+  clip?: string;
+  impact?: number;
+  window?: number;
+}
+
 export interface AdditionDef {
   name: string;
   /** Per-hit percentages; summing all of them equals the "Perfect" column. */
@@ -17,6 +30,8 @@ export interface AdditionDef {
    *  character instead requires performing all prior ones 80 times; we gate it
    *  high (99) until that progression rule is implemented. */
   acquireLevel: number;
+  /** Per-hit choreography (index = hit − 1); absent = the generic swing on every hit. */
+  choreo?: AdditionHitChoreo[];
 }
 
 /**
@@ -34,12 +49,15 @@ export const BASIC_ATTACK: AdditionDef = {
 };
 
 export const DART_ADDITIONS = {
+  // Choreographies: one Mixamo clip per hit, grafted onto dart.glb under these names (see
+  // docs/pipeline/character-assets.md). Impacts / windows are measured on the clips once in.
   doubleSlash: {
     name: "Double Slash",
     hits: [100, 50],
     multiplier: [100, 105, 110, 120, 135],
     spMax: 35,
     acquireLevel: 1,
+    choreo: [{ clip: "doubleSlash1" }, { clip: "doubleSlash2" }],
   },
   volcano: {
     name: "Volcano",
@@ -47,6 +65,7 @@ export const DART_ADDITIONS = {
     multiplier: [100, 105, 110, 115, 125],
     spMax: 36,
     acquireLevel: 2,
+    choreo: [{ clip: "volcano1" }, { clip: "volcano2" }, { clip: "volcano3" }, { clip: "volcano4" }],
   },
   burningRush: {
     name: "Burning Rush",
@@ -54,6 +73,7 @@ export const DART_ADDITIONS = {
     multiplier: [100, 100, 100, 100, 100],
     spMax: 102,
     acquireLevel: 8,
+    choreo: [{ clip: "burningRush1" }, { clip: "burningRush2" }, { clip: "burningRush3" }],
   },
   crushDance: {
     name: "Crush Dance",

@@ -64,8 +64,12 @@ export class AdditionRunner {
   /** Timed presses landed so far (hit 1 is free, so presses = hits - 1). */
   private presses = 0;
   private sightTimer = 0;
+  /** Collapse time of the current sight: the next hit's own window (choreography) or the default. */
+  private curWindow: number;
 
-  constructor(private sightDuration = SIGHT_DURATION) {}
+  constructor(private sightDuration = SIGHT_DURATION) {
+    this.curWindow = sightDuration;
+  }
 
   get current(): AdditionDef | undefined {
     return this.def;
@@ -98,12 +102,17 @@ export class AdditionRunner {
 
   /** Seconds for the active window to collapse to alignment. */
   get windowSeconds(): number {
-    return this.sightDuration;
+    return this.curWindow;
   }
 
   /** Collapse progress of the current sight (0 = wide, 1 = aligned, can exceed). */
   get sightProgress(): number {
-    return this.active ? this.sightTimer / this.sightDuration : 0;
+    return this.active ? this.sightTimer / this.curWindow : 0;
+  }
+
+  /** Arm the sight for the next hit (1-based `next`): its choreographed window, or the default. */
+  private armWindow(next: number): void {
+    this.curWindow = this.def?.choreo?.[next - 1]?.window ?? this.sightDuration;
   }
 
   /** True while a press would land the current hit. */
@@ -127,6 +136,7 @@ export class AdditionRunner {
       this.hits = 1;
       this.presses = 0;
       this.sightTimer = 0;
+      this.armWindow(2);
       if (multiHit) {
         this.gauge.spend(); // start refilling from empty — this attack's cadence
       } else {
@@ -146,6 +156,7 @@ export class AdditionRunner {
     this.hits += 1;
     this.presses += 1;
     this.sightTimer = 0;
+    this.armWindow(this.hits + 1);
     const perfect = p >= PERFECT_LO && p <= PERFECT_HI;
     const completed = this.presses >= additionPresses(this.def!);
     const hits = this.hits; // capture before endCombo resets state

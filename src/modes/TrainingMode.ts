@@ -1041,6 +1041,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.actionRecoveryT > 0) this.actionRecoveryT = Math.max(0, this.actionRecoveryT - cdt);
     // Keep the ATB gauge's fill time in sync with the bearer's Speed (gear can change it).
     this.runner.setFillTime(this.player.atbFillTime);
+    this.tickComboTimers(cdt);
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
@@ -1855,7 +1856,10 @@ export abstract class ArenaCombatMode extends GameMode {
    * perfect Addition. Handles the target dying.
    */
   private applyHit(target: Enemy, k: number): void {
-    this.player.strike(); // play the weapon's strike/draw animation on every blow
+    // The hit's own swing (its Addition's choreography), else the generic strike.
+    const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
+    const step = def.choreo?.[k - 1];
+    this.player.strike(step?.clip);
     const df = target.def.stats.df;
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
     const element = elementMultiplier(this.player.attackElement, target.def.element);
@@ -1893,7 +1897,20 @@ export abstract class ArenaCombatMode extends GameMode {
     // the combo ends (see finishAction/landComboDamage) — canon PS1, and it keeps the enemy alive
     // through the QTE so the Addition always completes. A spark still fires per swing for feedback.
     this.comboDamage += dmg;
-    this.atmosphere?.spark(target.headPosition);
+    // The spark when the blade actually connects (the clip's impact), else at once.
+    if (step?.impact) this.comboTimers.push({ t: step.impact, fn: () => this.atmosphere?.spark(target.headPosition) });
+    else this.atmosphere?.spark(target.headPosition);
+  }
+
+  /** Little things timed inside a combo (an impact spark on the blade's frame), in combo time. */
+  private comboTimers: { t: number; fn: () => void }[] = [];
+  private tickComboTimers(dt: number): void {
+    if (!this.comboTimers.length) return;
+    const due = this.comboTimers.filter((x) => (x.t -= dt) <= 0);
+    if (due.length) {
+      this.comboTimers = this.comboTimers.filter((x) => x.t > 0);
+      for (const x of due) x.fn();
+    }
   }
 
   /** Incremental damage of Addition hit `k`: running total minus the previous hits' total,
