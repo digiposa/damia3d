@@ -358,7 +358,7 @@ export abstract class ArenaCombatMode extends GameMode {
   /** The slot the Character menu is currently editing. */
   private activeSlot = 0;
   /** Shared training level applied to the whole party. */
-  protected partyLevel = 1;
+  protected partyLevel = 2; // map-building days: level 2 so Dart has Volcano to test
   /** Gambit rule ids per slot (3 rule slots each) — the AI rule lists the menu edits. */
   protected gambitIds: string[][] = [];
   /** Per-character gear/Addition config for the whole roster (persists across rebuilds). */

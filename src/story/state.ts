@@ -21,7 +21,7 @@ const KEY = "damia3d.story.v1";
 
 /** Where a new game starts (the intro comes later: Seles for now). */
 export function newStory(): StoryState {
-  return { map: "seles", entry: "start", flags: [], gold: 0, items: [{ id: "healingPotion", count: 3 }], party: ["dart"], level: 1 };
+  return { map: "seles", entry: "start", flags: [], gold: 0, items: [{ id: "healingPotion", count: 3 }], party: ["dart"], level: 2 }; // level 2 while the maps are built (Volcano to test)
 }
 
 let current: StoryState | null = null;
