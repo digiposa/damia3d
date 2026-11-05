@@ -2,7 +2,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
@@ -155,6 +155,9 @@ export class Player {
   private weaponBackMount?: TransformNode;
   /** Current mount state (true = on back) and the in-progress draw/sheathe transition, if any. */
   private weaponSheathed?: boolean;
+  /** Live two-handed grip (per-rig hand mount): the fist node whose orientation follows the hands,
+   *  and the bones it reads — right/left hand, their middle fingers, the right thumb and pinky. */
+  private grip?: { fist: TransformNode; socket: TransformNode; R: TransformNode; L: TransformNode; RM: TransformNode; LM: TransformNode; RT: TransformNode; RP: TransformNode };
   private weaponTransition?: "draw" | "sheathe";
   /** Pending draw/sheathe reparent timer id, cleared on dispose so it can't fire on dead nodes. */
   private weaponTimer?: number;
@@ -701,6 +704,7 @@ export class Player {
     }
     if (this.modelRoot) {
       this.updateWeaponHolster(); // draw / sheathe on a combat-stance change
+      this.updateGrip();
       // The draw/sheathe clip (like the attack) owns the body until it ends — don't override it.
       if (!this.modelAttacking && !this.weaponTransition) {
         // Mid-Addition, between the swings of a combo: hold a fighting posture instead of relaxing
@@ -780,6 +784,48 @@ export class Player {
     if (!mount || !this.weaponMeshes.length) return;
     for (const m of this.weaponMeshes) m.parent = mount;
     this.weaponSheathed = sheathed;
+  }
+
+  // Scratch for updateGrip (no per-frame allocation).
+  private static readonly gripTmp = { m: new Matrix(), q: new Quaternion(), v: [0, 1, 2, 3, 4, 5, 6].map(() => new Vector3()) };
+
+  /**
+   * Point the weapon along the hands, every frame (per-rig grip only): its length axis runs from
+   * the right fist to the left one when the two hold it together (the combat idle, the Additions'
+   * two-handed cuts — Mixamo animates both hands around an imaginary weapon, so this is what makes
+   * the blade go where the arms go), or along the right fist's thumb-side axis when the hands are
+   * apart (a run); the guard lies along the knuckles. Eased a little so the two cases don't pop.
+   */
+  private updateGrip(): void {
+    const g = this.grip;
+    if (!g || this.weaponSheathed !== false) return;
+    const { m, q, v } = Player.gripTmp;
+    const [R, L, f, y, x, z, t] = v;
+    g.socket.computeWorldMatrix(true);
+    g.socket.getWorldMatrix().invertToRef(m);
+    const at = (n: TransformNode, out: Vector3): Vector3 => Vector3.TransformCoordinatesToRef(n.getAbsolutePosition(), m, out);
+    at(g.R, R);
+    at(g.RM, f).subtractInPlace(R).normalize(); // along the fingers
+    R.addInPlace(f.scale(0.07)); // the fist's centre
+    at(g.L, L);
+    at(g.LM, y).subtractInPlace(L).normalize();
+    L.addInPlace(y.scale(0.07));
+    L.subtractToRef(R, y);
+    if (y.length() < 0.36) y.normalize(); // both hands on it: length axis through the fists
+    else {
+      // One-handed: the thumb-side axis across the palm (pommel on the pinky side).
+      at(g.RP, t);
+      at(g.RT, y).subtractInPlace(t);
+      y.subtractInPlace(f.scale(Vector3.Dot(y, f))).normalize().scaleInPlace(-1);
+    }
+    f.subtractToRef(y.scale(Vector3.Dot(f, y)), x);
+    x.normalize();
+    Vector3.CrossToRef(x, y, z);
+    z.normalize();
+    Matrix.FromXYZAxesToRef(x, y, z, m);
+    Quaternion.FromRotationMatrixToRef(m, q);
+    const rq = g.fist.rotationQuaternion!;
+    Quaternion.SlerpToRef(rq, q, 0.5, rq);
   }
 
   /** Chain an Addition blow right at the end of the one now playing (or at once if none is):
@@ -1085,6 +1131,14 @@ export class Player {
       handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
       handMount.parent = fist;
       handMount.position.y = -grip;
+      // The orientation then follows the hands every frame (see updateGrip): through both fists
+      // when they hold the weapon together, along the right fist's own grip axis otherwise.
+      const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === n)?.getTransformNode() ?? undefined;
+      const [R, L, RM, LM, RT, RP] = ["RightHand", "LeftHand", "RightHandMiddle1", "LeftHandMiddle1", "RightHandThumb1", "RightHandPinky1"].map((n) => bone(`mixamorig:${n}`));
+      if (R && L && RM && LM && RT && RP) {
+        fist.rotationQuaternion = Quaternion.FromEulerVector(fist.rotation);
+        this.grip = { fist, socket, R, L, RM, LM, RT, RP };
+      }
     } else {
       const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
       weapon.parent = socket;
