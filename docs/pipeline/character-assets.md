@@ -118,6 +118,16 @@ Meru vs ~0 % for Miranda) predicts how much of this you'll see. Always render id
 `pose.html` before committing, and keep the original model as a backup so a bad transfer is a one-file
 rollback.
 
+## Polygon budget — ~20 k triangles per character
+
+Characters ship at **~20–22 k triangles** (the detail is in the painted texture, not the mesh; the
+hero is on screen all the time and three bearers share the arena). Generate new characters in Tripo
+directly at **20 000 triangles** (Topology: Triangle; texture 2K, PBR off, Remove Lighting on).
+Older, heavier models were brought down by Claude without touching their rig: `weld` + meshoptimizer
+`simplify` (vertices are only collapsed onto existing ones, so skin weights, joints and every clip
+survive), then meshopt compression — Damia, her Dragoon form, Meru, Haschel, Shana, Miranda, Rose
+and the Commander went from ~120 k (Commander ~90 k) to ~22 k with no visible change at game distance.
+
 ## Standard animation set — the per-character checklist
 
 The engine's `Player` animation slots define what a character can do on screen. **Damia's 9-clip set
