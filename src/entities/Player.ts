@@ -38,8 +38,8 @@ const DRAGOON_HOVER = {
   beatHz: 0.55,
   lean: 0.1, // a slight forward lean, not a dive
   thigh: -0.12, // legs hanging, drawn back a touch…
-  kneeL: -0.15,
-  kneeR: -0.32, // …the right knee folded a little more (PS1)
+  kneeL: -0.06,
+  kneeR: -0.42, // …the right knee folded a little more (PS1)
   footOut: 0.15, // toes a touch outward (radians), both feet near parallel
   wingLift: 0.35, // wings raised from the T-pose bind…
   wing: 0.1, // …beating about that
