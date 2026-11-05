@@ -107,6 +107,7 @@ import { Button } from "../ui/Button";
 import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { PartySelect } from "../ui/PartySelect";
 import { TimingSight } from "../ui/TimingSight";
+import { GuardMarker } from "../ui/GuardMarker";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
 import { floatingText, skillCaptionEl, CAPTION_LIFE, CAPTION_RISE } from "../ui/FloatingText";
 import { CombatLog } from "../ui/CombatLog";
@@ -537,6 +538,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // Tapping a row takes control of that member.
     this.hud = new PartyPanel((i) => this.controlMember(i));
     this.sight = new TimingSight();
+    this.guardMarker = new GuardMarker(this.scene, GUARD_ICON_FRAMES[GUARD_ICON_FRAMES.length - 1]);
 
     // Training debug menu (Training only): set level, spawn enemies, DPS balance.
     // (Party composition + gambits live in the normal System menu.) Opened from a
@@ -1058,6 +1060,7 @@ export abstract class ArenaCombatMode extends GameMode {
       }
     }
     this.updateSight();
+    this.updateGuardMarker();
     this.updateDragoonSpace(); // end the Space once its initiator reverts
     this.grantTurnSp(); // Spirit Ring: +SP at the start of each member's turn
     this.checkPartyWipe(); // mode hook when the whole party is down (Survival: Game Over)
@@ -1583,6 +1586,14 @@ export abstract class ArenaCombatMode extends GameMode {
     return true;
   }
 
+
+  private guardMarker!: GuardMarker;
+
+  /** The guard read-out over whoever in the party is guarding (the controlled one first). */
+  private updateGuardMarker(): void {
+    const m = this.party.find((x) => x.avatar.guardActive);
+    this.guardMarker.update(m ? m.position.add(new Vector3(0, 2.3, 0)) : undefined, m ? m.avatar.guardFraction : 0);
+  }
 
   private updateSight(): void {
     if (this.runner.active && this.comboTarget && !this.runner.sightHeld) {
@@ -2880,6 +2891,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.party = [];
     this.hud.dispose();
     this.sight.dispose();
+    this.guardMarker.dispose();
     this.debugMenu?.dispose();
     this.debugBtn?.dispose();
     this.attackBtn?.dispose();
