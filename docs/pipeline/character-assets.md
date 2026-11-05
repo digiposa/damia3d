@@ -118,6 +118,17 @@ Meru vs ~0 % for Miranda) predicts how much of this you'll see. Always render id
 `pose.html` before committing, and keep the original model as a backup so a bad transfer is a one-file
 rollback.
 
+## Fix-up — knees too far forward (posture straightening)
+
+Some auto-rigs (Mixamo on armoured Tripo meshes: Dart) leave the character standing with knees bent
+forward and hips back. Rather than re-rig, Claude straightens the **clips**: each leg bone's rotation
+is scaled back towards its rest pose (`q' = rest · slerp(identity, rest⁻¹ · q, s)`) — knee, thigh and
+ankle — then the hips' translation is lifted by the amount the lowest foot moved, **measured in the
+engine** (Babylon bone positions over the clip), so the feet stay on the ground. Dart uses a strong
+correction on `idle` (knee 0.35, thigh 0.6, ankle 0.4) and a light one on `walk`/`run` (0.6 / 0.85 /
+0.6) so the stride keeps its swing. Note Mixamo clips write the hips' translation **Y-up**, even on a
+Tripo rig whose rest pose is Z-up.
+
 ## Standard animation set — the per-character checklist
 
 The engine's `Player` animation slots define what a character can do on screen. **Damia's 9-clip set
