@@ -1726,13 +1726,38 @@ export abstract class ArenaCombatMode extends GameMode {
     this.pendingAttack = false;
   }
 
-  /** Intersect the cursor ray with the y=0 ground plane. */
+  /** Intersect the cursor ray with the ground: the y=0 plane, or the map's relief if it has one
+   *  (a slope: marched down the ray from above the highest ground, then refined). */
   private groundPoint(e: PointerEvent): Vector3 | undefined {
     const ray = this.scene.createPickingRay(e.offsetX, e.offsetY, null, this.camera.camera);
-    if (Math.abs(ray.direction.y) < 1e-6) return undefined;
-    const t = -ray.origin.y / ray.direction.y;
+    if (ray.direction.y > -1e-6) return undefined;
+    const at = (t: number): Vector3 => ray.origin.add(ray.direction.scale(t));
+    const height = this.world.heightAt;
+    let t = -ray.origin.y / ray.direction.y; // the y=0 plane
+    if (height) {
+      const TOP = 30; // above any relief
+      let a = Math.max(0, (TOP - ray.origin.y) / ray.direction.y);
+      const step = 0.4 / -ray.direction.y; // 0.4 units of height per step
+      let hit = false;
+      for (let b = a; b <= t + step; b += step) {
+        const q = at(b);
+        if (q.y <= height(q.x, q.z)) {
+          for (let k = 0; k < 12; k++) {
+            const m = (a + b) / 2;
+            const r = at(m);
+            if (r.y <= height(r.x, r.z)) b = m;
+            else a = m;
+          }
+          t = b;
+          hit = true;
+          break;
+        }
+        a = b;
+      }
+      if (!hit) t = -ray.origin.y / ray.direction.y;
+    }
     if (t < 0) return undefined;
-    const p = ray.origin.add(ray.direction.scale(t));
+    const p = at(t);
     p.y = 0;
     this.world.clamp(p); // clicks beyond the wall walk to the arena edge
     return p;
