@@ -50,7 +50,7 @@ export class Game implements GameHost {
     this.modes = new ModeManager(this.engine, this.input, this);
 
     // The build tag lives in the DOM for the page lifetime; no need to retain it.
-    new TechOverlay(__COMMIT__);
+    new TechOverlay(__COMMIT__, this.engine);
     if (hasTouch()) this.joystick = new VirtualJoystick(this.input);
     this.menu = new MainMenu((mode, at) => this.startMode(mode, at));
     this.system = new SystemMenu({
