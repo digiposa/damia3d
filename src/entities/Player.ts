@@ -47,6 +47,10 @@ const DRAGOON_HOVER = {
   wingBackL: 0, // sweep back about the vertical, per side
   wingBackR: -0.3,
   wing: 0.1, // …beating about that
+  // The left arm alone (the raised left wing's shoulder bone drags it into the torso): eased out
+  // from the body about the forward axis, and the elbow straightened about the sideways axis.
+  armOutL: -0.5,
+  elbowL: 0.3,
 };
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
@@ -153,7 +157,7 @@ export class Player {
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
   private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number };
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "lFore", TransformNode | undefined>; obs: Observer<Scene>; t: number };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -996,6 +1000,8 @@ export class Player {
     addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
     addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
     addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
+    addWorld(h.bones.lArm, fwdW, DRAGOON_HOVER.armOutL);
+    addWorld(h.bones.lFore, rightW, DRAGOON_HOVER.elbowL);
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
@@ -1123,7 +1129,7 @@ export class Player {
     // after the animations have written the bones (so the pose adds to the clip, not under it).
     const sk = res.skeletons[0];
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
-    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder"), lArm: bone("LeftArm"), lFore: bone("LeftForeArm") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
     this.dragoonHover = { pose, bones, obs, t: 0 };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
