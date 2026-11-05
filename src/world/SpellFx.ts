@@ -52,6 +52,9 @@ export class SpellFx {
   private auraDur = 1;
   /** Crisp ground rings that expand and fade — the readable "buff" beat under the particles. */
   private readonly auraRings: { mesh: Mesh; mat: StandardMaterial; t: number; delay: number }[] = [];
+  /** A line of fire racing along the ground (Explosion): its flames, and the run in progress. */
+  private readonly trail: ParticleSystem;
+  private trailRun?: { from: Vector3; to: Vector3; t: number; dur: number; onArrive: () => void };
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -77,6 +80,7 @@ export class SpellFx {
     // Buff aura (Power Up): a rising column + swirling motes, emitted continuously for a duration.
     this.auraColumn = this.buildAuraColumn();
     this.auraSparks = this.buildAuraSparks();
+    this.trail = this.buildTrail();
     this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
     this.auraLight.range = 9;
     this.auraLight.intensity = 0;
@@ -109,6 +113,18 @@ export class SpellFx {
           this.auraColumn.emitRate = 0;
           this.auraSparks.emitRate = 0;
           this.auraLight.intensity = 0;
+        }
+      }
+      // The fire line: the flame emitter runs from caster to target, then the line goes off.
+      const run = this.trailRun;
+      if (run) {
+        run.t = Math.min(run.dur, run.t + dt);
+        const k = run.t / run.dur;
+        this.trail.emitter = Vector3.Lerp(run.from, run.to, k).add(new Vector3(0, 0.15, 0));
+        if (run.t >= run.dur) {
+          this.trail.emitRate = 0;
+          this.trailRun = undefined;
+          run.onArrive();
         }
       }
       // Ground rings: each waits out its stagger, then expands outward while fading.
@@ -158,6 +174,17 @@ export class SpellFx {
     });
   }
 
+  /**
+   * A line of fire that races along the ground from `from` to `to` over `seconds` (Dart's
+   * Explosion: the slammed ground splits and the flames run to the foe), then `onArrive` fires —
+   * the caller bursts the explosion and lands the damage.
+   */
+  fireTrail(from: Vector3, to: Vector3, seconds: number, onArrive: () => void): void {
+    this.trailRun = { from: from.clone(), to: to.clone(), t: 0, dur: Math.max(0.05, seconds), onArrive };
+    this.trail.emitter = from.add(new Vector3(0, 0.15, 0));
+    this.trail.emitRate = 420;
+  }
+
   /** Move a playing aura with its caster (called per frame while the buff clip runs). */
   moveAura(position: Vector3): void {
     if (this.auraT <= 0) return;
@@ -202,6 +229,31 @@ export class SpellFx {
     ps.emitRate = 0;
     ps.updateSpeed = 0.02;
     return { ps, yOffset, count };
+  }
+
+  /** Explosion's fire line: dense low flames left along the emitter's run, rising and tapering. */
+  private buildTrail(): ParticleSystem {
+    const ps = new ParticleSystem("fxFireTrail", 700, this.scene);
+    ps.particleTexture = this.dot;
+    ps.createConeEmitter(0.3, Math.PI / 2.6);
+    ps.color1 = new Color4(1.0, 0.88, 0.4, 1);
+    ps.color2 = new Color4(1.0, 0.4, 0.1, 1);
+    ps.colorDead = new Color4(0.45, 0.06, 0.0, 0);
+    ps.minSize = 0.3;
+    ps.maxSize = 0.8;
+    ps.addSizeGradient(0, 1.0);
+    ps.addSizeGradient(1, 0.1);
+    ps.minLifeTime = 0.35;
+    ps.maxLifeTime = 0.7;
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.gravity = new Vector3(0, 4.5, 0);
+    ps.minEmitPower = 1.2;
+    ps.maxEmitPower = 3;
+    ps.emitRate = 0;
+    ps.updateSpeed = 0.02;
+    ps.start();
+    this.disposables.push(ps);
+    return ps;
   }
 
   /** Power Up, part 1: a column of energy streaming UP from the ground around the body. */

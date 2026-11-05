@@ -234,6 +234,27 @@ GLBs are binary and inflate the git repo + the Pages download. Keep meshes **low
 the WebP + meshopt optimization, and if the roster grows large, switch to lazy-loading / Git LFS so
 mobile page-load stays fast.
 
+## Dragoon wings — a joint of their own (`wingbone`)
+
+Tripo rigs skin a Dragoon's wings to the shoulder (clavicle) bones, together with the shoulder
+pads. Turning those bones to spread the wings tilts the pads and drags the arms along. The
+scratch tool `wingbone.mjs` gives each wing its own joint (`mixamorig:LeftWing` /
+`mixamorig:RightWing`, children of the shoulders, identity bind) and moves every vertex that hangs
+off the BACK of the figure (x ≤ −0.2 in the mesh frame, the figure facing +x) onto it, blending
+over the wing root. All of the vertex's weight goes to the wing joint, or the turn is damped by the
+smoothed weights Tripo leaves on neighbouring bones.
+
+At runtime `Player.hoverDragoon` reads each wing's direction once from the skinned mesh (the
+centroid of the joint's vertices) and aims it, every frame, at `DRAGOON_HOVER.wingSide / wingUp /
+wingBack` in the figure's frame — the same on both sides by construction, mirrored bone chain or
+not. A rig without wing joints falls back to turning the shoulder bones (and undoing the turn on
+the arms).
+
+Adding a clip to an existing Dragoon GLB: `graftadd.mjs base.glb out.glb clip.glb:name` keeps the
+base's clips and textures (no re-compression), unlike `graftonly.mjs`. Dart's Dragoon carries
+`idle`, `attack`, `cast` (Flame Shot: the hand thrusts out at 1.45 s) and `cast2` (Explosion: the
+ground slam lands at 1.74 s).
+
 ## Non-humanoid enemies (quadrupeds, winged creatures) — procedural stop-gap ⚠️ DEBT
 
 Mixamo can only auto-rig humanoids, so non-humanoid mobs (the Forest's Berserk Mouse — a winged
