@@ -66,6 +66,9 @@ export class AdditionRunner {
   private sightTimer = 0;
   /** Collapse time of the current sight: the next hit's own window (choreography) or the default. */
   private curWindow: number;
+  /** Seconds the blow just validated still had to play when its press landed: the next blow (and
+   *  its sight) waits that long. Read by the owner right after a "hit" result. */
+  lastHold = 0;
 
   constructor(private sightDuration = SIGHT_DURATION) {
     this.curWindow = sightDuration;
@@ -113,15 +116,22 @@ export class AdditionRunner {
   /** Arm the sight for the press that validates hit `k` (1-based) — the blow now playing: it
    *  collapses over that hit's choreographed window, else the time to its impact, else the default.
    *  (The runner counts the validated hit as `hits` = k + 1: the chain's last blow is free.) */
-  private armWindow(k: number): void {
+  private armWindow(k: number, hold = 0): void {
     const step = this.def?.choreo?.[k - 1];
     this.curWindow = step?.window ?? step?.impact ?? this.sightDuration;
+    this.sightTimer = -hold; // the sight only starts collapsing once the previous blow is over
+    this.lastHold = hold;
   }
 
   /** True while a press would land the current hit. */
   get inWindow(): boolean {
     const p = this.sightProgress;
     return this.active && p >= WINDOW_LO && p <= WINDOW_HI;
+  }
+
+  /** True while the sight waits for the previous blow to finish (nothing to press yet, nothing shown). */
+  get sightHeld(): boolean {
+    return this.active && this.sightTimer < 0;
   }
 
   /**
@@ -138,7 +148,6 @@ export class AdditionRunner {
       this.active = true;
       this.hits = 1;
       this.presses = 0;
-      this.sightTimer = 0;
       this.armWindow(1); // the press on hit 1's blow
       if (multiHit) {
         this.gauge.spend(); // start refilling from empty — this attack's cadence
@@ -156,10 +165,12 @@ export class AdditionRunner {
       return { kind: "miss" };
     }
 
+    // The blow just validated plays out before the next one starts: hold the next sight that long.
+    const blow = this.def!.choreo?.[this.hits - 1];
+    const hold = blow?.length !== undefined ? Math.max(0, blow.length - this.sightTimer) : 0;
     this.hits += 1;
     this.presses += 1;
-    this.sightTimer = 0;
-    this.armWindow(this.hits); // the next press falls on the blow that now starts
+    this.armWindow(this.hits, hold); // the next press falls on the blow that follows
     const perfect = p >= PERFECT_LO && p <= PERFECT_HI;
     const completed = this.presses >= additionPresses(this.def!);
     const hits = this.hits; // capture before endCombo resets state
@@ -201,5 +212,6 @@ export class AdditionRunner {
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
+    this.lastHold = 0;
   }
 }

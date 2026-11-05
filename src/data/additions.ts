@@ -6,19 +6,22 @@
  * Currently Dart's set; other party members can be added with the same shape.
  */
 /**
- * How one hit of an Addition looks (PS1: the timed press falls ON each blow, and the last blow of
- * the chain follows the last good press by itself). Hit k's `clip` starts when the hit begins —
- * at the Attack command for hit 1, right at the press that validated hit k−1 otherwise — and
- * `impact` is the second inside it when the blade connects: the spark waits for it, and that is
- * the moment the press for this hit must land, so the timing sight collapses over `impact`
- * (`window` overrides that collapse time; the runner's default applies when neither is given).
- * The last hit needs no press. A missing clip falls back to the generic attack swing.
+ * How one hit of an Addition looks (PS1): blow 1's clip starts at the Attack command; its timing
+ * sight pops with it and collapses over `impact` — the second inside the clip when the blade
+ * connects (the spark waits for it) — so the press lands on the blow. A good press lets the blow
+ * finish (`length` seconds in all), then the next blow's clip chains right at its end, with its
+ * own sight; the last blow follows the last good press with no press of its own, and the chain's
+ * total damage lands on its impact. A missed press lets the current blow finish too, lands what
+ * was earned on its impact, and chains nothing. `window` overrides the sight's collapse time;
+ * without `length` the next blow starts at the press instead of at the end. A missing clip falls
+ * back to the generic attack swing.
  */
 export interface AdditionHitChoreo {
   clip?: string;
-  /** Playback speed of the clip (1 = as authored); `impact` is in played seconds. */
+  /** Playback speed of the clip (1 = as authored); `impact` and `length` are in played seconds. */
   speed?: number;
   impact?: number;
+  length?: number;
   window?: number;
 }
 
@@ -52,19 +55,22 @@ export const BASIC_ATTACK: AdditionDef = {
   acquireLevel: 1,
 };
 
+/** Dart's opening blow, shared by all his Additions: the downward cut (Mixamo clip with its two
+ *  dead holds cut out at graft time; blade at chest height on the way down at 0.58 s). */
+const DART_CUT: AdditionHitChoreo = { clip: "verticalCut", impact: 0.58, length: 0.75 };
+
 export const DART_ADDITIONS = {
   // Choreographies: one Mixamo clip per hit, grafted onto dart.glb under these names (see
-  // docs/pipeline/character-assets.md). Impacts / windows are measured on the clips once in.
+  // docs/pipeline/character-assets.md); every Addition of Dart's opens with the same downward cut.
+  // Impacts / lengths are measured on the clips (right-hand path) once in.
   doubleSlash: {
     name: "Double Slash",
     hits: [100, 50],
     multiplier: [100, 105, 110, 120, 135],
     spMax: 35,
     acquireLevel: 1,
-    // A downward cut (the press lands on it), then a left-to-right one. Impacts measured on the
-    // clips' right-hand path (blade at chest height on the way down); the first clip had its two
-    // dead holds (overhead, then low) cut out at graft time.
-    choreo: [{ clip: "doubleSlash1", impact: 0.58 }, { clip: "doubleSlash2", impact: 0.44 }],
+    // The downward cut (the press lands on it), then a left-to-right one.
+    choreo: [DART_CUT, { clip: "doubleSlash2", impact: 0.44, length: 0.88 }],
   },
   volcano: {
     name: "Volcano",
@@ -72,7 +78,7 @@ export const DART_ADDITIONS = {
     multiplier: [100, 105, 110, 115, 125],
     spMax: 36,
     acquireLevel: 2,
-    choreo: [{ clip: "volcano1" }, { clip: "volcano2" }, { clip: "volcano3" }, { clip: "volcano4" }],
+    choreo: [DART_CUT, { clip: "volcano2" }, { clip: "volcano3" }, { clip: "volcano4" }],
   },
   burningRush: {
     name: "Burning Rush",
@@ -80,7 +86,7 @@ export const DART_ADDITIONS = {
     multiplier: [100, 100, 100, 100, 100],
     spMax: 102,
     acquireLevel: 8,
-    choreo: [{ clip: "burningRush1" }, { clip: "burningRush2" }, { clip: "burningRush3" }],
+    choreo: [DART_CUT, { clip: "burningRush2" }, { clip: "burningRush3" }],
   },
   crushDance: {
     name: "Crush Dance",

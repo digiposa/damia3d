@@ -8,7 +8,7 @@ const volcano = DART_ADDITIONS.volcano; // 3 presses (4 hits)
 
 /** Tick the runner to a given sight progress (fraction of the active window). */
 function tickToProgress(r: AdditionRunner, progress: number): void {
-  r.tick(progress * r.windowSeconds);
+  r.tick(r.lastHold + progress * r.windowSeconds); // past any hold (the previous blow playing out), then into the sight
 }
 
 describe("AdditionRunner (timing sight)", () => {
@@ -46,7 +46,7 @@ describe("AdditionRunner (timing sight)", () => {
   it("misses when the sight lapses unpressed", () => {
     const r = new AdditionRunner();
     r.press(ds);
-    const timedOut = r.tick(r.windowSeconds * 1.2); // past the window
+    const timedOut = r.tick(r.lastHold + r.windowSeconds * 1.2); // past the window
     expect(timedOut).toBe(true);
     expect(r.active).toBe(false);
   });
@@ -92,6 +92,24 @@ describe("AdditionRunner (choreographed windows)", () => {
     expect(r.inWindow).toBe(true);
     expect(r.press(choreo)).toMatchObject({ kind: "hit", hits: 3 });
     expect(r.windowSeconds).toBe(0.7); // blow 3: nothing given → default (blow 4 is free: no press)
+  });
+
+  it("holds the next sight while the validated blow plays out, then collapses it from the next blow's start", () => {
+    const r = new AdditionRunner(0.7);
+    const def = { ...volcano, choreo: [{ clip: "a", impact: 0.5, length: 0.8 }, { clip: "b", impact: 0.4, length: 0.6 }, { clip: "c" }, { clip: "d" }] };
+    r.press(def);
+    r.tick(0.5); // press exactly on blow 1's impact
+    expect(r.press(def)).toMatchObject({ kind: "hit", hits: 2 });
+    expect(r.lastHold).toBeCloseTo(0.3); // 0.8 − 0.5: the rest of blow 1
+    expect(r.sightHeld).toBe(true);
+    expect(r.inWindow).toBe(false);
+    r.tick(0.25);
+    expect(r.sightHeld).toBe(true); // still playing out
+    r.tick(0.05 + 0.4 * 0.95); // blow 2 starts, then its sight collapses over its 0.4 s impact
+    expect(r.sightHeld).toBe(false);
+    expect(r.inWindow).toBe(true);
+    expect(r.press(def)).toMatchObject({ kind: "hit", hits: 3 });
+    expect(r.lastHold).toBeCloseTo(0.6 - 0.4 * 0.95, 5);
   });
 
   it("keeps the default window for Additions without a choreography", () => {

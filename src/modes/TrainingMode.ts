@@ -1143,13 +1143,14 @@ export abstract class ArenaCombatMode extends GameMode {
   private finishAction(): void {
     // Canon: an Addition's damage lands at the END of the QTE, not per hit — on the last blow's
     // impact when its clip says when that is.
-    if (this.lastImpact > 0) {
+    const wait = this.lastImpact - this.blowT; // the last blow's impact is still to come
+    if (this.lastImpact > 0 && wait > 0) {
       const target = this.comboTarget;
       const dmg = this.comboDamage;
       this.comboDamage = 0;
-      this.comboTimers.push({ t: this.lastImpact, fn: () => { if (dmg > 0 && target?.alive) this.landDamage(target, dmg, true); } });
-      this.lastImpact = 0;
+      this.comboTimers.push({ t: wait, fn: () => { if (dmg > 0 && target?.alive) this.landDamage(target, dmg, true); } });
     } else this.landComboDamage();
+    this.lastImpact = 0;
     this.comboTarget = undefined;
     this.actionRecoveryT = ACTION_RECOVERY;
     if (this.player.dragoonSpent) this.player.revert();
@@ -1568,7 +1569,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
 
   private updateSight(): void {
-    if (this.runner.active && this.comboTarget) {
+    if (this.runner.active && this.comboTarget && !this.runner.sightHeld) {
       const head = this.comboTarget.position.add(new Vector3(0, 1.6, 0));
       this.sight.update(this.scene, head, this.runner.sightProgress, this.runner.inWindow);
     } else {
@@ -1864,10 +1865,15 @@ export abstract class ArenaCombatMode extends GameMode {
    * perfect Addition. Handles the target dying.
    */
   private applyHit(target: Enemy, k: number): void {
-    // The hit's own swing (its Addition's choreography), else the generic strike.
+    // The hit's own swing (its Addition's choreography), else the generic strike. Blow 1 starts
+    // now; a later blow waits for the previous one to play out (the runner's hold) and chains at
+    // its end — its impact and sight are counted from that start.
     const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
     const step = def.choreo?.[k - 1];
-    this.player.strike(step?.clip, step?.speed);
+    const hold = k > 1 ? this.runner.lastHold : 0;
+    if (step?.clip && hold > 0) this.player.queueStrike(step.clip, step.speed);
+    else this.player.strike(step?.clip, step?.speed);
+    this.blowT = -hold;
     const df = target.def.stats.df;
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).
     const element = elementMultiplier(this.player.attackElement, target.def.element);
@@ -1907,15 +1913,18 @@ export abstract class ArenaCombatMode extends GameMode {
     this.comboDamage += dmg;
     // The spark when the blade actually connects (the clip's impact), else at once.
     this.lastImpact = step?.impact ?? 0;
-    if (step?.impact) this.comboTimers.push({ t: step.impact, fn: () => this.atmosphere?.spark(target.headPosition) });
+    if (step?.impact) this.comboTimers.push({ t: hold + step.impact, fn: () => this.atmosphere?.spark(target.headPosition) });
     else this.atmosphere?.spark(target.headPosition);
   }
-  /** Impact time of the blow now playing (0 = unknown): the combo's damage lands then. */
+  /** Impact time of the blow now playing or queued (0 = unknown): the combo's damage lands then. */
   private lastImpact = 0;
+  /** Combo time since that blow started (negative while it waits for the previous one to end). */
+  private blowT = 0;
 
   /** Little things timed inside a combo (an impact spark on the blade's frame), in combo time. */
   private comboTimers: { t: number; fn: () => void }[] = [];
   private tickComboTimers(dt: number): void {
+    this.blowT += dt;
     if (!this.comboTimers.length) return;
     const due = this.comboTimers.filter((x) => (x.t -= dt) <= 0);
     if (due.length) {

@@ -782,6 +782,19 @@ export class Player {
     this.weaponSheathed = sheathed;
   }
 
+  /** Chain an Addition blow right at the end of the one now playing (or at once if none is):
+   *  the swing starts the frame the previous ends, with no idle in between. */
+  queueStrike(clip: string, speed = 1): void {
+    const cur = this.modelCurrent;
+    if (!this.modelRoot || !this.modelAttacking || !cur) {
+      this.strike(clip, speed);
+      return;
+    }
+    cur.onAnimationGroupEndObservable.addOnce(() => {
+      if (this.modelCurrent === cur) this.strike(clip, speed); // not if something else took over
+    });
+  }
+
   /** Play a one-shot strike animation (call when a blow lands). `clip` names an Addition hit's own
    *  swing (restarted from its first frame even mid-swing: each hit is its own move); without one,
    *  or if the model lacks it, the generic attack swing plays. */
@@ -793,9 +806,12 @@ export class Player {
     if (this.modelRoot) {
       const own = clip ? this.modelAnims.byName.get(clip.toLowerCase()) : undefined;
       if (own) {
-        this.modelAttacking = true;
-        this.modelCurrent?.stop();
+        // Stopping the previous blow fires ITS end event: take it over first, so that event (and
+        // its "swing over" flag) is ignored and this blow owns the body till it ends.
+        const prev = this.modelCurrent;
         this.modelCurrent = own;
+        this.modelAttacking = true;
+        prev?.stop();
         own.start(false, speed, own.from, own.to);
         own.onAnimationGroupEndObservable.addOnce(() => {
           if (this.modelCurrent === own) this.modelAttacking = false;
@@ -809,12 +825,13 @@ export class Player {
       // swing back to its neutral first frame — reading as a "cut to idle" mid-combo. If a swing is
       // already playing, let it run to completion instead of restarting it.
       if (this.modelAttacking && this.modelCurrent === a) return;
-      this.modelAttacking = true;
-      this.modelCurrent?.stop();
+      const prev = this.modelCurrent;
       this.modelCurrent = a;
+      this.modelAttacking = true;
+      prev?.stop();
       a.start(false, 1.2, a.from, a.to);
       a.onAnimationGroupEndObservable.addOnce(() => {
-        this.modelAttacking = false;
+        if (this.modelCurrent === a) this.modelAttacking = false;
       });
       return;
     }
@@ -927,10 +944,9 @@ export class Player {
     this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
     this.modelAnims.death = g.find((a) => has(a, "death", "dying")); // a separate deathAnim GLB overrides it
     this.modelAnims.byName = new Map(g.map((a) => [a.name.toLowerCase(), a]));
-    // The Additions' per-hit swings cut from one to the next mid-motion: blend each in from the
-    // pose it finds (a few frames), so a chain reads as one movement.
-    const roles = new Set(Object.values(this.modelAnims).filter((v): v is AnimationGroup => v instanceof AnimationGroup));
-    for (const a of g) if (!roles.has(a)) { a.enableBlending = true; a.blendingSpeed = 0.25; }
+    // Every clip blends in from the pose it finds (a few frames): a chain of Addition blows reads
+    // as one movement, and the return to idle after the last doesn't pop.
+    for (const a of g) { a.enableBlending = true; a.blendingSpeed = 0.25; }
     for (const grp of g) grp.stop(); // ImportMesh auto-plays the first — stop all
     this.playModel(this.modelAnims.idle, true);
 
