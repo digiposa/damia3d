@@ -38,8 +38,8 @@ const DRAGOON_HOVER = {
   beatHz: 0.55,
   lean: 0.1, // a slight forward lean, not a dive
   thigh: -0.12, // legs hanging, drawn back a touch…
-  kneeL: -0.25,
-  kneeR: -0.55, // …the right knee folded a little more (PS1)
+  kneeL: -0.15,
+  kneeR: -0.32, // …the right knee folded a little more (PS1)
   wingLift: 0.35, // wings raised from the T-pose bind…
   wing: 0.1, // …beating about that
 };
@@ -593,9 +593,13 @@ export class Player {
     this.sp = this.dragoonTurns * 100;
     if (this.dragoonModelRoot) {
       // Swap the human figure (and its holstered weapon) for the GLB Dragoon model — the winged
-      // model is its own cue, so no glow ball.
+      // model is its own cue, so no glow ball. The weapon goes to the Dragoon's hand.
       this.setFigureEnabled(false);
       this.dragoonModelRoot.setEnabled(true);
+      if (this.dragoonWeaponMount && this.weaponMeshes.length) {
+        for (const m of this.weaponMeshes) m.parent = this.dragoonWeaponMount;
+        this.weaponSheathed = false;
+      }
     } else if (this.dragoonForm) {
       // Swap the human figure for the procedural Dragoon model (it carries its own glow — no aura).
       this.setFigureEnabled(false);
@@ -629,6 +633,10 @@ export class Player {
     if (this.dragoonModelRoot) {
       this.dragoonModelRoot.setEnabled(false);
       this.setFigureEnabled(true);
+      if (this.dragoonWeaponMount) {
+        this.weaponSheathed = undefined; // back to the human mounts (hand or back, per the stance)
+        this.applyWeaponSheath(!this.combat);
+      }
     } else if (this.dragoonForm) {
       this.dragoonForm.setEnabled(false);
       this.setFigureEnabled(true);
@@ -727,6 +735,7 @@ export class Player {
     if (this.dragoonActive && this.dragoonModelRoot) {
       // The GLB Dragoon: its hover idle, unless an attack swing owns the body.
       if (!this.modelAttacking) this.playModel(this.dragoonAnims.idle, true);
+      this.updateGrip(this.dragoonGrip);
       return;
     }
     if (this.dragoonActive && this.dragoonForm) {
@@ -824,6 +833,38 @@ export class Player {
     this.weaponSheathed = sheathed;
   }
 
+  /**
+   * Per-rig grip, fully specified in the hand bone's scale-cancelled frame (a rig whose hand axes
+   * aren't Mixamo's — Dart's Tripo rigs): the mount sits at `weaponHandOffset` (the fist's centre,
+   * in front of the wrist) with `weaponHandRotation`, and the mesh is slid so its grip point
+   * (`weaponGrip` up its length) lands on the mount. Both are solved from the bones (see
+   * bearers.ts). The orientation then follows the hands every frame (see {@link updateGrip}):
+   * through both fists when they hold the weapon together, along the right fist's own grip axis
+   * otherwise. Used for the human rig and again for the Dragoon's (same Tripo hand axes).
+   */
+  private buildRigGrip(scene: Scene, socket: TransformNode, skeleton: Skeleton | undefined, wScale: number, grip: number): { mount: TransformNode; grip?: Player["grip"] } {
+    const fist = new TransformNode(`weaponFist:${this.bearer.id}`, scene);
+    fist.parent = socket;
+    if (this.bearer.weaponHandOffset) fist.position = Vector3.FromArray(this.bearer.weaponHandOffset);
+    const [rx, ry, rz] = this.bearer.weaponHandRotation!;
+    fist.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
+    fist.scaling.setAll(wScale);
+    const mount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
+    mount.parent = fist;
+    mount.position.y = -grip;
+    const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === n)?.getTransformNode() ?? undefined;
+    const [R, L, RM, LM, RT, RP] = ["RightHand", "LeftHand", "RightHandMiddle1", "LeftHandMiddle1", "RightHandThumb1", "RightHandPinky1"].map((n) => bone(`mixamorig:${n}`));
+    if (R && L && RM && LM && RT && RP) {
+      fist.rotationQuaternion = Quaternion.FromEulerVector(fist.rotation);
+      return { mount, grip: { fist, socket, R, L, RM, LM, RT, RP } };
+    }
+    return { mount };
+  }
+
+  /** The Dragoon's own hand mount for the weapon (built with its model), and its live grip. */
+  private dragoonWeaponMount?: TransformNode;
+  private dragoonGrip?: Player["grip"];
+
   // Scratch for updateGrip (no per-frame allocation).
   private static readonly gripTmp = { m: new Matrix(), q: new Quaternion(), v: [0, 1, 2, 3, 4, 5, 6].map(() => new Vector3()) };
 
@@ -834,8 +875,7 @@ export class Player {
    * the blade go where the arms go), or along the right fist's thumb-side axis when the hands are
    * apart (a run); the guard lies along the knuckles. Eased a little so the two cases don't pop.
    */
-  private updateGrip(): void {
-    const g = this.grip;
+  private updateGrip(g = this.grip): void {
     if (!g || this.weaponSheathed !== false) return;
     const { m, q, v } = Player.gripTmp;
     const [R, L, f, y, x, z, t] = v;
@@ -1053,6 +1093,19 @@ export class Player {
     const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
     this.dragoonHover = { pose, bones, obs, t: 0 };
+    // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
+    const hand = bone("RightHand");
+    if (hand && this.bearer.weaponModel && this.bearer.weaponHandRotation) {
+      hand.computeWorldMatrix(true);
+      const hs = hand.absoluteScaling;
+      const scale = this.bearer.scale ?? 1;
+      const socket = new TransformNode(`dragoonWeaponSocket:${this.bearer.id}`, scene);
+      socket.parent = hand;
+      socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
+      const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, this.bearer.weaponGrip ?? WEAPON_GRIP_Y);
+      this.dragoonWeaponMount = built.mount;
+      this.dragoonGrip = built.grip;
+    }
     this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
     dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
     this.dragoonModelRoot = dragoonRoot;
@@ -1259,28 +1312,9 @@ export class Player {
     socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
     let handMount: TransformNode;
     if (this.bearer.weaponHandRotation) {
-      // Per-rig grip, fully specified in the hand bone's scale-cancelled frame (a rig whose hand
-      // axes aren't Mixamo's — Dart's Tripo rig): the mount sits at `weaponHandOffset` (the fist's
-      // centre, in front of the wrist) with that orientation, and the mesh is slid so its grip point
-      // (`weaponGrip` up its length) lands on the mount. Both are solved from the bones (see
-      // bearers.ts).
-      const fist = new TransformNode(`weaponFist:${this.bearer.id}`, scene);
-      fist.parent = socket;
-      if (this.bearer.weaponHandOffset) fist.position = Vector3.FromArray(this.bearer.weaponHandOffset);
-      const [rx, ry, rz] = this.bearer.weaponHandRotation;
-      fist.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
-      fist.scaling.setAll(wScale);
-      handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
-      handMount.parent = fist;
-      handMount.position.y = -grip;
-      // The orientation then follows the hands every frame (see updateGrip): through both fists
-      // when they hold the weapon together, along the right fist's own grip axis otherwise.
-      const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === n)?.getTransformNode() ?? undefined;
-      const [R, L, RM, LM, RT, RP] = ["RightHand", "LeftHand", "RightHandMiddle1", "LeftHandMiddle1", "RightHandThumb1", "RightHandPinky1"].map((n) => bone(`mixamorig:${n}`));
-      if (R && L && RM && LM && RT && RP) {
-        fist.rotationQuaternion = Quaternion.FromEulerVector(fist.rotation);
-        this.grip = { fist, socket, R, L, RM, LM, RT, RP };
-      }
+      const built = this.buildRigGrip(scene, socket, skeleton, wScale, grip);
+      handMount = built.mount;
+      this.grip = built.grip;
     } else {
       const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
       weapon.parent = socket;
