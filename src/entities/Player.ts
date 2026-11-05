@@ -132,6 +132,8 @@ export class Player {
   private dragoonForm?: DragoonForm;
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
+  /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -707,7 +709,11 @@ export class Player {
       if (this.hp > 0) this.downed = false; // revived → fall through and resume normal locomotion
       else return; // still dead → let the frozen death clip own the body
     }
-    if (this.dragoonActive && this.dragoonModelRoot) return; // static GLB dragoon model (no clips yet)
+    if (this.dragoonActive && this.dragoonModelRoot) {
+      // The GLB Dragoon: its hover idle, unless an attack swing owns the body.
+      if (!this.modelAttacking) this.playModel(this.dragoonAnims.idle, true);
+      return;
+    }
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.update(dt, moving);
       return;
@@ -889,6 +895,19 @@ export class Player {
       this.dragoonForm.strike();
       return;
     }
+    if (this.dragoonActive && this.dragoonModelRoot) {
+      const a = this.dragoonAnims.attack;
+      if (!a || (this.modelAttacking && this.modelCurrent === a)) return;
+      const prev = this.modelCurrent;
+      this.modelCurrent = a;
+      this.modelAttacking = true;
+      prev?.stop();
+      a.start(false, speed, a.from, a.to);
+      a.onAnimationGroupEndObservable.addOnce(() => {
+        if (this.modelCurrent === a) this.modelAttacking = false;
+      });
+      return;
+    }
     if (this.modelRoot) {
       const own = clip ? this.modelAnims.byName.get(clip.toLowerCase()) : undefined;
       if (own) {
@@ -957,9 +976,16 @@ export class Player {
     fitHeight(res.meshes, dragoonRoot, MODEL_TARGET_H);
     // This dragoon GLB is authored facing +X (not +Z like the base model), so it turned 90° off
     // the movement direction — add a quarter-turn to align its forward with the rig's +Z.
-    dragoonRoot.rotation.y = MODEL_YAW + Math.PI / 2;
+    dragoonRoot.rotation.y = MODEL_YAW + (this.bearer.dragoonModelYaw ?? Math.PI / 2);
     dragoonRoot.parent = this.root;
-    for (const g of res.animationGroups) g.stop();
+    for (const g of res.animationGroups) {
+      g.stop();
+      g.enableBlending = true;
+      g.blendingSpeed = 0.25;
+    }
+    const has = (a: AnimationGroup, ...k: string[]) => k.some((s) => a.name.toLowerCase().includes(s));
+    this.dragoonAnims.attack = res.animationGroups.find((a) => has(a, "attack", "slash"));
+    this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
     dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
     this.dragoonModelRoot = dragoonRoot;
   }
