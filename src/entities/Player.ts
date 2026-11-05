@@ -153,7 +153,7 @@ export class Player {
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
   private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number };
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "rArm", TransformNode | undefined>; obs: Observer<Scene>; t: number };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -904,6 +904,7 @@ export class Player {
       const tipW = fwdW.scale(0.7).subtractInPlace(Vector3.Up().scale(0.72)).normalize(); // ~45° down, ahead of him
       Vector3.TransformNormalToRef(tipW, m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
+      g.fist.position.copyFrom(R); // and the handle sits in the fist itself (its centre, as measured)
     } else {
       // One-handed: the thumb-side axis across the palm (pommel on the pinky side).
       at(g.RP, t);
@@ -992,10 +993,18 @@ export class Player {
     const upW = Vector3.TransformNormal(Vector3.Up(), wm).normalize();
     addWorld(h.bones.lFoot, upW, DRAGOON_HOVER.footYawL);
     addWorld(h.bones.rFoot, upW, DRAGOON_HOVER.footYawR);
-    addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
-    addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
+    // The wings are bound to the shoulder (clavicle) bones, whose children are the arms: each turn
+    // of a wing is undone on the arm below it, so the arm keeps the pose the clip gave it.
+    const lLift = DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat;
+    const rLift = -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.lWing, fwdW, lLift);
+    addWorld(h.bones.rWing, fwdW, rLift);
     addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
     addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
+    addWorld(h.bones.lArm, upW, -DRAGOON_HOVER.wingBackL);
+    addWorld(h.bones.rArm, upW, DRAGOON_HOVER.wingBackR);
+    addWorld(h.bones.lArm, fwdW, -lLift);
+    addWorld(h.bones.rArm, fwdW, -rLift);
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
@@ -1123,7 +1132,7 @@ export class Player {
     // after the animations have written the bones (so the pose adds to the clip, not under it).
     const sk = res.skeletons[0];
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
-    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder"), lArm: bone("LeftArm"), rArm: bone("RightArm") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
     this.dragoonHover = { pose, bones, obs, t: 0 };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
