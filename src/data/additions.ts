@@ -6,11 +6,13 @@
  * Currently Dart's set; other party members can be added with the same shape.
  */
 /**
- * How one hit of an Addition looks: the clip the character plays when the hit lands, when the
- * blade actually connects inside it (seconds — the impact spark waits for it), and how long the
- * timing sight takes to collapse before this hit (seconds from the previous hit's press; hit 1
- * is free so its `window` is unused). A missing clip falls back to the character's generic
- * attack swing; a missing window to the runner's default.
+ * How one hit of an Addition looks (PS1: the timed press falls ON each blow, and the last blow of
+ * the chain follows the last good press by itself). Hit k's `clip` starts when the hit begins —
+ * at the Attack command for hit 1, right at the press that validated hit k−1 otherwise — and
+ * `impact` is the second inside it when the blade connects: the spark waits for it, and that is
+ * the moment the press for this hit must land, so the timing sight collapses over `impact`
+ * (`window` overrides that collapse time; the runner's default applies when neither is given).
+ * The last hit needs no press. A missing clip falls back to the generic attack swing.
  */
 export interface AdditionHitChoreo {
   clip?: string;
@@ -57,7 +59,7 @@ export const DART_ADDITIONS = {
     multiplier: [100, 105, 110, 120, 135],
     spMax: 35,
     acquireLevel: 1,
-    choreo: [{ clip: "doubleSlash1" }, { clip: "doubleSlash2" }],
+    choreo: [{ clip: "doubleSlash1" }, { clip: "doubleSlash2" }], // a downward cut (the press), then a left-to-right one
   },
   volcano: {
     name: "Volcano",

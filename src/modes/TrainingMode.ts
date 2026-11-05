@@ -1141,7 +1141,15 @@ export abstract class ArenaCombatMode extends GameMode {
    *  Dragoon form just spent its last turn — revert now (at the action's END, so the boosted
    *  stats covered the whole action). Death (HP 0) reverts separately and immediately. */
   private finishAction(): void {
-    this.landComboDamage(); // canon: an Addition's damage lands at the END of the QTE, not per hit
+    // Canon: an Addition's damage lands at the END of the QTE, not per hit — on the last blow's
+    // impact when its clip says when that is.
+    if (this.lastImpact > 0) {
+      const target = this.comboTarget;
+      const dmg = this.comboDamage;
+      this.comboDamage = 0;
+      this.comboTimers.push({ t: this.lastImpact, fn: () => { if (dmg > 0 && target?.alive) this.landDamage(target, dmg, true); } });
+      this.lastImpact = 0;
+    } else this.landComboDamage();
     this.comboTarget = undefined;
     this.actionRecoveryT = ACTION_RECOVERY;
     if (this.player.dragoonSpent) this.player.revert();
@@ -1898,9 +1906,12 @@ export abstract class ArenaCombatMode extends GameMode {
     // through the QTE so the Addition always completes. A spark still fires per swing for feedback.
     this.comboDamage += dmg;
     // The spark when the blade actually connects (the clip's impact), else at once.
+    this.lastImpact = step?.impact ?? 0;
     if (step?.impact) this.comboTimers.push({ t: step.impact, fn: () => this.atmosphere?.spark(target.headPosition) });
     else this.atmosphere?.spark(target.headPosition);
   }
+  /** Impact time of the blow now playing (0 = unknown): the combo's damage lands then. */
+  private lastImpact = 0;
 
   /** Little things timed inside a combo (an impact spark on the blade's frame), in combo time. */
   private comboTimers: { t: number; fn: () => void }[] = [];

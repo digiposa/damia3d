@@ -73,24 +73,25 @@ describe("AdditionRunner (timing sight)", () => {
 });
 
 describe("AdditionRunner (choreographed windows)", () => {
+  // PS1: the press falls on each blow's impact; the last blow is free.
   const choreo = {
     ...volcano,
-    choreo: [{ clip: "a" }, { clip: "b", window: 0.4 }, { clip: "c", window: 1.2 }, { clip: "d" }],
+    choreo: [{ clip: "a", impact: 0.4 }, { clip: "b", impact: 0.5, window: 1.2 }, { clip: "c" }, { clip: "d", impact: 0.3 }],
   };
 
-  it("collapses each sight over its hit's own window, the default where none is given", () => {
+  it("collapses each sight over the playing blow's impact (or its window), the default where none is given", () => {
     const r = new AdditionRunner(0.7);
-    r.press(choreo); // hit 1 free → the sight for hit 2 is armed
+    r.press(choreo); // blow 1 starts → its press lands at its impact
     expect(r.windowSeconds).toBe(0.4);
     tickToProgress(r, 0.95);
     expect(r.press(choreo)).toMatchObject({ kind: "hit", hits: 2 });
-    expect(r.windowSeconds).toBe(1.2); // hit 3's window
+    expect(r.windowSeconds).toBe(1.2); // blow 2: an explicit window beats its impact
     r.tick(0.6); // 0.5 of 1.2: not yet in the window (would be past it at the default 0.7)
     expect(r.inWindow).toBe(false);
     r.tick(0.55);
     expect(r.inWindow).toBe(true);
     expect(r.press(choreo)).toMatchObject({ kind: "hit", hits: 3 });
-    expect(r.windowSeconds).toBe(0.7); // hit 4: no window given → default
+    expect(r.windowSeconds).toBe(0.7); // blow 3: nothing given → default (blow 4 is free: no press)
   });
 
   it("keeps the default window for Additions without a choreography", () => {

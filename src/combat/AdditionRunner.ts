@@ -110,9 +110,12 @@ export class AdditionRunner {
     return this.active ? this.sightTimer / this.curWindow : 0;
   }
 
-  /** Arm the sight for the next hit (1-based `next`): its choreographed window, or the default. */
-  private armWindow(next: number): void {
-    this.curWindow = this.def?.choreo?.[next - 1]?.window ?? this.sightDuration;
+  /** Arm the sight for the press that validates hit `k` (1-based) — the blow now playing: it
+   *  collapses over that hit's choreographed window, else the time to its impact, else the default.
+   *  (The runner counts the validated hit as `hits` = k + 1: the chain's last blow is free.) */
+  private armWindow(k: number): void {
+    const step = this.def?.choreo?.[k - 1];
+    this.curWindow = step?.window ?? step?.impact ?? this.sightDuration;
   }
 
   /** True while a press would land the current hit. */
@@ -136,7 +139,7 @@ export class AdditionRunner {
       this.hits = 1;
       this.presses = 0;
       this.sightTimer = 0;
-      this.armWindow(2);
+      this.armWindow(1); // the press on hit 1's blow
       if (multiHit) {
         this.gauge.spend(); // start refilling from empty — this attack's cadence
       } else {
@@ -156,7 +159,7 @@ export class AdditionRunner {
     this.hits += 1;
     this.presses += 1;
     this.sightTimer = 0;
-    this.armWindow(this.hits + 1);
+    this.armWindow(this.hits); // the next press falls on the blow that now starts
     const perfect = p >= PERFECT_LO && p <= PERFECT_HI;
     const completed = this.presses >= additionPresses(this.def!);
     const hits = this.hits; // capture before endCombo resets state
