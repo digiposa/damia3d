@@ -40,6 +40,7 @@ const DRAGOON_HOVER = {
   thigh: -0.12, // legs hanging, drawn back a touch…
   kneeL: -0.15,
   kneeR: -0.32, // …the right knee folded a little more (PS1)
+  footOut: 0.15, // toes a touch outward (radians), both feet near parallel
   wingLift: 0.35, // wings raised from the T-pose bind…
   wing: 0.1, // …beating about that
 };
@@ -148,7 +149,7 @@ export class Player {
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
   private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup } = {};
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number };
+  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing", TransformNode | undefined>; obs: Observer<Scene>; t: number; footFix: { L: number; R: number } };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -961,6 +962,24 @@ export class Player {
     addWorld(h.bones.rThigh, rightW, DRAGOON_HOVER.thigh);
     addWorld(h.bones.lKnee, rightW, DRAGOON_HOVER.kneeL);
     addWorld(h.bones.rKnee, rightW, DRAGOON_HOVER.kneeR);
+    // Feet near parallel (the rig's rest pose splays them): turn each about the vertical until the
+    // toes point a set angle off the forward direction. The turn is settled over a few frames by
+    // feedback (the bone chain carries mirrored scale, so an angle doesn't map 1:1 onto the heading).
+    const upW = Vector3.TransformNormal(Vector3.Up(), wm).normalize();
+    const heading = (foot: TransformNode, toe: TransformNode): number => {
+      foot.computeWorldMatrix(true);
+      toe.computeWorldMatrix(true);
+      const d = toe.getAbsolutePosition().subtract(foot.getAbsolutePosition());
+      return Math.atan2(Vector3.Dot(d, rightW), Vector3.Dot(d, fwdW)); // +: toes to the right
+    };
+    const level = (foot: TransformNode | undefined, toe: TransformNode | undefined, side: "L" | "R", target: number): void => {
+      if (!foot || !toe) return;
+      addWorld(foot, upW, h.footFix[side]);
+      const err = target - heading(foot, toe);
+      h.footFix[side] = Math.max(-1.6, Math.min(1.6, h.footFix[side] + 0.35 * err));
+    };
+    level(h.bones.lFoot, h.bones.lToe, "L", -DRAGOON_HOVER.footOut);
+    level(h.bones.rFoot, h.bones.rToe, "R", DRAGOON_HOVER.footOut);
     addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
     addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat));
   }
@@ -1090,9 +1109,9 @@ export class Player {
     // after the animations have written the bones (so the pose adds to the clip, not under it).
     const sk = res.skeletons[0];
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
-    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
-    this.dragoonHover = { pose, bones, obs, t: 0 };
+    this.dragoonHover = { pose, bones, obs, t: 0, footFix: { L: 0, R: 0 } };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
     const hand = bone("RightHand");
     if (hand && this.bearer.weaponModel && this.bearer.weaponHandRotation) {
