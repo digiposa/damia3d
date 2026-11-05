@@ -32,7 +32,17 @@ const MODEL_YAW = 0;
 /** Target on-screen height (world units) any imported bearer model is auto-fit to. */
 const MODEL_TARGET_H = 1.8;
 /** The Dragoon's hover pose (radians / world units): see {@link Player.hoverDragoon}. */
-const DRAGOON_HOVER = { height: 0.7, bob: 0.06, beatHz: 0.55, lean: 0.3, thigh: -0.55, knee: -0.9, wing: 0.12 };
+const DRAGOON_HOVER = {
+  height: 0.12, // barely off the ground (PS1: he floats a hand's width up)
+  bob: 0.03,
+  beatHz: 0.55,
+  lean: 0.1, // a slight forward lean, not a dive
+  thigh: -0.12, // legs hanging, drawn back a touch…
+  kneeL: -0.25,
+  kneeR: -0.55, // …the right knee folded a little more (PS1)
+  wingLift: 0.35, // wings raised from the T-pose bind…
+  wing: 0.1, // …beating about that
+};
 /** Right-hand bone name (weapon attach point), by rig: AccuRIG/Character-Creator first, then
  *  Mixamo. A bearer's model may come from either pipeline, so we try each in order. */
 const HAND_BONES = ["CC_Base_R_Hand", "mixamorig:RightHand", "RightHand"];
@@ -909,10 +919,10 @@ export class Player {
     };
     addWorld(h.bones.lThigh, rightW, DRAGOON_HOVER.thigh);
     addWorld(h.bones.rThigh, rightW, DRAGOON_HOVER.thigh);
-    addWorld(h.bones.lKnee, rightW, DRAGOON_HOVER.knee);
-    addWorld(h.bones.rKnee, rightW, DRAGOON_HOVER.knee);
-    addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wing * beat);
-    addWorld(h.bones.rWing, fwdW, -DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.lKnee, rightW, DRAGOON_HOVER.kneeL);
+    addWorld(h.bones.rKnee, rightW, DRAGOON_HOVER.kneeR);
+    addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat));
   }
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
