@@ -1230,7 +1230,16 @@ export abstract class ArenaCombatMode extends GameMode {
     if (!stock || stock.count <= 0 || !this.runner.gauge.isReady) return;
     // Attack items need a valid target; if none, don't consume the item or the turn.
     if (stock.def.attack && !this.useAttackItem(this.controlled, stock)) return;
-    else if (!stock.def.attack) this.useItem(this.controlled, stock);
+    else if (!stock.def.attack) {
+      // The toss-up gesture; the item takes effect as it leaves the hand.
+      const release = this.controlled.avatar.throwItem(true);
+      if (release > 0) {
+        stock.count -= 1; // committed now (the effect, below, no longer decrements)
+        this.attackAnimT = Math.max(this.attackAnimT, release + 0.4);
+        const m = this.controlled;
+        this.comboTimers.push({ t: release, fn: () => this.useItem(m, stock, false) });
+      } else this.useItem(this.controlled, stock);
+    }
     this.runner.gauge.spend(); // using an item is the member's ATB action
     this.finishAction();
     this.refreshHud();
@@ -1368,7 +1377,7 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
-  private useItem(m: PartyMember, stock: { def: ItemDef; count: number }): void {
+  private useItem(m: PartyMember, stock: { def: ItemDef; count: number }, decrement = true): void {
     const a = m.avatar;
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
@@ -1391,7 +1400,7 @@ export abstract class ArenaCombatMode extends GameMode {
         this.onCharmOutOfBattle(m);
       }
     }
-    stock.count -= 1;
+    if (decrement) stock.count -= 1;
   }
 
   /** Charm Potion used with no foe about: the mode resets its random-encounter counter (Story). */

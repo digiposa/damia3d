@@ -48,6 +48,8 @@ const BACK_GRIP = 0.5;
 const WEAPON_SCALE = 0.9;
 /** Where in the throw clip the item leaves the hand (arm at the top of its arc). */
 const THROW_RELEASE = 0.58;
+/** Where in the helpful-item clip the item is tossed up (hand at the top of its arc). */
+const THROW_HEAL_RELEASE = 0.6;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
 const WEAPON_GRIP_Y = 0.6;
 /** Uniform world scale of a back-strapped item (Shana's quiver) when the bearer gives no override. */
@@ -143,8 +145,9 @@ export class Player {
     draw?: AnimationGroup;
     sheathe?: AnimationGroup;
     death?: AnimationGroup;
-    /** Throwing an item (attack items, and healing ones until they get their own). */
+    /** Throwing an attack item, and tossing up a helpful one (potion…). */
     throw?: AnimationGroup;
+    throwHeal?: AnimationGroup;
     /** The braced guard stance (looped while guarding), and the jolt of a blow taken on it. */
     guard?: AnimationGroup;
     guardHit?: AnimationGroup;
@@ -845,11 +848,13 @@ export class Player {
   /** Throw an item: the throw clip when the model has one (the generic strike otherwise). Returns
    *  the second the item leaves the hand inside that motion (0 = at once), so the caller can time
    *  the item's effect to the release. */
-  throwItem(): number {
-    if (this.modelRoot && this.modelAnims.throw) {
-      this.strike("throw");
-      return THROW_RELEASE;
+  throwItem(helpful = false): number {
+    const clip = helpful ? this.modelAnims.throwHeal : this.modelAnims.throw;
+    if (this.modelRoot && clip) {
+      this.strike(clip.name);
+      return helpful ? THROW_HEAL_RELEASE : THROW_RELEASE;
     }
+    if (helpful) return 0; // no gesture for a potion on the placeholder figure
     this.strike();
     return 0;
   }
@@ -1028,7 +1033,8 @@ export class Player {
     this.modelAnims.draw = g.find((a) => has(a, "draw", "unsheath"));
     this.modelAnims.sheathe = g.find((a) => has(a, "sheath") && !has(a, "unsheath"));
     this.modelAnims.death = g.find((a) => has(a, "death", "dying")); // a separate deathAnim GLB overrides it
-    this.modelAnims.throw = g.find((a) => has(a, "throw", "cast"));
+    this.modelAnims.throwHeal = g.find((a) => has(a, "throwheal", "throw_heal", "useitem"));
+    this.modelAnims.throw = g.find((a) => has(a, "throw", "cast") && a !== this.modelAnims.throwHeal);
     this.modelAnims.guardHit = g.find((a) => has(a, "guardhit", "guard_impact", "guardimpact"));
     this.modelAnims.guard = g.find((a) => has(a, "guard", "block") && a !== this.modelAnims.guardHit);
     this.modelAnims.byName = new Map(g.map((a) => [a.name.toLowerCase(), a]));
