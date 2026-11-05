@@ -1033,21 +1033,39 @@ export class Player {
     const socket = new TransformNode(`weaponSocket:${this.bearer.id}`, scene);
     socket.parent = hand;
     socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
-    const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
-    weapon.parent = socket;
-    weapon.rotation.z = -Math.PI / 2;
-    weapon.scaling.setAll(wScale);
-    const handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
-    handMount.parent = weapon;
-    handMount.position.y = grip;
-    // Default: flip so a blade authored +Y points up out of the fist. A weapon that isn't a blade
-    // (Shana's bow, held sideways vertical) supplies its own full orientation via weaponRotation
-    // (degrees, tuned by measuring the attached bow's world bounds — see bearers.ts).
-    if (this.bearer.weaponRotation) {
-      const [rx, ry, rz] = this.bearer.weaponRotation;
-      handMount.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
+    let handMount: TransformNode;
+    if (this.bearer.weaponHandRotation) {
+      // Per-rig grip, fully specified in the hand bone's scale-cancelled frame (a rig whose hand
+      // axes aren't Mixamo's — Dart's Tripo rig): the mount sits at `weaponHandOffset` (the fist's
+      // centre, in front of the wrist) with that orientation, and the mesh is slid so its grip point
+      // (`weaponGrip` up its length) lands on the mount. Both are solved from the bones (see
+      // bearers.ts).
+      const fist = new TransformNode(`weaponFist:${this.bearer.id}`, scene);
+      fist.parent = socket;
+      if (this.bearer.weaponHandOffset) fist.position = Vector3.FromArray(this.bearer.weaponHandOffset);
+      const [rx, ry, rz] = this.bearer.weaponHandRotation;
+      fist.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
+      fist.scaling.setAll(wScale);
+      handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
+      handMount.parent = fist;
+      handMount.position.y = -grip;
     } else {
-      handMount.rotation.x = Math.PI;
+      const weapon = new TransformNode(`weapon:${this.bearer.id}`, scene);
+      weapon.parent = socket;
+      weapon.rotation.z = -Math.PI / 2;
+      weapon.scaling.setAll(wScale);
+      handMount = new TransformNode(`weaponAlign:${this.bearer.id}`, scene);
+      handMount.parent = weapon;
+      handMount.position.y = grip;
+      // Default: flip so a blade authored +Y points up out of the fist. A weapon that isn't a blade
+      // (Shana's bow, held sideways vertical) supplies its own full orientation via weaponRotation
+      // (degrees, tuned by measuring the attached bow's world bounds — see bearers.ts).
+      if (this.bearer.weaponRotation) {
+        const [rx, ry, rz] = this.bearer.weaponRotation;
+        handMount.rotation = new Vector3(rx, ry, rz).scaleInPlace(Math.PI / 180);
+      } else {
+        handMount.rotation.x = Math.PI;
+      }
     }
     this.weaponHandMount = handMount;
 

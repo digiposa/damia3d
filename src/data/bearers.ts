@@ -110,6 +110,12 @@ export interface Bearer {
   /** Full hand-mount orientation in DEGREES [x,y,z], replacing the default blade-up flip — for
    *  weapons that aren't a +Y blade (Shana's bow stands vertical, held sideways). */
   weaponRotation?: [number, number, number];
+  /** Full hand grip for a rig whose hand-bone axes aren't Mixamo's: orientation in DEGREES [x,y,z]
+   *  and the fist's centre [x,y,z] (world units) in the hand bone's scale-cancelled frame — the
+   *  weapon's +Y (its length, tip at 0) is laid along the mount's +Y, grip point on the mount.
+   *  Replaces the {@link weaponRotation} path entirely. Solved from the bones (fingers / thumb). */
+  weaponHandRotation?: [number, number, number];
+  weaponHandOffset?: [number, number, number];
   /** Attach the weapon to the LEFT hand instead of the right — the bow hand, so the right can draw
    *  the string. */
   weaponLeftHand?: boolean;
@@ -177,7 +183,7 @@ const C_EARTH: [number, number, number] = [0.78, 0.6, 0.26];
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
   { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "mane", outfit: "fullplate", color: C_FIRE, storyPlayable: false },
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", weaponModel: "dart_sword", weaponGrip: 0.88, weaponScale: 1.0, weaponBackRotation: [-4.9, 92.7, 150.9], weaponBackOffset: [-0.244, 0.556, -0.25], weaponBackScale: 0.966, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", weaponModel: "dart_sword", weaponGrip: 0.88, weaponScale: 1.0, weaponHandRotation: [-2.1, -151.6, -94.7], weaponHandOffset: [0.004, -0.07, -0.005], weaponBackRotation: [-4.9, 92.7, 150.9], weaponBackOffset: [-0.244, 0.556, -0.25], weaponBackScale: 0.966, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, model: "rose", modelYaw: -Math.PI / 2, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
   // Jade (Wind) — spears
