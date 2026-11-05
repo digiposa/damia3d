@@ -212,6 +212,7 @@ export class AdditionRunner {
     this.presses = 0;
     this.def = undefined;
     this.sightTimer = 0;
-    this.lastHold = 0;
+    // lastHold is kept: the owner reads it right after the press that ended the chain, to start
+    // the free last blow once the validated one is over. A new chain resets it (armWindow).
   }
 }
