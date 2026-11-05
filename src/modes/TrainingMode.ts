@@ -108,6 +108,7 @@ import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { PartySelect } from "../ui/PartySelect";
 import { TimingSight } from "../ui/TimingSight";
 import { GuardMarker } from "../ui/GuardMarker";
+import { AdditionBanner } from "../ui/AdditionBanner";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
 import { floatingText, skillCaptionEl, CAPTION_LIFE, CAPTION_RISE } from "../ui/FloatingText";
 import { CombatLog } from "../ui/CombatLog";
@@ -538,6 +539,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // Tapping a row takes control of that member.
     this.hud = new PartyPanel((i) => this.controlMember(i));
     this.sight = new TimingSight();
+    this.additionBanner = new AdditionBanner();
     this.guardMarker = new GuardMarker(this.scene, GUARD_ICON_FRAMES[GUARD_ICON_FRAMES.length - 1]);
 
     // Training debug menu (Training only): set level, spawn enemies, DPS balance.
@@ -1047,6 +1049,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
+      if (!this.comboIsDragoon) this.additionBanner.finish(t("combat.miss"), false);
       this.finishAction(); // a lapsed combo closes the action (and lands the hits already landed)
     }
     // Slowed (or frozen, at scale 0) while the player combos.
@@ -1385,6 +1388,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
       if (healed > 0) this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${healed}`, TEXT.hp);
+      this.spellFx?.powerUp(m.position, 1.1, new Color3(0.35, 1, 0.55)); // the healing glow climbing the body
     }
     if (stock.def.spRestore) {
       a.gainSp(stock.def.spRestore);
@@ -1588,6 +1592,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
 
   private guardMarker!: GuardMarker;
+  private additionBanner!: AdditionBanner;
 
   /** The guard read-out over whoever in the party is guarding (the controlled one first). */
   private updateGuardMarker(): void {
@@ -1843,6 +1848,8 @@ export abstract class ArenaCombatMode extends GameMode {
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
     this.comboDamage = 0; // fresh combo — start its damage tally from zero
+    // The PS1 read-out along the bottom (multi-hit Additions only; the tally grows per press).
+    if (!this.comboIsDragoon && additionPresses(def) > 0) this.additionBanner.start(0, this.player.dragoonUnlocked);
     this.player.face(target.position.subtract(this.player.position));
     this.player.tickDragoon(); // one attack = one Dragoon turn
     this.applyHit(target, res.hits); // guaranteed hit 1
@@ -1867,6 +1874,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     if (res.kind === "miss") {
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
+      if (!dragoon) this.additionBanner.finish(t("combat.miss"), false);
       this.finishAction(); // broken combo → lands the hits you did land, then closes the action
       return;
     }
@@ -1878,10 +1886,14 @@ export abstract class ArenaCombatMode extends GameMode {
     if (!dragoon) {
       const share = Math.floor((add.spMax / additionPresses(add)) * this.player.additionSpMultiplier);
       this.player.gainSp(share);
+      this.additionBanner.add(share);
     }
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), TEXT.perfect);
     if (res.completed) {
-      if (!dragoon) this.player.recordAddition(add);
+      if (!dragoon) {
+        this.player.recordAddition(add);
+        this.additionBanner.finish(add.name, true);
+      }
       this.finishAction(); // combo finished cleanly → lands the total, breather + Dragoon revert
     }
   }
@@ -2892,6 +2904,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.hud.dispose();
     this.sight.dispose();
     this.guardMarker.dispose();
+    this.additionBanner.dispose();
     this.debugMenu?.dispose();
     this.debugBtn?.dispose();
     this.attackBtn?.dispose();
