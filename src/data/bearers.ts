@@ -177,7 +177,7 @@ const C_EARTH: [number, number, number] = [0.78, 0.6, 0.26];
 export const BEARERS: Bearer[] = [
   // Red-Eye (Fire) — swords
   { id: "zieg", name: "Zieg", classId: "redEye", portrait: ziegPortrait, weapon: "sword", weaponVariant: "spiked", hair: "mane", outfit: "fullplate", color: C_FIRE, storyPlayable: false },
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", weaponModel: "dart_sword", weaponGrip: 0.88, weaponScale: 1.0, weaponBackRotation: [10, 0, 160], weaponBackOffset: [-0.06, 0.4, 0.22], weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", weaponModel: "dart_sword", weaponGrip: 0.88, weaponScale: 1.0, weaponBackRotation: [-4.9, 92.7, 150.9], weaponBackOffset: [-0.244, 0.556, -0.25], weaponBackScale: 0.966, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, model: "rose", modelYaw: -Math.PI / 2, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
   // Jade (Wind) — spears
