@@ -1,4 +1,5 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { audio } from "../core/audio";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -406,6 +407,7 @@ export class Enemy {
    *  enemy holds position and doesn't cut the motion with idle/walk. */
   private playOneShot(group?: AnimationGroup, speed = ATTACK_SPEED): void {
     if (!group) return;
+    if (group === this.anims.attack || group === this.anims.slashTwice) audio.playSfx("sword_swing", { volume: 0.7, rate: 0.9 });
     this.attacking = true;
     this.currentAnim?.stop();
     this.currentAnim = group;

@@ -1,4 +1,5 @@
 import { settings } from "./settings";
+import { playSynth } from "./synth";
 
 /**
  * Sound: a tiny WebAudio engine. Effects live in `src/assets/audio/sfx/` (MP3, mono, named by
@@ -184,6 +185,16 @@ class AudioEngine {
     const ctx = this.ctx;
     const bus = this.sfxBus;
     const startedAt = ctx.currentTime;
+    if (!sfxUrl(name)) {
+      // No recording of that name: the synthesized recipe, if there is one (see synth.ts).
+      this.applyVolumes();
+      let v = opts.volume ?? 1;
+      if (opts.distance !== undefined) v *= Math.max(0.15, Math.min(1, 1 - (opts.distance - 4) / 16));
+      const jitter = opts.jitter ?? 0.04;
+      const rate = (opts.rate ?? 1) * (1 + (Math.random() * 2 - 1) * jitter);
+      if (playSynth(name, ctx, bus, { rate, volume: v })) this.played += 1;
+      return;
+    }
     void this.load(name).then((buffer) => {
       if (!buffer || ctx.currentTime - startedAt > 0.6) return; // too late to be the sound of that moment
       this.applyVolumes();

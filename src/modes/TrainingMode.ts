@@ -875,6 +875,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
   /** Cycle player control to the next living party member (Tab / the ⇄ button). */
   private cycleControl(): void {
+    audio.playSfx("switch");
     if (this.party.length < 2) return;
     for (let step = 1; step < this.party.length; step++) {
       const idx = (this.controlledIndex + step) % this.party.length;
@@ -1253,6 +1254,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.tickDial(cdt); // the dial keeps the combat clock too (a slower setting = an easier dial)
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
+      audio.playSfx("timing_miss");
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
       this.additionBanner.finish(t("combat.miss"), false);
       this.finishAction(); // a lapsed combo closes the action (and lands the hits already landed)
@@ -1417,6 +1419,7 @@ export abstract class ArenaCombatMode extends GameMode {
     d.hits += 1;
     d.lap += 1;
     d.speed *= DIAL_GAIN;
+    audio.playSfx("dial_tick", { rate: 1.12 ** d.hits, jitter: 0 }); // climbing with each lap
     this.dragoonDial.hit(d.hits);
     if (d.hits >= d.total) this.endDial(true);
   }
@@ -1426,6 +1429,8 @@ export abstract class ArenaCombatMode extends GameMode {
     const d = this.dial;
     if (!d) return;
     this.dial = undefined;
+    if (!perfect) audio.playSfx("timing_miss");
+    else audio.playSfx("timing_perfect");
     const hits = Math.max(1, d.hits);
     this.dragoonDial.finish(perfect ? t("combat.perfect") : d.hits > 0 ? `${d.hits}` : t("combat.miss"), perfect ? "#ffe27a" : d.hits > 0 ? "#ffffff" : "#ff6a1a");
     if (d.target.alive) this.executeDAttack(d.target, hits, perfect);
@@ -1579,6 +1584,7 @@ export abstract class ArenaCombatMode extends GameMode {
   private transformWithFx(avatar: Player): void {
     avatar.transform();
     this.dragoonLight(avatar, 1.2);
+    audio.playSfx("transform");
   }
 
   /** The form has spent its last turn: linger a moment, then fall back to human in a soft light. */
@@ -1588,6 +1594,7 @@ export abstract class ArenaCombatMode extends GameMode {
       fn: () => {
         if (!avatar.dragoonSpent) return; // already reverted (death) or re-transformed
         this.dragoonLight(avatar, 0.7);
+        audio.playSfx("revert");
         avatar.revert();
         this.refreshHud();
       },
@@ -1602,6 +1609,7 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   private openItemMenu(): void {
+    audio.playSfx("menu_open");
     const enemyPresent = this.enemies.some((e) => e.alive);
     // A depleted item (count 0) drops out of the bag entirely rather than lingering greyed-out.
     const entries: ItemEntry[] = this.items
@@ -1635,6 +1643,7 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   private closeItemMenu(): void {
+    audio.playSfx("menu_close");
     this.itemMenu.close();
     this.paused = false;
   }
@@ -1648,6 +1657,7 @@ export abstract class ArenaCombatMode extends GameMode {
     else if (!stock.def.attack) {
       // The toss-up gesture; the item takes effect as it leaves the hand.
       const release = this.controlled.avatar.throwItem(true);
+      audio.playSfx("throw");
       if (release > 0) {
         stock.count -= 1; // committed now (the effect, below, no longer decrements)
         this.attackAnimT = Math.max(this.attackAnimT, release + 0.4);
@@ -1673,6 +1683,7 @@ export abstract class ArenaCombatMode extends GameMode {
           ].filter((e): e is Enemy => !!e);
     if (targets.length === 0) return false;
     const release = m.avatar.throwItem(); // the throw motion; the item leaves the hand `release` s in
+    audio.playSfx("throw");
     this.announceSkill(
       () => m.position.add(new Vector3(0, 2.6, 0)),
       m.avatar.bearer.name,
@@ -1797,7 +1808,8 @@ export abstract class ArenaCombatMode extends GameMode {
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
       if (healed > 0) this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${healed}`, TEXT.hp);
-      this.spellFx?.powerUp(m.position, 1.1, new Color3(0.35, 1, 0.55)); // the healing glow climbing the body
+      this.spellFx?.powerUp(m.position, 1.1, new Color3(0.35, 1, 0.55));
+      audio.playSfx("heal"); // the healing glow climbing the body
     }
     if (stock.def.spRestore) {
       a.gainSp(stock.def.spRestore);
@@ -1868,6 +1880,7 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   private openSpellMenu(): void {
+    audio.playSfx("menu_open");
     const p = this.player;
     const entries: SpellEntry[] = p.spells.map((s) => ({
       id: s.id,
@@ -1882,6 +1895,7 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   private closeSpellMenu(): void {
+    audio.playSfx("menu_close");
     this.spellMenu.close();
     this.paused = false;
   }
@@ -1921,6 +1935,7 @@ export abstract class ArenaCombatMode extends GameMode {
         fn: () => {
           const foes = this.enemies.filter((e) => e.alive);
           this.spellFx?.burst(spell.element, column, 1.6);
+          audio.playSfx("dragon_roar");
           this.spellFx?.fireDragon(
             column.add(new Vector3(0, 0.5, 0)),
             foes.map((e) => () => e.position),
@@ -1965,6 +1980,7 @@ export abstract class ArenaCombatMode extends GameMode {
           p.face(dir);
           p.castPose("flight");
           this.spellFx?.fireShell(() => p.position.add(new Vector3(0, 1.1 + p.dragoonLift, 0)), BURST_OUT_SECONDS);
+          audio.playSfx("fire_shell");
           this.dash = {
             p,
             start,
@@ -2006,6 +2022,7 @@ export abstract class ArenaCombatMode extends GameMode {
             const start = p.position.add(fwd.scale(0.7));
             this.spellFx?.burst(spell.element, start, 0.7); // the slam splits the ground
             this.camera.shake(0.12, 0.25);
+            audio.playSfx("fire_trail");
             const at = target.position.clone();
             this.spellFx?.fireTrail(start, at, Vector3.Distance(start, at) / FIRE_TRAIL_SPEED, () => {
               this.spellFx?.burst(spell.element, at, 2.2);
@@ -2040,6 +2057,7 @@ export abstract class ArenaCombatMode extends GameMode {
           const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
           const from = p.position.add(fwd.scale(0.6)).add(new Vector3(0, 1.35, 0));
           this.spellFx?.powerUp(p.position, 0.5, new Color3(1, 0.5, 0.15));
+          audio.playSfx("fire_shot");
           this.arrows.push(
             new Arrow(this.scene, {
               from,
@@ -2472,6 +2490,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const res = this.runner.press(add, add.choreo ? this.player.blowRemaining() : undefined);
 
     if (res.kind === "miss") {
+      audio.playSfx("timing_miss");
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
       this.additionBanner.finish(t("combat.miss"), false);
       this.finishAction(); // broken combo → lands the hits you did land, then closes the action
@@ -2487,6 +2506,7 @@ export abstract class ArenaCombatMode extends GameMode {
       this.player.gainSp(share);
       this.additionBanner.add(share);
     } else this.additionBanner.add(0); // one more blow on the D'Attack read-out
+    audio.playSfx(res.perfect ? "timing_perfect" : "timing_ok");
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), TEXT.perfect);
     if (res.completed) {
       if (!dragoon) {
@@ -2549,10 +2569,20 @@ export abstract class ArenaCombatMode extends GameMode {
     // the combo ends (see finishAction/landComboDamage) — canon PS1, and it keeps the enemy alive
     // through the QTE so the Addition always completes. A spark still fires per swing for feedback.
     this.comboDamage += dmg;
-    // The spark when the blade actually connects (the clip's impact), else at once.
+    // The swing as the blade starts, the spark + thud when it actually connects (the clip's
+    // impact), else at once.
+    const connect = (): void => {
+      this.atmosphere?.spark(target.headPosition);
+      audio.playSfx("hit_flesh");
+    };
     this.lastImpact = step?.impact ?? 0;
-    if (step?.impact) this.comboTimers.push({ t: hold + step.impact, fn: () => this.atmosphere?.spark(target.headPosition) });
-    else this.atmosphere?.spark(target.headPosition);
+    if (step?.impact) {
+      this.comboTimers.push({ t: hold, fn: () => audio.playSfx("sword_swing") });
+      this.comboTimers.push({ t: hold + step.impact, fn: connect });
+    } else {
+      audio.playSfx("sword_swing");
+      connect();
+    }
   }
   /** Impact time of the blow now playing or queued (0 = unknown): the combo's damage lands then. */
   private lastImpact = 0;
@@ -2762,9 +2792,13 @@ export abstract class ArenaCombatMode extends GameMode {
       // Blocked (guarding, damage halved): a spark off the guard, and the word.
       if (guard < 1) {
         this.player.guardImpact();
+        audio.playSfx("guard_block");
         this.atmosphere?.spark(this.player.position.add(new Vector3(0, 1.2, 0)));
         this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y + 0.7, 0)), t("combat.guard"), TEXT.hp);
-      } else this.player.hurt(); // unguarded: the flinch (unless busy with their own move)
+      } else {
+        audio.playSfx("hurt");
+        this.player.hurt(); // unguarded: the flinch (unless busy with their own move)
+      }
       if (this.player.hp === 0) {
         const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)

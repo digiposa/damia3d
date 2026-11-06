@@ -10,6 +10,7 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { softDotTexture } from "./atmosphere";
 import { FlameDragon } from "./FlameDragon";
+import { audio } from "../core/audio";
 import type { Element } from "../combat/element";
 
 /** How long one Power Up ground ring takes to expand and fade. */
@@ -319,6 +320,7 @@ export class SpellFx {
   /** Fire the element's effect at a world position (feet of the target). */
   burst(element: Element, position: Vector3, power = 1): void {
     const p = Math.max(0.15, power);
+    if (p >= 0.55) audio.playSfx(element === "Fire" ? "fire_burst" : "magic_burst", { volume: Math.min(1, 0.5 + p * 0.3) });
     const systems = this.systems[ELEMENT_KIND[element]];
     for (const b of systems) {
       b.ps.emitter = position.add(new Vector3(0, b.yOffset, 0));
