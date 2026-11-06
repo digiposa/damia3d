@@ -980,6 +980,12 @@ export class Player {
       // A spear held in both hands during a blow (a two-handed sword clip): the tip goes to
       // whichever end is ahead of him, and stays ahead (see below).
       if (g.upright && this.modelAttacking && !this.throwing) this.spearAhead(y, m);
+    } else if (g.upright && this.modelAttacking && !this.throwing && g.RF) {
+      // A spear in one hand during a blow (the human or the Dragoon): along the forearm, tip ahead
+      // of the fist (a thrust), but never behind him — the wind-up draws the arm back and the
+      // forearm turns backward, while the spearhead stays on the target.
+      at(g.RF, y).subtractInPlace(R).normalize(); // y = tip → pommel, i.e. towards the elbow
+      this.spearAhead(y, m, false);
     } else if (g.hang) {
       // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs tip down and a
       // little forward of him (PS1), whatever the hand does — a fixed direction in his own frame,
@@ -989,12 +995,6 @@ export class Player {
       const tipW = fwdW.scale(0.7).subtractInPlace(Vector3.Up().scale(0.72)).normalize(); // ~45° down, ahead of him
       Vector3.TransformNormalToRef(tipW, m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
-    } else if (g.upright && this.modelAttacking && !this.throwing && g.RF) {
-      // A spear in one hand during a blow: along the forearm, tip ahead of the fist (a thrust),
-      // but never behind him — the wind-up draws the arm back and the forearm turns backward,
-      // while the spearhead stays on the target.
-      at(g.RF, y).subtractInPlace(R).normalize(); // y = tip → pommel, i.e. towards the elbow
-      this.spearAhead(y, m, false);
     } else if (g.upright) {
       // A spear in one hand stands on end, tip up (carried at rest), whatever the hand does.
       Vector3.TransformNormalToRef(Vector3.Up(), m, y);
