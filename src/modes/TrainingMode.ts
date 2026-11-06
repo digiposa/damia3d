@@ -159,6 +159,11 @@ const BURST_LIFT = 0.7;
 const WIND_CHARGE_SECONDS = 1.6;
 const WIND_OUT_SECONDS = 0.5;
 const WIND_SPIN = { at: 0.25, seconds: 1.1, turns: 2, plane: "front" as const };
+/** Gaspless (Lavitz): seconds gathering the air (the spear wheeling), the stream's flight to the
+ *  foe, and the tornado's life there. */
+const GASP_CHARGE_SECONDS = 1.3;
+const GASP_STREAM_SECONDS = 0.35;
+const GASP_TORNADO_SECONDS = 1.3;
 /** D'Attack: the Dragoon flies at the foe (seconds), stops this far in front, strikes, and at the
  *  end of the combo reappears where it took off (PS1). */
 const DATTACK_DASH_SECONDS = 0.32;
@@ -2086,6 +2091,43 @@ export abstract class ArenaCombatMode extends GameMode {
           audio.playSfx("wind_charge");
           this.castSpell(p, spell, primary, party, false);
           this.refreshHud();
+        },
+      });
+      this.refreshHud();
+      return;
+    }
+    if (spell.id === "gaspless" && primary && p.castGestureLength("ball") > 0 && p.castGestureLength("shot") > 0) {
+      // Gaspless (PS1): Lavitz gathers a flow of air before him (the spear wheeling), thrusts a
+      // hand out and the flow streams straight at the foe, where it whips up a mini tornado.
+      p.mp = Math.max(0, p.mp - spell.mp);
+      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#9ff2d2");
+      const target = primary;
+      p.castPose("ball", WIND_SPIN);
+      this.spellFx?.powerUp(p.position, GASP_CHARGE_SECONDS, new Color3(0.5, 1, 0.7));
+      audio.playSfx("wind_charge");
+      this.attackAnimT = Math.max(this.attackAnimT, GASP_CHARGE_SECONDS + p.castGestureLength("shot") + 0.3);
+      this.comboTimers.push({
+        t: GASP_CHARGE_SECONDS,
+        fn: () => {
+          p.endCastPose();
+          if (target.alive) p.face(target.position.subtract(p.position));
+          const release = p.castGesture("shot");
+          this.comboTimers.push({
+            t: release,
+            fn: () => {
+              const from = p.position.add(new Vector3(0, 1.2 + p.dragoonLift, 0));
+              const to = target.position.add(new Vector3(0, 1.0, 0));
+              audio.playSfx("wind_rush");
+              this.spellFx?.windStream(from, to, GASP_STREAM_SECONDS, () => {
+                this.spellFx?.tornado(target.position, GASP_TORNADO_SECONDS);
+                this.spellFx?.burst(spell.element, target.position, 1.2);
+                audio.playSfx("magic_burst");
+                this.camera.shake(0.2, 0.3);
+                this.castSpell(p, spell, target, allies(), false);
+                this.refreshHud();
+              });
+            },
+          });
         },
       });
       this.refreshHud();

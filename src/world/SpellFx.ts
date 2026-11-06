@@ -58,7 +58,12 @@ export class SpellFx {
   private readonly auraRings: { mesh: Mesh; mat: StandardMaterial; t: number; delay: number }[] = [];
   /** A line of fire racing along the ground (Explosion): its flames, and the run in progress. */
   private readonly trail: ParticleSystem;
-  private trailRun?: { from: Vector3; to: Vector3; t: number; dur: number; onArrive: () => void };
+  private trailRun?: { from: Vector3; to: Vector3; t: number; dur: number; onArrive: () => void; wind?: boolean };
+  /** The mini tornado (Gaspless): a spinning funnel of wind on the struck foe, motes whirling up. */
+  private readonly funnel: Mesh;
+  private readonly funnelMat: StandardMaterial;
+  private readonly gust: ParticleSystem;
+  private funnelRun?: { t: number; dur: number };
   /** A shell of fire wrapping a charging caster (Final Burst): the sphere, and the run in progress. */
   private readonly shell: Mesh;
   private readonly shellMat: StandardMaterial;
@@ -130,8 +135,18 @@ export class SpellFx {
     this.wall.material = this.wallMat;
     this.wall.isPickable = false;
     this.wall.setEnabled(false);
-    this.petals = this.buildPetals();
-    this.disposables.push(this.wall, this.wallMat, this.petals);
+    this.petals = this.buildMotes("fxPetals", [new Color4(1, 0.72, 0.88, 1), new Color4(1, 0.5, 0.78, 1), new Color4(0.9, 0.4, 0.7, 0)], 1.9, 0.16, 0.3);
+    this.funnelMat = new StandardMaterial("fxFunnelMat", scene);
+    this.funnelMat.disableLighting = true;
+    this.funnelMat.emissiveColor = new Color3(0.7, 1, 0.85);
+    this.funnelMat.alpha = 0;
+    this.funnelMat.backFaceCulling = false;
+    this.funnel = MeshBuilder.CreateCylinder("fxFunnel", { height: 1, diameterTop: 1, diameterBottom: 0.25, tessellation: 24, cap: 0 }, scene);
+    this.funnel.material = this.funnelMat;
+    this.funnel.isPickable = false;
+    this.funnel.setEnabled(false);
+    this.gust = this.buildMotes("fxGust", [new Color4(0.85, 1, 0.9, 1), new Color4(0.5, 0.95, 0.7, 1), new Color4(0.2, 0.5, 0.35, 0)], 0.5, 0.08, 0.2);
+    this.disposables.push(this.wall, this.wallMat, this.petals, this.funnel, this.funnelMat, this.gust);
     this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
     this.auraLight.range = 9;
     this.auraLight.intensity = 0;
@@ -215,16 +230,34 @@ export class SpellFx {
           this.shellRun = undefined;
         }
       }
-      // The fire line: the flame emitter runs from caster to target, then the line goes off.
+      // The fire line (or the stream of wind): the emitter runs from caster to target, then the
+      // line goes off.
       const run = this.trailRun;
       if (run) {
         run.t = Math.min(run.dur, run.t + dt);
         const k = run.t / run.dur;
-        this.trail.emitter = Vector3.Lerp(run.from, run.to, k).add(new Vector3(0, 0.15, 0));
+        this.trail.emitter = Vector3.Lerp(run.from, run.to, k).add(new Vector3(0, run.wind ? 0 : 0.15, 0));
         if (run.t >= run.dur) {
           this.trail.emitRate = 0;
           this.trailRun = undefined;
+          if (run.wind) this.setTrailColours(SpellFx.FIRE_TRAIL);
           run.onArrive();
+        }
+      }
+      // The mini tornado: the funnel spins up, sways, then breaks up as its motes settle.
+      const funnel = this.funnelRun;
+      if (funnel) {
+        funnel.t += dt;
+        const k = funnel.t / funnel.dur;
+        const grow = Math.min(1, funnel.t / 0.25);
+        const sway = 0.12 * Math.sin(funnel.t * 7);
+        this.funnel.scaling.set((1.7 + sway) * grow, 2.6 * grow, (1.7 - sway) * grow);
+        this.funnel.rotation.y += dt * 14;
+        this.funnelMat.alpha = 0.3 * grow * (k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4);
+        if (k >= 0.65) this.gust.emitRate = 0;
+        if (k >= 1) {
+          this.funnel.setEnabled(false);
+          this.funnelRun = undefined;
         }
       }
       // Ground rings: each waits out its stagger, then expands outward while fading.
@@ -286,6 +319,27 @@ export class SpellFx {
   }
 
   /**
+   * Gaspless (Lavitz): the gathered wind streams in a straight line from the caster's hand to the
+   * foe over `seconds` (pale green motes), then `onArrive` — the caller raises the tornado there.
+   */
+  windStream(from: Vector3, to: Vector3, seconds: number, onArrive: () => void): void {
+    this.trailRun = { from: from.clone(), to: to.clone(), t: 0, dur: Math.max(0.05, seconds), onArrive, wind: true };
+    this.setTrailColours(SpellFx.WIND_TRAIL);
+    this.trail.emitter = from.clone();
+    this.trail.emitRate = 460;
+  }
+
+  /** A mini tornado on `at` for `seconds`: a spinning funnel of wind, motes whirling up out of it. */
+  tornado(at: Vector3, seconds: number): void {
+    this.funnel.position.set(at.x, at.y + 1.3, at.z);
+    this.funnel.scaling.set(0.01, 0.01, 0.01);
+    this.funnel.setEnabled(true);
+    this.funnelRun = { t: 0, dur: Math.max(0.4, seconds) };
+    this.gust.emitter = at.clone();
+    this.gust.emitRate = 520;
+  }
+
+  /**
    * A shell of fire around a charging caster (Dart's Final Burst): a breathing sphere of flame
    * around `at()` (re-read every frame, so it follows the flight), flames streaming off it, for
    * `seconds`.
@@ -311,15 +365,17 @@ export class SpellFx {
     this.petals.emitRate = 420;
   }
 
-  private buildPetals(): ParticleSystem {
-    const ps = new ParticleSystem("fxPetals", 600, this.scene);
+  /** Motes rising off a ring on the ground (petals in the wind, a gust): coloured `c`, from a ring
+   *  of `radius`, `minSize`–`maxSize` across, spinning as they rise. */
+  private buildMotes(name: string, [c1, c2, dead]: [Color4, Color4, Color4], radius: number, minSize: number, maxSize: number): ParticleSystem {
+    const ps = new ParticleSystem(name, 600, this.scene);
     ps.particleTexture = this.dot;
-    ps.createCylinderEmitter(1.9, 0.4, 0.3, 0.4); // the ring the wall stands on
-    ps.color1 = new Color4(1, 0.72, 0.88, 1);
-    ps.color2 = new Color4(1, 0.5, 0.78, 1);
-    ps.colorDead = new Color4(0.9, 0.4, 0.7, 0);
-    ps.minSize = 0.16;
-    ps.maxSize = 0.3;
+    ps.createCylinderEmitter(radius, 0.4, 0.3, 0.4);
+    ps.color1 = c1;
+    ps.color2 = c2;
+    ps.colorDead = dead;
+    ps.minSize = minSize;
+    ps.maxSize = maxSize;
     ps.minLifeTime = 1.0;
     ps.maxLifeTime = 1.8;
     ps.minEmitPower = 0.6;
