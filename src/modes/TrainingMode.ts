@@ -51,6 +51,7 @@ import {
 import { SpellMenu, type SpellEntry } from "../ui/SpellMenu";
 import { ItemMenu, type ItemEntry } from "../ui/ItemMenu";
 import { MashMeter } from "../ui/MashMeter";
+import { DragoonDial } from "../ui/DragoonDial";
 import type { DragoonSpell } from "../data/dragoonSpells";
 import { estimateDps } from "../combat/balance";
 import { elementMultiplier, fieldMultiplier, type Element } from "../combat/element";
@@ -150,6 +151,11 @@ const BURST_LIFT = 0.7;
  *  end of the combo reappears where it took off (PS1). */
 const DATTACK_DASH_SECONDS = 0.32;
 const DATTACK_STAND_OFF = 1.6;
+/** The Time-Dial: the light's first lap (turns per real second), how much faster each landed
+ *  press makes it, and how close to the mark (turns, either side) a press must fall. */
+const DIAL_SPEED = 0.55;
+const DIAL_GAIN = 1.3;
+const DIAL_WINDOW = 0.09;
 /** Red-Eye Dragon: the flame column erupts this many seconds into the summon (the crouch), this
  *  far in front of the caster; the dragon bursts out of it at the gesture's release. */
 const SUMMON_COLUMN_AT = 0.75;
@@ -346,6 +352,7 @@ export abstract class ArenaCombatMode extends GameMode {
   private spellMenu!: SpellMenu;
   private itemMenu!: ItemMenu;
   private mashMeter!: MashMeter;
+  private dragoonDial!: DragoonDial;
   /** Active attack-item mashing QTE (Multi items); undefined when no throw is being charged. */
   private mash?: MashState;
   /** Hit-stop: seconds of real time the whole scene freezes on a heavy hit (juice). */
@@ -622,6 +629,7 @@ export abstract class ArenaCombatMode extends GameMode {
       () => this.closeItemMenu(),
     );
     this.mashMeter = new MashMeter(() => this.mashTap());
+    this.dragoonDial = new DragoonDial(() => this.dialPress());
     this.attackBtn = new ActionButton(
       "⚔",
       () => this.input.pressVirtual("Space"),
@@ -1068,7 +1076,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // While the player executes a combo, the rest of the world (enemies, allies, every ATB
     // gauge) runs at COMBO_TIME_SCALE — so the combo's length costs ~no game time and long
     // Additions aren't penalised. The combo's own timing keeps running at real `cdt`.
-    const worldScale = this.runner.active ? COMBO_TIME_SCALE : 1;
+    const worldScale = this.runner.active || this.dial ? COMBO_TIME_SCALE : 1;
     const worldDt = cdt * worldScale;
     this.player.tickGuard(cdt);
     for (const m of this.party) m.avatar.evadeT = Math.max(0, m.avatar.evadeT - cdt); // Charm Potion
@@ -1077,6 +1085,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.runner.setFillTime(this.player.atbFillTime);
     this.tickComboTimers(cdt);
     this.tickDash(cdt);
+    this.tickDial(dt);
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
@@ -1193,6 +1202,100 @@ export abstract class ArenaCombatMode extends GameMode {
     // A D'Attack flown in: home once the last blow has landed, a beat after its impact.
     if (this.dAttackHome) this.comboTimers.push({ t: wait > 0 ? wait + 0.35 : 0.3, fn: () => this.flyHome() });
     if (this.player.dragoonSpent) this.scheduleRevert(this.player);
+  }
+
+  // --- The D'Attack's Time-Dial (PS1) --------------------------------------------------------
+
+  /** The dial in progress: the light's position (turns), its speed, blows earned, turns left. */
+  private dial?: { target: Enemy; turn: number; speed: number; hits: number; total: number; lap: number };
+
+  /** The Attack command in Dragoon form: spend the turn, then spin the dial. The world slows
+   *  (like an Addition's sight) and the Dragoon hovers rooted until the blows are done. With the
+   *  Dragoon Space up (the Special), the dial is skipped and the attack is perfect (canon). */
+  private startDial(target: Enemy): void {
+    const p = this.player;
+    if (!this.runner.gauge.isReady) return;
+    this.runner.gauge.spend();
+    p.tickDragoon(); // one attack = one Dragoon turn
+    p.face(target.position.subtract(p.position));
+    this.clearNav();
+    const total = p.dragoonStrikes;
+    if (this.dragoonSpace) {
+      this.executeDAttack(target, total, true);
+      return;
+    }
+    this.dial = { target, turn: 0, speed: DIAL_SPEED, hits: 0, total, lap: 0 };
+    this.attackAnimT = Math.max(this.attackAnimT, 1);
+    this.dragoonDial.show(total, ELEMENT_COLOR[p.element] ?? "#ff9a4a");
+  }
+
+  /** Advance the light (real time, not combat time); passing the mark unpressed ends the dial. */
+  private tickDial(dt: number): void {
+    const d = this.dial;
+    if (!d) return;
+    this.attackAnimT = Math.max(this.attackAnimT, 0.5); // rooted throughout
+    d.turn += d.speed * dt;
+    this.dragoonDial.update(d.turn);
+    if (d.turn - d.lap > 1 + DIAL_WINDOW) this.endDial(false); // the mark went by unpressed
+  }
+
+  /** A press on the dial: on the mark = a blow earned and a faster lap; off it = the dial stops. */
+  private dialPress(): void {
+    const d = this.dial;
+    if (!d) return;
+    const phase = d.turn - d.lap; // 0 → 1 across this lap; the mark is at 1 (and the next lap's 0)
+    const onMark = phase >= 1 - DIAL_WINDOW && phase <= 1 + DIAL_WINDOW;
+    if (!onMark) {
+      this.endDial(false);
+      return;
+    }
+    d.hits += 1;
+    d.lap += 1;
+    d.speed *= DIAL_GAIN;
+    this.dragoonDial.hit(d.hits);
+    if (d.hits >= d.total) this.endDial(true);
+  }
+
+  /** The dial stops: as many blows as presses landed (one at the least), perfect = all of them. */
+  private endDial(perfect: boolean): void {
+    const d = this.dial;
+    if (!d) return;
+    this.dial = undefined;
+    const hits = Math.max(1, d.hits);
+    this.dragoonDial.finish(perfect ? t("combat.perfect") : d.hits > 0 ? `${d.hits}` : t("combat.miss"), perfect ? "#ffe27a" : d.hits > 0 ? "#ffffff" : "#ff6a1a");
+    if (d.target.alive) this.executeDAttack(d.target, hits, perfect);
+    else this.finishAction();
+  }
+
+  /** Play the D'Attack's blows in a row (each chained at the end of the previous), the total
+   *  landing on the last one's impact — then, on a perfect, a flash of the Dragoon's element. */
+  private executeDAttack(target: Enemy, hits: number, perfect: boolean): void {
+    const p = this.player;
+    this.comboIsDragoon = true;
+    this.comboTarget = target;
+    this.comboDamage = 0;
+    this.additionBanner.start(0, false, ELEMENT_COLOR[p.element] ?? "#ffb060");
+    const def = p.dragoonAttackDef;
+    const blowLength = (k: number): number => def.choreo?.[k - 1]?.length ?? 0.9;
+    const blow = (k: number): void => {
+      if (!target.alive && k > 1) {
+        this.finishAction();
+        return;
+      }
+      p.face(target.position.subtract(p.position));
+      this.applyHit(target, k, 0);
+      if (k > 1) this.additionBanner.add(0);
+      if (k < hits) {
+        this.comboTimers.push({ t: blowLength(k), fn: () => blow(k + 1) });
+        return;
+      }
+      // The last blow: the read-out's verdict, the element flash on a perfect, and the close-out.
+      this.additionBanner.finish(perfect ? t("combat.perfect") : "D'Attack", true);
+      if (perfect) this.comboTimers.push({ t: this.lastImpact, fn: () => this.spellFx?.burst(p.element, target.position, 1.4) });
+      this.finishAction();
+    };
+    this.attackAnimT = Math.max(this.attackAnimT, 0.5);
+    blow(1);
   }
 
   /** Where the Dragoon took off for its D'Attack, to reappear there once the combo is over. */
@@ -2081,6 +2184,10 @@ export abstract class ArenaCombatMode extends GameMode {
    * or, while one is running, resolves the current timing-sight press.
    */
   private attack(preferred?: Enemy): void {
+    if (this.dial) {
+      this.dialPress();
+      return;
+    }
     if (this.runner.active) {
       this.resolveTimingPress();
       return;
@@ -2144,7 +2251,12 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.player.usesBasicAttack && !this.player.transformed && !this.runner.gauge.isReady) return;
     if (this.actionRecoveryT > 0) return; // post-action breather
 
-    // In Dragoon form the Attack command is the D'Attack (its own combo + damage formula).
+    // In Dragoon form the Attack command is the D'Attack: the Time-Dial decides how many blows,
+    // then they all play out in a row (PS1) — no timing sight on the blows themselves.
+    if (this.player.transformed && !this.player.usesBasicAttack) {
+      this.startDial(target);
+      return;
+    }
     this.comboIsDragoon = this.player.transformed;
     const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
     const res = this.runner.press(def);
@@ -2208,13 +2320,12 @@ export abstract class ArenaCombatMode extends GameMode {
    * running total minus the previous hits' total, so the chain's sum equals a
    * perfect Addition. Handles the target dying.
    */
-  private applyHit(target: Enemy, k: number): void {
+  private applyHit(target: Enemy, k: number, hold = k > 1 ? this.runner.lastHold : 0): void {
     // The hit's own swing (its Addition's choreography), else the generic strike. Blow 1 starts
     // now; a later blow waits for the previous one to play out (the runner's hold) and chains at
     // its end — its impact and sight are counted from that start.
     const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
     const step = def.choreo?.[k - 1];
-    const hold = k > 1 ? this.runner.lastHold : 0;
     if (step?.clip && hold > 0) this.player.queueStrike(step.clip, step.speed);
     else this.player.strike(step?.clip, step?.speed);
     this.blowT = -hold;
@@ -3223,6 +3334,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.spellMenu.dispose();
     this.itemMenu.dispose();
     this.mashMeter.dispose();
+    this.dragoonDial.dispose();
     this.spellFx?.dispose();
     this.marker?.dispose();
     this.combatLog?.dispose();
