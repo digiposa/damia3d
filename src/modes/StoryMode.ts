@@ -17,6 +17,7 @@ import { SpeechBubble } from "../ui/SpeechBubble";
 import { MAPS } from "../story/maps";
 import { hasFlag, itemDef, saveStory, setFlag, story } from "../story/state";
 import { settings } from "../core/settings";
+import { audio } from "../core/audio";
 import type { BattleUnit, NpcHandle, StoryApi, StoryMap } from "../story/StoryMap";
 import type { World } from "../world/World";
 import { ExitMarker } from "../ui/ExitMarker";
@@ -140,6 +141,8 @@ export class StoryMode extends ArenaCombatMode {
       m.position.copyFrom(p);
     });
     this.camera.follow(this.player.position, 1);
+    if (this.map.music) audio.playMusic(this.map.music);
+    else audio.stopMusic();
     const look = this.map.facing?.[this.entry];
     if (look) {
       this.party.forEach((m) => m.avatar.face(look));

@@ -27,6 +27,7 @@ export const selesMap: MapFactory = (scene) => {
   const world = selesWorld(scene);
   return {
     world,
+    music: "seles",
     entries: {
       start: P(SELES_SPOTS.start),
       fromForest: P(SELES_SPOTS.fromForest),

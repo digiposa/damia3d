@@ -22,6 +22,8 @@ export interface StoryMap {
   encounterAt?(p: Vector3): { rate: number; formations: EnemyDef[][] } | null;
   /** Models to preload with the party (the map's enemies and props). */
   models?: string[];
+  /** The map's music (a track's base name in src/assets/audio/music), looped while it is played. */
+  music?: string;
   /** Set the map up (NPCs, chests, triggers, exits, opening scene). Called once play starts. */
   start(api: StoryApi, entry: string): void;
 }

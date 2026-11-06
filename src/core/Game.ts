@@ -13,6 +13,7 @@ import type { ModeFactory } from "./GameMode";
 import { SurvivalMode } from "../modes/SurvivalMode";
 import { VirtualJoystick } from "../ui/VirtualJoystick";
 import { MainMenu, type ModeId } from "../ui/MainMenu";
+import { audio } from "./audio";
 import { SystemMenu } from "../ui/SystemMenu";
 import { LoadingOverlay } from "../ui/LoadingOverlay";
 import { TechOverlay } from "../ui/TechOverlay";
@@ -136,6 +137,7 @@ export class Game implements GameHost {
   }
 
   private openMainMenu(): void {
+    audio.stopMusic();
     this.system.hide();
     this.modes.clear();
     this.paused = true;

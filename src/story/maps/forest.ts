@@ -53,6 +53,7 @@ export const forestMap: MapFactory = (scene) => {
   const world = forestWorld(scene);
   return {
     world,
+    music: "forest",
     entries: {
       fromSeles: trackPointAt(MAP_START_U + 3),
       fromHellena: trackPointAt(MAP_END_U - 4),

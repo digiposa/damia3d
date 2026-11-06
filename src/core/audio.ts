@@ -13,10 +13,24 @@ const SFX_URLS = import.meta.glob("../assets/audio/sfx/*.mp3", {
   import: "default",
 }) as Record<string, string>;
 
+const MUSIC_URLS = import.meta.glob("../assets/audio/music/*.mp3", {
+  eager: true,
+  query: "?url",
+  import: "default",
+}) as Record<string, string>;
+
 /** Resolve an effect's bundled URL from its base filename (no extension). */
 export function sfxUrl(name: string): string | undefined {
   return SFX_URLS[`../assets/audio/sfx/${name}.mp3`];
 }
+
+/** Resolve a music track's bundled URL from its base filename (no extension). */
+export function musicUrl(name: string): string | undefined {
+  return MUSIC_URLS[`../assets/audio/music/${name}.mp3`];
+}
+
+/** Seconds a track takes to fade in / out when switching. */
+const MUSIC_FADE = 1.2;
 
 export interface PlayOptions {
   /** Linear gain on top of the effects volume (1 = as recorded). */
@@ -37,6 +51,11 @@ class AudioEngine {
   private readonly buffers = new Map<string, Promise<AudioBuffer | undefined>>();
   /** Effects played so far (for tests and the tech overlay). */
   played = 0;
+  /** The track playing (its name, source and own gain), and the one asked for before the engine
+   *  could start (it starts on the first gesture). */
+  private music?: { name: string; src: AudioBufferSourceNode; gain: GainNode };
+  private musicWanted?: string;
+  private musicSerial = 0;
 
   constructor() {
     if (typeof window === "undefined") return;
@@ -63,6 +82,7 @@ class AudioEngine {
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     this.applyVolumes();
+    if (this.musicWanted && !this.music) this.playMusic(this.musicWanted);
   }
 
   /** True once the browser lets us make sound. */
@@ -81,10 +101,11 @@ class AudioEngine {
   }
 
   /** Fetch + decode an effect once (later calls share the promise). Needs the context. */
-  private load(name: string): Promise<AudioBuffer | undefined> {
-    let p = this.buffers.get(name);
+  private load(name: string, kind: "sfx" | "music" = "sfx"): Promise<AudioBuffer | undefined> {
+    const key = `${kind}:${name}`;
+    let p = this.buffers.get(key);
     if (!p) {
-      const url = sfxUrl(name);
+      const url = kind === "music" ? musicUrl(name) : sfxUrl(name);
       const ctx = this.ctx;
       p =
         url && ctx
@@ -96,9 +117,59 @@ class AudioEngine {
                 return undefined;
               })
           : Promise.resolve(undefined);
-      this.buffers.set(name, p);
+      this.buffers.set(key, p);
     }
     return p;
+  }
+
+  /** The track now playing (its name), if any. */
+  get musicPlaying(): string | undefined {
+    return this.music?.name ?? this.musicWanted;
+  }
+
+  /**
+   * Play a track (looped), fading the previous one out and this one in. The same track again is
+   * left alone. Before the first gesture the request is kept and honoured once the engine starts.
+   */
+  playMusic(name: string): void {
+    this.musicWanted = name;
+    if (!this.ctx || !this.musicBus) return;
+    if (this.music?.name === name) return;
+    const ctx = this.ctx;
+    const bus = this.musicBus;
+    const serial = ++this.musicSerial;
+    this.fadeOutCurrent();
+    void this.load(name, "music").then((buffer) => {
+      if (!buffer || serial !== this.musicSerial) return; // superseded meanwhile
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + MUSIC_FADE);
+      src.connect(gain);
+      gain.connect(bus);
+      src.start();
+      this.music = { name, src, gain };
+    });
+  }
+
+  /** Fade the music out and stop it (leaving the menu, a cut to silence). */
+  stopMusic(): void {
+    this.musicWanted = undefined;
+    this.musicSerial += 1;
+    this.fadeOutCurrent();
+  }
+
+  private fadeOutCurrent(): void {
+    const cur = this.music;
+    if (!cur || !this.ctx) return;
+    this.music = undefined;
+    const t = this.ctx.currentTime;
+    cur.gain.gain.cancelScheduledValues(t);
+    cur.gain.gain.setValueAtTime(cur.gain.gain.value, t);
+    cur.gain.gain.linearRampToValueAtTime(0, t + MUSIC_FADE);
+    cur.src.stop(t + MUSIC_FADE + 0.05);
   }
 
   /** Warm the cache for effects a scene will need (no-op before the first gesture). */
