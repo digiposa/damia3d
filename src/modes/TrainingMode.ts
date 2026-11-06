@@ -202,6 +202,12 @@ const ACTION_RECOVERY = 0.5;
  *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
 const COMBO_TIME_SCALE = 0.2;
 /** The arena's battle music: one of these, drawn at random each time it is entered. */
+/** The glow an item's restore sends up the body: HP a watery blue, MP a leafy green, SP indigo. */
+const RESTORE_GLOW = {
+  hp: new Color3(0.25, 0.55, 1),
+  mp: new Color3(0.4, 1, 0.5),
+  sp: new Color3(0.45, 0.3, 1),
+};
 /** Seconds before the last blow's clip ends at which the Addition's call-out starts. */
 const ADDITION_CALLOUT_LEAD = 0.35;
 const BATTLE_TRACKS = ["battle1", "battle2", "boss1", "boss2", "boss3"];
@@ -1847,19 +1853,25 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
   private useItem(m: PartyMember, stock: { def: ItemDef; count: number }, decrement = true): void {
     const a = m.avatar;
+    // Each kind of restore has its own glow climbing the body: blue for HP, green for MP, indigo
+    // for SP (the Dragoon gauge), with the heal chime pitched apart.
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
       if (healed > 0) this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${healed}`, TEXT.hp);
-      this.spellFx?.powerUp(m.position, 1.1, new Color3(0.35, 1, 0.55));
-      audio.playSfx("heal"); // the healing glow climbing the body
+      this.spellFx?.powerUp(m.position, 1.1, RESTORE_GLOW.hp);
+      audio.playSfx("heal");
     }
     if (stock.def.spRestore) {
       a.gainSp(stock.def.spRestore);
       this.popText(m.position.add(new Vector3(0, 2.6, 0)), `+${stock.def.spRestore} ${t("stat.sp")}`, TEXT.sp);
+      this.spellFx?.powerUp(m.position, 1.1, RESTORE_GLOW.sp);
+      audio.playSfx("heal", { rate: 0.85 });
     }
     if (stock.def.mpRestore) {
       const gained = a.restoreMp(stock.def.mpRestore);
       if (gained > 0) this.popText(m.position.add(new Vector3(0, 2.8, 0)), `+${gained} ${t("stat.mp")}`, TEXT.mp);
+      this.spellFx?.powerUp(m.position, 1.1, RESTORE_GLOW.mp);
+      audio.playSfx("heal", { rate: 1.15 });
     }
     if (stock.def.charm) {
       if (this.enemies.some((e) => e.alive)) {
@@ -2223,6 +2235,8 @@ export abstract class ArenaCombatMode extends GameMode {
     const healed = m.avatar.heal(Math.floor(m.avatar.maxHp * stock.def.healFraction));
     stock.count -= 1;
     this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${healed}`, TEXT.hp);
+    this.spellFx?.powerUp(m.position, 1.1, RESTORE_GLOW.hp);
+    audio.playSfx("heal");
     return true;
   }
 
