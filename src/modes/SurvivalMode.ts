@@ -120,9 +120,10 @@ export class SurvivalMode extends ArenaCombatMode {
    *  so (unlike Training) don't unpause here; {@link beginRun} runs its own gate then unpauses. */
   protected override onAssetsReady(): void {}
 
-  /** No music in Survival yet (its own track is still to be chosen). */
+  /** The character picker is still a menu: the menu theme until the run begins. No music in a
+   *  Survival run yet (its own track is still to be chosen). */
   protected override enterMusic(): string | string[] | undefined {
-    return undefined;
+    return "menu";
   }
 
   override enter(): void {
@@ -163,6 +164,7 @@ export class SurvivalMode extends ArenaCombatMode {
     this.lastLevel = this.partyLevelReached();
     this.partyWiped = false;
     this.runActive = true;
+    this.playEnterMusic(undefined); // the menu theme ends with the picker
     // Gate wave 1 behind the loading screen until the chosen party's models (and the knights)
     // are in — usually instant, since entering the mode already loaded the default set. Then
     // warm the wave-5 Commander in the background so the first mini-boss pops fully formed.

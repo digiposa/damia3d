@@ -158,7 +158,7 @@ export class Game implements GameHost {
   }
 
   private openMainMenu(): void {
-    audio.stopMusic();
+    audio.playMusic("menu"); // the title screen, its Options and the character pickers share it
     this.system.hide();
     this.modes.clear();
     this.paused = true;
@@ -209,7 +209,10 @@ export class Game implements GameHost {
     // The System menu and a mode's own overlay (debug/item/spell) are mutually exclusive.
     if (this.modes.current?.hasOpenMenu?.()) return;
     const atMainMenu = this.menu.isOpen;
-    if (!atMainMenu) this.paused = true; // pause gameplay (nothing runs at the title)
+    if (!atMainMenu) {
+      this.paused = true; // pause gameplay (nothing runs at the title)
+      audio.pushMusic("menu"); // the menu theme over the map's music, back to it on closing
+    }
     this.systemBtn.setVisible(false);
     this.muteBtn.setVisible(false);
     this.joystick?.setVisible(false);
@@ -224,6 +227,7 @@ export class Game implements GameHost {
     if (!this.menu.isOpen) {
       this.paused = false;
       this.joystick?.setVisible(true);
+      audio.popMusic();
     }
   }
 

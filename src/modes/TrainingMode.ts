@@ -544,6 +544,13 @@ export abstract class ArenaCombatMode extends GameMode {
     return BATTLE_TRACKS;
   }
 
+  /** Start what {@link enterMusic} names: a looped track, a random list, or silence. */
+  protected playEnterMusic(track: string | string[] | undefined): void {
+    if (Array.isArray(track)) audio.playMusicList(track);
+    else if (track) audio.playMusic(track);
+    else audio.stopMusic();
+  }
+
   /** Put the camera in the view {@link cameraView} asks for (at entry, and when Config changes it). */
   protected applyCameraView(): void {
     const view = this.cameraView();
@@ -578,10 +585,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
     this.camera.framing = this.world.framing;
     this.applyCameraView();
-    const track = this.enterMusic();
-    if (Array.isArray(track)) audio.playMusicList(track);
-    else if (track) audio.playMusic(track);
-    else audio.stopMusic();
+    this.playEnterMusic(this.enterMusic());
     if (settings.cameraStyle === 1) {
       // Third person from the start: behind the hero, looking where they look.
       const r = this.player.facingAngle;
@@ -3614,6 +3618,11 @@ export class TrainingMode extends ArenaCombatMode {
     if (!this.select) this.paused = false;
   }
 
+  /** The character picker is still a menu: the menu theme until the session begins. */
+  protected override enterMusic(): string | string[] | undefined {
+    return "menu";
+  }
+
   override enter(): void {
     super.enter(); // arena, camera, atmosphere, a bootstrap party, combat + debug UI
     this.select = new PartySelect(
@@ -3635,6 +3644,7 @@ export class TrainingMode extends ArenaCombatMode {
     this.gambitIds = party.map(() => [...DEFAULT_GAMBIT_IDS]);
     this.controlledIndex = 0;
     this.buildParty();
+    this.playEnterMusic(super.enterMusic()); // the arena's battle music starts with the session
     // Gate on the picked character's models (usually instant — the menu prefetches the roster).
     void this.gateAssets().then(() => {
       if (!this.scene.isDisposed) this.paused = false;

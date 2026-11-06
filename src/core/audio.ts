@@ -59,6 +59,8 @@ class AudioEngine {
   private musicSerial = 0;
   /** A set of tracks played one after another at random (the arena), none looped. */
   private playlist?: string[];
+  /** What played before {@link pushMusic} put the menu theme over it (restored by popMusic). */
+  private saved?: { name?: string; playlist?: string[] };
 
   constructor() {
     if (typeof window === "undefined") return;
@@ -136,8 +138,31 @@ class AudioEngine {
    * left alone. Before the first gesture the request is kept and honoured once the engine starts.
    */
   playMusic(name: string): void {
+    this.saved = undefined;
     this.playlist = undefined;
     this.startTrack(name, true);
+  }
+
+  /**
+   * Play a track (looped) over whatever was playing, remembering it: the menu theme while the
+   * System menu is open in a game. {@link popMusic} brings the previous music back.
+   */
+  pushMusic(name: string): void {
+    if (this.saved) return; // already pushed: keep the music to come back to
+    this.saved = { name: this.musicWanted, playlist: this.playlist };
+    this.playlist = undefined;
+    this.startTrack(name, true);
+  }
+
+  /** Bring back what played before {@link pushMusic}: the same track, a fresh draw from the same
+   *  list, or silence. */
+  popMusic(): void {
+    const s = this.saved;
+    if (!s) return;
+    this.saved = undefined;
+    if (s.playlist) this.playMusicList(s.playlist);
+    else if (s.name) this.playMusic(s.name);
+    else this.stopMusic();
   }
 
   /**
@@ -145,6 +170,7 @@ class AudioEngine {
    * row), none looped: when one ends the next starts. The arena's battle music.
    */
   playMusicList(names: string[]): void {
+    this.saved = undefined;
     this.playlist = names;
     const cur = this.music?.name ?? this.musicWanted;
     const pool = names.length > 1 ? names.filter((n) => n !== cur) : names;
@@ -182,6 +208,7 @@ class AudioEngine {
 
   /** Fade the music out over `fade` seconds and stop it (leaving a map, back to the menu). */
   stopMusic(fade = MUSIC_FADE): void {
+    this.saved = undefined;
     this.musicWanted = undefined;
     this.playlist = undefined;
     this.musicSerial += 1;
