@@ -18,6 +18,19 @@ const GAP = 0.42;
  * chain and undulates, and two flapping wings behind the head. All emissive, no lighting — it IS
  * the light. The caller moves the head ({@link update}) and fades it out ({@link fade}).
  */
+/** The beast's colours: the head's core, the body, the wings / spines / horns, the rim glow. */
+export interface DragonPalette {
+  hot: [number, number, number];
+  body: [number, number, number];
+  ember: [number, number, number];
+  rim: [number, number, number];
+}
+
+/** Fire (the Red-Eye Dragon). */
+export const FIRE_PALETTE: DragonPalette = { hot: [1, 0.86, 0.45], body: [1, 0.5, 0.12], ember: [0.9, 0.22, 0.04], rim: [1, 0.95, 0.7] };
+/** Wind (the Jade Dragoon's feathered serpent): jade and pale green, a white rim. */
+export const WIND_PALETTE: DragonPalette = { hot: [0.85, 1, 0.9], body: [0.4, 0.92, 0.62], ember: [0.2, 0.65, 0.48], rim: [0.95, 1, 0.98] };
+
 export class FlameDragon {
   readonly head: TransformNode;
   private readonly body: Mesh[] = [];
@@ -29,7 +42,7 @@ export class FlameDragon {
   private readonly heading = new Vector3(0, 0, 1);
   private t = 0;
 
-  constructor(scene: Scene, at: Vector3) {
+  constructor(scene: Scene, at: Vector3, palette: DragonPalette = FIRE_PALETTE) {
     const mat = (name: string, r: number, g: number, b: number, alpha: number): StandardMaterial => {
       const m = new StandardMaterial(name, scene);
       m.disableLighting = true;
@@ -38,7 +51,7 @@ export class FlameDragon {
       m.emissiveFresnelParameters = new FresnelParameters();
       m.emissiveFresnelParameters.bias = 0.35;
       m.emissiveFresnelParameters.power = 2.2;
-      m.emissiveFresnelParameters.leftColor = new Color3(1, 0.95, 0.7);
+      m.emissiveFresnelParameters.leftColor = new Color3(...palette.rim);
       m.emissiveFresnelParameters.rightColor = new Color3(r, g, b);
       m.alpha = alpha;
       m.backFaceCulling = false;
@@ -46,9 +59,9 @@ export class FlameDragon {
       this.alphas.push(alpha);
       return m;
     };
-    const hot = mat("fxDragonHot", 1, 0.86, 0.45, 0.95); // white-gold: the head's core
-    const flame = mat("fxDragonFlame", 1, 0.5, 0.12, 0.88); // orange: the body
-    const ember = mat("fxDragonEmber", 0.9, 0.22, 0.04, 0.8); // red: wings, spines, horns
+    const hot = mat("fxDragonHot", ...palette.hot, 0.95); // the head's core
+    const flame = mat("fxDragonFlame", ...palette.body, 0.88); // the body
+    const ember = mat("fxDragonEmber", ...palette.ember, 0.8); // wings, spines, horns
     const eye = mat("fxDragonEye", 1, 1, 0.7, 1);
 
     // --- Head: skull + snout along +z, horns swept back, eyes, lower jaw ---
@@ -123,6 +136,11 @@ export class FlameDragon {
     this.wingL = wing(-1);
     this.wingR = wing(1);
     this.prevHead = at.clone();
+  }
+
+  /** The way the head is flying (unit, world). */
+  get direction(): Vector3 {
+    return this.heading.clone();
   }
 
   /** Move the head to `pos` (the body trails, undulating); `dt` drives the flap and the ripple. */

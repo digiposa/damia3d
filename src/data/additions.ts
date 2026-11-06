@@ -33,6 +33,8 @@ export interface WeaponSpin {
   at: number;
   seconds: number;
   turns: number;
+  /** Flat over the head (default), or a wheel in front of the bearer (`front`). */
+  plane?: "flat" | "front";
 }
 
 export interface AdditionDef {

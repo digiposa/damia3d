@@ -153,6 +153,11 @@ const BURST_BALL_SECONDS = 0.9;
 const BURST_OUT_SECONDS = 0.45;
 const BURST_OVERSHOOT = 2.5;
 const BURST_LIFT = 0.7;
+/** Wing Blaster (Lavitz): seconds gathering the wind (the spear wheeling before him) before the
+ *  charge, the charge's length, and the spear's twirl during the gathering. */
+const WIND_CHARGE_SECONDS = 1.6;
+const WIND_OUT_SECONDS = 0.5;
+const WIND_SPIN = { at: 0.25, seconds: 1.1, turns: 2, plane: "front" as const };
 /** D'Attack: the Dragoon flies at the foe (seconds), stops this far in front, strikes, and at the
  *  end of the combo reappears where it took off (PS1). */
 const DATTACK_DASH_SECONDS = 0.32;
@@ -2048,6 +2053,59 @@ export abstract class ArenaCombatMode extends GameMode {
               this.castSpell(p, spell, target, allies(), false);
             },
             done: () => {
+              p.dragoonLift = 0;
+              p.endCastPose();
+              if (target.alive) p.face(target.position.subtract(p.position));
+              this.finishAction();
+              this.refreshHud();
+            },
+          };
+        },
+      });
+      this.refreshHud();
+      return;
+    }
+    if (spell.id === "wingBlaster" && primary && p.castGestureLength("flight") > 0) {
+      // Wing Blaster (PS1): Lavitz gathers the wind about him, the spear wheeling before him, then
+      // charges through the foes as a serpent of wind, and is back where he stood. Every enemy is
+      // caught in the rush.
+      p.mp = Math.max(0, p.mp - spell.mp);
+      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#9ff2d2");
+      const target = primary;
+      this.attackAnimT = Math.max(this.attackAnimT, WIND_CHARGE_SECONDS + WIND_OUT_SECONDS + 0.2);
+      p.castPose("ball", WIND_SPIN);
+      this.spellFx?.powerUp(p.position, WIND_CHARGE_SECONDS, new Color3(0.5, 1, 0.7));
+      audio.playSfx("wind_charge");
+      this.comboTimers.push({
+        t: WIND_CHARGE_SECONDS,
+        fn: () => {
+          const start = p.position.clone();
+          const at = target.position.clone();
+          const dir = at.subtract(start);
+          dir.y = 0;
+          const reach = dir.length();
+          dir.normalize();
+          const end = at.add(dir.scale(BURST_OVERSHOOT));
+          end.y = start.y;
+          p.face(dir);
+          p.castPose("flight");
+          this.spellFx?.windSerpent(() => p.position.add(dir.scale(0.9)).add(new Vector3(0, 1.1 + p.dragoonLift, 0)), WIND_OUT_SECONDS + 0.4);
+          audio.playSfx("wind_rush");
+          this.dash = {
+            p,
+            start,
+            end,
+            t: 0,
+            out: WIND_OUT_SECONDS,
+            hitAt: reach / Math.max(0.01, reach + BURST_OVERSHOOT),
+            hit: () => {
+              const caught = this.enemies.filter((e) => e.alive);
+              for (const e of caught) this.spellFx?.burst(spell.element, e.position, 1.4);
+              this.camera.shake(0.25, 0.35);
+              this.castSpell(p, spell, target, allies(), false, caught);
+            },
+            done: () => {
+              this.spellFx?.freeSerpent(); // the serpent flies on past the foes while he is back home
               p.dragoonLift = 0;
               p.endCastPose();
               if (target.alive) p.face(target.position.subtract(p.position));

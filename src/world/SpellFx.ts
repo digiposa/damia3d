@@ -9,7 +9,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { softDotTexture } from "./atmosphere";
-import { FlameDragon } from "./FlameDragon";
+import { FlameDragon, WIND_PALETTE } from "./FlameDragon";
 import { audio } from "../core/audio";
 import type { Element } from "../combat/element";
 
@@ -63,6 +63,10 @@ export class SpellFx {
   private readonly shell: Mesh;
   private readonly shellMat: StandardMaterial;
   private shellRun?: { at: () => Vector3; t: number; dur: number };
+  /** A serpent of wind riding with the charging caster (the Jade Dragoon's Wing Blaster). */
+  private ride?: { beast: FlameDragon; at: () => Vector3; t: number; dur: number; free?: { pos: Vector3; dir: Vector3 } };
+  private static readonly FIRE_TRAIL: [Color4, Color4, Color4] = [new Color4(1.0, 0.88, 0.4, 1), new Color4(1.0, 0.4, 0.1, 1), new Color4(0.45, 0.06, 0.0, 0)];
+  private static readonly WIND_TRAIL: [Color4, Color4, Color4] = [new Color4(0.85, 1, 0.9, 1), new Color4(0.45, 0.95, 0.65, 1), new Color4(0.1, 0.4, 0.3, 0)];
   /** The Red-Eye Dragon in flight (see {@link fireDragon}). */
   private dragon?: {
     beast: FlameDragon;
@@ -147,6 +151,22 @@ export class SpellFx {
         }
       }
       this.tickDragon(dt);
+      // The wind serpent: its head rides just ahead of the caster, its body streams behind.
+      const ride = this.ride;
+      if (ride) {
+        ride.t += dt;
+        if (ride.free) ride.free.pos.addInPlace(ride.free.dir.scale(dt * 14)); // let go: it flies on
+        ride.beast.update(dt, ride.free ? ride.free.pos : ride.at());
+        this.trail.emitter = ride.beast.flamePoint().clone();
+        const left = ride.dur - ride.t;
+        if (left < 0.3) ride.beast.fade(1 - Math.max(0, left) / 0.3);
+        if (ride.t >= ride.dur) {
+          ride.beast.dispose();
+          this.ride = undefined;
+          this.trail.emitRate = 0;
+          this.setTrailColours(SpellFx.FIRE_TRAIL);
+        }
+      }
       // The fire shell: wraps the charging caster, breathing, its flames streaming behind.
       const shell = this.shellRun;
       if (shell) {
@@ -244,6 +264,35 @@ export class SpellFx {
     this.shell.setEnabled(true);
     this.trail.emitter = at();
     this.trail.emitRate = 320;
+  }
+
+  /**
+   * A serpent of wind (the Jade Dragoon's Wing Blaster): a feathered serpent whose head flies at
+   * `at()` (re-read every frame: a little ahead of the charging caster), its body trailing behind
+   * through the charge, for `seconds`, then fades.
+   */
+  windSerpent(at: () => Vector3, seconds: number): void {
+    this.ride?.beast.dispose();
+    const beast = new FlameDragon(this.scene, at(), WIND_PALETTE);
+    this.ride = { beast, at, t: 0, dur: Math.max(0.3, seconds) };
+    this.setTrailColours(SpellFx.WIND_TRAIL);
+    this.trail.emitter = at();
+    this.trail.emitRate = 360;
+  }
+
+  /** Let the serpent go: from where it is, it keeps flying its way (the caster is back home) and
+   *  fades out over what is left of its time. */
+  freeSerpent(): void {
+    const ride = this.ride;
+    if (!ride || ride.free) return;
+    ride.free = { pos: ride.beast.head.position.clone(), dir: ride.beast.direction };
+    ride.dur = Math.min(ride.dur, ride.t + 0.45);
+  }
+
+  private setTrailColours([c1, c2, dead]: [Color4, Color4, Color4]): void {
+    this.trail.color1 = c1;
+    this.trail.color2 = c2;
+    this.trail.colorDead = dead;
   }
 
   /**

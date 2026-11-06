@@ -1039,7 +1039,11 @@ export class Player {
     this.root.computeWorldMatrix(true);
     const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
     const angle = Math.PI * 2 * s.turns * k;
-    const spinW = new Vector3(fwdW.x * Math.cos(angle) + fwdW.z * Math.sin(angle), 0, -fwdW.x * Math.sin(angle) + fwdW.z * Math.cos(angle));
+    const spinW =
+      s.plane === "front"
+        ? // a wheel in the plane facing him: round his forward axis, through up and his right
+          new Vector3(fwdW.z * Math.sin(angle), Math.cos(angle), -fwdW.x * Math.sin(angle))
+        : new Vector3(fwdW.x * Math.cos(angle) + fwdW.z * Math.sin(angle), 0, -fwdW.x * Math.sin(angle) + fwdW.z * Math.cos(angle));
     const sock = this.grip!.socket;
     sock.computeWorldMatrix(true);
     const tipW = Vector3.TransformNormal(y, sock.getWorldMatrix()).normalize().scaleInPlace(-1);
@@ -1124,7 +1128,7 @@ export class Player {
 
   /** Hold a Dragoon pose (looped: curled into a ball, flying) until {@link endCastPose}; the
    *  caller moves the figure. False when the model has no such clip. */
-  castPose(form: "ball" | "flight"): boolean {
+  castPose(form: "ball" | "flight", spin?: WeaponSpin): boolean {
     const a = this.dragoonActive && this.dragoonModelRoot ? this.dragoonCastClip(form) : undefined;
     if (!a) return false;
     if (this.modelCurrent === a && a.isPlaying) return true;
@@ -1133,6 +1137,7 @@ export class Player {
     this.modelAttacking = true;
     prev?.stop();
     a.start(true, combatClipSpeed, a.from, a.to);
+    this.weaponSpin = spin ? { ...spin, clip: a, speed: 1 } : undefined; // the pose loops: so does the twirl
     return true;
   }
 
@@ -1142,6 +1147,7 @@ export class Player {
     if (!a || (a !== this.dragoonAnims.ball && a !== this.dragoonAnims.flight)) return;
     a.stop();
     this.modelAttacking = false;
+    this.weaponSpin = undefined;
   }
 
   /** Throw an item: the throw clip when the model has one (the generic strike otherwise). Returns
@@ -1365,7 +1371,7 @@ export class Player {
     // after the animations have written the bones (so the pose adds to the clip, not under it).
     const sk = res.skeletons[0];
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
-    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftShoulder"), rWing: bone("RightShoulder"), lArm: bone("LeftArm"), lFore: bone("LeftForeArm"), rArm: bone("RightArm"), rFore: bone("RightForeArm") };
+    const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftWing") ?? bone("LeftShoulder"), rWing: bone("RightWing") ?? bone("RightShoulder"), lArm: bone("LeftArm"), lFore: bone("LeftForeArm"), rArm: bone("RightArm"), rFore: bone("RightForeArm") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
     this.dragoonHover = { pose, bones, obs, t: 0 };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).

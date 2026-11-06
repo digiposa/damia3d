@@ -148,6 +148,14 @@ export const RECIPES: Record<string, Recipe> = {
     noiseBurst(ctx, out, o, { type: "bandpass", f0: 1500, f1: 300, q: 0.8, dur: 0.45, gain: 0.45 });
     notes(ctx, out, o, [392, 523, 659], 0.04, 0.35, 0.15, "triangle");
   },
+  wind_charge: (ctx, out, o) => {
+    noiseBurst(ctx, out, o, { type: "bandpass", f0: 500, f1: 2400, q: 0.6, dur: 1.4, gain: 0.3, attack: 0.4 });
+    tone(ctx, out, o, { type: "sine", f0: 220, f1: 660, dur: 1.4, gain: 0.08, attack: 0.4 });
+  },
+  wind_rush: (ctx, out, o) => {
+    noiseBurst(ctx, out, o, { type: "highpass", f0: 900, f1: 300, q: 0.7, dur: 0.6, gain: 0.5, attack: 0.03 });
+    noiseBurst(ctx, out, o, { type: "bandpass", f0: 3000, f1: 800, q: 1.5, dur: 0.5, gain: 0.3, attack: 0.02 });
+  },
   // --- Items and interface ---
   throw: (ctx, out, o) => noiseBurst(ctx, out, o, { type: "highpass", f0: 800, f1: 2500, dur: 0.16, gain: 0.3, attack: 0.02 }),
   heal: (ctx, out, o) => notes(ctx, out, o, [523, 659, 784, 1047], 0.09, 0.45, 0.16),
