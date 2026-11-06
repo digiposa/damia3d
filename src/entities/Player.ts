@@ -538,11 +538,17 @@ export class Player {
 
   /** Rose/Blossom Storm: while active, incoming damage is halved (the Power-Up modifier). */
   private damageHalveTimer = 0;
+  private damageHalveTotal = 0;
   get damageHalved(): boolean {
     return this.damageHalveTimer > 0;
   }
+  /** How much of the halving is left (1 → 0), for its read-out. */
+  get damageHalveLeft(): number {
+    return this.damageHalveTotal > 0 ? Math.max(0, Math.min(1, this.damageHalveTimer / this.damageHalveTotal)) : 0;
+  }
   applyDamageHalve(seconds: number): void {
     this.damageHalveTimer = Math.max(this.damageHalveTimer, seconds);
+    this.damageHalveTotal = Math.max(this.damageHalveTotal, this.damageHalveTimer);
   }
 
   /** Advance guard + buff timers (use combat-scaled dt). */

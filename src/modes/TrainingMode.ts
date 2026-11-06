@@ -1326,7 +1326,10 @@ export abstract class ArenaCombatMode extends GameMode {
     }
     this.updateSight();
     this.updateGuardMarker();
-    this.buffMarker.update(dt, this.party.filter((m) => m.avatar.hp > 0 && m.avatar.damageHalved).map((m) => m.position.add(new Vector3(0, 2.75, 0))));
+    this.buffMarker.update(
+      dt,
+      this.party.filter((m) => m.avatar.hp > 0 && m.avatar.damageHalved).map((m) => ({ head: m.position.add(new Vector3(0, 2.75, 0)), left: m.avatar.damageHalveLeft })),
+    );
     this.updateDragoonSpace(); // end the Space once its initiator reverts
     this.grantTurnSp(); // Spirit Ring: +SP at the start of each member's turn
     this.checkPartyWipe(); // mode hook when the whole party is down (Survival: Game Over)
