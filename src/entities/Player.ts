@@ -226,6 +226,9 @@ export class Player {
   /** Weapon holstering: the top-level weapon meshes and the two mount points they swap between —
    *  the hand (drawn, in combat) and the back (sheathed, out of combat). */
   private weaponMeshes: AbstractMesh[] = [];
+  /** The Dragoon form's own weapon (bearer.dragoonWeaponModel), on its hand mount; the human one is
+   *  hidden while transformed. Empty when the Dragoon takes the human weapon. */
+  private dragoonWeaponMeshes: AbstractMesh[] = [];
   private weaponHandMount?: TransformNode;
   private weaponBackMount?: TransformNode;
   /** Current mount state (true = on back) and the in-progress draw/sheathe transition, if any. */
@@ -679,8 +682,9 @@ export class Player {
       // model is its own cue, so no glow ball. The weapon goes to the Dragoon's hand.
       this.setFigureEnabled(false);
       this.dragoonModelRoot.setEnabled(true);
-      if (this.dragoonWeaponMount && this.weaponMeshes.length) {
-        for (const m of this.weaponMeshes) m.parent = this.dragoonWeaponMount;
+      if (this.dragoonWeaponMount && (this.weaponMeshes.length || this.dragoonWeaponMeshes.length)) {
+        if (this.dragoonWeaponMeshes.length) for (const m of this.weaponMeshes) m.setEnabled(false); // its own weapon: the human one is put away
+        else for (const m of this.weaponMeshes) m.parent = this.dragoonWeaponMount;
         this.weaponSheathed = false;
       }
     } else if (this.dragoonForm) {
@@ -717,6 +721,7 @@ export class Player {
       this.dragoonModelRoot.setEnabled(false);
       this.setFigureEnabled(true);
       if (this.dragoonWeaponMount) {
+        for (const m of this.weaponMeshes) m.setEnabled(true);
         this.weaponSheathed = undefined; // back to the human mounts (hand or back, per the stance)
         this.applyWeaponSheath(!this.combat);
       }
@@ -1232,10 +1237,11 @@ export class Player {
     addWorld(h.bones.rFoot, upW, DRAGOON_HOVER.footYawR);
     if (h.wingRest.l && h.bones.lWing) h.bones.lWing.rotationQuaternion = h.wingRest.l.clone();
     if (h.wingRest.r && h.bones.rWing) h.bones.rWing.rotationQuaternion = h.wingRest.r.clone();
-    addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
-    addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
-    addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
-    addWorld(h.bones.rWing, upW, -DRAGOON_HOVER.wingBackR);
+    const wings = this.bearer.dragoonWings ?? { liftL: DRAGOON_HOVER.wingLift, liftR: -DRAGOON_HOVER.wingLiftR, backL: DRAGOON_HOVER.wingBackL, backR: -DRAGOON_HOVER.wingBackR };
+    addWorld(h.bones.lWing, fwdW, wings.liftL + DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.rWing, fwdW, wings.liftR - DRAGOON_HOVER.wing * beat);
+    addWorld(h.bones.lWing, upW, wings.backL);
+    addWorld(h.bones.rWing, upW, wings.backR);
     addWorld(h.bones.lArm, fwdW, DRAGOON_HOVER.armOutL);
     addWorld(h.bones.lFore, rightW, DRAGOON_HOVER.elbowL);
     addWorld(h.bones.rArm, fwdW, DRAGOON_HOVER.armOutR);
@@ -1396,9 +1402,29 @@ export class Player {
       socket.parent = hand;
       socket.scaling = new Vector3(scale / hs.x, scale / hs.y, scale / hs.z);
       // Held in one hand, the fist sits on the handle itself (nearer the pommel than the two-handed grip).
-      const built = this.buildRigGrip(scene, socket, sk, this.bearer.weaponScale ?? WEAPON_SCALE, Math.min(0.95, (this.bearer.weaponGrip ?? WEAPON_GRIP_Y) + 0.07));
+      const built = this.buildRigGrip(
+        scene,
+        socket,
+        sk,
+        this.bearer.dragoonWeaponScale ?? this.bearer.weaponScale ?? WEAPON_SCALE,
+        Math.min(0.95, (this.bearer.dragoonWeaponGrip ?? this.bearer.weaponGrip ?? WEAPON_GRIP_Y) + 0.07),
+      );
       this.dragoonWeaponMount = built.mount;
       this.dragoonGrip = built.grip ? { ...built.grip, hang: true } : undefined;
+      if (this.bearer.dragoonWeaponModel) {
+        // The form's own weapon, on that mount from the start (hidden with the Dragoon root).
+        const w = await instantiateModel(scene, this.bearer.dragoonWeaponModel).catch(() => undefined);
+        if (w && !this.root.isDisposed()) {
+          this.modelDisposables.push(...w.animationGroups, ...w.skeletons);
+          for (const mesh of w.meshes) {
+            if (!mesh.parent) {
+              mesh.parent = built.mount;
+              this.dragoonWeaponMeshes.push(mesh);
+            }
+            mesh.isPickable = false;
+          }
+        } else w?.dispose();
+      }
     }
     this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
     dragoonRoot.setEnabled(this.dragoonActive); // hidden unless already transformed
