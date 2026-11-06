@@ -201,7 +201,7 @@ const ACTION_RECOVERY = 0.5;
  *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
 const COMBO_TIME_SCALE = 0.2;
 /** The arena's battle music: one of these, drawn at random each time it is entered. */
-const BATTLE_TRACKS = ["battle1", "battle2", "boss2", "boss3"];
+const BATTLE_TRACKS = ["battle1", "battle2", "boss1", "boss2", "boss3"];
 
 /** Config → Camera "3rd person", on a map with no scenic shot of its own: low behind the hero. */
 const THIRD_PERSON = { beta: 1.25, fov: 0.9, radius: 10, lift: 1.5 };
