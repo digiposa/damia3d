@@ -20,9 +20,6 @@ import { settings } from "../core/settings";
 import type { BattleUnit, NpcHandle, StoryApi, StoryMap } from "../story/StoryMap";
 import type { World } from "../world/World";
 import { ExitMarker } from "../ui/ExitMarker";
-import { Ray } from "@babylonjs/core/Culling/ray";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 
 /** Average distance walked between encounters = DISTANCE_PER_RATE / rate (rate 14 → ~21 units). */
 const DISTANCE_PER_RATE = 300;
@@ -31,9 +28,6 @@ const SPAWN_DIST = 11;
 
 /** Random encounters — off while the maps are being built (scripted fights still run). */
 const ENCOUNTERS = false;
-
-/** Config → Camera "3rd person", on a map with no scenic shot of its own: low behind the hero. */
-const THIRD_PERSON = { beta: 1.25, fov: 0.9, radius: 10, lift: 1.5 };
 
 interface Trigger {
   at: Vector3;
@@ -115,16 +109,6 @@ export class StoryMode extends ArenaCombatMode {
     return this.map.world;
   }
 
-  /**
-   * Config → Camera: ISO everywhere, or third person everywhere — the map's own scenic shot where
-   * it has one (Hellena), else a default one behind the hero. The heading stays the iso one (the
-   * camera never turns), so the controls are the same in both. Applied when a map is entered.
-   */
-  protected override cameraView(): World["view"] {
-    if (settings.cameraStyle !== 1) return undefined;
-    return this.world.view ?? { ...THIRD_PERSON, ...this.world.thirdPerson };
-  }
-
   protected override pickParty(): Bearer[] {
     const s = story();
     this.partyLevel = s.level;
@@ -148,11 +132,6 @@ export class StoryMode extends ArenaCombatMode {
 
   override enter(): void {
     super.enter();
-    window.addEventListener("pointerdown", this.onCamDown);
-    window.addEventListener("pointermove", this.onCamMove);
-    window.addEventListener("pointerup", this.onCamUp);
-    window.addEventListener("pointercancel", this.onCamUp);
-    window.addEventListener("contextmenu", this.noMenu);
     // Stand the party at the map's entry point.
     const at = this.map.entries[this.entry] ?? Object.values(this.map.entries)[0] ?? Vector3.Zero();
     this.party.forEach((m, i) => {
@@ -178,142 +157,7 @@ export class StoryMode extends ArenaCombatMode {
 
   // --- Frame ---------------------------------------------------------------------------------
 
-  /** Config → Camera as it was last applied (switched live when the player changes it). */
-  private appliedCamera = settings.cameraStyle;
-
-  // --- Free third-person camera ----------------------------------------------------------------
-  /** Drag on the screen (outside the joystick and the buttons), right-drag, or Z / C: turn the view. */
-  private dragId: number | null = null;
-  private dragX = 0;
-  private dragY = 0;
-  /** The player's own tilt on top of the map's (drag up / down), radians. */
-  private pitch = 0;
-  private manualT = 0; // seconds since the player last turned it by hand
-  private onCamDown = (e: PointerEvent): void => {
-    if (settings.cameraStyle !== 1 || this.dragId !== null) return; // ISO stays fixed (see updateFreeCamera)
-    const stickZone = e.pointerType === "touch" && e.clientX < window.innerWidth * 0.5 && e.clientY > window.innerHeight * 0.34;
-    if (stickZone || (e.pointerType === "mouse" && e.button !== 2)) return; // the stick; left click = move
-    this.dragId = e.pointerId;
-    this.dragX = e.clientX;
-    this.dragY = e.clientY;
-  };
-  private onCamMove = (e: PointerEvent): void => {
-    if (e.pointerId !== this.dragId) return;
-    this.camera.turn(-(e.clientX - this.dragX) * 0.008);
-    // Drag up: look from lower down (towards the horizon); drag down: from higher up.
-    this.pitch = Math.max(-0.6, Math.min(0.35, this.pitch - (e.clientY - this.dragY) * 0.004));
-    this.dragX = e.clientX;
-    this.dragY = e.clientY;
-    this.manualT = 0;
-  };
-  private onCamUp = (e: PointerEvent): void => {
-    if (e.pointerId === this.dragId) this.dragId = null;
-  };
-  private noMenu = (e: Event): void => {
-    if (settings.cameraStyle === 1) e.preventDefault(); // right-drag turns the camera
-  };
-
-  /** Turn the view by hand, and when the player has let it be, swing it slowly behind the hero as
-   *  they walk forward (never while strafing or backing up, so it doesn't spin). */
-  private updateFreeCamera(dt: number): void {
-    // Third person only: the maps are dressed for the fixed ISO angle (nothing tall between the
-    // camera and the path); turned, the ISO view looks straight through the canopy at a wall of leaves.
-    if (settings.cameraStyle !== 1) return;
-    const base = this.world.thirdPerson?.beta ?? THIRD_PERSON.beta;
-    const tilt = (this.world.thirdPersonTiltAt?.(this.player.position) ?? base) + this.pitch;
-    this.camera.tilt = Math.max(0.5, Math.min(1.5, tilt));
-    this.camera.tickTilt(dt);
-    const keys = (this.input.isDown("KeyC") ? 1 : 0) - (this.input.isDown("KeyZ") ? 1 : 0); // E is "interact"
-    if (keys) {
-      this.camera.turn(keys * 1.8 * dt);
-      this.manualT = 0;
-    }
-    this.manualT += dt;
-    const ax = this.input.axis();
-    // Swinging back behind the hero: third person only (in ISO the view stays where it was put).
-    if (settings.cameraStyle !== 1 || this.manualT < 1.5 || this.dragId !== null || ax.y < 0.4 || this.inputLocked) return;
-    const r = this.player.facingAngle;
-    const want = Math.atan2(-Math.cos(r), -Math.sin(r)); // alpha with the view along the facing
-    let d = want - this.camera.heading;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.camera.turn(d * Math.min(1, dt * 1.1) * Math.min(1, ax.y));
-  }
-
-  /**
-   * Third person: when a wall, a tree or the slope stands between the camera and the hero, the
-   * camera pulls in in front of it (fast), and eases back out once the view is clear (slowly).
-   * A ray from the hero to the camera, against the big solid things only, every other frame.
-   */
-  private camFrame = 0;
-  private camHit = Infinity;
-  private updateCameraPull(dt: number): void {
-    if (!this.camera.isPerspective || settings.cameraStyle !== 1) return;
-    const cam = this.camera.camera;
-    const full = this.camera.viewRadius;
-    if (this.camFrame++ % 2 === 0) {
-      // From the hero's chest to where the camera would sit at its full distance.
-      const from = this.player.position.add(new Vector3(0, 1.1, 0));
-      const r0 = Math.max(cam.radius, 1e-3);
-      const to = cam.target.add(cam.position.subtract(cam.target).scale(full / r0));
-      const dir = to.subtract(from);
-      const len = dir.length();
-      this.camHit = Infinity;
-      if (len > 1.2) {
-        dir.scaleInPlace(1 / len);
-        const start = from.add(dir.scale(0.8)); // clear of the hero's own body
-        const ray = new Ray(start, dir, len - 0.8);
-        let best = Infinity;
-        for (const m of this.cameraBlockers()) {
-          if (!m.isEnabled() || !m.isVisible) continue;
-          // Cheap reject first: the bounding sphere must come near the segment.
-          const bs = m.getBoundingInfo().boundingSphere;
-          const c = bs.centerWorld.subtract(start);
-          const along = Math.max(0, Math.min(len - 0.8, Vector3.Dot(c, dir)));
-          if (c.subtract(dir.scale(along)).lengthSquared() > bs.radiusWorld * bs.radiusWorld) continue;
-          const hit = ray.intersectsMesh(m as Mesh, false);
-          if (hit.hit && hit.distance < best) best = hit.distance;
-        }
-        // The hit as a fraction of the full distance, turned into a radius.
-        if (best < Infinity) this.camHit = (full * (best + 0.8 - 0.6)) / len;
-      }
-    }
-    const want = Math.max(3 + Math.max(0, this.camera.framing), Math.min(full, this.camHit)); // never inside the hero
-    const r = cam.radius;
-    cam.radius = want < r ? r + (want - r) * Math.min(1, dt * 12) : r + (want - r) * Math.min(1, dt * 2);
-  }
-
-  /** The meshes that can stand in the camera's way, listed once (again if the scene grows). */
-  private blockers: AbstractMesh[] = [];
-  private blockersOf = -1;
-  private cameraBlockers(): AbstractMesh[] {
-    if (this.blockersOf !== this.scene.meshes.length) {
-      this.blockersOf = this.scene.meshes.length;
-      this.blockers = this.scene.meshes.filter((m) => this.blocksCamera(m));
-    }
-    return this.blockers;
-  }
-
-  /** Solid enough to stand in the camera's way (not grass cards, particles, sky, water, glows). */
-  private blocksCamera(m: AbstractMesh): boolean {
-    if (m.infiniteDistance || m.getTotalVertices() === 0 || m.skeleton) return false; // not the people
-    if (/Sky|FarLand|Sea|Water|Shaft|Cloud|Haze|Glow|Pool|Mist|Foam|Ivy|Fern|Grass|Flower/i.test(m.name)) return false;
-    const mat = m.material;
-    if (mat && (mat.alpha < 1 || mat.needAlphaBlending() || mat.needAlphaTesting())) return false;
-    return m.getBoundingInfo().boundingSphere.radiusWorld > 0.45; // planks and beams too
-  }
-
   override update(dt: number): void {
-    this.updateCameraPull(dt);
-    if (settings.cameraStyle !== this.appliedCamera) {
-      this.appliedCamera = settings.cameraStyle;
-      this.applyCameraView();
-      if (settings.cameraStyle === 1) {
-        // Into third person: start out behind the hero, looking where they look.
-        const r = this.player.facingAngle;
-        this.camera.turn(Math.atan2(-Math.cos(r), -Math.sin(r)) - this.camera.heading);
-      }
-    }
-    this.updateFreeCamera(dt);
     // Dialogue: Space / Enter / E finish or close the line (taps are handled by the box).
     if (this.dialogue?.isOpen && ["Space", "Enter", "KeyE"].some((k) => this.input.wasPressed(k))) this.dialogue.advance();
     super.update(dt);
@@ -664,11 +508,6 @@ export class StoryMode extends ArenaCombatMode {
   }
 
   override dispose(): void {
-    window.removeEventListener("pointerdown", this.onCamDown);
-    window.removeEventListener("pointermove", this.onCamMove);
-    window.removeEventListener("pointerup", this.onCamUp);
-    window.removeEventListener("pointercancel", this.onCamUp);
-    window.removeEventListener("contextmenu", this.noMenu);
     this.syncState();
     saveStory();
     this.dialogue?.dispose();
