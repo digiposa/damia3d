@@ -200,6 +200,9 @@ const ACTION_RECOVERY = 0.5;
  *  ~0.2 = slow-mo (combo still costs a little, world stays alive); 1 = no slow-down (the old
  *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
 const COMBO_TIME_SCALE = 0.2;
+/** The arena's battle music: one of these, drawn at random each time it is entered. */
+const BATTLE_TRACKS = ["battle1", "battle2", "boss2", "boss3"];
+
 /** Config → Camera "3rd person", on a map with no scenic shot of its own: low behind the hero. */
 const THIRD_PERSON = { beta: 1.25, fov: 0.9, radius: 10, lift: 1.5 };
 
@@ -533,6 +536,12 @@ export abstract class ArenaCombatMode extends GameMode {
     return startingItems();
   }
 
+  /** The music to start on entering this mode (none = silence). The arena draws a battle track at
+   *  random; the Story maps name their own (see StoryMode). */
+  protected enterMusic(): string | undefined {
+    return BATTLE_TRACKS[Math.floor(Math.random() * BATTLE_TRACKS.length)];
+  }
+
   /** Put the camera in the view {@link cameraView} asks for (at entry, and when Config changes it). */
   protected applyCameraView(): void {
     const view = this.cameraView();
@@ -567,6 +576,9 @@ export abstract class ArenaCombatMode extends GameMode {
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
     this.camera.framing = this.world.framing;
     this.applyCameraView();
+    const track = this.enterMusic();
+    if (track) audio.playMusic(track);
+    else audio.stopMusic();
     if (settings.cameraStyle === 1) {
       // Third person from the start: behind the hero, looking where they look.
       const r = this.player.facingAngle;

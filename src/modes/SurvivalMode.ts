@@ -120,6 +120,11 @@ export class SurvivalMode extends ArenaCombatMode {
    *  so (unlike Training) don't unpause here; {@link beginRun} runs its own gate then unpauses. */
   protected override onAssetsReady(): void {}
 
+  /** No music in Survival yet (its own track is still to be chosen). */
+  protected override enterMusic(): string | undefined {
+    return undefined;
+  }
+
   override enter(): void {
     super.enter(); // arena, camera, atmosphere/VFX, a bootstrap party, combat UI (no debug button)
     this.buildBanner();

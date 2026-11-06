@@ -110,6 +110,11 @@ export class StoryMode extends ArenaCombatMode {
     return this.map.world;
   }
 
+  /** The map's own music (none = silence over the map). */
+  protected override enterMusic(): string | undefined {
+    return this.map.music;
+  }
+
   protected override pickParty(): Bearer[] {
     const s = story();
     this.partyLevel = s.level;
@@ -141,8 +146,6 @@ export class StoryMode extends ArenaCombatMode {
       m.position.copyFrom(p);
     });
     this.camera.follow(this.player.position, 1);
-    if (this.map.music) audio.playMusic(this.map.music);
-    else audio.stopMusic();
     const look = this.map.facing?.[this.entry];
     if (look) {
       this.party.forEach((m) => m.avatar.face(look));
