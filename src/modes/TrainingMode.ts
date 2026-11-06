@@ -1080,7 +1080,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
-      if (!this.comboIsDragoon) this.additionBanner.finish(t("combat.miss"), false);
+      this.additionBanner.finish(t("combat.miss"), false);
       this.finishAction(); // a lapsed combo closes the action (and lands the hits already landed)
     }
     // Slowed (or frozen, at scale 0) while the player combos.
@@ -2152,7 +2152,11 @@ export abstract class ArenaCombatMode extends GameMode {
     this.comboTarget = target;
     this.comboDamage = 0; // fresh combo — start its damage tally from zero
     // The PS1 read-out along the bottom (multi-hit Additions only; the tally grows per press).
-    if (!this.comboIsDragoon && additionPresses(def) > 0) this.additionBanner.start(0, this.player.dragoonUnlocked);
+    // (A D'Attack earns no SP: its read-out counts the blows, in the Dragoon's element colour.)
+    if (additionPresses(def) > 0) {
+      if (this.comboIsDragoon) this.additionBanner.start(0, false, ELEMENT_COLOR[this.player.element] ?? "#ffb060");
+      else this.additionBanner.start(0, this.player.dragoonUnlocked);
+    }
     this.player.face(target.position.subtract(this.player.position));
     this.player.tickDragoon(); // one attack = one Dragoon turn
     this.applyHit(target, res.hits); // guaranteed hit 1
@@ -2177,7 +2181,7 @@ export abstract class ArenaCombatMode extends GameMode {
 
     if (res.kind === "miss") {
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
-      if (!dragoon) this.additionBanner.finish(t("combat.miss"), false);
+      this.additionBanner.finish(t("combat.miss"), false);
       this.finishAction(); // broken combo → lands the hits you did land, then closes the action
       return;
     }
@@ -2190,13 +2194,11 @@ export abstract class ArenaCombatMode extends GameMode {
       const share = Math.floor((add.spMax / additionPresses(add)) * this.player.additionSpMultiplier);
       this.player.gainSp(share);
       this.additionBanner.add(share);
-    }
+    } else this.additionBanner.add(0); // one more blow on the D'Attack read-out
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), TEXT.perfect);
     if (res.completed) {
-      if (!dragoon) {
-        this.player.recordAddition(add);
-        this.additionBanner.finish(add.name, true);
-      }
+      if (!dragoon) this.player.recordAddition(add);
+      this.additionBanner.finish(add.name, true);
       this.finishAction(); // combo finished cleanly → lands the total, breather + Dragoon revert
     }
   }

@@ -12,6 +12,8 @@ export class AdditionBanner {
   private terms: number[] = [];
   /** Without a Dragoon Spirit no SP is earned (canon): the tally then counts the blows instead. */
   private showSp = true;
+  /** Colour of the newest term (the SP mint, or a Dragoon's element for its D'Attack). */
+  private accent = "#6fe3c0";
   private fadeTimer?: number;
 
   constructor() {
@@ -59,8 +61,9 @@ export class AdditionBanner {
   }
 
   /** A new chain begins (its first blow's SP, 0 when none yet); `showSp` false = no Dragoon Spirit. */
-  start(sp: number, showSp = true): void {
+  start(sp: number, showSp = true, accent = "#6fe3c0"): void {
     this.showSp = showSp;
+    this.accent = accent;
     if (this.fadeTimer !== undefined) {
       window.clearTimeout(this.fadeTimer);
       this.fadeTimer = undefined;
@@ -101,10 +104,10 @@ export class AdditionBanner {
       ...this.terms.flatMap((sp, i) => {
         const term = document.createElement("span");
         term.textContent = this.showSp ? `${sp}SP` : `${i + 1}`;
-        term.style.color = i === this.terms.length - 1 ? "#6fe3c0" : "#b9c5c0";
+        term.style.color = i === this.terms.length - 1 ? this.accent : "#b9c5c0";
         if (i === 0) return [term];
         const plus = document.createElement("span");
-        plus.textContent = " + ";
+        plus.textContent = this.showSp ? " + " : " · ";
         plus.style.color = "#e8e8e8";
         return [plus, term];
       }),
