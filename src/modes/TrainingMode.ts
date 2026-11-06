@@ -1223,7 +1223,9 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   private doGuard(m: PartyMember): boolean {
-    if (m.avatar.guardActive) return false;
+    // A Dragoon neither guards nor uses items (canon): those commands belong to the human form,
+    // and the keys must follow the buttons, which are hidden while transformed.
+    if (m.avatar.guardActive || m.avatar.transformed) return false;
     const heal = m.avatar.startGuard();
     this.popText(m.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${heal}`, TEXT.hp);
     return true;
@@ -1265,7 +1267,8 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   /** Item opens the picker (combat pauses); the chosen item spends the turn, not the open. */
-  private doItem(_m: PartyMember): boolean {
+  private doItem(m: PartyMember): boolean {
+    if (m.avatar.transformed) return false; // human form only (see doGuard)
     this.openItemMenu();
     return false;
   }
@@ -2603,7 +2606,7 @@ export abstract class ArenaCombatMode extends GameMode {
         return true;
       }
       case "guard": {
-        if (avatar.guardActive) return false;
+        if (avatar.guardActive || avatar.transformed) return false; // a Dragoon doesn't guard
         const heal = avatar.startGuard();
         this.popText(member.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `+${heal}`, TEXT.hp);
         return true;
