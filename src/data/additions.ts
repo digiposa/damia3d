@@ -161,6 +161,7 @@ export const LAVITZ_ADDITIONS = {
   },
   spinningCane: {
     name: "Spinning Cane",
+    sound: "addition_spinning_cane",
     hits: [50, 25, 25],
     multiplier: [100, 125, 150, 175, 200],
     spMax: 35,
@@ -172,6 +173,7 @@ export const LAVITZ_ADDITIONS = {
   },
   rodTyphoon: {
     name: "Rod Typhoon",
+    sound: "addition_rod_typhoon",
     hits: [30, 30, 30, 30, 30],
     multiplier: [100, 108, 116, 124, 135],
     spMax: 100,
@@ -179,6 +181,7 @@ export const LAVITZ_ADDITIONS = {
   },
   gustOfWindDance: {
     name: "Gust of Wind Dance",
+    sound: "addition_gust_of_wind_dance",
     hits: [30, 30, 30, 30, 30, 30, 20],
     multiplier: [100, 120, 140, 160, 175],
     spMax: 35,
@@ -186,6 +189,7 @@ export const LAVITZ_ADDITIONS = {
   },
   flowerStorm: {
     name: "Flower Storm",
+    sound: "addition_flower_storm",
     hits: [30, 30, 30, 40, 40, 40, 40, 50],
     multiplier: [100, 108, 116, 124, 135],
     spMax: 202,
