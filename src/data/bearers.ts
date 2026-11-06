@@ -133,6 +133,12 @@ export interface Bearer {
    *  Replaces the {@link weaponRotation} path entirely. Solved from the bones (fingers / thumb). */
   weaponHandRotation?: [number, number, number];
   weaponHandOffset?: [number, number, number];
+  /** How far apart (model units, height = 1) the fists may be and still both hold the weapon: its
+   *  length axis then runs through both. Default 0.36 (a sword); a spear's hands sit wider. */
+  weaponTwoHandReach?: number;
+  /** Held in one hand, the weapon stands upright (tip up) instead of lying along the thumb — a
+   *  spear carried at rest; both hands on it still point it through the fists. */
+  weaponUpright?: boolean;
   /** Attach the weapon to the LEFT hand instead of the right — the bow hand, so the right can draw
    *  the string. */
   weaponLeftHand?: boolean;
@@ -209,7 +215,7 @@ export const BEARERS: Bearer[] = [
   // Jade (Wind) — spears
   { id: "syuveil", name: "Syuveil", classId: "jade", portrait: syuveilPortrait, weapon: "spear", hair: "neat", outfit: "scholar", color: C_WIND, bodyColor: [0.88, 0.89, 0.92], storyPlayable: false },
   { id: "greham", name: "Greham", classId: "jade", portrait: grehamPortrait, weapon: "spear", hair: "banded", outfit: "darkknight", color: C_WIND, bodyColor: [0.26, 0.19, 0.13], storyPlayable: false },
-  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, model: "lavitz", weapon: "spear", hair: "short", outfit: "knight", color: C_WIND, storyPlayable: true },
+  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, model: "lavitz", weaponModel: "lavitz_lance", weaponGrip: 0.6, weaponScale: 2.0, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponTwoHandReach: 0.65, weaponUpright: true, weapon: "spear", hair: "short", outfit: "knight", color: C_WIND, storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },

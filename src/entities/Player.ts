@@ -217,7 +217,7 @@ export class Player {
   private weaponSheathed?: boolean;
   /** Live two-handed grip (per-rig hand mount): the fist node whose orientation follows the hands,
    *  and the bones it reads — right/left hand, their middle fingers, the right thumb and pinky. */
-  private grip?: { fist: TransformNode; socket: TransformNode; R: TransformNode; L: TransformNode; RM: TransformNode; LM: TransformNode; RT: TransformNode; RP: TransformNode; hang?: boolean };
+  private grip?: { fist: TransformNode; socket: TransformNode; R: TransformNode; L: TransformNode; RM: TransformNode; LM: TransformNode; RT: TransformNode; RP: TransformNode; RF?: TransformNode; hang?: boolean; upright?: boolean };
   private weaponTransition?: "draw" | "sheathe";
   /** Pending draw/sheathe reparent timer id, cleared on dispose so it can't fire on dead nodes. */
   private weaponTimer?: number;
@@ -922,10 +922,10 @@ export class Player {
     mount.parent = fist;
     mount.position.y = -grip;
     const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === n)?.getTransformNode() ?? undefined;
-    const [R, L, RM, LM, RT, RP] = ["RightHand", "LeftHand", "RightHandMiddle1", "LeftHandMiddle1", "RightHandThumb1", "RightHandPinky1"].map((n) => bone(`mixamorig:${n}`));
+    const [R, L, RM, LM, RT, RP, RF] = ["RightHand", "LeftHand", "RightHandMiddle1", "LeftHandMiddle1", "RightHandThumb1", "RightHandPinky1", "RightForeArm"].map((n) => bone(`mixamorig:${n}`));
     if (R && L && RM && LM && RT && RP) {
       fist.rotationQuaternion = Quaternion.FromEulerVector(fist.rotation);
-      return { mount, grip: { fist, socket, R, L, RM, LM, RT, RP } };
+      return { mount, grip: { fist, socket, R, L, RM, LM, RT, RP, RF, upright: this.bearer.weaponUpright } };
     }
     return { mount };
   }
@@ -958,7 +958,17 @@ export class Player {
     at(g.LM, y).subtractInPlace(L).normalize();
     L.addInPlace(y.scale(0.07));
     L.subtractToRef(R, y);
-    if (y.length() < 0.36) y.normalize(); // both hands on it: length axis through the fists
+    const reach = this.bearer.weaponTwoHandReach ?? 0.36;
+    // Both hands on it: the length axis runs through the fists. A long reach (a spear) also wants
+    // the left fist to lie along the right one's grip axis — hands side by side at the hips are
+    // not both on the shaft.
+    let both = y.length() < reach;
+    if (both && reach > 0.36) {
+      at(g.RP, t);
+      at(g.RT, x).subtractInPlace(t).normalize();
+      both = Math.abs(Vector3.Dot(y.normalizeToNew(), x)) > 0.6;
+    }
+    if (both) y.normalize();
     else if (g.hang) {
       // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs tip down and a
       // little forward of him (PS1), whatever the hand does — a fixed direction in his own frame,
@@ -967,6 +977,13 @@ export class Player {
       const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
       const tipW = fwdW.scale(0.7).subtractInPlace(Vector3.Up().scale(0.72)).normalize(); // ~45° down, ahead of him
       Vector3.TransformNormalToRef(tipW, m, y);
+      y.normalize().scaleInPlace(-1); // y = tip → pommel
+    } else if (g.upright && this.modelAttacking && g.RF) {
+      // A spear in one hand during a blow: along the forearm, tip ahead of the fist (a thrust).
+      at(g.RF, y).subtractInPlace(R).normalize(); // y = tip → pommel, i.e. towards the elbow
+    } else if (g.upright) {
+      // A spear in one hand stands on end, tip up (carried at rest), whatever the hand does.
+      Vector3.TransformNormalToRef(Vector3.Up(), m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
     } else {
       // One-handed: the thumb-side axis across the palm (pommel on the pinky side).
