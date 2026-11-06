@@ -12,7 +12,9 @@ export type ProjectileKind =
   /** A thrown rock (the Goblin's Throw Stone). */
   | "stone"
   /** A thrown attack item (a flask): lobbed in an arc, bursts into its spell on landing. */
-  | "flask";
+  | "flask"
+  /** A ball of flame (a Dragoon's Flame Shot): a blazing core in a glowing halo, flickering. */
+  | "fireball";
 
 export interface ProjectileOptions {
   from: Vector3;
@@ -47,6 +49,9 @@ export class Arrow {
   private readonly arc: number;
   private readonly spin: boolean;
   private delay: number;
+  /** The fireball's halo, pulsed in {@link update}. */
+  private halo?: TransformNode;
+  private age = 0;
   /** Distance covered so far — drives the arc's parabola (0 → total). */
   private travelled = 0;
   private done = false;
@@ -86,6 +91,27 @@ export class Arrow {
       cork.material = corkMat;
       cork.isPickable = false;
       cork.parent = this.root;
+    } else if (kind === "fireball") {
+      const tint = color ?? new Color3(1, 0.45, 0.1);
+      const coreMat = new StandardMaterial("fireCoreMat", scene);
+      coreMat.diffuseColor = Color3.Black();
+      coreMat.emissiveColor = new Color3(1, 0.9, 0.55); // white-hot heart
+      coreMat.disableLighting = true;
+      const core = MeshBuilder.CreateSphere("fireCore", { diameter: 0.22, segments: 8 }, scene);
+      core.material = coreMat;
+      core.isPickable = false;
+      core.parent = this.root;
+      const haloMat = new StandardMaterial("fireHaloMat", scene);
+      haloMat.diffuseColor = Color3.Black();
+      haloMat.emissiveColor = tint;
+      haloMat.disableLighting = true;
+      haloMat.alpha = 0.55;
+      haloMat.backFaceCulling = false;
+      const halo = MeshBuilder.CreateSphere("fireHalo", { diameter: 0.5, segments: 8 }, scene);
+      halo.material = haloMat;
+      halo.isPickable = false;
+      halo.parent = this.root;
+      this.halo = halo;
     } else if (kind === "stone") {
       const rockMat = new StandardMaterial("rockMat", scene);
       rockMat.diffuseColor = color ?? new Color3(0.42, 0.4, 0.37);
@@ -152,6 +178,13 @@ export class Arrow {
     }
     this.travelled += step;
     this.root.position.addInPlace(flat.scaleInPlace(step / dist));
+    if (this.halo) {
+      // A roaring flicker: the halo breathes fast and unevenly.
+      this.age += dt;
+      const k = 1 + 0.18 * Math.sin(this.age * 37) + 0.1 * Math.sin(this.age * 61 + 1);
+      this.halo.scaling.setAll(k);
+      this.halo.rotation.y += dt * 6;
+    }
     if (this.arc > 0) {
       // Parabola over the WHOLE flight: peaks at mid-course, back to the target's height on landing.
       const total = this.travelled + dist;
