@@ -132,14 +132,22 @@ export const DART_ADDITIONS = {
   },
 } satisfies Record<string, AdditionDef>;
 
+/** Lavitz's opening blow: his basic thrust (the `attack` clip, dead holds cut at graft time;
+ *  the spearhead reaches the target at 0.82 s). The Additions' own hits follow it. */
+const LAVITZ_THRUST: AdditionHitChoreo = { clip: "attack", impact: 0.82, length: 1.45 };
+
 /** Lavitz / Albert Additions (Jade line). */
 export const LAVITZ_ADDITIONS = {
   harpoon: {
     name: "Harpoon",
+    sound: "addition_harpoon",
     hits: [75, 25],
     multiplier: [100, 110, 120, 130, 150],
     spMax: 50,
     acquireLevel: 1,
+    // Clips grafted onto lavitz.glb (see docs/pipeline/character-assets.md); impacts measured on
+    // the right-hand path: the thrust, then an overhead cut down and forward (A1_2).
+    choreo: [LAVITZ_THRUST, { clip: "harpoon2", impact: 0.75, length: 1.1 }],
   },
   spinningCane: {
     name: "Spinning Cane",
