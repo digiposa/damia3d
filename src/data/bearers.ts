@@ -22,23 +22,14 @@ import type { AdditionHitChoreo } from "./additions";
 
 /** Dart's D'Attack blows (five at D'Lv 5): his Addition swings, grafted onto the Dragoon rig —
  *  vertical, horizontal, the Volcano turn and its bottom-up finish. Fewer D'Lv = the first few. */
+// (Lavitz's Jade Dragoon uses the same five, grafted onto its GLB: standing cuts that sit well over
+// the hover, where his own ground Addition clips — crouches, lunges — contorted it.)
 const DART_DRAGOON_ATTACK: AdditionHitChoreo[] = [
   { clip: "verticalCut", impact: 0.58, length: 0.75 },
   { clip: "doubleSlash2", impact: 0.44, length: 0.88 },
   { clip: "volcano2", impact: 0.56, length: 0.97 },
   { clip: "volcano3", impact: 0.42, length: 0.96 },
   { clip: "volcano4", impact: 0.45, length: 0.9 },
-];
-
-/** Lavitz's D'Attack blows (Jade Dragoon): his own Addition clips grafted onto the Dragoon GLB —
- *  the thrust, the upward cut, Harpoon's downward cut, the thrust again, then Spinning Cane's
- *  finisher with the spear twirled over the head. */
-const LAVITZ_DRAGOON_ATTACK: AdditionHitChoreo[] = [
-  { clip: "thrust", impact: 0.82, length: 1.45 },
-  { clip: "cane2", impact: 0.79, length: 1.1 },
-  { clip: "harpoon2", impact: 0.75, length: 1.1 },
-  { clip: "thrust", impact: 0.82, length: 1.45 },
-  { clip: "cane3", impact: 1.8, length: 2.8, spin: { at: 0.55, seconds: 0.9, turns: 2 } },
 ];
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
@@ -240,7 +231,7 @@ export const BEARERS: Bearer[] = [
   // Jade (Wind) — spears
   { id: "syuveil", name: "Syuveil", classId: "jade", portrait: syuveilPortrait, weapon: "spear", hair: "neat", outfit: "scholar", color: C_WIND, bodyColor: [0.88, 0.89, 0.92], storyPlayable: false },
   { id: "greham", name: "Greham", classId: "jade", portrait: grehamPortrait, weapon: "spear", hair: "banded", outfit: "darkknight", color: C_WIND, bodyColor: [0.26, 0.19, 0.13], storyPlayable: false },
-  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, model: "lavitz", dragoonModel: "lavitz_dragoon", dragoonModelYaw: -Math.PI / 2, dragoonAttackChoreo: LAVITZ_DRAGOON_ATTACK, dragoonWeaponModel: "lavitz_dragoon_lance", weaponModel: "lavitz_lance", weaponGrip: 0.6, weaponScale: 2.0, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponTwoHandReach: 0.65, weaponUpright: true, throwRelease: 0.8, throwHealRelease: 0.75, weaponBackRotation: [1.4, -179.1, -23.7], weaponBackOffset: [0.24, -0.625, -0.133], weaponBackScale: 2.0, weapon: "spear", hair: "short", outfit: "knight", color: C_WIND, storyPlayable: true },
+  { id: "lavitz", name: "Lavitz", classId: "jade", portrait: lavitzPortrait, model: "lavitz", dragoonModel: "lavitz_dragoon", dragoonModelYaw: -Math.PI / 2, dragoonAttackChoreo: DART_DRAGOON_ATTACK, dragoonWeaponModel: "lavitz_dragoon_lance", weaponModel: "lavitz_lance", weaponGrip: 0.6, weaponScale: 2.0, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponTwoHandReach: 0.65, weaponUpright: true, throwRelease: 0.8, throwHealRelease: 0.75, weaponBackRotation: [1.4, -179.1, -23.7], weaponBackOffset: [0.24, -0.625, -0.133], weaponBackScale: 2.0, weapon: "spear", hair: "short", outfit: "knight", color: C_WIND, storyPlayable: true },
   { id: "albert", name: "Albert", classId: "jade", portrait: albertPortrait, weapon: "spear", hair: "swept", outfit: "noble", color: C_WIND, storyPlayable: true },
   // White-Silver (Light) — bows, no Additions
   { id: "shirley", name: "Shirley", classId: "whiteSilver", portrait: shirleyPortrait, weapon: "bow", hair: "wavy", outfit: "priestess", color: C_LIGHT, bodyColor: [0.8, 0.87, 0.96], storyPlayable: false },

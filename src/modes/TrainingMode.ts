@@ -1327,7 +1327,6 @@ export abstract class ArenaCombatMode extends GameMode {
     this.updateSight();
     this.updateGuardMarker();
     this.buffMarker.update(
-      dt,
       this.party.filter((m) => m.avatar.hp > 0 && m.avatar.damageHalved).map((m) => ({ head: m.position.add(new Vector3(0, 2.75, 0)), left: m.avatar.damageHalveLeft })),
     );
     this.updateDragoonSpace(); // end the Space once its initiator reverts
