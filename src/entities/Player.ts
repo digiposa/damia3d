@@ -187,7 +187,15 @@ export class Player {
   /** Extra height of the Dragoon figure above its hover (a charge in flight), world units. */
   dragoonLift = 0;
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
-  private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "lFore" | "rArm" | "rFore", TransformNode | undefined>; obs: Observer<Scene>; t: number };
+  private dragoonHover?: {
+    pose: TransformNode;
+    bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "lFore" | "rArm" | "rFore", TransformNode | undefined>;
+    /** Dedicated wing joints (no clip animates them): their rest rotation, put back every frame
+     *  before the beat is added — else the additive turn would pile up frame after frame. */
+    wingRest: { l?: Quaternion; r?: Quaternion };
+    obs: Observer<Scene>;
+    t: number;
+  };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
   private modelRoot?: TransformNode;
   private modelAnims: {
@@ -1222,6 +1230,8 @@ export class Player {
     const upW = Vector3.TransformNormal(Vector3.Up(), wm).normalize();
     addWorld(h.bones.lFoot, upW, DRAGOON_HOVER.footYawL);
     addWorld(h.bones.rFoot, upW, DRAGOON_HOVER.footYawR);
+    if (h.wingRest.l && h.bones.lWing) h.bones.lWing.rotationQuaternion = h.wingRest.l.clone();
+    if (h.wingRest.r && h.bones.rWing) h.bones.rWing.rotationQuaternion = h.wingRest.r.clone();
     addWorld(h.bones.lWing, fwdW, DRAGOON_HOVER.wingLift + DRAGOON_HOVER.wing * beat);
     addWorld(h.bones.rWing, fwdW, -(DRAGOON_HOVER.wingLiftR + DRAGOON_HOVER.wing * beat));
     addWorld(h.bones.lWing, upW, DRAGOON_HOVER.wingBackL);
@@ -1373,7 +1383,9 @@ export class Player {
     const bone = (n: string): TransformNode | undefined => sk?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
     const bones = { lThigh: bone("LeftUpLeg"), rThigh: bone("RightUpLeg"), lKnee: bone("LeftLeg"), rKnee: bone("RightLeg"), lFoot: bone("LeftFoot"), rFoot: bone("RightFoot"), lToe: bone("LeftToeBase"), rToe: bone("RightToeBase"), lWing: bone("LeftWing") ?? bone("LeftShoulder"), rWing: bone("RightWing") ?? bone("RightShoulder"), lArm: bone("LeftArm"), lFore: bone("LeftForeArm"), rArm: bone("RightArm"), rFore: bone("RightForeArm") };
     const obs = scene.onAfterAnimationsObservable.add(() => this.hoverDragoon(scene.getEngine().getDeltaTime() / 1000));
-    this.dragoonHover = { pose, bones, obs, t: 0 };
+    const restOf = (n: TransformNode | undefined): Quaternion | undefined =>
+      n && /Wing$/.test(n.name) ? (n.rotationQuaternion?.clone() ?? Quaternion.FromEulerVector(n.rotation)) : undefined;
+    this.dragoonHover = { pose, bones, wingRest: { l: restOf(bones.lWing), r: restOf(bones.rWing) }, obs, t: 0 };
     // The weapon rides the Dragoon's right hand too (same per-rig grip as the human rig).
     const hand = bone("RightHand");
     if (hand && this.bearer.weaponModel && this.bearer.weaponHandRotation) {
