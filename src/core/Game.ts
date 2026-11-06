@@ -35,6 +35,9 @@ export class Game implements GameHost {
   private menu: MainMenu;
   private system: SystemMenu;
   private systemBtn: Button;
+  /** The mute toggle beside the gear (also the M key). */
+  private muteBtn: Button;
+  private muteShown = settings.soundEnabled;
   private paused = false;
   /** Last retro setting applied to the backbuffer, to notice an Options change. */
   private retroLines = settings.retroLines;
@@ -73,6 +76,18 @@ export class Game implements GameHost {
       },
     });
 
+    this.muteBtn = new Button({
+      label: settings.soundEnabled ? "🔊" : "🔇",
+      onClick: () => this.toggleMute(),
+      style: {
+        top: "calc(env(safe-area-inset-top, 0px) + 10px)",
+        right: "calc(env(safe-area-inset-right, 0px) + 64px)",
+        font: "600 18px/1 system-ui, sans-serif",
+        padding: "10px 12px",
+        zIndex: "32",
+      },
+    });
+
     // Retro (PS1) resolution: the backbuffer size depends on the window height, so re-derive it on
     // every resize — and once now, before the first frame.
     applyRetroResolution(this.engine);
@@ -93,6 +108,11 @@ export class Game implements GameHost {
       if (settings.retroLines !== this.retroLines) {
         this.retroLines = settings.retroLines;
         applyRetroResolution(this.engine);
+      }
+      // The mute button mirrors the setting wherever it was changed (the Options screen too).
+      if (this.muteShown !== settings.soundEnabled) {
+        this.muteShown = settings.soundEnabled;
+        this.muteBtn.setLabel(settings.soundEnabled ? "🔊" : "🔇");
       }
       const dt = this.engine.getDeltaTime() / 1000;
       if (!this.paused) this.modes.update(dt);
@@ -142,7 +162,8 @@ export class Game implements GameHost {
     this.system.hide();
     this.modes.clear();
     this.paused = true;
-    this.systemBtn.setVisible(true); // gear stays available on the title screen (Config only)
+    this.systemBtn.setVisible(true);
+    this.muteBtn.setVisible(true); // gear stays available on the title screen (Config only)
     this.joystick?.setVisible(false);
     this.menu.show();
     // Warm the pipeline while the player reads the title screen: the default party's models plus
@@ -178,6 +199,7 @@ export class Game implements GameHost {
     this.system.hide();
     this.paused = false;
     this.systemBtn.setVisible(true);
+    this.muteBtn.setVisible(true);
     this.joystick?.setVisible(true);
   }
 
@@ -189,6 +211,7 @@ export class Game implements GameHost {
     const atMainMenu = this.menu.isOpen;
     if (!atMainMenu) this.paused = true; // pause gameplay (nothing runs at the title)
     this.systemBtn.setVisible(false);
+    this.muteBtn.setVisible(false);
     this.joystick?.setVisible(false);
     this.system.show(atMainMenu, section);
   }
@@ -196,6 +219,7 @@ export class Game implements GameHost {
   private closeSystemMenu(): void {
     this.system.hide();
     this.systemBtn.setVisible(true);
+    this.muteBtn.setVisible(true);
     // Returning to the title leaves the main menu (still shown) paused.
     if (!this.menu.isOpen) {
       this.paused = false;
@@ -203,7 +227,19 @@ export class Game implements GameHost {
     }
   }
 
+  /** Mute / unmute everything (the button beside the gear, or M). */
+  private toggleMute(): void {
+    settings.soundEnabled = !settings.soundEnabled;
+    audio.applyVolumes();
+  }
+
   private handleHotkeys(e: KeyboardEvent): void {
+    if (e.code === "KeyM" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      this.toggleMute();
+      return;
+    }
     if (e.code !== "Escape") return;
     e.preventDefault();
     // Escape closes whatever menu is currently open, at any level:
