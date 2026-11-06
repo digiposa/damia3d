@@ -120,6 +120,7 @@ export class Game implements GameHost {
    * The mode's own loading gate, when it downloads models, shows its byte progress on top.
    */
   private async launch(factory: ModeFactory): Promise<void> {
+    audio.stopMusic(0.3); // nothing plays over the loading screen; the new map starts its own
     const overlay = new LoadingOverlay();
     overlay.setProgress(0.05);
     const frame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));

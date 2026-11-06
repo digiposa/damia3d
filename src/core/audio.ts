@@ -154,22 +154,22 @@ class AudioEngine {
     });
   }
 
-  /** Fade the music out and stop it (leaving the menu, a cut to silence). */
-  stopMusic(): void {
+  /** Fade the music out over `fade` seconds and stop it (leaving a map, back to the menu). */
+  stopMusic(fade = MUSIC_FADE): void {
     this.musicWanted = undefined;
     this.musicSerial += 1;
-    this.fadeOutCurrent();
+    this.fadeOutCurrent(fade);
   }
 
-  private fadeOutCurrent(): void {
+  private fadeOutCurrent(fade = MUSIC_FADE): void {
     const cur = this.music;
     if (!cur || !this.ctx) return;
     this.music = undefined;
     const t = this.ctx.currentTime;
     cur.gain.gain.cancelScheduledValues(t);
     cur.gain.gain.setValueAtTime(cur.gain.gain.value, t);
-    cur.gain.gain.linearRampToValueAtTime(0, t + MUSIC_FADE);
-    cur.src.stop(t + MUSIC_FADE + 0.05);
+    cur.gain.gain.linearRampToValueAtTime(0, t + fade);
+    cur.src.stop(t + fade + 0.05);
   }
 
   /** Warm the cache for effects a scene will need (no-op before the first gesture). */

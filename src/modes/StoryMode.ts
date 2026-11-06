@@ -492,6 +492,7 @@ export class StoryMode extends ArenaCombatMode {
   /** Leave for another map: fade out, save, rebuild the scene with the next map. */
   private async gotoMap(map: string, entry: string): Promise<void> {
     this.lock();
+    audio.stopMusic(0.6); // the music goes with the picture: silence over the loading screen
     await this.fader?.fade(1, 0.6);
     this.syncState();
     const s = story();
