@@ -1,5 +1,6 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { ClickMarker } from "../world/ClickMarker";
 import "@babylonjs/core/Meshes/meshBuilder";
 // Side-effect import: scene.pick / createPickingRay need Ray registered, else
 // every click throws "Ray needs to be imported before" and click-to-move dies.
@@ -355,6 +356,8 @@ export abstract class ArenaCombatMode extends GameMode {
   private debugBtn?: Button;
   /** One-tap training dummy (🎯, left of the 🛠 button; N on a keyboard) — Training only. */
   private dummyBtn?: Button;
+  /** Where the last click-to-move click landed (desktop): a ring on the ground, kept while walking. */
+  private clickMarker?: ClickMarker;
   private debugMenu?: TrainingMenu;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
@@ -586,6 +589,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.buildParty();
     this.camera = new IsoCamera(this.scene, this.player.position.clone());
     this.camera.framing = this.world.framing;
+    this.clickMarker = new ClickMarker(this.scene);
     this.applyCameraView();
     this.playEnterMusic(this.enterMusic());
     if (settings.cameraStyle === 1) {
@@ -1196,6 +1200,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // and guarding roots in place too. The post-whiff lockout doesn't root (you may
     // reposition while you can't attack).
     const rooted = this.player.guardActive || this.runner.active || this.attackAnimT > 0 || this.inputLocked;
+    this.clickMarker?.update(dt, !!this.moveTarget && !rooted);
     const before = this.player.position.clone();
     // Walk vs run: gauged by joystick magnitude on touch (past RUN_THRESHOLD = run); desktop
     // click-to-move has no analog input, so it defaults to a run. Holding Alt forces a walk
@@ -2335,6 +2340,7 @@ export abstract class ArenaCombatMode extends GameMode {
       this.moveTarget = ground;
       this.attackTarget = undefined;
       this.pendingAttack = false;
+      this.clickMarker?.show(ground); // where the click landed (QoL): a ring on the ground
     }
   };
 
@@ -3593,6 +3599,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.hud.dispose();
     this.sight.dispose();
     this.guardMarker.dispose();
+    this.clickMarker?.dispose();
     this.additionBanner.dispose();
     this.debugMenu?.dispose();
     this.debugBtn?.dispose();
