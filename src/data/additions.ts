@@ -122,6 +122,7 @@ export const DART_ADDITIONS = {
   },
   blazingDynamo: {
     name: "Blazing Dynamo",
+    sound: "addition_blazing_dynamo",
     hits: [40, 30, 30, 30, 30, 30, 30, 30],
     multiplier: [100, 120, 140, 160, 180],
     spMax: 150,
