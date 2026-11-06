@@ -161,7 +161,9 @@ export class Player {
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
-  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup } = {};
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup } = {};
+  /** Extra height of the Dragoon figure above its hover (a charge in flight), world units. */
+  dragoonLift = 0;
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
   private dragoonHover?: { pose: TransformNode; bones: Record<"lThigh" | "rThigh" | "lKnee" | "rKnee" | "lFoot" | "rFoot" | "lToe" | "rToe" | "lWing" | "rWing" | "lArm" | "lFore" | "rArm" | "rFore", TransformNode | undefined>; obs: Observer<Scene>; t: number };
   /** Rigged glTF model container (when the bearer supplies one), replacing the placeholder. */
@@ -950,11 +952,16 @@ export class Player {
     });
   }
 
+  private dragoonCastClip(form: "shot" | "ground" | "ball" | "flight"): AnimationGroup | undefined {
+    const a = this.dragoonAnims;
+    return form === "ground" ? a.cast2 : form === "ball" ? a.ball : form === "flight" ? a.flight : a.cast;
+  }
+
   /** The Dragoon's spell-casting gesture, when its model has one: `shot` thrusts a hand out (a
    *  bolt leaves it), `ground` slams the ground. Returns the second the spell goes off inside that
    *  motion (0 = no gesture: the spell resolves at once). */
   castGesture(form: "shot" | "ground" = "shot"): number {
-    const a = this.dragoonActive && this.dragoonModelRoot ? (form === "ground" ? this.dragoonAnims.cast2 : this.dragoonAnims.cast) : undefined;
+    const a = this.dragoonActive && this.dragoonModelRoot ? this.dragoonCastClip(form) : undefined;
     if (!a) {
       this.strike();
       return 0;
@@ -964,9 +971,31 @@ export class Player {
   }
 
   /** How long the cast gesture lasts in all (seconds), 0 without one. */
-  castGestureLength(form: "shot" | "ground" = "shot"): number {
-    const a = form === "ground" ? this.dragoonAnims.cast2 : this.dragoonAnims.cast;
+  castGestureLength(form: "shot" | "ground" | "ball" | "flight" = "shot"): number {
+    const a = this.dragoonCastClip(form);
     return a ? (a.to - a.from) / 60 : 0;
+  }
+
+  /** Hold a Dragoon pose (looped: curled into a ball, flying) until {@link endCastPose}; the
+   *  caller moves the figure. False when the model has no such clip. */
+  castPose(form: "ball" | "flight"): boolean {
+    const a = this.dragoonActive && this.dragoonModelRoot ? this.dragoonCastClip(form) : undefined;
+    if (!a) return false;
+    if (this.modelCurrent === a && a.isPlaying) return true;
+    const prev = this.modelCurrent;
+    this.modelCurrent = a;
+    this.modelAttacking = true;
+    prev?.stop();
+    a.start(true, 1, a.from, a.to);
+    return true;
+  }
+
+  /** Release a held cast pose: the hover idle resumes. */
+  endCastPose(): void {
+    const a = this.modelCurrent;
+    if (!a || (a !== this.dragoonAnims.ball && a !== this.dragoonAnims.flight)) return;
+    a.stop();
+    this.modelAttacking = false;
   }
 
   /** Throw an item: the throw clip when the model has one (the generic strike otherwise). Returns
@@ -998,7 +1027,7 @@ export class Player {
     const beat = Math.sin(h.t * DRAGOON_HOVER.beatHz * Math.PI * 2);
     const root = h.pose.parent as TransformNode;
     const k = 1 / Math.max(1e-3, root.scaling.y); // the root is scaled to fit the figure's height
-    h.pose.position.y = (DRAGOON_HOVER.height + DRAGOON_HOVER.bob * beat) * k;
+    h.pose.position.y = (DRAGOON_HOVER.height + DRAGOON_HOVER.bob * beat + this.dragoonLift) * k;
     // The mesh's own forward/right in the root's frame (the root carries the model's yaw fix).
     const yawFix = this.bearer.dragoonModelYaw ?? Math.PI / 2;
     const unyaw = Matrix.RotationY(-yawFix);
@@ -1158,6 +1187,8 @@ export class Player {
     this.dragoonAnims.attack = res.animationGroups.find((a) => has(a, "attack", "slash"));
     this.dragoonAnims.cast = res.animationGroups.find((a) => a.name.toLowerCase() === "cast" || has(a, "spell1", "cast1"));
     this.dragoonAnims.cast2 = res.animationGroups.find((a) => has(a, "cast2", "spell2", "slam"));
+    this.dragoonAnims.ball = res.animationGroups.find((a) => has(a, "cast3a", "ball", "curl"));
+    this.dragoonAnims.flight = res.animationGroups.find((a) => has(a, "cast3b", "flight", "fly"));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
     // PS1 hover: leaning forward, legs trailing back, wings beating — laid over whatever clip plays,
     // after the animations have written the bones (so the pose adds to the clip, not under it).

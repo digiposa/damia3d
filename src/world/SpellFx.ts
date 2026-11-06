@@ -55,6 +55,10 @@ export class SpellFx {
   /** A line of fire racing along the ground (Explosion): its flames, and the run in progress. */
   private readonly trail: ParticleSystem;
   private trailRun?: { from: Vector3; to: Vector3; t: number; dur: number; onArrive: () => void };
+  /** A shell of fire wrapping a charging caster (Final Burst): the sphere, and the run in progress. */
+  private readonly shell: Mesh;
+  private readonly shellMat: StandardMaterial;
+  private shellRun?: { at: () => Vector3; t: number; dur: number };
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -81,6 +85,16 @@ export class SpellFx {
     this.auraColumn = this.buildAuraColumn();
     this.auraSparks = this.buildAuraSparks();
     this.trail = this.buildTrail();
+    this.shellMat = new StandardMaterial("fxShellMat", scene);
+    this.shellMat.disableLighting = true;
+    this.shellMat.emissiveColor = new Color3(1, 0.45, 0.1);
+    this.shellMat.alpha = 0.5;
+    this.shellMat.backFaceCulling = false;
+    this.shell = MeshBuilder.CreateSphere("fxShell", { diameter: 1, segments: 12 }, scene);
+    this.shell.material = this.shellMat;
+    this.shell.isPickable = false;
+    this.shell.setEnabled(false);
+    this.disposables.push(this.shell, this.shellMat);
     this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
     this.auraLight.range = 9;
     this.auraLight.intensity = 0;
@@ -113,6 +127,22 @@ export class SpellFx {
           this.auraColumn.emitRate = 0;
           this.auraSparks.emitRate = 0;
           this.auraLight.intensity = 0;
+        }
+      }
+      // The fire shell: wraps the charging caster, breathing, its flames streaming behind.
+      const shell = this.shellRun;
+      if (shell) {
+        shell.t += dt;
+        const at = shell.at();
+        this.shell.position.copyFrom(at);
+        const s = 2.1 + 0.25 * Math.sin(shell.t * 29) + 0.12 * Math.sin(shell.t * 47 + 1);
+        this.shell.scaling.setAll(s);
+        this.shellMat.alpha = 0.5 + 0.12 * Math.sin(shell.t * 23);
+        this.trail.emitter = at;
+        if (shell.t >= shell.dur) {
+          this.shell.setEnabled(false);
+          this.trail.emitRate = 0;
+          this.shellRun = undefined;
         }
       }
       // The fire line: the flame emitter runs from caster to target, then the line goes off.
@@ -183,6 +213,19 @@ export class SpellFx {
     this.trailRun = { from: from.clone(), to: to.clone(), t: 0, dur: Math.max(0.05, seconds), onArrive };
     this.trail.emitter = from.add(new Vector3(0, 0.15, 0));
     this.trail.emitRate = 420;
+  }
+
+  /**
+   * A shell of fire around a charging caster (Dart's Final Burst): a breathing sphere of flame
+   * around `at()` (re-read every frame, so it follows the flight), flames streaming off it, for
+   * `seconds`.
+   */
+  fireShell(at: () => Vector3, seconds: number): void {
+    this.shellRun = { at, t: 0, dur: Math.max(0.05, seconds) };
+    this.shell.position.copyFrom(at());
+    this.shell.setEnabled(true);
+    this.trail.emitter = at();
+    this.trail.emitRate = 320;
   }
 
   /** Move a playing aura with its caster (called per frame while the buff clip runs). */

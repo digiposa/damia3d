@@ -140,6 +140,13 @@ const FIREBALL_SPEED = 14;
 /** Explosion: how fast the fire line races along the ground, and how wide the blast lands. */
 const FIRE_TRAIL_SPEED = 9;
 const EXPLOSION_RADIUS = 3.5;
+/** Final Burst: the caster curls into a ball (seconds), charges through the foe and `overshoot`
+ *  units past them (seconds out), then flies back to where they started (seconds back). */
+const BURST_BALL_SECONDS = 0.9;
+const BURST_OUT_SECONDS = 0.45;
+const BURST_BACK_SECONDS = 0.65;
+const BURST_OVERSHOOT = 2.5;
+const BURST_LIFT = 0.7;
 /** VFX power of an attack item at the BOTTOM of its mash range (one QTE step). The player's Burn Out
  *  scales from here up to ~1.9 on a perfect mash; an enemy's cast has no QTE, so it lands at this
  *  floor — same spell, same flame column, just the un-mashed version. */
@@ -1060,6 +1067,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // Keep the ATB gauge's fill time in sync with the bearer's Speed (gear can change it).
     this.runner.setFillTime(this.player.atbFillTime);
     this.tickComboTimers(cdt);
+    this.tickDash(cdt);
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
@@ -1174,6 +1182,43 @@ export abstract class ArenaCombatMode extends GameMode {
     this.comboTarget = undefined;
     this.actionRecoveryT = ACTION_RECOVERY;
     if (this.player.dragoonSpent) this.player.revert();
+  }
+
+  /** A Final Burst charge in progress: out through the foe, then back to the start (see tickDash). */
+  private dash?: { p: Player; start: Vector3; end: Vector3; t: number; out: number; back: number; hitAt: number; turned?: boolean; hit?: () => void; done: () => void };
+
+  /** Fly the charging caster along their path: out to the far point (the blow lands as they pass
+   *  the foe), then back to where they started; lifted off the ground in between. */
+  private tickDash(dt: number): void {
+    const d = this.dash;
+    if (!d) return;
+    d.t += dt;
+    const ease = (k: number): number => k * k * (3 - 2 * k);
+    if (d.t <= d.out) {
+      const k = d.t / d.out;
+      if (d.hit && k >= d.hitAt) {
+        d.hit();
+        d.hit = undefined;
+      }
+      Vector3.LerpToRef(d.start, d.end, ease(k), d.p.position);
+      d.p.dragoonLift = BURST_LIFT * Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5);
+      return;
+    }
+    const k = Math.min(1, (d.t - d.out) / d.back);
+    if (d.hit) {
+      d.hit();
+      d.hit = undefined;
+    }
+    if (!d.turned) {
+      d.turned = true;
+      d.p.face(d.start.subtract(d.end)); // wheel round and fly home
+    }
+    Vector3.LerpToRef(d.end, d.start, ease(k), d.p.position);
+    d.p.dragoonLift = BURST_LIFT * Math.sin((1 - k) * Math.PI * 0.5);
+    if (k < 1) return;
+    d.p.position.copyFrom(d.start);
+    this.dash = undefined;
+    d.done();
   }
 
   /** Apply the whole Addition/D'Attack total to its target in one blow (see {@link applyHit}). Landing
@@ -1503,6 +1548,56 @@ export abstract class ArenaCombatMode extends GameMode {
     this.runner.gauge.spend(); // a cast costs the ATB action…
     p.tickDragoon(); // …and one Dragoon turn
     const allies = (): Player[] => this.party.map((m) => m.avatar);
+    if (spell.id === "finalBurst" && primary && p.castGestureLength("flight") > 0) {
+      // Final Burst (PS1): Dart wraps himself in fire, charges straight THROUGH the foe and flies
+      // back to where he stood. Rooted throughout; the figure is moved here (see tickDash).
+      p.mp = Math.max(0, p.mp - spell.mp);
+      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
+      const target = primary;
+      const total = BURST_BALL_SECONDS + BURST_OUT_SECONDS + BURST_BACK_SECONDS + 0.2;
+      this.attackAnimT = Math.max(this.attackAnimT, total);
+      p.castPose("ball");
+      this.spellFx?.powerUp(p.position, BURST_BALL_SECONDS, new Color3(1, 0.5, 0.15));
+      this.comboTimers.push({
+        t: BURST_BALL_SECONDS,
+        fn: () => {
+          const start = p.position.clone();
+          const at = target.position.clone();
+          const dir = at.subtract(start);
+          dir.y = 0;
+          const reach = dir.length();
+          dir.normalize();
+          const end = at.add(dir.scale(BURST_OVERSHOOT));
+          end.y = start.y;
+          p.face(dir);
+          p.castPose("flight");
+          this.spellFx?.fireShell(() => p.position.add(new Vector3(0, 1.1 + p.dragoonLift, 0)), BURST_OUT_SECONDS + BURST_BACK_SECONDS);
+          this.dash = {
+            p,
+            start,
+            end,
+            t: 0,
+            out: BURST_OUT_SECONDS,
+            back: BURST_BACK_SECONDS,
+            hitAt: reach / Math.max(0.01, reach + BURST_OVERSHOOT),
+            hit: () => {
+              this.spellFx?.burst(spell.element, target.position, 2.0);
+              this.camera.shake(0.3, 0.4);
+              this.castSpell(p, spell, target, allies(), false);
+            },
+            done: () => {
+              p.dragoonLift = 0;
+              p.endCastPose();
+              if (target.alive) p.face(target.position.subtract(p.position));
+              this.finishAction();
+              this.refreshHud();
+            },
+          };
+        },
+      });
+      this.refreshHud();
+      return;
+    }
     if (spell.target === "allEnemies" && primary) {
       const release = p.castGesture("ground");
       if (release > 0) {
