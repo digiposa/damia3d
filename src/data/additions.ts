@@ -39,7 +39,7 @@ export interface AdditionDef {
   acquireLevel: number;
   /** Per-hit choreography (index = hit − 1); absent = the generic swing on every hit. */
   choreo?: AdditionHitChoreo[];
-  /** The call-out played as the Addition starts (an effect's base name in src/assets/audio/sfx). */
+  /** The call-out played when the Addition is completed (an effect's base name in src/assets/audio/sfx). */
   sound?: string;
 }
 

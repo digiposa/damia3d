@@ -2443,7 +2443,6 @@ export abstract class ArenaCombatMode extends GameMode {
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
     this.comboDamage = 0; // fresh combo — start its damage tally from zero
-    if (def.sound && !this.comboIsDragoon) audio.playSfx(def.sound); // the Addition's call-out
     // The PS1 read-out along the bottom (multi-hit Additions only; the tally grows per press).
     // (A D'Attack earns no SP: its read-out counts the blows, in the Dragoon's element colour.)
     if (additionPresses(def) > 0) {
@@ -2490,7 +2489,10 @@ export abstract class ArenaCombatMode extends GameMode {
     } else this.additionBanner.add(0); // one more blow on the D'Attack read-out
     if (res.perfect) this.popText(target.position.add(new Vector3(0, 3.1, 0)), t("combat.perfect"), TEXT.perfect);
     if (res.completed) {
-      if (!dragoon) this.player.recordAddition(add);
+      if (!dragoon) {
+        this.player.recordAddition(add);
+        if (add.sound) audio.playSfx(add.sound); // the Addition's call-out: on completing it (PS1)
+      }
       this.additionBanner.finish(add.name, true);
       this.finishAction(); // combo finished cleanly → lands the total, breather + Dragoon revert
     }
