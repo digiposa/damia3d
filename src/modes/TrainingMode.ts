@@ -2264,6 +2264,9 @@ export abstract class ArenaCombatMode extends GameMode {
       this.input.pressVirtual("Space"); // tap = attack the locked enemy
       return;
     }
+    // Mouse / pen: only the main button moves or aims (the right button turns the camera, the
+    // middle one is the browser's).
+    if (e.button !== 0) return;
     const picked = this.scene.pick(e.offsetX, e.offsetY)?.pickedMesh?.metadata;
     if (picked instanceof Enemy && this.enemies.includes(picked)) {
       this.lockOn(picked);
