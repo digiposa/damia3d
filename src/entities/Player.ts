@@ -979,7 +979,7 @@ export class Player {
       y.normalize();
       // A spear held in both hands during a blow (a two-handed sword clip): the tip goes to
       // whichever end is ahead of him, and stays ahead (see below).
-      if (g.upright && this.modelAttacking) this.spearAhead(y, m);
+      if (g.upright && this.modelAttacking && !this.throwing) this.spearAhead(y, m);
     } else if (g.hang) {
       // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs tip down and a
       // little forward of him (PS1), whatever the hand does — a fixed direction in his own frame,
@@ -989,7 +989,7 @@ export class Player {
       const tipW = fwdW.scale(0.7).subtractInPlace(Vector3.Up().scale(0.72)).normalize(); // ~45° down, ahead of him
       Vector3.TransformNormalToRef(tipW, m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
-    } else if (g.upright && this.modelAttacking && g.RF) {
+    } else if (g.upright && this.modelAttacking && !this.throwing && g.RF) {
       // A spear in one hand during a blow: along the forearm, tip ahead of the fist (a thrust),
       // but never behind him — the wind-up draws the arm back and the forearm turns backward,
       // while the spearhead stays on the target.
@@ -1151,7 +1151,8 @@ export class Player {
     const clip = helpful ? this.modelAnims.throwHeal : this.modelAnims.throw;
     if (this.modelRoot && clip) {
       this.strike(clip.name);
-      return helpful ? THROW_HEAL_RELEASE : THROW_RELEASE;
+      this.throwing = true;
+      return helpful ? (this.bearer.throwHealRelease ?? THROW_HEAL_RELEASE) : (this.bearer.throwRelease ?? THROW_RELEASE);
     }
     if (helpful) return 0; // no gesture for a potion on the placeholder figure
     this.strike();
@@ -1160,6 +1161,9 @@ export class Player {
 
   /** Addition blows waiting their turn: each starts the frame the previous one ends. */
   private blowQueue: { clip: string; speed: number; spin?: WeaponSpin }[] = [];
+  /** A throw clip is on: the weapon rests in the hand (a spear stays upright) instead of following
+   *  the throwing arm like a blow. */
+  private throwing = false;
   /** The twirl the blow now playing asks for (see AdditionHitChoreo.spin), on that clip. */
   private weaponSpin?: WeaponSpin & { clip: AnimationGroup; speed: number };
 
@@ -1248,6 +1252,7 @@ export class Player {
    *  or if the model lacks it, the generic attack swing plays. */
   strike(clip?: string, speed = 1, spin?: WeaponSpin): void {
     this.weaponSpin = undefined;
+    this.throwing = false;
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.strike();
       return;
@@ -1299,7 +1304,10 @@ export class Player {
       if (this.modelCurrent !== own) return; // something else took over
       const next = this.blowQueue.shift();
       if (next) this.strike(next.clip, next.speed, next.spin); // the chain goes on, same frame
-      else this.modelAttacking = false;
+      else {
+        this.modelAttacking = false;
+        this.throwing = false;
+      }
     });
   }
 
