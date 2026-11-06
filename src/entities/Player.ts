@@ -91,6 +91,10 @@ const GUARD_DURATION = 2; // seconds the stance lasts
 const GUARD_HIT_SECONDS = 0.6;
 /** Seconds the hurt recoil owns the body (the clip's flinch; it then fades into the stance). */
 const HURT_SECONDS = 0.7;
+/** A flinch (hurt or guard jolt) plays for a blow worth at least this share of max HP, and not
+ *  again within {@link FLINCH_COOLDOWN} seconds: a hail of small hits doesn't keep jerking the body. */
+export const FLINCH_HP_FRACTION = 0.1;
+const FLINCH_COOLDOWN = 1.5;
 /** Combat-time multiplier (the Options "combat speed"): the combat clips — strikes, casts, hurt,
  *  guard jolts — play at this rate so their impacts stay on the combat clock the modes time
  *  them with (sight windows, blow chains, projectile releases). Set by the mode each frame. */
@@ -457,13 +461,21 @@ export class Player {
 
   /** Seconds the guard-impact jolt still owns the body (0 = none); also its replay cooldown. */
   private guardHitT = 0;
-  /** Seconds the hurt recoil still owns the body (0 = none); also its replay cooldown. */
+  /** Seconds the hurt recoil still owns the body (0 = none). */
   private hurtT = 0;
+  /** Seconds before another flinch (hurt or guard jolt) may play. */
+  private flinchCd = 0;
+
+  /** Whether a blow of `amount` HP warrants a flinch now (heavy enough, and the cooldown is over). */
+  flinchFor(amount: number): boolean {
+    return amount >= this.maxHp * FLINCH_HP_FRACTION && this.flinchCd <= 0;
+  }
 
   /** A blow taken unguarded: the flinch, unless the figure is busy with its own move (an attack,
    *  a cast: the action plays out — PS1) or already recoiling. */
   hurt(): void {
-    if (this.downed || this.guardActive || this.hurtT > 0) return;
+    if (this.downed || this.guardActive || this.hurtT > 0 || this.flinchCd > 0) return;
+    this.flinchCd = FLINCH_COOLDOWN;
     if (this.dragoonActive && this.dragoonModelRoot) {
       if (this.modelAttacking) return;
       const a = this.dragoonAnims.hurt;
@@ -484,7 +496,8 @@ export class Player {
    *  at once don't restart it over and over). */
   guardImpact(): void {
     const a = this.modelAnims.guardHit;
-    if (!a || !this.guardActive || this.guardHitT > 0) return;
+    if (!a || !this.guardActive || this.guardHitT > 0 || this.flinchCd > 0) return;
+    this.flinchCd = FLINCH_COOLDOWN;
     this.guardHitT = GUARD_HIT_SECONDS;
     this.modelCurrent?.stop();
     this.modelCurrent = a;
@@ -516,6 +529,7 @@ export class Player {
     }
     if (this.guardHitT > 0) this.guardHitT = Math.max(0, this.guardHitT - dt);
     if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
+    if (this.flinchCd > 0) this.flinchCd = Math.max(0, this.flinchCd - dt);
     if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
     if (this.damageHalveTimer > 0) this.damageHalveTimer = Math.max(0, this.damageHalveTimer - dt);
   }

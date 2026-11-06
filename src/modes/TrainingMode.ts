@@ -2803,14 +2803,16 @@ export abstract class ArenaCombatMode extends GameMode {
       // straight down, which would make the lean vertical — and vertical tells you nothing.
       this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y, 0)), `${amount}`, TEXT.damage, false, enemy.bodyPosition);
       // Blocked (guarding, damage halved): a spark off the guard, and the word.
+      // The body only reacts to a real blow (a tenth of max HP or more), and not twice in a row.
+      const flinch = this.player.flinchFor(amount);
       if (guard < 1) {
-        this.player.guardImpact();
+        if (flinch) this.player.guardImpact();
         audio.playSfx("guard_block");
         this.atmosphere?.spark(this.player.position.add(new Vector3(0, 1.2, 0)));
         this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y + 0.7, 0)), t("combat.guard"), TEXT.hp);
       } else {
         audio.playSfx("hurt");
-        this.player.hurt(); // unguarded: the flinch (unless busy with their own move)
+        if (flinch) this.player.hurt(); // unguarded: the flinch (unless busy with their own move)
       }
       if (this.player.hp === 0) {
         const downed = this.controlled;
