@@ -2617,6 +2617,7 @@ export abstract class ArenaCombatMode extends GameMode {
         this.popText(member.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), TEXT.dragoon);
         return true;
       case "item":
+        if (avatar.transformed) return false; // a Dragoon doesn't use items either
         return this.useHealItem(member);
       default:
         return false;
