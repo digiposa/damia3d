@@ -68,6 +68,9 @@ const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "
 const BACK_ROT = new Vector3(0, 0, 2.9); // near-vertical with a slight incline across the back
 const BACK_POS = new Vector3(0.05, 0.6, -0.14); // centred on the spine, dropped to mid-back, hugging behind
 const BACK_GRIP = 0.5;
+/** A one-handed spear during a blow keeps its tip at least this far forward (cosine of the angle
+ *  to the bearer's facing: 0.35 ≈ 70° off it at most). */
+const SPEAR_AHEAD = 0.35;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
 /** Where in the throw clip the item leaves the hand (arm at the top of its arc). */
@@ -979,8 +982,21 @@ export class Player {
       Vector3.TransformNormalToRef(tipW, m, y);
       y.normalize().scaleInPlace(-1); // y = tip → pommel
     } else if (g.upright && this.modelAttacking && g.RF) {
-      // A spear in one hand during a blow: along the forearm, tip ahead of the fist (a thrust).
-      at(g.RF, y).subtractInPlace(R).normalize(); // y = tip → pommel, i.e. towards the elbow
+      // A spear in one hand during a blow: along the forearm, tip ahead of the fist (a thrust),
+      // but never behind him — the wind-up draws the arm back and the forearm turns backward,
+      // while the spearhead stays on the target: the tip is kept at least SPEAR_AHEAD forward.
+      this.root.computeWorldMatrix(true);
+      const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
+      const tipW = g.R.getAbsolutePosition().subtract(g.RF.getAbsolutePosition()).normalize();
+      const d = Vector3.Dot(tipW, fwdW);
+      if (d < SPEAR_AHEAD) {
+        const side = tipW.subtract(fwdW.scale(d)); // the part across his forward axis
+        const len = side.length();
+        if (len > 1e-4) side.scaleInPlace(Math.sqrt(1 - SPEAR_AHEAD * SPEAR_AHEAD) / len);
+        tipW.copyFrom(side.addInPlace(fwdW.scale(SPEAR_AHEAD)).normalize());
+      }
+      Vector3.TransformNormalToRef(tipW, m, y);
+      y.normalize().scaleInPlace(-1); // y = tip → pommel
     } else if (g.upright) {
       // A spear in one hand stands on end, tip up (carried at rest), whatever the hand does.
       Vector3.TransformNormalToRef(Vector3.Up(), m, y);
