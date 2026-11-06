@@ -1267,9 +1267,48 @@ export abstract class ArenaCombatMode extends GameMode {
     else this.finishAction();
   }
 
+  /** Fly the Dragoon at `target` (in the flight pose, lifted), stopping in reach; `then` on
+   *  arrival. Remembers where it took off so {@link flyHome} can cut back there. */
+  private flyTo(target: Enemy, then: () => void): void {
+    const p = this.player;
+    const start = p.position.clone();
+    const dir = target.position.subtract(start);
+    dir.y = 0;
+    const reach = dir.length();
+    dir.normalize();
+    const end = start.add(dir.scale(Math.max(0, reach - Math.min(DATTACK_STAND_OFF, this.reach - 0.2))));
+    if (this.world.heightAt) end.y = this.world.heightAt(end.x, end.z);
+    this.clearNav();
+    this.attackAnimT = Math.max(this.attackAnimT, DATTACK_DASH_SECONDS + 0.05);
+    p.face(dir);
+    p.castPose("flight");
+    this.dAttackHome = start;
+    this.dash = {
+      p,
+      start,
+      end,
+      t: 0,
+      out: DATTACK_DASH_SECONDS,
+      hitAt: 2, // no blow on the way
+      done: () => {
+        p.dragoonLift = 0;
+        p.endCastPose();
+        then();
+      },
+    };
+  }
+
   /** Play the D'Attack's blows in a row (each chained at the end of the previous), the total
-   *  landing on the last one's impact — then, on a perfect, a flash of the Dragoon's element. */
+   *  landing on the last one's impact — then, on a perfect, a flash of the Dragoon's element.
+   *  Out of reach, the Dragoon first flies at the foe. */
   private executeDAttack(target: Enemy, hits: number, perfect: boolean): void {
+    if (!this.inReach(target) && this.player.castGestureLength("flight") > 0) {
+      this.flyTo(target, () => {
+        if (target.alive) this.executeDAttack(target, hits, perfect);
+        else this.finishAction();
+      });
+      return;
+    }
     const p = this.player;
     this.comboIsDragoon = true;
     this.comboTarget = target;
@@ -2202,38 +2241,11 @@ export abstract class ArenaCombatMode extends GameMode {
         preferred && preferred.alive && this.withinAcquire(preferred)
           ? preferred
           : this.nearestEnemy(ACQUIRE_RANGE);
-      if (acquire && this.player.transformed && this.player.castGestureLength("flight") > 0 && !this.dash && !this.dAttackHome) {
-        // A Dragoon doesn't walk over: it flies at the foe, strikes there, and flies home at the
-        // end of the combo (an instant cut, see finishAction).
-        const p = this.player;
-        const start = p.position.clone();
-        const dir = acquire.position.subtract(start);
-        dir.y = 0;
-        const reach = dir.length();
-        dir.normalize();
-        const end = start.add(dir.scale(Math.max(0, reach - Math.min(DATTACK_STAND_OFF, this.reach - 0.2))));
-        if (this.world.heightAt) end.y = this.world.heightAt(end.x, end.z);
-        this.clearNav(); // no walking after it: the flight is the approach, and home is a cut
-        this.attackAnimT = Math.max(this.attackAnimT, DATTACK_DASH_SECONDS + 0.05);
-        p.face(dir);
-        p.castPose("flight");
-        this.dAttackHome = start;
-        this.dash = {
-          p,
-          start,
-          end,
-          t: 0,
-          out: DATTACK_DASH_SECONDS,
-          hitAt: 2, // no blow on the way
-          done: () => {
-            p.dragoonLift = 0;
-            p.endCastPose();
-            if (acquire.alive) {
-              p.face(acquire.position.subtract(p.position));
-              this.attack(acquire); // in reach now: the D'Attack combo starts
-            } else this.flyHome();
-          },
-        };
+      if (acquire && this.player.transformed && !this.player.usesBasicAttack && !this.dash && !this.dAttackHome) {
+        // A Dragoon doesn't walk over: the Time-Dial spins where it hovers, then it flies at the
+        // foe for the blows and flies home at the end (an instant cut, see finishAction).
+        if (this.actionRecoveryT > 0) return;
+        this.startDial(acquire);
         return;
       }
       if (acquire) {
