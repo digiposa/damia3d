@@ -54,13 +54,14 @@ class AudioEngine {
   played = 0;
   /** The track playing (its name, source and own gain), and the one asked for before the engine
    *  could start (it starts on the first gesture). */
-  private music?: { name: string; src: AudioBufferSourceNode; gain: GainNode };
+  private music?: { name: string; src: AudioBufferSourceNode; gain: GainNode; startedAt: number };
   private musicWanted?: string;
   private musicSerial = 0;
   /** A set of tracks played one after another at random (the arena), none looped. */
   private playlist?: string[];
-  /** What played before {@link pushMusic} put the menu theme over it (restored by popMusic). */
-  private saved?: { name?: string; playlist?: string[] };
+  /** What played before {@link pushMusic} put the menu theme over it (restored by popMusic), and
+   *  how far into the track it was, so it picks up where it left off. */
+  private saved?: { name?: string; playlist?: string[]; offset: number };
 
   constructor() {
     if (typeof window === "undefined") return;
@@ -149,19 +150,29 @@ class AudioEngine {
    */
   pushMusic(name: string): void {
     if (this.saved) return; // already pushed: keep the music to come back to
-    this.saved = { name: this.musicWanted, playlist: this.playlist };
+    const cur = this.music;
+    let offset = 0;
+    if (cur && this.ctx) {
+      offset = Math.max(0, this.ctx.currentTime - cur.startedAt);
+      const dur = cur.src.buffer?.duration ?? 0;
+      if (cur.src.loop && dur > 0) offset %= dur;
+    }
+    this.saved = { name: this.musicWanted, playlist: this.playlist, offset };
     this.playlist = undefined;
     this.startTrack(name, true);
   }
 
-  /** Bring back what played before {@link pushMusic}: the same track, a fresh draw from the same
-   *  list, or silence. */
+  /** Bring back what played before {@link pushMusic}: the same track from where it was (its list,
+   *  if it came from one, goes on after it), or silence. */
   popMusic(): void {
     const s = this.saved;
     if (!s) return;
     this.saved = undefined;
-    if (s.playlist) this.playMusicList(s.playlist);
-    else if (s.name) this.playMusic(s.name);
+    if (s.playlist) {
+      this.playlist = s.playlist;
+      if (s.name) this.startTrack(s.name, false, s.offset);
+      else this.playMusicList(s.playlist);
+    } else if (s.name) this.startTrack(s.name, true, s.offset);
     else this.stopMusic();
   }
 
@@ -177,7 +188,7 @@ class AudioEngine {
     this.startTrack(pool[Math.floor(Math.random() * pool.length)], false);
   }
 
-  private startTrack(name: string, loop: boolean): void {
+  private startTrack(name: string, loop: boolean, offset = 0): void {
     this.musicWanted = name;
     if (!this.ctx || !this.musicBus) return;
     if (this.music?.name === name && this.music.src.loop === loop) return;
@@ -201,8 +212,9 @@ class AudioEngine {
       gain.gain.linearRampToValueAtTime(1, ctx.currentTime + MUSIC_FADE);
       src.connect(gain);
       gain.connect(bus);
-      src.start();
-      this.music = { name, src, gain };
+      const at = offset > 0 && offset < buffer.duration - 1 ? offset : 0;
+      src.start(0, at);
+      this.music = { name, src, gain, startedAt: ctx.currentTime - at };
     });
   }
 
