@@ -84,7 +84,7 @@ export class Game implements GameHost {
         right: "calc(env(safe-area-inset-right, 0px) + 64px)",
         font: "600 18px/1 system-ui, sans-serif",
         padding: "10px 12px",
-        zIndex: "32",
+        zIndex: "47", // above every overlay (menus, pickers, loading): mute is wanted anywhere
       },
     });
 
@@ -158,7 +158,7 @@ export class Game implements GameHost {
   }
 
   private openMainMenu(): void {
-    audio.playMusic("menu"); // the title screen, its Options and the character pickers share it
+    audio.playMusic("title"); // the title theme; Options and the character pickers have the menu theme
     this.system.hide();
     this.modes.clear();
     this.paused = true;
@@ -209,12 +209,9 @@ export class Game implements GameHost {
     // The System menu and a mode's own overlay (debug/item/spell) are mutually exclusive.
     if (this.modes.current?.hasOpenMenu?.()) return;
     const atMainMenu = this.menu.isOpen;
-    if (!atMainMenu) {
-      this.paused = true; // pause gameplay (nothing runs at the title)
-      audio.pushMusic("menu"); // the menu theme over the map's music, back to it on closing
-    }
-    this.systemBtn.setVisible(false);
-    this.muteBtn.setVisible(false);
+    if (!atMainMenu) this.paused = true; // pause gameplay (nothing runs at the title)
+    audio.pushMusic("menu"); // the menu theme over the title's or the map's music, back to it on closing
+    this.systemBtn.setVisible(false); // the mute button stays: it is wanted anywhere
     this.joystick?.setVisible(false);
     this.system.show(atMainMenu, section);
   }
@@ -227,8 +224,8 @@ export class Game implements GameHost {
     if (!this.menu.isOpen) {
       this.paused = false;
       this.joystick?.setVisible(true);
-      audio.popMusic();
     }
+    audio.popMusic();
   }
 
   /** Mute / unmute everything (the button beside the gear, or M). */
