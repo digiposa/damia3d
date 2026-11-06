@@ -68,6 +68,9 @@ const BACK_BONES = ["mixamorig:Spine2", "mixamorig:Spine1", "CC_Base_Spine02", "
 const BACK_ROT = new Vector3(0, 0, 2.9); // near-vertical with a slight incline across the back
 const BACK_POS = new Vector3(0.05, 0.6, -0.14); // centred on the spine, dropped to mid-back, hugging behind
 const BACK_GRIP = 0.5;
+/** A Dragoon's cast gestures: a bolt from the hand, a ground slam, a summoning, raising a wall of
+ *  wind, and the two held poses of a charge (curled up, flying). */
+type CastForm = "shot" | "ground" | "summon" | "wall" | "ball" | "flight";
 /** A one-handed spear during a blow keeps its tip at least this far forward (cosine of the angle
  *  to the bearer's facing: 0.35 ≈ 70° off it at most). */
 const SPEAR_AHEAD = 0.35;
@@ -85,6 +88,8 @@ const DRAGOON_CAST_RELEASE = 1.45;
 const DRAGOON_CAST_GROUND_RELEASE = 1.74;
 /** Second the Dragoon's summoning cast throws its arms up (see the cast4 clip). */
 const DRAGOON_CAST_SUMMON_RELEASE = 1.4;
+/** Second the Dragoon's wall-raising cast throws the wind up (see the cast5 clip: Rose Storm). */
+const DRAGOON_CAST_WALL_RELEASE = 1.8;
 /** Where in the helpful-item clip the item is tossed up (hand at the top of its arc). */
 const THROW_HEAL_RELEASE = 0.6;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
@@ -183,7 +188,7 @@ export class Player {
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
-  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup; hurt?: AnimationGroup; byName: Map<string, AnimationGroup> } = { byName: new Map() };
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup; wall?: AnimationGroup; hurt?: AnimationGroup; byName: Map<string, AnimationGroup> } = { byName: new Map() };
   /** Extra height of the Dragoon figure above its hover (a charge in flight), world units. */
   dragoonLift = 0;
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
@@ -1115,26 +1120,26 @@ export class Player {
     });
   }
 
-  private dragoonCastClip(form: "shot" | "ground" | "summon" | "ball" | "flight"): AnimationGroup | undefined {
+  private dragoonCastClip(form: CastForm): AnimationGroup | undefined {
     const a = this.dragoonAnims;
-    return form === "ground" ? a.cast2 : form === "summon" ? a.summon : form === "ball" ? a.ball : form === "flight" ? a.flight : a.cast;
+    return form === "ground" ? a.cast2 : form === "summon" ? a.summon : form === "wall" ? a.wall : form === "ball" ? a.ball : form === "flight" ? a.flight : a.cast;
   }
 
   /** The Dragoon's spell-casting gesture, when its model has one: `shot` thrusts a hand out (a
    *  bolt leaves it), `ground` slams the ground. Returns the second the spell goes off inside that
    *  motion (0 = no gesture: the spell resolves at once). */
-  castGesture(form: "shot" | "ground" | "summon" = "shot"): number {
+  castGesture(form: "shot" | "ground" | "summon" | "wall" = "shot"): number {
     const a = this.dragoonActive && this.dragoonModelRoot ? this.dragoonCastClip(form) : undefined;
     if (!a) {
       this.strike();
       return 0;
     }
     this.playDragoonOneShot(a);
-    return form === "ground" ? DRAGOON_CAST_GROUND_RELEASE : form === "summon" ? DRAGOON_CAST_SUMMON_RELEASE : DRAGOON_CAST_RELEASE;
+    return form === "ground" ? DRAGOON_CAST_GROUND_RELEASE : form === "summon" ? DRAGOON_CAST_SUMMON_RELEASE : form === "wall" ? DRAGOON_CAST_WALL_RELEASE : DRAGOON_CAST_RELEASE;
   }
 
   /** How long the cast gesture lasts in all (seconds), 0 without one. */
-  castGestureLength(form: "shot" | "ground" | "summon" | "ball" | "flight" = "shot"): number {
+  castGestureLength(form: CastForm = "shot"): number {
     const a = this.dragoonCastClip(form);
     return a ? (a.to - a.from) / 60 : 0;
   }
@@ -1380,6 +1385,7 @@ export class Player {
     this.dragoonAnims.ball = res.animationGroups.find((a) => has(a, "cast3a", "ball", "curl"));
     this.dragoonAnims.flight = res.animationGroups.find((a) => has(a, "cast3b", "flight", "fly"));
     this.dragoonAnims.summon = res.animationGroups.find((a) => has(a, "cast4", "summon"));
+    this.dragoonAnims.wall = res.animationGroups.find((a) => has(a, "cast5", "wall"));
     this.dragoonAnims.hurt = res.animationGroups.find((a) => has(a, "hurt", "hit_react"));
     this.dragoonAnims.byName = new Map(res.animationGroups.map((a) => [a.name.toLowerCase(), a]));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];

@@ -63,6 +63,11 @@ export class SpellFx {
   private readonly shell: Mesh;
   private readonly shellMat: StandardMaterial;
   private shellRun?: { at: () => Vector3; t: number; dur: number };
+  /** The wall of wind and petals (Rose Storm): a spinning curtain round the party, petals rising. */
+  private readonly wall: Mesh;
+  private readonly wallMat: StandardMaterial;
+  private readonly petals: ParticleSystem;
+  private wallRun?: { t: number; dur: number };
   /** A serpent of wind riding with the charging caster (the Jade Dragoon's Wing Blaster). */
   private ride?: { beast: FlameDragon; at: () => Vector3; t: number; dur: number; free?: { pos: Vector3; dir: Vector3 } };
   private static readonly FIRE_TRAIL: [Color4, Color4, Color4] = [new Color4(1.0, 0.88, 0.4, 1), new Color4(1.0, 0.4, 0.1, 1), new Color4(0.45, 0.06, 0.0, 0)];
@@ -116,6 +121,17 @@ export class SpellFx {
     this.shell.isPickable = false;
     this.shell.setEnabled(false);
     this.disposables.push(this.shell, this.shellMat);
+    this.wallMat = new StandardMaterial("fxWallMat", scene);
+    this.wallMat.disableLighting = true;
+    this.wallMat.emissiveColor = new Color3(0.45, 0.95, 0.65);
+    this.wallMat.alpha = 0;
+    this.wallMat.backFaceCulling = false;
+    this.wall = MeshBuilder.CreateCylinder("fxWall", { height: 3.2, diameter: 1, tessellation: 40, cap: 0 }, scene);
+    this.wall.material = this.wallMat;
+    this.wall.isPickable = false;
+    this.wall.setEnabled(false);
+    this.petals = this.buildPetals();
+    this.disposables.push(this.wall, this.wallMat, this.petals);
     this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
     this.auraLight.range = 9;
     this.auraLight.intensity = 0;
@@ -151,6 +167,22 @@ export class SpellFx {
         }
       }
       this.tickDragon(dt);
+      // The wall of wind: spins up round the party, breathes, then thins out as the petals settle.
+      const wall = this.wallRun;
+      if (wall) {
+        wall.t += dt;
+        const k = wall.t / wall.dur;
+        const grow = Math.min(1, wall.t / 0.35);
+        const r = (3.8 + 0.2 * Math.sin(wall.t * 9)) * grow;
+        this.wall.scaling.set(r, grow, r);
+        this.wall.rotation.y += dt * 5.5;
+        this.wallMat.alpha = 0.07 * grow * (k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3);
+        if (k >= 0.75) this.petals.emitRate = 0;
+        if (k >= 1) {
+          this.wall.setEnabled(false);
+          this.wallRun = undefined;
+        }
+      }
       // The wind serpent: its head rides just ahead of the caster, its body streams behind.
       const ride = this.ride;
       if (ride) {
@@ -264,6 +296,41 @@ export class SpellFx {
     this.shell.setEnabled(true);
     this.trail.emitter = at();
     this.trail.emitRate = 320;
+  }
+
+  /**
+   * Rose Storm (Lavitz): a wall of wind rises round the party at `center` — a spinning curtain of
+   * pale green with pink petals whirling up through it — for `seconds`, then thins away.
+   */
+  petalWall(center: Vector3, seconds: number): void {
+    this.wall.position.set(center.x, center.y + 1.6, center.z);
+    this.wall.scaling.set(0.01, 0.01, 0.01);
+    this.wall.setEnabled(true);
+    this.wallRun = { t: 0, dur: Math.max(0.5, seconds) };
+    this.petals.emitter = center.clone();
+    this.petals.emitRate = 420;
+  }
+
+  private buildPetals(): ParticleSystem {
+    const ps = new ParticleSystem("fxPetals", 600, this.scene);
+    ps.particleTexture = this.dot;
+    ps.createCylinderEmitter(1.9, 0.4, 0.3, 0.4); // the ring the wall stands on
+    ps.color1 = new Color4(1, 0.72, 0.88, 1);
+    ps.color2 = new Color4(1, 0.5, 0.78, 1);
+    ps.colorDead = new Color4(0.9, 0.4, 0.7, 0);
+    ps.minSize = 0.16;
+    ps.maxSize = 0.3;
+    ps.minLifeTime = 1.0;
+    ps.maxLifeTime = 1.8;
+    ps.minEmitPower = 0.6;
+    ps.maxEmitPower = 1.4;
+    ps.gravity = new Vector3(0, 1.6, 0); // petals lifted by the wind
+    ps.minAngularSpeed = -6;
+    ps.maxAngularSpeed = 6;
+    ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    ps.emitRate = 0;
+    ps.start();
+    return ps;
   }
 
   /**

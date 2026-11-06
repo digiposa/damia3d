@@ -115,6 +115,7 @@ import { PartyPanel, type PartyRowView } from "../ui/PartyPanel";
 import { PartySelect } from "../ui/PartySelect";
 import { TimingSight } from "../ui/TimingSight";
 import { GuardMarker } from "../ui/GuardMarker";
+import { BuffMarker } from "../ui/BuffMarker";
 import { AdditionBanner } from "../ui/AdditionBanner";
 import { TrainingMenu, type BalanceRow } from "../ui/TrainingMenu";
 import { floatingText, skillCaptionEl, CAPTION_LIFE, CAPTION_RISE } from "../ui/FloatingText";
@@ -634,6 +635,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.sight = new TimingSight();
     this.additionBanner = new AdditionBanner();
     this.guardMarker = new GuardMarker(this.scene, GUARD_ICON_FRAMES[GUARD_ICON_FRAMES.length - 1]);
+    this.buffMarker = new BuffMarker(this.scene);
 
     // Training debug menu (Training only): set level, spawn enemies, DPS balance.
     // (Party composition + gambits live in the normal System menu.) Opened from a
@@ -1324,6 +1326,7 @@ export abstract class ArenaCombatMode extends GameMode {
     }
     this.updateSight();
     this.updateGuardMarker();
+    this.buffMarker.update(dt, this.party.filter((m) => m.avatar.hp > 0 && m.avatar.damageHalved).map((m) => m.position.add(new Vector3(0, 2.75, 0))));
     this.updateDragoonSpace(); // end the Space once its initiator reverts
     this.grantTurnSp(); // Spirit Ring: +SP at the start of each member's turn
     this.checkPartyWipe(); // mode hook when the whole party is down (Survival: Game Over)
@@ -2065,6 +2068,27 @@ export abstract class ArenaCombatMode extends GameMode {
       this.refreshHud();
       return;
     }
+    if (spell.id === "roseStorm" && p.castGestureLength("wall") > 0) {
+      // Rose Storm (PS1): Lavitz raises a wall of wind full of petals round the party; everyone's
+      // incoming damage is halved for a while, a little bubble over each of them says so.
+      p.mp = Math.max(0, p.mp - spell.mp);
+      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, "#ff9ad4");
+      const release = p.castGesture("wall");
+      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("wall"));
+      this.comboTimers.push({
+        t: release,
+        fn: () => {
+          const party = allies();
+          const center = party.reduce((acc, a) => acc.addInPlace(a.position), Vector3.Zero()).scaleInPlace(1 / Math.max(1, party.length));
+          this.spellFx?.petalWall(center, 2.4);
+          audio.playSfx("wind_charge");
+          this.castSpell(p, spell, primary, party, false);
+          this.refreshHud();
+        },
+      });
+      this.refreshHud();
+      return;
+    }
     if (spell.id === "wingBlaster" && primary && p.castGestureLength("flight") > 0) {
       // Wing Blaster (PS1): Lavitz gathers the wind about him, the spear wheeling before him, then
       // charges through the foes as a serpent of wind, and is back where he stood. Every enemy is
@@ -2300,6 +2324,8 @@ export abstract class ArenaCombatMode extends GameMode {
 
 
   private guardMarker!: GuardMarker;
+  /** The bubble over every ally under Rose Storm's protection. */
+  private buffMarker!: BuffMarker;
   private additionBanner!: AdditionBanner;
 
   /** The guard read-out over whoever in the party is guarding (the controlled one first). */
@@ -3671,6 +3697,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.hud.dispose();
     this.sight.dispose();
     this.guardMarker.dispose();
+    this.buffMarker.dispose();
     this.clickMarker?.dispose();
     this.additionBanner.dispose();
     this.debugMenu?.dispose();
