@@ -150,6 +150,8 @@ const BURST_LIFT = 0.7;
  *  far in front of the caster; the dragon bursts out of it at the gesture's release. */
 const SUMMON_COLUMN_AT = 0.75;
 const SUMMON_COLUMN_AHEAD = 2.2;
+/** Seconds a Dragoon lingers in form after the action that spent its last turn, before reverting. */
+const REVERT_LINGER = 2.5;
 /** VFX power of an attack item at the BOTTOM of its mash range (one QTE step). The player's Burn Out
  *  scales from here up to ~1.9 on a perfect mash; an enemy's cast has no QTE, so it lands at this
  *  floor — same spell, same flame column, just the un-mashed version. */
@@ -1184,7 +1186,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.lastImpact = 0;
     this.comboTarget = undefined;
     this.actionRecoveryT = ACTION_RECOVERY;
-    if (this.player.dragoonSpent) this.player.revert();
+    if (this.player.dragoonSpent) this.scheduleRevert(this.player);
   }
 
   /** A Final Burst charge in progress: out through the foe, then a cut back to the start (see tickDash). */
@@ -1229,9 +1231,37 @@ export abstract class ArenaCombatMode extends GameMode {
 
   private doTransform(m: PartyMember): boolean {
     if (!m.avatar.canTransform) return false;
-    m.avatar.transform();
+    this.transformWithFx(m.avatar);
     this.popText(m.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), TEXT.dragoon);
     return true;
+  }
+
+  /** The Dragoon Spirit's light: a column of the element's colour climbing the body and a flash. */
+  private dragoonLight(avatar: Player, power: number): void {
+    const element = dragoonClass(avatar.bearer.classId)?.element ?? "Non-Elemental";
+    const tint = Color3.FromHexString(ELEMENT_COLOR[element] ?? "#c8a6ff");
+    this.spellFx?.powerUp(avatar.position, 0.6 + 0.5 * power, tint);
+    this.spellFx?.burst(element, avatar.position, power);
+    this.camera.shake(0.08 * power, 0.3);
+  }
+
+  /** Transform in a blaze of the Dragoon's element. */
+  private transformWithFx(avatar: Player): void {
+    avatar.transform();
+    this.dragoonLight(avatar, 1.2);
+  }
+
+  /** The form has spent its last turn: linger a moment, then fall back to human in a soft light. */
+  private scheduleRevert(avatar: Player): void {
+    this.comboTimers.push({
+      t: REVERT_LINGER,
+      fn: () => {
+        if (!avatar.dragoonSpent) return; // already reverted (death) or re-transformed
+        this.dragoonLight(avatar, 0.7);
+        avatar.revert();
+        this.refreshHud();
+      },
+    });
   }
 
   /** Item opens the picker (combat pauses); the chosen item spends the turn, not the open. */
@@ -1472,7 +1502,7 @@ export abstract class ArenaCombatMode extends GameMode {
   private doSpecial(): void {
     if (!this.canSpecial || !this.runner.gauge.isReady || this.runner.active) return;
     const initiator = this.controlled;
-    for (const m of this.party) m.avatar.transform();
+    for (const m of this.party) this.transformWithFx(m.avatar);
     this.dragoonSpace = initiator.avatar.element;
     this.spaceInitiator = initiator;
     this.showSpace(this.dragoonSpace);
@@ -2539,8 +2569,8 @@ export abstract class ArenaCombatMode extends GameMode {
         if (decision.kind !== "transform") {
           member.gauge.spend();
           member.avatar.tickDragoon();
-          // AI actions resolve at once, so revert here if that spent the last Dragoon turn.
-          if (member.avatar.dragoonSpent) member.avatar.revert();
+          // AI actions resolve at once, so schedule the revert here if that spent the last turn.
+          if (member.avatar.dragoonSpent) this.scheduleRevert(member.avatar);
         }
       } else if ("target" in decision) {
         member.avatar.face(decision.target.position.subtract(member.position));
@@ -2580,7 +2610,7 @@ export abstract class ArenaCombatMode extends GameMode {
       }
       case "transform":
         if (!avatar.canTransform) return false;
-        avatar.transform();
+        this.transformWithFx(avatar);
         this.popText(member.position.add(new Vector3(0, 2.6, 0)), t("combat.dragoon"), TEXT.dragoon);
         return true;
       case "item":
