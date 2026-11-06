@@ -1,9 +1,11 @@
 /**
- * Global, mutable game settings edited from the Options menu. A plain shared
- * object keeps it simple at this scale; systems read it live each frame.
+ * Global, mutable game settings edited from the Options menu. A plain shared object keeps it
+ * simple at this scale; systems read it live each frame. It is remembered in localStorage (best
+ * effort): every assignment saves, and the saved values are read back on the next visit.
  */
 export interface GameSettings {
-  /** Master sound switch (no audio is wired up yet — placeholder). */
+  /** Master sound switch. Off until the player turns it on (a page that starts making noise on
+   *  its own is unwelcome): the 🔊 button or M, remembered from then on. */
   soundEnabled: boolean;
   /** Music volume, 0–1. */
   musicVolume: number;
@@ -32,8 +34,8 @@ export interface GameSettings {
 /** The retro presets offered in Options: off, a softer "CRT-era" look, and the real thing. */
 export const RETRO_LEVELS = [0, 420, 280] as const;
 
-export const settings: GameSettings = {
-  soundEnabled: true,
+const DEFAULTS: GameSettings = {
+  soundEnabled: false,
   musicVolume: 0.25,
   sfxVolume: 0.5,
   combatSpeed: 1,
@@ -41,3 +43,40 @@ export const settings: GameSettings = {
   retroLines: 0, // off by default: the PS1 MOOD lives in the arena and lighting, not in pixels
   cameraStyle: 0,
 };
+
+const STORAGE_KEY = "damia3d.settings";
+
+/** The saved settings merged over the defaults: only known keys, only values of the right type. */
+function load(): GameSettings {
+  const out: GameSettings = { ...DEFAULTS };
+  try {
+    const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+    if (!raw) return out;
+    const saved = JSON.parse(raw) as Record<string, unknown>;
+    for (const key of Object.keys(DEFAULTS) as (keyof GameSettings)[]) {
+      const v = saved[key];
+      if (typeof v === typeof DEFAULTS[key] && (typeof v !== "number" || Number.isFinite(v))) {
+        (out as unknown as Record<string, unknown>)[key] = v;
+      }
+    }
+  } catch {
+    /* localStorage may be unavailable, or hold junk */
+  }
+  return out;
+}
+
+function save(value: GameSettings): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    /* a private window just won't remember */
+  }
+}
+
+export const settings: GameSettings = new Proxy(load(), {
+  set(target, key, value) {
+    (target as unknown as Record<string | symbol, unknown>)[key] = value;
+    save(target);
+    return true;
+  },
+});
