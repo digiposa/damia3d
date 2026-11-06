@@ -88,7 +88,9 @@ const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 
 
 /** Defense (Guard): stand firm, heal, halve incoming damage for a short time. */
 const GUARD_DURATION = 2; // seconds the stance lasts
-const GUARD_HIT_SECONDS = 0.6; // the jolt of a blow taken on the guard (then the stance resumes); no replay sooner
+const GUARD_HIT_SECONDS = 0.6;
+/** Seconds the hurt recoil owns the body (the clip's flinch; it then fades into the stance). */
+const HURT_SECONDS = 0.7; // the jolt of a blow taken on the guard (then the stance resumes); no replay sooner
 const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activation)
 const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
 
@@ -163,7 +165,7 @@ export class Player {
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
-  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup } = {};
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup; hurt?: AnimationGroup } = {};
   /** Extra height of the Dragoon figure above its hover (a charge in flight), world units. */
   dragoonLift = 0;
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
@@ -187,6 +189,7 @@ export class Player {
     /** The braced guard stance (looped while guarding), and the jolt of a blow taken on it. */
     guard?: AnimationGroup;
     guardHit?: AnimationGroup;
+    hurt?: AnimationGroup;
     /** Every clip by (lower-case) name: the Additions' per-hit swings live here. */
     byName: Map<string, AnimationGroup>;
   } = { byName: new Map() };
@@ -447,6 +450,28 @@ export class Player {
 
   /** Seconds the guard-impact jolt still owns the body (0 = none); also its replay cooldown. */
   private guardHitT = 0;
+  /** Seconds the hurt recoil still owns the body (0 = none); also its replay cooldown. */
+  private hurtT = 0;
+
+  /** A blow taken unguarded: the flinch, unless the figure is busy with its own move (an attack,
+   *  a cast: the action plays out — PS1) or already recoiling. */
+  hurt(): void {
+    if (this.downed || this.guardActive || this.hurtT > 0) return;
+    if (this.dragoonActive && this.dragoonModelRoot) {
+      if (this.modelAttacking) return;
+      const a = this.dragoonAnims.hurt;
+      if (!a) return;
+      this.hurtT = HURT_SECONDS;
+      this.playDragoonOneShot(a, 1.3);
+      return;
+    }
+    const a = this.modelAnims.hurt;
+    if (!a || !this.modelRoot || this.modelAttacking || this.weaponTransition) return;
+    this.hurtT = HURT_SECONDS;
+    this.modelCurrent?.stop();
+    this.modelCurrent = a;
+    a.start(false, 1.3, a.from, a.to);
+  }
 
   /** A blow taken on the guard: the jolt, unless one is already playing (several enemies striking
    *  at once don't restart it over and over). */
@@ -483,6 +508,7 @@ export class Player {
       this.guardTimer = Math.max(0, this.guardTimer - dt);
     }
     if (this.guardHitT > 0) this.guardHitT = Math.max(0, this.guardHitT - dt);
+    if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
     if (this.guardCdTimer > 0) this.guardCdTimer = Math.max(0, this.guardCdTimer - dt);
     if (this.damageHalveTimer > 0) this.damageHalveTimer = Math.max(0, this.damageHalveTimer - dt);
   }
@@ -782,6 +808,7 @@ export class Player {
           this.playModel(this.modelAnims.guard, true);
           return;
         }
+        if (this.hurtT > 0 && !moving) return; // the flinch owns the body (moving breaks it off)
         const idle = (this.combat && this.modelAnims.idleCombat) || this.modelAnims.idle;
         const walk = (this.combat && this.modelAnims.walkCombat) || this.modelAnims.walk;
         const run = (this.combat && this.modelAnims.runCombat) || this.modelAnims.run;
@@ -1192,6 +1219,7 @@ export class Player {
     this.dragoonAnims.ball = res.animationGroups.find((a) => has(a, "cast3a", "ball", "curl"));
     this.dragoonAnims.flight = res.animationGroups.find((a) => has(a, "cast3b", "flight", "fly"));
     this.dragoonAnims.summon = res.animationGroups.find((a) => has(a, "cast4", "summon"));
+    this.dragoonAnims.hurt = res.animationGroups.find((a) => has(a, "hurt", "hit_react"));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
     // PS1 hover: leaning forward, legs trailing back, wings beating — laid over whatever clip plays,
     // after the animations have written the bones (so the pose adds to the clip, not under it).
@@ -1291,6 +1319,7 @@ export class Player {
     this.modelAnims.throwHeal = g.find((a) => has(a, "throwheal", "throw_heal", "useitem"));
     this.modelAnims.throw = g.find((a) => has(a, "throw", "cast") && a !== this.modelAnims.throwHeal);
     this.modelAnims.guardHit = g.find((a) => has(a, "guardhit", "guard_impact", "guardimpact"));
+    this.modelAnims.hurt = g.find((a) => has(a, "hurt", "hit_react", "hitreact", "damage"));
     this.modelAnims.guard = g.find((a) => has(a, "guard", "block") && a !== this.modelAnims.guardHit);
     this.modelAnims.byName = new Map(g.map((a) => [a.name.toLowerCase(), a]));
     // Every clip blends in from the pose it finds (a few frames): a chain of Addition blows reads

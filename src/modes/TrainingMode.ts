@@ -2412,7 +2412,7 @@ export abstract class ArenaCombatMode extends GameMode {
         this.player.guardImpact();
         this.atmosphere?.spark(this.player.position.add(new Vector3(0, 1.2, 0)));
         this.popText(this.player.position.add(new Vector3(0, BODY_ANCHOR_Y + 0.7, 0)), t("combat.guard"), TEXT.hp);
-      }
+      } else this.player.hurt(); // unguarded: the flinch (unless busy with their own move)
       if (this.player.hp === 0) {
         const downed = this.controlled;
         this.player.revert(); // HP 0 forces de-transformation (canon)
