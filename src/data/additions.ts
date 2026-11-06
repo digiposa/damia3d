@@ -23,6 +23,16 @@ export interface AdditionHitChoreo {
   impact?: number;
   length?: number;
   window?: number;
+  /** A twirl of the weapon in the hands before the blow (a spear spun flat over the head). */
+  spin?: WeaponSpin;
+}
+
+/** The weapon twirled in the hands, flat, `turns` full turns from `at` seconds into the clip
+ *  (played seconds) over `seconds` — the hand's own motion carries on underneath. */
+export interface WeaponSpin {
+  at: number;
+  seconds: number;
+  turns: number;
 }
 
 export interface AdditionDef {
@@ -155,6 +165,10 @@ export const LAVITZ_ADDITIONS = {
     multiplier: [100, 125, 150, 175, 200],
     spMax: 35,
     acquireLevel: 5,
+    // The thrust, an upward cut (A2_2: great-sword swing low to high, impact on the way up), then
+    // A2_3: the arm up over the head (the spear twirled there), a cut down to the ground and the
+    // rise back up (its holds cut at graft time: 2.8 s, impact at 1.8 s).
+    choreo: [LAVITZ_THRUST, { clip: "cane2", impact: 0.79, length: 1.1 }, { clip: "cane3", impact: 1.8, length: 2.8, spin: { at: 0.55, seconds: 0.9, turns: 2 } }],
   },
   rodTyphoon: {
     name: "Rod Typhoon",

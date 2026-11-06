@@ -2593,8 +2593,8 @@ export abstract class ArenaCombatMode extends GameMode {
     // its end — its impact and sight are counted from that start.
     const def = this.comboIsDragoon ? this.player.dragoonAttackDef : this.player.addition;
     const step = def.choreo?.[k - 1];
-    if (step?.clip && hold > 0) this.player.queueStrike(step.clip, step.speed);
-    else this.player.strike(step?.clip, step?.speed);
+    if (step?.clip && hold > 0) this.player.queueStrike(step.clip, step.speed, step.spin);
+    else this.player.strike(step?.clip, step?.speed, step?.spin);
     this.blowT = -hold;
     const df = target.def.stats.df;
     // Element modifier: the weapon's element vs the target's element (1 if non-elemental).

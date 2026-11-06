@@ -8,7 +8,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { statsForLevel, levelForExp, nextLevelExp, type CharacterLevel } from "../data/dart";
-import { BASIC_ATTACK, type AdditionDef } from "../data/additions";
+import { BASIC_ATTACK, type AdditionDef, type WeaponSpin } from "../data/additions";
 import { type EquipDef, type EquipSlot, type Member, equipById } from "../data/equipment";
 import { type DragoonClass, type DragoonStatMult, dragoonClass } from "../data/dragoonClasses";
 import { type DragoonSpell, spellsForClass } from "../data/dragoonSpells";
@@ -73,6 +73,8 @@ const BACK_GRIP = 0.5;
 const SPEAR_AHEAD = 0.35;
 /** …and its tip no lower than this (sine of the angle below the horizontal: −0.4 ≈ 24° down). */
 const SPEAR_TIP_MIN_Y = -0.4;
+/** …and the tip itself never lower than this above the ground (model units). */
+const SPEAR_TIP_CLEARANCE = 0.1;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
 /** Where in the throw clip the item leaves the hand (arm at the top of its arc). */
@@ -1003,6 +1005,7 @@ export class Player {
       at(g.RT, y).subtractInPlace(t);
       y.subtractInPlace(f.scale(Vector3.Dot(y, f))).normalize().scaleInPlace(-1);
     }
+    this.applySpin(y, m);
     f.subtractToRef(y.scale(Vector3.Dot(f, y)), x);
     if (x.lengthSquared() < 1e-4) {
       // The length axis runs along the fingers (the hanging grip): take the guard across the palm.
@@ -1017,6 +1020,32 @@ export class Player {
     Quaternion.FromRotationMatrixToRef(m, q);
     const rq = g.fist.rotationQuaternion!;
     Quaternion.SlerpToRef(rq, q, 0.5, rq);
+  }
+
+  /**
+   * The blow's twirl, if one is on: over its window the weapon's length axis (`y`, tip → pommel,
+   * socket frame) is swung round flat, `turns` times, eased in and out of whatever the hands
+   * would hold — a spear spun over the head before it comes down.
+   */
+  private applySpin(y: Vector3, inv: Matrix): void {
+    const s = this.weaponSpin;
+    if (!s || this.modelCurrent !== s.clip) return;
+    const frame = s.clip.animatables[0]?.masterFrame;
+    if (frame === undefined) return;
+    const t = (frame - s.clip.from) / 60 / Math.max(0.01, s.speed); // played seconds into the clip
+    const k = (t - s.at) / s.seconds;
+    if (k <= 0 || k >= 1) return;
+    const w = Math.min(1, k / 0.2, (1 - k) / 0.2); // eased in and out
+    this.root.computeWorldMatrix(true);
+    const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
+    const angle = Math.PI * 2 * s.turns * k;
+    const spinW = new Vector3(fwdW.x * Math.cos(angle) + fwdW.z * Math.sin(angle), 0, -fwdW.x * Math.sin(angle) + fwdW.z * Math.cos(angle));
+    const sock = this.grip!.socket;
+    sock.computeWorldMatrix(true);
+    const tipW = Vector3.TransformNormal(y, sock.getWorldMatrix()).normalize().scaleInPlace(-1);
+    tipW.scaleInPlace(1 - w).addInPlace(spinW.scaleInPlace(w)).normalize();
+    Vector3.TransformNormalToRef(tipW, inv, y);
+    y.normalize().scaleInPlace(-1);
   }
 
   /**
@@ -1041,10 +1070,15 @@ export class Player {
       if (len > 1e-4) side.scaleInPlace(Math.sqrt(1 - SPEAR_AHEAD * SPEAR_AHEAD) / len);
       tipW.copyFrom(side.addInPlace(fwdW.scale(SPEAR_AHEAD)).normalize());
     }
-    if (tipW.y < SPEAR_TIP_MIN_Y) {
+    // Never into the floor: from the hand's height, the tip (grip point → tip along the shaft) must
+    // stay a little above the ground, however low the hand goes (a cut down to the ground).
+    const reach = (this.bearer.weaponGrip ?? 0.5) * (this.bearer.weaponScale ?? 1);
+    const handY = this.grip!.socket.getAbsolutePosition().y - this.root.getAbsolutePosition().y;
+    const minY = Math.max(SPEAR_TIP_MIN_Y, Math.min(0.9, (SPEAR_TIP_CLEARANCE - handY) / Math.max(0.2, reach)));
+    if (tipW.y < minY) {
       const h = Math.hypot(tipW.x, tipW.z);
-      const k = Math.sqrt(1 - SPEAR_TIP_MIN_Y * SPEAR_TIP_MIN_Y) / Math.max(1e-4, h);
-      tipW.set(tipW.x * k, SPEAR_TIP_MIN_Y, tipW.z * k);
+      const k = Math.sqrt(1 - minY * minY) / Math.max(1e-4, h);
+      tipW.set(tipW.x * k, minY, tipW.z * k);
     }
     Vector3.TransformNormalToRef(tipW, inv, y);
     y.normalize().scaleInPlace(-1); // y = tip → pommel
@@ -1125,7 +1159,9 @@ export class Player {
   }
 
   /** Addition blows waiting their turn: each starts the frame the previous one ends. */
-  private blowQueue: { clip: string; speed: number }[] = [];
+  private blowQueue: { clip: string; speed: number; spin?: WeaponSpin }[] = [];
+  /** The twirl the blow now playing asks for (see AdditionHitChoreo.spin), on that clip. */
+  private weaponSpin?: WeaponSpin & { clip: AnimationGroup; speed: number };
 
   /**
    * The Dragoon's hover (PS1): the whole figure floats a little above the ground and bobs, leaning
@@ -1188,12 +1224,12 @@ export class Player {
 
   /** Chain an Addition blow after the one now playing and any already queued (or at once if no
    *  blow is playing): the swing starts the frame the previous ends, with no idle in between. */
-  queueStrike(clip: string, speed = 1): void {
+  queueStrike(clip: string, speed = 1, spin?: WeaponSpin): void {
     if (!this.modelRoot || !this.modelAttacking || !this.modelCurrent) {
-      this.strike(clip, speed);
+      this.strike(clip, speed, spin);
       return;
     }
-    this.blowQueue.push({ clip, speed });
+    this.blowQueue.push({ clip, speed, spin });
   }
 
   /** Seconds left in the blow now playing (undefined when no clip-driven blow is on). */
@@ -1210,7 +1246,8 @@ export class Player {
   /** Play a one-shot strike animation (call when a blow lands). `clip` names an Addition hit's own
    *  swing (restarted from its first frame even mid-swing: each hit is its own move); without one,
    *  or if the model lacks it, the generic attack swing plays. */
-  strike(clip?: string, speed = 1): void {
+  strike(clip?: string, speed = 1, spin?: WeaponSpin): void {
+    this.weaponSpin = undefined;
     if (this.dragoonActive && this.dragoonForm) {
       this.dragoonForm.strike();
       return;
@@ -1225,6 +1262,7 @@ export class Player {
       const own = clip ? this.modelAnims.byName.get(clip.toLowerCase()) : undefined;
       if (own) {
         this.playBlow(own, speed);
+        if (spin) this.weaponSpin = { ...spin, clip: own, speed };
         return;
       }
       const a = this.modelAnims.attack;
@@ -1260,7 +1298,7 @@ export class Player {
     own.onAnimationGroupEndObservable.addOnce(() => {
       if (this.modelCurrent !== own) return; // something else took over
       const next = this.blowQueue.shift();
-      if (next) this.strike(next.clip, next.speed); // the chain goes on, same frame
+      if (next) this.strike(next.clip, next.speed, next.spin); // the chain goes on, same frame
       else this.modelAttacking = false;
     });
   }
