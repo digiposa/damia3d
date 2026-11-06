@@ -34,8 +34,8 @@ export const RETRO_LEVELS = [0, 420, 280] as const;
 
 export const settings: GameSettings = {
   soundEnabled: true,
-  musicVolume: 0.7,
-  sfxVolume: 0.8,
+  musicVolume: 0.25,
+  sfxVolume: 0.5,
   combatSpeed: 1,
   cameraZoom: 1,
   retroLines: 0, // off by default: the PS1 MOOD lives in the arena and lighting, not in pixels
