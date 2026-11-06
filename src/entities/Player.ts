@@ -71,6 +71,8 @@ const BACK_GRIP = 0.5;
 /** A one-handed spear during a blow keeps its tip at least this far forward (cosine of the angle
  *  to the bearer's facing: 0.35 ≈ 70° off it at most). */
 const SPEAR_AHEAD = 0.35;
+/** …and its tip no lower than this (sine of the angle below the horizontal: −0.4 ≈ 24° down). */
+const SPEAR_TIP_MIN_Y = -0.4;
 /** Uniform world scale of a hand-attached weapon model. */
 const WEAPON_SCALE = 0.9;
 /** Where in the throw clip the item leaves the hand (arm at the top of its arc). */
@@ -971,8 +973,12 @@ export class Player {
       at(g.RT, x).subtractInPlace(t).normalize();
       both = Math.abs(Vector3.Dot(y.normalizeToNew(), x)) > 0.6;
     }
-    if (both) y.normalize();
-    else if (g.hang) {
+    if (both) {
+      y.normalize();
+      // A spear held in both hands during a blow (a two-handed sword clip): the tip goes to
+      // whichever end is ahead of him, and stays ahead (see below).
+      if (g.upright && this.modelAttacking) this.spearAhead(y, m);
+    } else if (g.hang) {
       // Held loosely in one hand (the Dragoon's hover, arms down): the blade hangs tip down and a
       // little forward of him (PS1), whatever the hand does — a fixed direction in his own frame,
       // brought into the socket's.
@@ -984,19 +990,9 @@ export class Player {
     } else if (g.upright && this.modelAttacking && g.RF) {
       // A spear in one hand during a blow: along the forearm, tip ahead of the fist (a thrust),
       // but never behind him — the wind-up draws the arm back and the forearm turns backward,
-      // while the spearhead stays on the target: the tip is kept at least SPEAR_AHEAD forward.
-      this.root.computeWorldMatrix(true);
-      const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
-      const tipW = g.R.getAbsolutePosition().subtract(g.RF.getAbsolutePosition()).normalize();
-      const d = Vector3.Dot(tipW, fwdW);
-      if (d < SPEAR_AHEAD) {
-        const side = tipW.subtract(fwdW.scale(d)); // the part across his forward axis
-        const len = side.length();
-        if (len > 1e-4) side.scaleInPlace(Math.sqrt(1 - SPEAR_AHEAD * SPEAR_AHEAD) / len);
-        tipW.copyFrom(side.addInPlace(fwdW.scale(SPEAR_AHEAD)).normalize());
-      }
-      Vector3.TransformNormalToRef(tipW, m, y);
-      y.normalize().scaleInPlace(-1); // y = tip → pommel
+      // while the spearhead stays on the target.
+      at(g.RF, y).subtractInPlace(R).normalize(); // y = tip → pommel, i.e. towards the elbow
+      this.spearAhead(y, m, false);
     } else if (g.upright) {
       // A spear in one hand stands on end, tip up (carried at rest), whatever the hand does.
       Vector3.TransformNormalToRef(Vector3.Up(), m, y);
@@ -1021,6 +1017,37 @@ export class Player {
     Quaternion.FromRotationMatrixToRef(m, q);
     const rq = g.fist.rotationQuaternion!;
     Quaternion.SlerpToRef(rq, q, 0.5, rq);
+  }
+
+  /**
+   * Keep a spear's tip ahead of the bearer during a blow: `y` (tip → pommel, in the hand socket's
+   * frame, `inv` its inverse world matrix) is flipped end for end when the tip points behind him
+   * (`flip`: both hands on the shaft — either end may lead), then bent so the tip stays at least
+   * SPEAR_AHEAD forward and SPEAR_TIP_MIN_Y above the horizontal (never into the floor).
+   */
+  private spearAhead(y: Vector3, inv: Matrix, flip = true): void {
+    this.root.computeWorldMatrix(true);
+    const fwdW = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
+    this.grip!.socket.computeWorldMatrix(true);
+    const tipW = Vector3.TransformNormal(y, this.grip!.socket.getWorldMatrix()).normalize().scaleInPlace(-1);
+    let d = Vector3.Dot(tipW, fwdW);
+    if (flip && d < 0) {
+      tipW.scaleInPlace(-1);
+      d = -d;
+    }
+    if (d < SPEAR_AHEAD) {
+      const side = tipW.subtract(fwdW.scale(d)); // the part across his forward axis
+      const len = side.length();
+      if (len > 1e-4) side.scaleInPlace(Math.sqrt(1 - SPEAR_AHEAD * SPEAR_AHEAD) / len);
+      tipW.copyFrom(side.addInPlace(fwdW.scale(SPEAR_AHEAD)).normalize());
+    }
+    if (tipW.y < SPEAR_TIP_MIN_Y) {
+      const h = Math.hypot(tipW.x, tipW.z);
+      const k = Math.sqrt(1 - SPEAR_TIP_MIN_Y * SPEAR_TIP_MIN_Y) / Math.max(1e-4, h);
+      tipW.set(tipW.x * k, SPEAR_TIP_MIN_Y, tipW.z * k);
+    }
+    Vector3.TransformNormalToRef(tipW, inv, y);
+    y.normalize().scaleInPlace(-1); // y = tip → pommel
   }
 
   /** One of the Dragoon GLB's one-shot clips (attack, cast): plays it over the hover and flags the
