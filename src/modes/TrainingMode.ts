@@ -18,6 +18,7 @@ import { loadModels, prefetchModels, hasContainer } from "../core/AssetService";
 import { LoadingOverlay } from "../ui/LoadingOverlay";
 import { clampToScreen, projectToScreen, type ScreenPoint } from "../world/project";
 import { Player, MAX_DRAGOON_LEVEL } from "../entities/Player";
+import { setCombatClipSpeed } from "../entities/Player";
 import { PartyMember } from "../entities/PartyMember";
 import { Enemy, type EnemyAction } from "../entities/Enemy";
 import { Arrow } from "../entities/Arrow";
@@ -1053,7 +1054,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.updateCombatState(dt); // toggle the party's combat vs exploration stance
 
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
-    if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt));
+    if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt * settings.combatSpeed));
     if (this.pendingHits.length) this.updatePendingHits(dt);
     if (this.captions.length) this.updateCaptions(dt);
     if (this.attackAnimT > 0) this.attackAnimT = Math.max(0, this.attackAnimT - dt);
@@ -1071,8 +1072,11 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.input.wasPressed("Special") || this.input.wasPressed("KeyX")) this.doSpecial();
     if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
 
-    // Combat time scales with the Options "combat speed" setting.
+    // Combat time scales with the Options "combat speed" setting — for the fighters' clips and the
+    // spell effects too, so impacts, releases and flights keep in step with the timers below.
     const cdt = dt * settings.combatSpeed;
+    setCombatClipSpeed(settings.combatSpeed);
+    if (this.spellFx) this.spellFx.timeScale = settings.combatSpeed;
     // While the player executes a combo, the rest of the world (enemies, allies, every ATB
     // gauge) runs at COMBO_TIME_SCALE — so the combo's length costs ~no game time and long
     // Additions aren't penalised. The combo's own timing keeps running at real `cdt`.
@@ -1085,7 +1089,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.runner.setFillTime(this.player.atbFillTime);
     this.tickComboTimers(cdt);
     this.tickDash(cdt);
-    this.tickDial(dt);
+    this.tickDial(cdt); // the dial keeps the combat clock too (a slower setting = an easier dial)
     if (this.runner.tick(cdt, worldDt)) {
       // The timing sight lapsed unpressed — a whiff; show it like a missed press.
       this.popText(this.player.position.add(new Vector3(0, 2.2, 0)), t("combat.miss"), TEXT.miss);
@@ -1229,7 +1233,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.dragoonDial.show(total, ELEMENT_COLOR[p.element] ?? "#ff9a4a");
   }
 
-  /** Advance the light (real time, not combat time); passing the mark unpressed ends the dial. */
+  /** Advance the light (combat time); passing the mark unpressed ends the dial. */
   private tickDial(dt: number): void {
     const d = this.dial;
     if (!d) return;

@@ -90,7 +90,14 @@ const MP_PER_DRAGOON_LEVEL = 20; // canon: max MP = D'Lv × 20 (20 at D'Lv1 … 
 const GUARD_DURATION = 2; // seconds the stance lasts
 const GUARD_HIT_SECONDS = 0.6;
 /** Seconds the hurt recoil owns the body (the clip's flinch; it then fades into the stance). */
-const HURT_SECONDS = 0.7; // the jolt of a blow taken on the guard (then the stance resumes); no replay sooner
+const HURT_SECONDS = 0.7;
+/** Combat-time multiplier (the Options "combat speed"): the combat clips — strikes, casts, hurt,
+ *  guard jolts — play at this rate so their impacts stay on the combat clock the modes time
+ *  them with (sight windows, blow chains, projectile releases). Set by the mode each frame. */
+export let combatClipSpeed = 1;
+export function setCombatClipSpeed(v: number): void {
+  combatClipSpeed = v;
+} // the jolt of a blow taken on the guard (then the stance resumes); no replay sooner
 const GUARD_COOLDOWN = 6; // seconds before it can be used again (from activation)
 const GUARD_HEAL_FRACTION = 0.1; // 10% of max HP restored on activation
 
@@ -470,7 +477,7 @@ export class Player {
     this.hurtT = HURT_SECONDS;
     this.modelCurrent?.stop();
     this.modelCurrent = a;
-    a.start(false, 1.3, a.from, a.to);
+    a.start(false, 1.3 * combatClipSpeed, a.from, a.to);
   }
 
   /** A blow taken on the guard: the jolt, unless one is already playing (several enemies striking
@@ -481,7 +488,7 @@ export class Player {
     this.guardHitT = GUARD_HIT_SECONDS;
     this.modelCurrent?.stop();
     this.modelCurrent = a;
-    a.start(false, 1, a.from, a.to);
+    a.start(false, combatClipSpeed, a.from, a.to);
   }
 
   /** Begin guarding: heal 10% max HP and halve incoming damage for the duration. Returns HP healed. */
@@ -977,7 +984,7 @@ export class Player {
     this.modelCurrent = a;
     this.modelAttacking = true;
     prev?.stop();
-    a.start(false, speed, a.from, a.to);
+    a.start(false, speed * combatClipSpeed, a.from, a.to);
     a.onAnimationGroupEndObservable.addOnce(() => {
       if (this.modelCurrent === a) this.modelAttacking = false;
     });
@@ -1017,7 +1024,7 @@ export class Player {
     this.modelCurrent = a;
     this.modelAttacking = true;
     prev?.stop();
-    a.start(true, 1, a.from, a.to);
+    a.start(true, combatClipSpeed, a.from, a.to);
     return true;
   }
 
@@ -1121,7 +1128,9 @@ export class Player {
     if (!this.modelRoot || !this.modelAttacking || !a) return undefined;
     const frame = a.animatables[0]?.masterFrame;
     if (frame === undefined) return undefined;
-    return Math.max(0, (a.to - frame) / 60 / Math.max(0.01, a.speedRatio)); // glTF clips run at 60 fps
+    // Real seconds left (glTF clips run at 60 fps), back on the combat clock (clips run at
+    // combatClipSpeed × their nominal rate).
+    return Math.max(0, ((a.to - frame) / 60 / Math.max(0.01, a.speedRatio)) * combatClipSpeed);
   }
 
   /** Play a one-shot strike animation (call when a blow lands). `clip` names an Addition hit's own
@@ -1155,7 +1164,7 @@ export class Player {
       this.modelCurrent = a;
       this.modelAttacking = true;
       prev?.stop();
-      a.start(false, 1.2, a.from, a.to);
+      a.start(false, 1.2 * combatClipSpeed, a.from, a.to);
       a.onAnimationGroupEndObservable.addOnce(() => {
         if (this.modelCurrent === a) this.modelAttacking = false;
       });
@@ -1173,7 +1182,7 @@ export class Player {
     this.modelCurrent = own;
     this.modelAttacking = true;
     prev?.stop();
-    own.start(false, speed, own.from, own.to);
+    own.start(false, speed * combatClipSpeed, own.from, own.to);
     own.onAnimationGroupEndObservable.addOnce(() => {
       if (this.modelCurrent !== own) return; // something else took over
       const next = this.blowQueue.shift();

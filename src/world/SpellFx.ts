@@ -44,6 +44,8 @@ export class SpellFx {
   private flashPeak = 0;
   private flashT = 0;
   private flashDur = 0.14;
+  /** Clock multiplier for everything timed here (the Options "combat speed"); the mode sets it. */
+  timeScale = 1;
 
   /** Buff aura (Power Up): continuously-emitting systems gated by {@link auraT}. */
   private readonly auraColumn: ParticleSystem;
@@ -127,7 +129,7 @@ export class SpellFx {
     }
 
     this.flashObs = scene.onBeforeRenderObservable.add(() => {
-      const dt = scene.getEngine().getDeltaTime() / 1000;
+      const dt = (scene.getEngine().getDeltaTime() / 1000) * this.timeScale;
       if (this.flashT > 0) {
         this.flashT = Math.max(0, this.flashT - dt);
         this.flashLight.intensity = this.flashPeak * (this.flashT / this.flashDur);
