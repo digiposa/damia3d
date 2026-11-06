@@ -201,6 +201,8 @@ const ACTION_RECOVERY = 0.5;
  *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
 const COMBO_TIME_SCALE = 0.2;
 /** The arena's battle music: one of these, drawn at random each time it is entered. */
+/** Seconds before the last blow's clip ends at which the Addition's call-out starts. */
+const ADDITION_CALLOUT_LEAD = 0.35;
 const BATTLE_TRACKS = ["battle1", "battle2", "boss1", "boss2", "boss3"];
 
 /** Config → Camera "3rd person", on a map with no scenic shot of its own: low behind the hero. */
@@ -2549,7 +2551,8 @@ export abstract class ArenaCombatMode extends GameMode {
         // The Addition's call-out (PS1): once the last blow has played out, not at the press.
         const sound = add.sound;
         if (sound) {
-          const at = this.lastEnd - this.blowT;
+          // A touch before the clip's end (the voice carries into the recovery), never before the blow lands.
+          const at = Math.max(this.lastImpact, this.lastEnd - ADDITION_CALLOUT_LEAD) - this.blowT;
           if (at > 0) this.comboTimers.push({ t: at, fn: () => audio.playSfx(sound) });
           else audio.playSfx(sound);
         }
