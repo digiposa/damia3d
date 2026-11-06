@@ -121,7 +121,7 @@ export class SurvivalMode extends ArenaCombatMode {
   protected override onAssetsReady(): void {}
 
   /** No music in Survival yet (its own track is still to be chosen). */
-  protected override enterMusic(): string | undefined {
+  protected override enterMusic(): string | string[] | undefined {
     return undefined;
   }
 

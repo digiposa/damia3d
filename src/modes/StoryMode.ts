@@ -111,7 +111,7 @@ export class StoryMode extends ArenaCombatMode {
   }
 
   /** The map's own music (none = silence over the map). */
-  protected override enterMusic(): string | undefined {
+  protected override enterMusic(): string | string[] | undefined {
     return this.map.music;
   }
 

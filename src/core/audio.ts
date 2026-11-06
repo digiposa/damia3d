@@ -57,6 +57,8 @@ class AudioEngine {
   private music?: { name: string; src: AudioBufferSourceNode; gain: GainNode };
   private musicWanted?: string;
   private musicSerial = 0;
+  /** A set of tracks played one after another at random (the arena), none looped. */
+  private playlist?: string[];
 
   constructor() {
     if (typeof window === "undefined") return;
@@ -83,7 +85,8 @@ class AudioEngine {
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     this.applyVolumes();
-    if (this.musicWanted && !this.music) this.playMusic(this.musicWanted);
+    if (this.playlist && !this.music) this.playMusicList(this.playlist);
+    else if (this.musicWanted && !this.music) this.playMusic(this.musicWanted);
   }
 
   /** True once the browser lets us make sound. */
@@ -133,9 +136,25 @@ class AudioEngine {
    * left alone. Before the first gesture the request is kept and honoured once the engine starts.
    */
   playMusic(name: string): void {
+    this.playlist = undefined;
+    this.startTrack(name, true);
+  }
+
+  /**
+   * Play the tracks of a list one after another, each drawn at random (never the same twice in a
+   * row), none looped: when one ends the next starts. The arena's battle music.
+   */
+  playMusicList(names: string[]): void {
+    this.playlist = names;
+    const cur = this.music?.name ?? this.musicWanted;
+    const pool = names.length > 1 ? names.filter((n) => n !== cur) : names;
+    this.startTrack(pool[Math.floor(Math.random() * pool.length)], false);
+  }
+
+  private startTrack(name: string, loop: boolean): void {
     this.musicWanted = name;
     if (!this.ctx || !this.musicBus) return;
-    if (this.music?.name === name) return;
+    if (this.music?.name === name && this.music.src.loop === loop) return;
     const ctx = this.ctx;
     const bus = this.musicBus;
     const serial = ++this.musicSerial;
@@ -144,7 +163,13 @@ class AudioEngine {
       if (!buffer || serial !== this.musicSerial) return; // superseded meanwhile
       const src = ctx.createBufferSource();
       src.buffer = buffer;
-      src.loop = true;
+      src.loop = loop;
+      src.onended = () => {
+        // The track ran out (not faded out by a switch): the list goes on with another one.
+        if (this.music?.src !== src || !this.playlist) return;
+        this.music = undefined;
+        this.playMusicList(this.playlist);
+      };
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, ctx.currentTime);
       gain.gain.linearRampToValueAtTime(1, ctx.currentTime + MUSIC_FADE);
@@ -158,6 +183,7 @@ class AudioEngine {
   /** Fade the music out over `fade` seconds and stop it (leaving a map, back to the menu). */
   stopMusic(fade = MUSIC_FADE): void {
     this.musicWanted = undefined;
+    this.playlist = undefined;
     this.musicSerial += 1;
     this.fadeOutCurrent(fade);
   }

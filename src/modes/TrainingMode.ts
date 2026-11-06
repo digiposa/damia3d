@@ -536,10 +536,10 @@ export abstract class ArenaCombatMode extends GameMode {
     return startingItems();
   }
 
-  /** The music to start on entering this mode (none = silence). The arena draws a battle track at
-   *  random; the Story maps name their own (see StoryMode). */
-  protected enterMusic(): string | undefined {
-    return BATTLE_TRACKS[Math.floor(Math.random() * BATTLE_TRACKS.length)];
+  /** The music to start on entering this mode: one track looped, a list played at random one
+   *  after another (the arena's battle music), or none (silence). The Story maps name their own. */
+  protected enterMusic(): string | string[] | undefined {
+    return BATTLE_TRACKS;
   }
 
   /** Put the camera in the view {@link cameraView} asks for (at entry, and when Config changes it). */
@@ -577,7 +577,8 @@ export abstract class ArenaCombatMode extends GameMode {
     this.camera.framing = this.world.framing;
     this.applyCameraView();
     const track = this.enterMusic();
-    if (track) audio.playMusic(track);
+    if (Array.isArray(track)) audio.playMusicList(track);
+    else if (track) audio.playMusic(track);
     else audio.stopMusic();
     if (settings.cameraStyle === 1) {
       // Third person from the start: behind the hero, looking where they look.
