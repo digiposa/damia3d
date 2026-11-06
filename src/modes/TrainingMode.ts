@@ -2546,7 +2546,13 @@ export abstract class ArenaCombatMode extends GameMode {
     if (res.completed) {
       if (!dragoon) {
         this.player.recordAddition(add);
-        if (add.sound) audio.playSfx(add.sound); // the Addition's call-out: on completing it (PS1)
+        // The Addition's call-out (PS1): once the last blow has played out, not at the press.
+        const sound = add.sound;
+        if (sound) {
+          const at = this.lastEnd - this.blowT;
+          if (at > 0) this.comboTimers.push({ t: at, fn: () => audio.playSfx(sound) });
+          else audio.playSfx(sound);
+        }
       }
       this.additionBanner.finish(add.name, true);
       this.finishAction(); // combo finished cleanly → lands the total, breather + Dragoon revert
@@ -2611,6 +2617,7 @@ export abstract class ArenaCombatMode extends GameMode {
       audio.playSfx("hit_flesh");
     };
     this.lastImpact = step?.impact ?? 0;
+    this.lastEnd = step?.length ?? (step?.impact ? step.impact + 0.3 : 0);
     if (step?.impact) {
       this.comboTimers.push({ t: hold, fn: () => audio.playSfx("sword_swing") });
       this.comboTimers.push({ t: hold + step.impact, fn: connect });
@@ -2621,6 +2628,8 @@ export abstract class ArenaCombatMode extends GameMode {
   }
   /** Impact time of the blow now playing or queued (0 = unknown): the combo's damage lands then. */
   private lastImpact = 0;
+  /** When that blow's clip ends (its choreography's length; 0 = unknown): the call-out waits for it. */
+  private lastEnd = 0;
   /** Combo time since that blow started (negative while it waits for the previous one to end). */
   private blowT = 0;
 
