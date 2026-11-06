@@ -1098,7 +1098,7 @@ export abstract class ArenaCombatMode extends GameMode {
     }
     // Slowed (or frozen, at scale 0) while the player combos.
     if (worldScale > 0) {
-      this.updateEnemies(worldDt);
+      this.updateEnemies(worldDt, worldScale * settings.combatSpeed);
       // AI party members (everyone except the controlled one) run their Brain. Compute the
       // living-enemy list once and share it (was re-filtered per member each frame).
       const aliveEnemies = this.enemies.filter((e) => e.alive);
@@ -1618,7 +1618,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.mash) {
       const worldDt = dt * settings.combatSpeed * COMBO_TIME_SCALE;
       this.player.tickGuard(dt * settings.combatSpeed);
-      this.updateEnemies(worldDt);
+      this.updateEnemies(worldDt, settings.combatSpeed * COMBO_TIME_SCALE);
       const aliveEnemies = this.enemies.filter((e) => e.alive);
       for (const m of this.party) {
         if (m !== this.controlled) this.updateAiMember(m, dt * COMBO_TIME_SCALE, worldDt, aliveEnemies);
@@ -2507,12 +2507,12 @@ export abstract class ArenaCombatMode extends GameMode {
   /** A story scene has the controls: the world keeps living (held enemies idle, the HUD stays in
    *  sync), but no ATB, no actions, no AI fighting. */
   private updateLockedWorld(dt: number): void {
-    this.updateEnemies(dt * settings.combatSpeed);
+    this.updateEnemies(dt * settings.combatSpeed, settings.combatSpeed);
     for (const m of this.party) if (m !== this.controlled) m.avatar.animate(dt, false);
     this.refreshHud();
   }
 
-  private updateEnemies(cdt: number): void {
+  private updateEnemies(cdt: number, clock = 1): void {
     // Keep a playing buff aura glued to its caster (Power Up).
     if (this.auraSource) {
       if (this.auraSource.alive) this.spellFx?.moveAura(this.auraSource.position);
@@ -2522,6 +2522,7 @@ export abstract class ArenaCombatMode extends GameMode {
     for (const e of this.enemies) if (e.alive && e.def.id.startsWith("knight_of_sandora")) knightsAlive++;
     const ctx = { knightsAlive };
     for (const enemy of this.enemies) {
+      enemy.setTimeScale(clock); // their clips crawl with their timers (slow-mo, combat speed)
       enemy.tickStatus(cdt); // expire Fear/Stun + refresh their glow
       const action = enemy.aiUpdate(cdt, this.player.position, ctx);
       enemy.tickKnockback(cdt); // hit recoil, applied on top of the AI move

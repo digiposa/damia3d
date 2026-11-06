@@ -375,12 +375,25 @@ export class Enemy {
     }
   }
 
+  /** Rate of this enemy's clips: the world's clock (the combat-speed setting, and the slow-motion
+   *  of a player's Addition / Time-Dial), so a swing seen mid-QTE crawls with its damage timer. */
+  private clipScale = 1;
+  private clipBase = 1;
+
+  /** Set the world's clock rate on the playing clip (the modes call this each frame). */
+  setTimeScale(k: number): void {
+    if (k === this.clipScale) return;
+    this.clipScale = k;
+    if (this.currentAnim) this.currentAnim.speedRatio = this.clipBase * k;
+  }
+
   /** Loop a locomotion/idle animation, replacing whatever is playing (no-op if already it). */
   private play(group?: AnimationGroup): void {
     if (!group || group === this.currentAnim) return;
     this.currentAnim?.stop();
     this.currentAnim = group;
-    group.start(true, 1.0, group.from, group.to);
+    this.clipBase = 1;
+    group.start(true, this.clipScale, group.from, group.to);
   }
 
   /** Set the walking vs idle loop (ignored mid-attack so the swing isn't cut short). */
@@ -396,7 +409,8 @@ export class Enemy {
     this.attacking = true;
     this.currentAnim?.stop();
     this.currentAnim = group;
-    group.start(false, speed, group.from, group.to);
+    this.clipBase = speed;
+    group.start(false, speed * this.clipScale, group.from, group.to);
     group.onAnimationGroupEndObservable.addOnce(() => {
       this.attacking = false;
     });
