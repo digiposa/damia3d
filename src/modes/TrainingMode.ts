@@ -146,6 +146,10 @@ const BURST_BALL_SECONDS = 0.9;
 const BURST_OUT_SECONDS = 0.45;
 const BURST_OVERSHOOT = 2.5;
 const BURST_LIFT = 0.7;
+/** D'Attack: the Dragoon flies at the foe (seconds), stops this far in front, strikes, and at the
+ *  end of the combo reappears where it took off (PS1). */
+const DATTACK_DASH_SECONDS = 0.32;
+const DATTACK_STAND_OFF = 1.6;
 /** Red-Eye Dragon: the flame column erupts this many seconds into the summon (the crouch), this
  *  far in front of the caster; the dragon bursts out of it at the gesture's release. */
 const SUMMON_COLUMN_AT = 0.75;
@@ -1186,7 +1190,24 @@ export abstract class ArenaCombatMode extends GameMode {
     this.lastImpact = 0;
     this.comboTarget = undefined;
     this.actionRecoveryT = ACTION_RECOVERY;
+    // A D'Attack flown in: home once the last blow has landed, a beat after its impact.
+    if (this.dAttackHome) this.comboTimers.push({ t: wait > 0 ? wait + 0.35 : 0.3, fn: () => this.flyHome() });
     if (this.player.dragoonSpent) this.scheduleRevert(this.player);
+  }
+
+  /** Where the Dragoon took off for its D'Attack, to reappear there once the combo is over. */
+  private dAttackHome?: Vector3;
+
+  /** The D'Attack is over: the Dragoon reappears where it took off (PS1: a cut, no flight back). */
+  private flyHome(): void {
+    const home = this.dAttackHome;
+    if (!home) return;
+    this.dAttackHome = undefined;
+    const p = this.player;
+    const target = this.locked ?? this.attackTarget;
+    this.clearNav();
+    p.position.copyFrom(home);
+    if (target?.alive) p.face(target.position.subtract(p.position));
   }
 
   /** A Final Burst charge in progress: out through the foe, then a cut back to the start (see tickDash). */
@@ -1207,7 +1228,7 @@ export abstract class ArenaCombatMode extends GameMode {
     Vector3.LerpToRef(d.start, d.end, ease(k), d.p.position);
     d.p.dragoonLift = BURST_LIFT * Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5);
     if (k < 1) return;
-    d.p.position.copyFrom(d.start);
+    if (d.hitAt <= 1) d.p.position.copyFrom(d.start); // the charge: back where it started
     this.dash = undefined;
     d.done();
   }
@@ -2074,6 +2095,40 @@ export abstract class ArenaCombatMode extends GameMode {
         preferred && preferred.alive && this.withinAcquire(preferred)
           ? preferred
           : this.nearestEnemy(ACQUIRE_RANGE);
+      if (acquire && this.player.transformed && this.player.castGestureLength("flight") > 0 && !this.dash && !this.dAttackHome) {
+        // A Dragoon doesn't walk over: it flies at the foe, strikes there, and flies home at the
+        // end of the combo (an instant cut, see finishAction).
+        const p = this.player;
+        const start = p.position.clone();
+        const dir = acquire.position.subtract(start);
+        dir.y = 0;
+        const reach = dir.length();
+        dir.normalize();
+        const end = start.add(dir.scale(Math.max(0, reach - Math.min(DATTACK_STAND_OFF, this.reach - 0.2))));
+        if (this.world.heightAt) end.y = this.world.heightAt(end.x, end.z);
+        this.clearNav(); // no walking after it: the flight is the approach, and home is a cut
+        this.attackAnimT = Math.max(this.attackAnimT, DATTACK_DASH_SECONDS + 0.05);
+        p.face(dir);
+        p.castPose("flight");
+        this.dAttackHome = start;
+        this.dash = {
+          p,
+          start,
+          end,
+          t: 0,
+          out: DATTACK_DASH_SECONDS,
+          hitAt: 2, // no blow on the way
+          done: () => {
+            p.dragoonLift = 0;
+            p.endCastPose();
+            if (acquire.alive) {
+              p.face(acquire.position.subtract(p.position));
+              this.attack(acquire); // in reach now: the D'Attack combo starts
+            } else this.flyHome();
+          },
+        };
+        return;
+      }
       if (acquire) {
         this.attackTarget = acquire;
         this.moveTarget = undefined;

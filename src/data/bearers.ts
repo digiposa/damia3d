@@ -18,6 +18,17 @@ import doelPortrait from "../assets/portraits/doel.png";
 import lenusPortrait from "../assets/portraits/lenus.png";
 import mirandaPortrait from "../assets/portraits/miranda.png";
 import { type DragoonClassId, isClassImplemented } from "./dragoonClasses";
+import type { AdditionHitChoreo } from "./additions";
+
+/** Dart's D'Attack blows (five at D'Lv 5): his Addition swings, grafted onto the Dragoon rig —
+ *  vertical, horizontal, the Volcano turn and its bottom-up finish. Fewer D'Lv = the first few. */
+const DART_DRAGOON_ATTACK: AdditionHitChoreo[] = [
+  { clip: "verticalCut", impact: 0.58, length: 0.75 },
+  { clip: "doubleSlash2", impact: 0.44, length: 0.88 },
+  { clip: "volcano2", impact: 0.56, length: 0.97 },
+  { clip: "volcano3", impact: 0.42, length: 0.96 },
+  { clip: "volcano4", impact: 0.45, length: 0.9 },
+];
 
 /** Weapon silhouette held by the placeholder figure (and the strike motion it uses). */
 export type WeaponKind = "sword" | "spear" | "bow" | "rapier" | "fist" | "hammer" | "axe" | "dualsword";
@@ -95,6 +106,9 @@ export interface Bearer {
   /** Extra yaw (radians) of the Dragoon GLB, like {@link modelYaw} (default: a quarter-turn, the
    *  first such model being authored facing +X). */
   dragoonModelYaw?: number;
+  /** Per-blow choreography of the D'Attack on the Dragoon GLB (clips grafted into it), by hit;
+   *  without it every blow plays the GLB's generic attack swing. */
+  dragoonAttackChoreo?: AdditionHitChoreo[];
   /** Optional weapon GLB (base filename in src/assets/models/) attached to the loaded model's
    *  right-hand bone. Only used alongside {@link model}. */
   weaponModel?: string;
@@ -189,7 +203,7 @@ export const BEARERS: Bearer[] = [
   // Dart's sword is held two-handed (his combat clips): the grip axis runs through both fists
   // (solved from the bones in the combat idle), scale 1.3 so the handle spans them, right fist just
   // under the guard (grip 0.83), left at the pommel. Back seat solved for that length.
-  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", dragoonModel: "dart_dragoon", dragoonModelYaw: -Math.PI / 2, weaponModel: "dart_sword", weaponGrip: 0.83, weaponScale: 1.3, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponBackRotation: [-4.3, 92.4, 162.4], weaponBackOffset: [-0.258, 0.876, -0.194], weaponBackScale: 1.297, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
+  { id: "dart", name: "Dart", classId: "redEye", portrait: dartPortrait, model: "dart", dragoonModel: "dart_dragoon", dragoonModelYaw: -Math.PI / 2, dragoonAttackChoreo: DART_DRAGOON_ATTACK, weaponModel: "dart_sword", weaponGrip: 0.83, weaponScale: 1.3, weaponHandRotation: [4, -76.7, -104.9], weaponHandOffset: [0.004, -0.07, -0.005], weaponBackRotation: [-4.3, 92.4, 162.4], weaponBackOffset: [-0.258, 0.876, -0.194], weaponBackScale: 1.297, weapon: "sword", hair: "spiky", outfit: "armored", color: C_FIRE, storyPlayable: true },
   // Darkness — rapier
   { id: "rose", name: "Rose", classId: "darkness", portrait: rosePortrait, model: "rose", modelYaw: -Math.PI / 2, weapon: "rapier", hair: "long", outfit: "darkness", color: C_DARK, storyPlayable: true },
   // Jade (Wind) — spears

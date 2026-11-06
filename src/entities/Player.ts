@@ -165,7 +165,7 @@ export class Player {
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
-  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup; hurt?: AnimationGroup } = {};
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup; hurt?: AnimationGroup; byName: Map<string, AnimationGroup> } = { byName: new Map() };
   /** Extra height of the Dragoon figure above its hover (a charge in flight), world units. */
   dragoonLift = 0;
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
@@ -579,12 +579,14 @@ export class Player {
   get dragoonAttackDef(): AdditionDef {
     const n = this.dragoonStrikes;
     if (!this._dragoonDef || this._dragoonDef.hits.length !== n) {
+      const choreo = this.bearer.dragoonAttackChoreo?.slice(0, n);
       this._dragoonDef = {
         name: "D'Attack",
         hits: Array.from({ length: n }, () => 100),
         multiplier: [100, 100, 100, 100, 100],
         spMax: 0,
         acquireLevel: 1,
+        ...(choreo && choreo.length === n ? { choreo } : {}),
       };
     }
     return this._dragoonDef;
@@ -1131,25 +1133,15 @@ export class Player {
       return;
     }
     if (this.dragoonActive && this.dragoonModelRoot) {
-      this.playDragoonOneShot(this.dragoonAnims.attack, speed);
+      const own = clip ? this.dragoonAnims.byName.get(clip.toLowerCase()) : undefined;
+      if (own) this.playBlow(own, speed); // a D'Attack blow of its own (see bearers' choreo)
+      else this.playDragoonOneShot(this.dragoonAnims.attack, speed);
       return;
     }
     if (this.modelRoot) {
       const own = clip ? this.modelAnims.byName.get(clip.toLowerCase()) : undefined;
       if (own) {
-        // Stopping the previous blow fires ITS end event: take it over first, so that event (and
-        // its "swing over" flag) is ignored and this blow owns the body till it ends.
-        const prev = this.modelCurrent;
-        this.modelCurrent = own;
-        this.modelAttacking = true;
-        prev?.stop();
-        own.start(false, speed, own.from, own.to);
-        own.onAnimationGroupEndObservable.addOnce(() => {
-          if (this.modelCurrent !== own) return; // something else took over
-          const next = this.blowQueue.shift();
-          if (next) this.strike(next.clip, next.speed); // the chain goes on, same frame
-          else this.modelAttacking = false;
-        });
+        this.playBlow(own, speed);
         return;
       }
       const a = this.modelAnims.attack;
@@ -1170,6 +1162,24 @@ export class Player {
       return;
     }
     this.humanoid?.strike();
+  }
+
+  /** One blow of a chain (an Addition hit's own swing): it owns the body till it ends, then the
+   *  next queued blow starts the same frame (see {@link queueStrike}), or the swing is over. */
+  private playBlow(own: AnimationGroup, speed: number): void {
+    // Stopping the previous blow fires ITS end event: take it over first, so that event (and
+    // its "swing over" flag) is ignored and this blow owns the body till it ends.
+    const prev = this.modelCurrent;
+    this.modelCurrent = own;
+    this.modelAttacking = true;
+    prev?.stop();
+    own.start(false, speed, own.from, own.to);
+    own.onAnimationGroupEndObservable.addOnce(() => {
+      if (this.modelCurrent !== own) return; // something else took over
+      const next = this.blowQueue.shift();
+      if (next) this.strike(next.clip, next.speed); // the chain goes on, same frame
+      else this.modelAttacking = false;
+    });
   }
 
   /** Loop/replace the model's current animation group (no-op if already playing it). */
@@ -1220,6 +1230,7 @@ export class Player {
     this.dragoonAnims.flight = res.animationGroups.find((a) => has(a, "cast3b", "flight", "fly"));
     this.dragoonAnims.summon = res.animationGroups.find((a) => has(a, "cast4", "summon"));
     this.dragoonAnims.hurt = res.animationGroups.find((a) => has(a, "hurt", "hit_react"));
+    this.dragoonAnims.byName = new Map(res.animationGroups.map((a) => [a.name.toLowerCase(), a]));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
     // PS1 hover: leaning forward, legs trailing back, wings beating — laid over whatever clip plays,
     // after the animations have written the bones (so the pose adds to the clip, not under it).
