@@ -945,7 +945,7 @@ export class Player {
    * apart (a run); the guard lies along the knuckles. Eased a little so the two cases don't pop.
    */
   private updateGrip(g = this.grip): void {
-    if (!g || this.weaponSheathed !== false) return;
+    if (!g || (this.weaponSheathed !== false && !this.bearer.weaponNoSheath)) return; // never sheathed: always in hand
     const { m, q, v } = Player.gripTmp;
     const [R, L, f, y, x, z, t] = v;
     g.socket.computeWorldMatrix(true);
