@@ -9,6 +9,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { softDotTexture } from "./atmosphere";
+import { FlameDragon } from "./FlameDragon";
 import type { Element } from "../combat/element";
 
 /** How long one Power Up ground ring takes to expand and fade. */
@@ -61,8 +62,7 @@ export class SpellFx {
   private shellRun?: { at: () => Vector3; t: number; dur: number };
   /** The Red-Eye Dragon in flight (see {@link fireDragon}). */
   private dragon?: {
-    segs: Mesh[];
-    mats: StandardMaterial[];
+    beast: FlameDragon;
     targets: (() => Vector3)[];
     next: number;
     phase: "rise" | "dive" | "hop" | "leave";
@@ -250,31 +250,15 @@ export class SpellFx {
    */
   fireDragon(from: Vector3, targets: (() => Vector3)[], onStrike: (i: number) => void, onDone: () => void): void {
     this.endDragon();
-    const segs: Mesh[] = [];
-    const mats: StandardMaterial[] = [];
-    const n = 9;
-    for (let i = 0; i < n; i++) {
-      const mat = new StandardMaterial(`fxDragonMat${i}`, this.scene);
-      mat.disableLighting = true;
-      const k = i / (n - 1);
-      mat.emissiveColor = new Color3(1, 0.75 - 0.5 * k, 0.3 - 0.25 * k); // white-gold head → ember tail
-      mat.alpha = 0.9 - 0.45 * k;
-      const seg = MeshBuilder.CreateSphere(`fxDragon${i}`, { diameter: i === 0 ? 1.1 : 0.9 - 0.6 * k, segments: 10 }, this.scene);
-      seg.material = mat;
-      seg.isPickable = false;
-      seg.position.copyFrom(from);
-      segs.push(seg);
-      mats.push(mat);
-    }
-    this.dragon = { segs, mats, targets, next: 0, phase: "rise", from: from.clone(), to: from.add(new Vector3(0, 4, 0)), t: 0, dur: 0.45, onStrike, onDone };
+    const beast = new FlameDragon(this.scene, from);
+    this.dragon = { beast, targets, next: 0, phase: "rise", from: from.clone(), to: from.add(new Vector3(0, 4, 0)), t: 0, dur: 0.45, onStrike, onDone };
     this.trail.emitter = from.clone();
     this.trail.emitRate = 380;
   }
 
   private endDragon(): void {
     if (!this.dragon) return;
-    for (const s of this.dragon.segs) s.dispose();
-    for (const m of this.dragon.mats) m.dispose();
+    this.dragon.beast.dispose();
     this.trail.emitRate = 0;
     this.dragon = undefined;
   }
@@ -286,21 +270,12 @@ export class SpellFx {
     d.t += dt;
     const k = Math.min(1, d.t / d.dur);
     const ease = k * k * (3 - 2 * k);
-    const head = d.segs[0];
-    Vector3.LerpToRef(d.from, d.to, ease, head.position);
-    if (d.phase === "rise" || d.phase === "hop") head.position.y += Math.sin(k * Math.PI) * 1.2; // an arc over the top
-    for (let i = 1; i < d.segs.length; i++) {
-      const prev = d.segs[i - 1].position;
-      const seg = d.segs[i];
-      const dir = seg.position.subtract(prev);
-      const len = dir.length();
-      const gap = 0.42;
-      if (len > gap) seg.position.copyFrom(prev.add(dir.scale(gap / len)));
-    }
-    this.trail.emitter = head.position.clone();
+    const pos = Vector3.Lerp(d.from, d.to, ease);
+    if (d.phase === "rise" || d.phase === "hop") pos.y += Math.sin(k * Math.PI) * 1.2; // an arc over the top
+    d.beast.update(dt, pos);
+    this.trail.emitter = d.beast.flamePoint().clone(); // flames all along the body
     if (d.phase === "leave") {
-      const fade = 1 - k;
-      d.mats.forEach((m, i) => (m.alpha = (0.9 - 0.45 * (i / (d.mats.length - 1))) * fade));
+      d.beast.fade(k);
       if (k >= 1) {
         const done = d.onDone;
         this.endDragon();
@@ -310,7 +285,7 @@ export class SpellFx {
     }
     if (k < 1) return;
     if (d.phase === "dive") d.onStrike(d.next++);
-    d.from = head.position.clone();
+    d.from = d.beast.head.position.clone();
     d.t = 0;
     if (d.next < d.targets.length) {
       const aim = d.targets[d.next]().add(new Vector3(0, 0.9, 0));
