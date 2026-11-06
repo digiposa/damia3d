@@ -141,10 +141,9 @@ const FIREBALL_SPEED = 14;
 const FIRE_TRAIL_SPEED = 9;
 const EXPLOSION_RADIUS = 3.5;
 /** Final Burst: the caster curls into a ball (seconds), charges through the foe and `overshoot`
- *  units past them (seconds out), then flies back to where they started (seconds back). */
+ *  units past them (seconds out), then reappears where they started (PS1: a cut, no flight back). */
 const BURST_BALL_SECONDS = 0.9;
 const BURST_OUT_SECONDS = 0.45;
-const BURST_BACK_SECONDS = 0.65;
 const BURST_OVERSHOOT = 2.5;
 const BURST_LIFT = 0.7;
 /** VFX power of an attack item at the BOTTOM of its mash range (one QTE step). The player's Burn Out
@@ -1184,37 +1183,23 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.player.dragoonSpent) this.player.revert();
   }
 
-  /** A Final Burst charge in progress: out through the foe, then back to the start (see tickDash). */
-  private dash?: { p: Player; start: Vector3; end: Vector3; t: number; out: number; back: number; hitAt: number; turned?: boolean; hit?: () => void; done: () => void };
+  /** A Final Burst charge in progress: out through the foe, then a cut back to the start (see tickDash). */
+  private dash?: { p: Player; start: Vector3; end: Vector3; t: number; out: number; hitAt: number; hit?: () => void; done: () => void };
 
-  /** Fly the charging caster along their path: out to the far point (the blow lands as they pass
-   *  the foe), then back to where they started; lifted off the ground in between. */
+  /** Fly the charging caster out to the far point (the blow lands as they pass the foe), lifted
+   *  off the ground; at the end they reappear where they started, on the spot (PS1). */
   private tickDash(dt: number): void {
     const d = this.dash;
     if (!d) return;
     d.t += dt;
     const ease = (k: number): number => k * k * (3 - 2 * k);
-    if (d.t <= d.out) {
-      const k = d.t / d.out;
-      if (d.hit && k >= d.hitAt) {
-        d.hit();
-        d.hit = undefined;
-      }
-      Vector3.LerpToRef(d.start, d.end, ease(k), d.p.position);
-      d.p.dragoonLift = BURST_LIFT * Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5);
-      return;
-    }
-    const k = Math.min(1, (d.t - d.out) / d.back);
-    if (d.hit) {
+    const k = Math.min(1, d.t / d.out);
+    if (d.hit && k >= d.hitAt) {
       d.hit();
       d.hit = undefined;
     }
-    if (!d.turned) {
-      d.turned = true;
-      d.p.face(d.start.subtract(d.end)); // wheel round and fly home
-    }
-    Vector3.LerpToRef(d.end, d.start, ease(k), d.p.position);
-    d.p.dragoonLift = BURST_LIFT * Math.sin((1 - k) * Math.PI * 0.5);
+    Vector3.LerpToRef(d.start, d.end, ease(k), d.p.position);
+    d.p.dragoonLift = BURST_LIFT * Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5);
     if (k < 1) return;
     d.p.position.copyFrom(d.start);
     this.dash = undefined;
@@ -1554,7 +1539,7 @@ export abstract class ArenaCombatMode extends GameMode {
       p.mp = Math.max(0, p.mp - spell.mp);
       this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
       const target = primary;
-      const total = BURST_BALL_SECONDS + BURST_OUT_SECONDS + BURST_BACK_SECONDS + 0.2;
+      const total = BURST_BALL_SECONDS + BURST_OUT_SECONDS + 0.2;
       this.attackAnimT = Math.max(this.attackAnimT, total);
       p.castPose("ball");
       this.spellFx?.powerUp(p.position, BURST_BALL_SECONDS, new Color3(1, 0.5, 0.15));
@@ -1571,14 +1556,13 @@ export abstract class ArenaCombatMode extends GameMode {
           end.y = start.y;
           p.face(dir);
           p.castPose("flight");
-          this.spellFx?.fireShell(() => p.position.add(new Vector3(0, 1.1 + p.dragoonLift, 0)), BURST_OUT_SECONDS + BURST_BACK_SECONDS);
+          this.spellFx?.fireShell(() => p.position.add(new Vector3(0, 1.1 + p.dragoonLift, 0)), BURST_OUT_SECONDS);
           this.dash = {
             p,
             start,
             end,
             t: 0,
             out: BURST_OUT_SECONDS,
-            back: BURST_BACK_SECONDS,
             hitAt: reach / Math.max(0.01, reach + BURST_OVERSHOOT),
             hit: () => {
               this.spellFx?.burst(spell.element, target.position, 2.0);
