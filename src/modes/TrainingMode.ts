@@ -351,6 +351,8 @@ export abstract class ArenaCombatMode extends GameMode {
   private decor: PropPlacement[] = [];
   private sight!: TimingSight;
   private debugBtn?: Button;
+  /** One-tap training dummy (🎯, left of the 🛠 button; N on a keyboard) — Training only. */
+  private dummyBtn?: Button;
   private debugMenu?: TrainingMenu;
   private attackBtn?: ActionButton;
   private guardBtn?: ActionButton;
@@ -650,6 +652,19 @@ export abstract class ArenaCombatMode extends GameMode {
           padding: "10px 14px",
         },
       });
+      // A training dummy in one tap, without opening the menu (desktop: the N key). Left of 🛠,
+      // under the mute button — the right column below 🛠 is the Tab (switch) button's.
+      this.dummyBtn = new Button({
+        label: "🎯",
+        onClick: () => this.spawnDummy(),
+        style: {
+          top: "calc(env(safe-area-inset-top, 0px) + 58px)",
+          right: "calc(env(safe-area-inset-right, 0px) + 64px)",
+          font: "600 18px/1 system-ui, sans-serif",
+          padding: "10px 12px",
+        },
+      });
+      this.dummyBtn.el.title = `${t("spawn.dummy").replace(/^\S+\s+/, "")} (N)`;
     }
     // On-screen action cluster: a big ⚔ attack button bottom-right, with the secondary
     // actions in an arc above it that SWAP with the form (human: Guard/Item/Transform ·
@@ -916,12 +931,14 @@ export abstract class ArenaCombatMode extends GameMode {
     if (!this.debugMenu) return;
     this.paused = true;
     this.debugBtn?.setVisible(false);
+    this.dummyBtn?.setVisible(false);
     this.debugMenu.show();
   }
 
   private closeDebugMenu(): void {
     this.debugMenu?.hide();
     this.debugBtn?.setVisible(true);
+    this.dummyBtn?.setVisible(true);
     this.paused = false;
   }
 
@@ -1246,6 +1263,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (this.input.wasPressed("Transform") || this.input.wasPressed("KeyT")) this.playerAct("transform");
     if (this.input.wasPressed("Special") || this.input.wasPressed("KeyX")) this.doSpecial();
     if (this.input.wasPressed("Tab") || this.input.wasPressed("Switch")) this.cycleControl();
+    if (this.dummyBtn && this.input.wasPressed("KeyN")) this.spawnDummy();
 
     // Combat time scales with the Options "combat speed" setting — for the fighters' clips and the
     // spell effects too, so impacts, releases and flights keep in step with the timers below.
@@ -3562,6 +3580,7 @@ export abstract class ArenaCombatMode extends GameMode {
     this.additionBanner.dispose();
     this.debugMenu?.dispose();
     this.debugBtn?.dispose();
+    this.dummyBtn?.dispose();
     this.attackBtn?.dispose();
     this.guardBtn?.dispose();
     this.transformBtn?.dispose();
