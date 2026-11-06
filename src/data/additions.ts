@@ -39,6 +39,8 @@ export interface AdditionDef {
   acquireLevel: number;
   /** Per-hit choreography (index = hit − 1); absent = the generic swing on every hit. */
   choreo?: AdditionHitChoreo[];
+  /** The call-out played as the Addition starts (an effect's base name in src/assets/audio/sfx). */
+  sound?: string;
 }
 
 /**
@@ -65,6 +67,7 @@ export const DART_ADDITIONS = {
   // Impacts / lengths are measured on the clips (right-hand path) once in.
   doubleSlash: {
     name: "Double Slash",
+    sound: "addition_double_slash",
     hits: [100, 50],
     multiplier: [100, 105, 110, 120, 135],
     spMax: 35,
@@ -74,6 +77,7 @@ export const DART_ADDITIONS = {
   },
   volcano: {
     name: "Volcano",
+    sound: "addition_volcano",
     hits: [50, 50, 50, 50],
     multiplier: [100, 105, 110, 115, 125],
     spMax: 36,
@@ -84,6 +88,7 @@ export const DART_ADDITIONS = {
   },
   burningRush: {
     name: "Burning Rush",
+    sound: "addition_burning_rush",
     hits: [50, 50, 50],
     multiplier: [100, 100, 100, 100, 100],
     spMax: 102,
@@ -93,6 +98,7 @@ export const DART_ADDITIONS = {
   },
   crushDance: {
     name: "Crush Dance",
+    sound: "addition_crush_dance",
     hits: [30, 30, 30, 30, 30],
     multiplier: [100, 115, 130, 145, 167],
     spMax: 100,
@@ -100,6 +106,7 @@ export const DART_ADDITIONS = {
   },
   madnessHero: {
     name: "Madness Hero",
+    sound: "addition_madness_hero",
     hits: [20, 20, 20, 20, 10, 10],
     multiplier: [100, 100, 100, 100, 100],
     spMax: 204,
@@ -107,6 +114,7 @@ export const DART_ADDITIONS = {
   },
   moonStrike: {
     name: "Moon Strike",
+    sound: "addition_moon_strike",
     hits: [30, 30, 30, 30, 30, 30, 20],
     multiplier: [100, 120, 140, 160, 175],
     spMax: 20,

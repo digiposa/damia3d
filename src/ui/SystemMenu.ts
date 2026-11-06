@@ -1,4 +1,5 @@
 import { settings, RETRO_LEVELS } from "../core/settings";
+import { audio } from "../core/audio";
 import { hasTouch } from "../core/device";
 import { t, getLocale, setLocale, LOCALES } from "../core/i18n";
 import type {
@@ -528,12 +529,19 @@ export class SystemMenu {
     box.append(
       pill(settings.soundEnabled ? t("config.sound.on") : t("config.sound.off"), () => {
         settings.soundEnabled = !settings.soundEnabled;
+        audio.applyVolumes();
         this.render();
       }),
     );
-    box.append(slider(t("config.music"), settings.musicVolume, (v) => (settings.musicVolume = v)));
-    box.append(slider(t("config.sfx"), settings.sfxVolume, (v) => (settings.sfxVolume = v)));
-    box.append(hint(t("config.sound.note")));
+    box.append(slider(t("config.music"), settings.musicVolume, (v) => {
+      settings.musicVolume = v;
+      audio.applyVolumes();
+    }));
+    box.append(slider(t("config.sfx"), settings.sfxVolume, (v) => {
+      settings.sfxVolume = v;
+      audio.applyVolumes();
+      audio.playSfx("addition_double_slash", { volume: 0.8 }); // hear the level you set
+    }));
 
     box.append(divider(), label(t("config.combatSpeed")));
     box.append(

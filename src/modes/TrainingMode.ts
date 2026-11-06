@@ -7,6 +7,7 @@ import "@babylonjs/core/Culling/ray";
 
 import { GameMode } from "../core/GameMode";
 import { settings } from "../core/settings";
+import { audio } from "../core/audio";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -2439,6 +2440,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
     this.comboDamage = 0; // fresh combo — start its damage tally from zero
+    if (def.sound && !this.comboIsDragoon) audio.playSfx(def.sound); // the Addition's call-out
     // The PS1 read-out along the bottom (multi-hit Additions only; the tally grows per press).
     // (A D'Attack earns no SP: its read-out counts the blows, in the Dragoon's element colour.)
     if (additionPresses(def) > 0) {
