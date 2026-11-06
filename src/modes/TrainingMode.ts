@@ -146,6 +146,10 @@ const BURST_BALL_SECONDS = 0.9;
 const BURST_OUT_SECONDS = 0.45;
 const BURST_OVERSHOOT = 2.5;
 const BURST_LIFT = 0.7;
+/** Red-Eye Dragon: the flame column erupts this many seconds into the summon (the crouch), this
+ *  far in front of the caster; the dragon bursts out of it at the gesture's release. */
+const SUMMON_COLUMN_AT = 0.75;
+const SUMMON_COLUMN_AHEAD = 2.2;
 /** VFX power of an attack item at the BOTTOM of its mash range (one QTE step). The player's Burn Out
  *  scales from here up to ~1.9 on a perfect mash; an enemy's cast has no QTE, so it lands at this
  *  floor — same spell, same flame column, just the un-mashed version. */
@@ -1533,6 +1537,49 @@ export abstract class ArenaCombatMode extends GameMode {
     this.runner.gauge.spend(); // a cast costs the ATB action…
     p.tickDragoon(); // …and one Dragoon turn
     const allies = (): Player[] => this.party.map((m) => m.avatar);
+    if (spell.id === "redEyeDragon" && p.castGestureLength("summon") > 0 && this.enemies.some((e) => e.alive)) {
+      // Red-Eye Dragon (PS1): Dart summons — a column of flame erupts before him, the dragon
+      // bursts out of it and crashes onto every foe in turn, each in a blast of fire.
+      p.mp = Math.max(0, p.mp - spell.mp);
+      const release = p.castGesture("summon");
+      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("summon") + 2.5);
+      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#c8a6ff");
+      const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
+      const column = p.position.add(fwd.scale(SUMMON_COLUMN_AHEAD));
+      if (this.world.heightAt) column.y = this.world.heightAt(column.x, column.z);
+      this.comboTimers.push({
+        t: SUMMON_COLUMN_AT,
+        fn: () => {
+          this.spellFx?.powerUp(column, release - SUMMON_COLUMN_AT + 0.6, new Color3(1, 0.42, 0.1));
+          this.spellFx?.burst(spell.element, column, 0.9);
+          this.camera.shake(0.1, 0.5);
+        },
+      });
+      this.comboTimers.push({
+        t: release,
+        fn: () => {
+          const foes = this.enemies.filter((e) => e.alive);
+          this.spellFx?.burst(spell.element, column, 1.6);
+          this.spellFx?.fireDragon(
+            column.add(new Vector3(0, 0.5, 0)),
+            foes.map((e) => () => e.position),
+            (i) => {
+              const foe = foes[i];
+              this.spellFx?.burst(spell.element, foe.position, 2.2);
+              this.camera.shake(0.28, 0.35);
+              this.castSpell(p, spell, foe, allies(), false, [foe]);
+            },
+            () => {
+              this.attackAnimT = 0;
+              this.finishAction();
+              this.refreshHud();
+            },
+          );
+        },
+      });
+      this.refreshHud();
+      return;
+    }
     if (spell.id === "finalBurst" && primary && p.castGestureLength("flight") > 0) {
       // Final Burst (PS1): Dart wraps himself in fire, charges straight THROUGH the foe and flies
       // back to where he stood. Rooted throughout; the figure is moved here (see tickDash).

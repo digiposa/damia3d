@@ -76,6 +76,8 @@ const THROW_RELEASE = 0.58;
 const DRAGOON_CAST_RELEASE = 1.45;
 /** Second the Dragoon's ground-slam cast hits the ground (see the cast2 clip). */
 const DRAGOON_CAST_GROUND_RELEASE = 1.74;
+/** Second the Dragoon's summoning cast throws its arms up (see the cast4 clip). */
+const DRAGOON_CAST_SUMMON_RELEASE = 1.4;
 /** Where in the helpful-item clip the item is tossed up (hand at the top of its arc). */
 const THROW_HEAL_RELEASE = 0.6;
 /** Height (0–1 up the weapon mesh) of the grip seated in the fist — Meru's hammer grip ≈ 0.6. */
@@ -161,7 +163,7 @@ export class Player {
   /** GLB Dragoon-form model (when the bearer supplies one), shown while transformed. */
   private dragoonModelRoot?: TransformNode;
   /** The Dragoon GLB's clips (hover idle, attack…), once it has some. */
-  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup } = {};
+  private dragoonAnims: { idle?: AnimationGroup; attack?: AnimationGroup; cast?: AnimationGroup; cast2?: AnimationGroup; ball?: AnimationGroup; flight?: AnimationGroup; summon?: AnimationGroup } = {};
   /** Extra height of the Dragoon figure above its hover (a charge in flight), world units. */
   dragoonLift = 0;
   /** The hover pose laid over the Dragoon GLB's clips (see {@link hoverDragoon}). */
@@ -952,26 +954,26 @@ export class Player {
     });
   }
 
-  private dragoonCastClip(form: "shot" | "ground" | "ball" | "flight"): AnimationGroup | undefined {
+  private dragoonCastClip(form: "shot" | "ground" | "summon" | "ball" | "flight"): AnimationGroup | undefined {
     const a = this.dragoonAnims;
-    return form === "ground" ? a.cast2 : form === "ball" ? a.ball : form === "flight" ? a.flight : a.cast;
+    return form === "ground" ? a.cast2 : form === "summon" ? a.summon : form === "ball" ? a.ball : form === "flight" ? a.flight : a.cast;
   }
 
   /** The Dragoon's spell-casting gesture, when its model has one: `shot` thrusts a hand out (a
    *  bolt leaves it), `ground` slams the ground. Returns the second the spell goes off inside that
    *  motion (0 = no gesture: the spell resolves at once). */
-  castGesture(form: "shot" | "ground" = "shot"): number {
+  castGesture(form: "shot" | "ground" | "summon" = "shot"): number {
     const a = this.dragoonActive && this.dragoonModelRoot ? this.dragoonCastClip(form) : undefined;
     if (!a) {
       this.strike();
       return 0;
     }
     this.playDragoonOneShot(a);
-    return form === "ground" ? DRAGOON_CAST_GROUND_RELEASE : DRAGOON_CAST_RELEASE;
+    return form === "ground" ? DRAGOON_CAST_GROUND_RELEASE : form === "summon" ? DRAGOON_CAST_SUMMON_RELEASE : DRAGOON_CAST_RELEASE;
   }
 
   /** How long the cast gesture lasts in all (seconds), 0 without one. */
-  castGestureLength(form: "shot" | "ground" | "ball" | "flight" = "shot"): number {
+  castGestureLength(form: "shot" | "ground" | "summon" | "ball" | "flight" = "shot"): number {
     const a = this.dragoonCastClip(form);
     return a ? (a.to - a.from) / 60 : 0;
   }
@@ -1189,6 +1191,7 @@ export class Player {
     this.dragoonAnims.cast2 = res.animationGroups.find((a) => has(a, "cast2", "spell2", "slam"));
     this.dragoonAnims.ball = res.animationGroups.find((a) => has(a, "cast3a", "ball", "curl"));
     this.dragoonAnims.flight = res.animationGroups.find((a) => has(a, "cast3b", "flight", "fly"));
+    this.dragoonAnims.summon = res.animationGroups.find((a) => has(a, "cast4", "summon"));
     this.dragoonAnims.idle = res.animationGroups.find((a) => has(a, "idle", "hover", "fly")) ?? res.animationGroups[0];
     // PS1 hover: leaning forward, legs trailing back, wings beating — laid over whatever clip plays,
     // after the animations have written the bones (so the pose adds to the clip, not under it).
