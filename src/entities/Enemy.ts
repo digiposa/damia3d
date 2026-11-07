@@ -742,7 +742,6 @@ export class Enemy {
     // animation to it: the Power-Up instant plays its own clip; Slash Twice / Multi pick theirs.
     const wasPowered = this.poweredUp;
     const action = this.chooseAction(ctx);
-    if (!action) return null; // a Senior Warden's ~Do nothing: the turn passes
     if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
     else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED); // spell cast
     else if (action.kind === "physical" && action.ranged) this.playThrow(); // a rock hurled point-blank
@@ -867,10 +866,8 @@ export class Enemy {
     return (clip.to - clip.from) / 60 / (kind === "magical" ? CAST_SPEED : ATTACK_SPEED);
   }
 
-  private chooseAction(_ctx: EnemyContext): EnemyAction | null {
+  private chooseAction(_ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction();
-    // A Senior Warden: ~Do nothing or ~Slash & Pierce, at random (PS1).
-    if (this.def.behavior === "seniorWarden" && Math.random() < 0.5) return null;
     if (this.def.behavior === "fruegel" || this.def.behavior === "fruegel2") {
       // His blows, one at random; the Rock Throw is hurled even point-blank, but it has the same
       // recharge as from afar (no spamming it).

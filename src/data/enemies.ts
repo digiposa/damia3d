@@ -354,7 +354,7 @@ export const HELLENA_WARDEN_BOSS: EnemyDef = {
 
 /**
  * Senior Warden, whistled in by Fruegel in the first fight (boss extra, once both Hellena Wardens
- * are down). Rules (wiki): ~Do nothing or ~Slash & Pierce (1×) at random; Power Up (dealt ×1.5,
+ * are down). Rules (wiki, without PS1's ~Do nothing turns): ~Slash & Pierce (1×); Power Up (dealt ×1.5,
  * taken ×0.5 for 3 turns) on his next turn once an ally has fallen — Auto, and once any enemy has
  * used Power Up, no enemy uses it again; Last Gasp: brought to 0 HP, he powers up instead of
  * falling if his Power Up is open, else he throws a Gushing Magma (1× Fire magic on the party) and
