@@ -57,12 +57,18 @@ function forEachPBRMaterial(meshes: AbstractMesh[], apply: (m: PBRMaterial) => v
  * Y bounds and scale/position `root` so it stands the right size regardless of the source's units
  * (AI/Mixamo/AccuRIG exports arrive at wildly different scales). Rotation is set by the caller.
  */
-export function fitHeight(meshes: AbstractMesh[], root: TransformNode, targetH: number): void {
+export function fitHeight(meshes: AbstractMesh[], root: TransformNode, targetH: number, skinned = false): void {
   let lo = Infinity;
   let hi = -Infinity;
   for (const mesh of meshes) {
     if (mesh.getTotalVertices() === 0) continue; // skip the empty glTF __root__
     mesh.computeWorldMatrix(true);
+    // `skinned`: measure the mesh as its skeleton deforms it (the rest pose) — a Mixamo-rigged
+    // export's raw geometry can sit far from where the bones put it.
+    if (skinned && mesh.skeleton) {
+      mesh.skeleton.prepare();
+      mesh.refreshBoundingInfo({ applySkeleton: true });
+    }
     const bb = mesh.getBoundingInfo().boundingBox;
     lo = Math.min(lo, bb.minimumWorld.y);
     hi = Math.max(hi, bb.maximumWorld.y);

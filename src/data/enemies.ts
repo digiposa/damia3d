@@ -69,6 +69,9 @@ export interface EnemyDef {
    *  bone (mixamorig:RightHand). The blade is authored along the mesh's own axis; the engine seats
    *  the grip in the fist and points it out. */
   weaponModel?: string;
+  /** Fit and ground the model on its skinned rest pose (a Mixamo-rigged Tripo export, whose raw
+   *  geometry sits elsewhere than where its bones put it) rather than on the raw mesh. */
+  fitSkinned?: boolean;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -264,6 +267,7 @@ export const FRUEGEL: EnemyDef = {
   model: "fruegel",
   cellShaded: true,
   weaponModel: "fruegel_mace", // his mace (head at the mesh origin, like the swords' tip)
+  fitSkinned: true,
 };
 
 /* ============================================================================

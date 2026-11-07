@@ -45,6 +45,8 @@ const CAST_RELEASE_FRACTION = 0.35;
 const ATTACK_SPEED = 1.2;
 /** Uniform world-space scale of a hand-attached weapon model (blade length ≈ this × mesh height). */
 const WEAPON_SCALE = 1.3;
+/** Height of a rigged enemy's toe joints above the floor once grounded (the sole). */
+const SOLE = 0.04;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
 const WEAPON_GRIP_Y = 0.87;
 
@@ -258,7 +260,7 @@ export class Enemy {
     if (this.def.cellShaded) flattenCellShaded(res.meshes);
     else tuneImportedMetal(res.meshes);
 
-    fitHeight(res.meshes, modelRoot, 1.8); // ≈ our characters' height; exports arrive at any scale
+    fitHeight(res.meshes, modelRoot, 1.8, this.def.fitSkinned); // ≈ our characters' height; exports arrive at any scale
     // Some exports face away from the enemy's forward (+Z, toward the target). A per-def yaw spins the
     // mesh so its head points where the enemy looks (matters for the attack lunge direction).
     if (this.def.modelYaw) modelRoot.rotation.y = (this.def.modelYaw * Math.PI) / 180;
@@ -295,6 +297,28 @@ export class Enemy {
     if (this.def.weaponModel) await this.attachWeapon(this.def.weaponModel, scene, res.skeletons[0]);
 
     this.play(this.anims.idle);
+    if (this.def.fitSkinned) {
+      // Its idle can carry the body well away from the bind pose the fit measured: once that clip
+      // has posed the bones, put the lowest skinned point back on the ground.
+      const scene = this.root.getScene();
+      // (The skin matrices are only rebuilt at render time, so the bones' own nodes are what is
+      // current here: the toes, a sole's thickness above the floor.)
+      const toes = (res.skeletons[0]?.bones ?? [])
+        .filter((bn) => /(Toe_?Base|Foot)$/.test(bn.name))
+        .map((bn) => bn.getTransformNode())
+        .filter((n): n is TransformNode => !!n);
+      scene.onAfterAnimationsObservable.addOnce(() => {
+        if (!toes.length) return;
+        this.root.computeWorldMatrix(true);
+        let lo = Infinity;
+        for (const n of toes) {
+          n.computeWorldMatrix(true);
+          lo = Math.min(lo, n.getAbsolutePosition().y);
+        }
+        const k = modelRoot.parent ? (modelRoot.parent as TransformNode).absoluteScaling.y : 1;
+        modelRoot.position.y -= (lo - this.root.getAbsolutePosition().y - SOLE * this.scale) / Math.max(1e-4, k);
+      });
+    }
   }
 
   /**
