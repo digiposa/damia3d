@@ -746,10 +746,11 @@ export class Enemy {
     return action;
   }
 
-  /** False while he cannot be targeted at all (no enemy uses it for now: Fruegel fights from the
-   *  start, his Hellena Wardens at his side). */
+  /** False while he cannot be targeted at all: Fruegel (first fight) as long as one of his
+   *  Hellena Wardens stands (PS1) — though, unlike PS1's Observer, he keeps fighting meanwhile. */
   get targetable(): boolean {
-    return true;
+    if (this.def.behavior !== "fruegel") return true;
+    return !(this.others?.() ?? []).some((e) => e !== this && e.alive && e.def.id === "hellena_warden_boss");
   }
 
   /** Fruegel's Whistle: the battle opened with Hellena Wardens at his side (the story fight), and

@@ -268,9 +268,10 @@ const FRUEGEL_LOOK = {
 
 /**
  * Fruegel, first visit (formation 386: Fruegel, Hellena Warden ×2, Senior Warden ×2). In the story
- * fight he opens with two Hellena Wardens at his side and fights from the start (no Observer, as
- * on PS1); once both are down he blows his Whistle (Auto, single use) and two Senior Wardens come
- * in. Spawned alone (Training), he never whistles.
+ * fight he opens with two Hellena Wardens at his side: he cannot be targeted while one stands
+ * (PS1), but — unlike PS1's Observer, which made the fight too easy — he attacks from the start.
+ * Once both are down he blows his Whistle (Auto, single use) and two Senior Wardens come in.
+ * Spawned alone (Training), he is targetable at once and never whistles.
  * Moves: ~Slam (1.5×) and ~Rock Throw (2×) at random; ~Club (1×) only as his Retaliate — 20% when
  * an Addition is aimed at him, out of turn order; Power Up (dealt ×1.5, taken ×0.5 for 3 of his
  * turns) on his next turn after he is hit by magic, single use, only if no other enemy has.
