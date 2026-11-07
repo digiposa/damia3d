@@ -46,7 +46,7 @@ export const HELLENA_SPOTS = {
   coastEnd: { u: 70, v: 0 }, // on to the guard post (a long walk: the view is the point)
   // The guard post (iso section).
   fromCoast: { u: 33, v: 0 },
-  backToCoast: { u: 29.5, v: 0 },
+  backToCoast: { u: 28.5, v: 0 }, // across the whole path's width (no slipping past it)
   bridge: { u: 49, v: 0 },
   landing: { u: 56, v: 1 },
   gate: { u: 60, v: 3 },
@@ -80,6 +80,11 @@ function coastEdge(u: number): number {
 /** The guard post section's ways in from the coast, over the bridge, round the landing. */
 const TRAILS: Knot[][] = [
   [
+    // The coastal path arriving (the same cobbled way, as wide, with the same gentle swing), from
+    // well behind where the section starts: looking back, it runs on along the cliff.
+    { u: -18, v: -0.3, w: 3.2 },
+    { u: 4, v: 0.5, w: 3.2 },
+    { u: 16, v: -0.3, w: 3.2 },
     { u: 28, v: 0.4, w: 3.2 },
     { u: 34, v: 0.4, w: 3.4 },
     { u: 44.5, v: 0, w: 3 },
@@ -189,9 +194,16 @@ export function hellenaWorld(scene: Scene): World {
   const rock = rockMaterial(scene, rand);
   const wood = matte("hellenaWood", scene, undefined, new Color3(0.32, 0.22, 0.15));
 
-  const grounds = buildGround(scene, root, rand, 24, WALL_U + 1, [[24, BRIDGE_U0], [BRIDGE_U1, WALL_U + 1]]);
-  buildCliffFaces(scene, root, rand, rock, [[22, BRIDGE_U0], [BRIDGE_U1, WALL_U + 2]], true);
-  // No rocks on the right here (PS1): the lookout stands there.
+  // The ground starts well behind the section's start, so the coastal path runs on behind the hero
+  // (two painted pieces: one would be wider than MAX_TEX at the standard density).
+  const grounds = [
+    ...buildGround(scene, root, rand, -18, 16, [[-18, 16]]),
+    ...buildGround(scene, root, rand, 16, WALL_U + 1, [[16, BRIDGE_U0], [BRIDGE_U1, WALL_U + 1]]),
+  ];
+  buildCliffFaces(scene, root, rand, rock, [[-20, BRIDGE_U0], [BRIDGE_U1, WALL_U + 2]], true);
+  // The coast's high craggy wall of rocks on the right, up to where the lookout stands (PS1: none
+  // around the lookout).
+  buildRightRocks(scene, root, rand, rock, -18, 30.5, true);
   const ticks = buildPrison(scene, root, rand, rock, wood);
   buildDrawbridge(scene, root, rand, wood);
   const noGlow = buildHorizon(scene, root, rand, ticks, false);

@@ -17,7 +17,7 @@ export const hellenaCoastMap: MapFactory = (scene) => ({
   encounterAt: () => null, // canon: no battles on the coastal path
   start(api) {
     api.exit(P(HELLENA_SPOTS.coastBack), 2.2, "forest", "fromHellena");
-    api.exit(P(HELLENA_SPOTS.coastEnd), 2.6, "hellena", "fromCoast");
+    api.exit(P(HELLENA_SPOTS.coastEnd), 3.4, "hellena", "fromCoast"); // the path's whole width
   },
 });
 
@@ -28,7 +28,7 @@ export const hellenaMap: MapFactory = (scene) => ({
   music: "hellena",
   encounterAt: () => null,
   start(api) {
-    api.exit(P(HELLENA_SPOTS.backToCoast), 1.8, "hellenaCoast", "fromGate");
+    api.exit(P(HELLENA_SPOTS.backToCoast), 3.4, "hellenaCoast", "fromGate"); // the path's whole width
     api.sign(P(HELLENA_SPOTS.gate), 2.8, t("hellena.gate.title"), t("story.exit.soon"));
   },
 });
