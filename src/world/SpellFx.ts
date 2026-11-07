@@ -62,6 +62,8 @@ export class SpellFx {
   /** The Jade Dragon (Lavitz's summon): the wind serpent rises before him, hangs there facing the
    *  foes, unleashes its storm, then climbs away. */
   private summon?: { beast: FlameDragon; phase: "rise" | "hold" | "storm" | "leave"; from: Vector3; to: Vector3; look: Vector3; t: number; dur: number; onStorm: () => void; onDone: () => void };
+  /** The dragon's breath: gusts of wind streaming fast out of its mouth across the foes. */
+  private readonly breath: ParticleSystem;
   /** The mini tornado (Gaspless): a spinning funnel of wind on the struck foe, motes whirling up. */
   private readonly funnel: Mesh;
   private readonly funnelMat: StandardMaterial;
@@ -149,7 +151,8 @@ export class SpellFx {
     this.funnel.isPickable = false;
     this.funnel.setEnabled(false);
     this.gust = this.buildMotes("fxGust", [new Color4(0.85, 1, 0.9, 1), new Color4(0.5, 0.95, 0.7, 1), new Color4(0.2, 0.5, 0.35, 0)], 0.5, 0.08, 0.2);
-    this.disposables.push(this.wall, this.wallMat, this.petals, this.funnel, this.funnelMat, this.gust);
+    this.breath = this.buildBreath();
+    this.disposables.push(this.wall, this.wallMat, this.petals, this.funnel, this.funnelMat, this.gust, this.breath);
     this.auraLight = new PointLight("fxAura", new Vector3(0, 1, 0), scene);
     this.auraLight.range = 9;
     this.auraLight.intensity = 0;
@@ -367,6 +370,11 @@ export class SpellFx {
     const beast = new FlameDragon(this.scene, from, WIND_PALETTE);
     const to = from.add(new Vector3(0, 2.6, 0)).add(look.scale(0.6));
     this.summon = { beast, phase: "rise", from: from.clone(), to, look: look.clone(), t: 0, dur: 0.55, onStorm, onDone };
+    // The breath blows the way the dragon looks, fanned out a little and slanting down onto the foes.
+    const side = Vector3.Cross(Vector3.Up(), look).normalize();
+    const e = this.breath.particleEmitterType as unknown as { direction1: Vector3; direction2: Vector3 };
+    e.direction1 = look.add(side.scale(-0.35)).add(new Vector3(0, -0.15, 0));
+    e.direction2 = look.add(side.scale(0.35)).add(new Vector3(0, -0.4, 0));
     this.setTrailColours(SpellFx.WIND_TRAIL);
     this.trail.emitter = from.clone();
     this.trail.emitRate = 380;
@@ -377,7 +385,31 @@ export class SpellFx {
     this.summon.beast.dispose();
     this.summon = undefined;
     this.trail.emitRate = 0;
+    this.breath.emitRate = 0;
     this.setTrailColours(SpellFx.FIRE_TRAIL);
+  }
+
+  /** Gusts: big fast motes blown straight out along a direction set per storm (see windDragon). */
+  private buildBreath(): ParticleSystem {
+    const ps = new ParticleSystem("fxBreath", 1200, this.scene);
+    ps.particleTexture = this.dot;
+    ps.createDirectedCylinderEmitter(0.5, 0.4, 0.6, new Vector3(0, 0, 1), new Vector3(0, 0, 1));
+    ps.color1 = new Color4(0.8, 1, 0.9, 0.7);
+    ps.color2 = new Color4(0.45, 0.9, 0.65, 0.6);
+    ps.colorDead = new Color4(0.3, 0.7, 0.5, 0);
+    ps.minSize = 0.35;
+    ps.maxSize = 0.8;
+    ps.minLifeTime = 0.55;
+    ps.maxLifeTime = 0.9;
+    ps.minEmitPower = 9;
+    ps.maxEmitPower = 14;
+    ps.gravity = new Vector3(0, -1.5, 0); // the gusts sink as they run out
+    ps.minAngularSpeed = -4;
+    ps.maxAngularSpeed = 4;
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.emitRate = 0;
+    ps.start();
+    return ps;
   }
 
   private tickSummon(dt: number): void {
@@ -401,15 +433,19 @@ export class SpellFx {
       const bob = new Vector3(0, 0.15 * Math.sin(s.t * 5), 0);
       s.beast.update(dt, s.to.add(bob), s.look);
       if (s.phase === "storm") {
+        // The breath: gusts pour out of the mouth for the whole storm, the torrent's front running
+        // out across the foes again and again.
         const mouth = s.beast.head.position.add(s.look.scale(1.3));
-        this.trail.emitter = mouth.add(s.look.scale(k * 7)); // the torrent runs out across the foes
+        this.breath.emitter = mouth;
+        this.breath.emitRate = 600;
+        this.trail.emitter = mouth.add(s.look.scale(((s.t * 1.6) % 1) * 7));
         this.trail.emitRate = 520;
       } else this.trail.emitter = s.beast.flamePoint().clone();
       if (k >= 1) {
         if (s.phase === "hold") {
           s.phase = "storm";
           s.t = 0;
-          s.dur = 1.1;
+          s.dur = 2.0;
           s.onStorm();
         } else {
           s.phase = "leave";
@@ -418,6 +454,7 @@ export class SpellFx {
           s.t = 0;
           s.dur = 0.7;
           this.trail.emitRate = 0;
+          this.breath.emitRate = 0;
         }
       }
       return;

@@ -2030,7 +2030,7 @@ export abstract class ArenaCombatMode extends GameMode {
       // wind rises out of it to hang there facing the foes, and unleashes a storm over them all.
       p.mp = Math.max(0, p.mp - spell.mp);
       const release = p.castGesture("summon");
-      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("summon") + 3.2);
+      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("summon") + 4.2);
       this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#9ff2d2");
       const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
       const column = p.position.add(fwd.scale(SUMMON_COLUMN_AHEAD));
@@ -2053,8 +2053,9 @@ export abstract class ArenaCombatMode extends GameMode {
             () => {
               const foes = this.enemies.filter((e) => e.alive);
               audio.playSfx("wind_rush");
+              this.comboTimers.push({ t: 0.9, fn: () => audio.playSfx("wind_rush", { rate: 0.9 }) });
               for (const foe of foes) this.spellFx?.burst(spell.element, foe.position, 1.6);
-              if (primary?.alive) this.spellFx?.tornado(primary.position, 1.2);
+              if (primary?.alive) this.spellFx?.tornado(primary.position, 2.0);
               this.camera.shake(0.3, 0.6);
               if (foes.length) this.castSpell(p, spell, primary ?? foes[0], allies(), false, foes);
               this.refreshHud();
