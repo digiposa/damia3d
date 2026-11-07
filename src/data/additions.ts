@@ -181,8 +181,9 @@ export const LAVITZ_ADDITIONS = {
     spMax: 100,
     acquireLevel: 7,
     // The thrust, then its own spinning strike (A3_1, a fast overhead cut, 1.33 s, the spear down
-    // on the foe at 0.52 s) over and over, each repeat back from its first frame.
-    choreo: [LAVITZ_THRUST, ...Array.from({ length: 4 }, () => ({ clip: "typhoon", impact: 0.52, length: 1.25 }))],
+    // on the foe at 0.52 s) over and over, each repeat back from its first frame — played 1.5× so
+    // the spins run into one another (impact and length are in played seconds).
+    choreo: [LAVITZ_THRUST, ...Array.from({ length: 4 }, () => ({ clip: "typhoon", speed: 1.5, impact: 0.35, length: 0.84 }))],
   },
   gustOfWindDance: {
     name: "Gust of Wind Dance",
