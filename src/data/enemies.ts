@@ -267,9 +267,10 @@ const FRUEGEL_LOOK = {
 };
 
 /**
- * Fruegel, first visit (formation 386: Fruegel, Hellena Warden ×2, Senior Warden ×2). He opens
- * behind two Hellena Wardens — Observer: he only watches and cannot be targeted while one stands.
- * Once they are down he blows his Whistle (Auto, single use) and two Senior Wardens come in.
+ * Fruegel, first visit (formation 386: Fruegel, Hellena Warden ×2, Senior Warden ×2). In the story
+ * fight he opens with two Hellena Wardens at his side and fights from the start (no Observer, as
+ * on PS1); once both are down he blows his Whistle (Auto, single use) and two Senior Wardens come
+ * in. Spawned alone (Training), he never whistles.
  * Moves: ~Slam (1.5×) and ~Rock Throw (2×) at random; ~Club (1×) only as his Retaliate — 20% when
  * an Addition is aimed at him, out of turn order; Power Up (dealt ×1.5, taken ×0.5 for 3 of his
  * turns) on his next turn after he is hit by magic, single use, only if no other enemy has.
@@ -323,7 +324,7 @@ export const FRUEGEL_2: EnemyDef = {
 };
 
 /**
- * Hellena Warden, at Fruegel's side in the first fight: the guard he hides behind. Stats are the
+ * Hellena Warden, at Fruegel's side in the first fight (their fall makes him whistle). Stats are the
  * first-visit Hellena Warden's JP figures (HP 12; US/EU 9); the boss formation's copies have
  * "slightly higher HP" (exact figure not documented). Element Fire. The Knight of Sandora's model
  * stands in for him until his own.

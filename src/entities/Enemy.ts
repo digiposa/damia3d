@@ -510,9 +510,7 @@ export class Enemy {
   /** Play the melee swing for the chosen action (Slash Twice uses its own clip when present). */
   private playAttack(name = ""): void {
     const twice = /twice|multi/i.test(name);
-    // No melee clip yet (a boss whose swing is still to come): his throwing gesture, so the blow
-    // at least reads as one.
-    this.playOneShot((twice && this.anims.slashTwice) || this.anims.attack || this.anims.throw);
+    this.playOneShot((twice && this.anims.slashTwice) || this.anims.attack);
   }
 
   /** Play the dagger-throw animation once. */
@@ -669,13 +667,6 @@ export class Enemy {
     // Stunned: frozen — no chase, no acting, and the ATB does NOT charge (that's what a stun is).
     if (this.stunned) return null;
 
-    // Fruegel's Observer: while a Hellena Warden still stands he only watches (untargetable).
-    if (this.def.behavior === "fruegel" && !this.targetable) {
-      const look = targetPos.subtract(this.position);
-      if (look.x * look.x + look.z * look.z > 1e-6) this.root.rotation.y = Math.atan2(look.x, look.z);
-      this.setMoving(false);
-      return null;
-    }
     // Retaliate: the Club blow he owes ignores turn order (no gauge), as soon as he is free.
     if (this.retaliate && !this.attacking) {
       const r = this.retaliate;
@@ -755,11 +746,20 @@ export class Enemy {
     return action;
   }
 
-  /** False while he cannot be targeted at all (Fruegel behind his Hellena Wardens). */
+  /** False while he cannot be targeted at all (no enemy uses it for now: Fruegel fights from the
+   *  start, his Hellena Wardens at his side). */
   get targetable(): boolean {
-    if (this.def.behavior !== "fruegel") return true;
-    return !(this.others?.() ?? []).some((e) => e !== this && e.alive && e.def.id === "hellena_warden_boss");
+    return true;
   }
+
+  /** Fruegel's Whistle: the battle opened with Hellena Wardens at his side (the story fight), and
+   *  all of them are down now. Spawned alone (Training), he never whistles. */
+  private wardensFallen(): boolean {
+    const wardens = (this.others?.() ?? []).filter((e) => e !== this && e.def.id === "hellena_warden_boss");
+    if (wardens.length) this.hadWardens = true;
+    return this.hadWardens && !wardens.some((e) => e.alive);
+  }
+  private hadWardens = false;
 
   /** Damage he deals, times this (Power Up: ×1.5). */
   get damageOutMultiplier(): number {
@@ -860,7 +860,7 @@ export class Enemy {
    *  in {@link takeDamage}). Pure predicate — no side effects, unlike {@link selfAction}. */
   private selfActionPending(): boolean {
     if (this.powerUpPending && !this.powerUpUsed) return true;
-    if (this.def.behavior === "fruegel" && !this.whistled && this.targetable) return true;
+    if (this.def.behavior === "fruegel" && !this.whistled && this.wardensFallen()) return true;
     return this.def.behavior === "commander" && !this.poweredUp && this.hp < 0.5 * this.def.stats.maxHp;
   }
 
@@ -877,7 +877,7 @@ export class Enemy {
       return { kind: "buff", name: "Power Up" };
     }
     // Whistle: the Hellena Wardens down, Fruegel calls two Senior Wardens (Auto, single use).
-    if (this.def.behavior === "fruegel" && !this.whistled && this.targetable) {
+    if (this.def.behavior === "fruegel" && !this.whistled && this.wardensFallen()) {
       this.whistled = true;
       return { kind: "summon", name: "Whistle", id: "senior_warden_boss", count: 2 };
     }

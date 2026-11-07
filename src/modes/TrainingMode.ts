@@ -35,7 +35,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, FRUEGEL_2, HELLENA_WARDEN_BOSS, SUMMONS, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, FRUEGEL_2, SUMMONS, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -3622,18 +3622,12 @@ export abstract class ArenaCombatMode extends GameMode {
     this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
   }
 
-  /** Spawn Fruegel's first-visit formation: Fruegel behind his two Hellena Wardens (he whistles
-   *  in two Senior Wardens once they are down). */
+  /** Spawn Fruegel as fought on the first visit — alone here (his Hellena Wardens, and the Whistle
+   *  their fall triggers, belong to the story fight). */
   private async spawnFruegel(): Promise<void> {
-    await Promise.all([this.ensureEnemyAssets(FRUEGEL), this.ensureEnemyAssets(HELLENA_WARDEN_BOSS), this.ensureEnemyAssets(SUMMONS.senior_warden_boss)]);
+    await this.ensureEnemyAssets(FRUEGEL);
     if (this.scene.isDisposed) return;
-    const at = this.ringPosition(8);
-    this.addEnemy(new Enemy(this.scene, FRUEGEL, at));
-    const toPlayer = this.player.position.subtract(at);
-    toPlayer.y = 0;
-    const fwd = toPlayer.lengthSquared() > 1e-4 ? toPlayer.normalize() : new Vector3(0, 0, -1);
-    const side = new Vector3(fwd.z, 0, -fwd.x);
-    for (const s of [1, -1]) this.addEnemy(new Enemy(this.scene, HELLENA_WARDEN_BOSS, at.add(fwd.scale(2)).add(side.scale(1.8 * s))));
+    this.addEnemy(new Enemy(this.scene, FRUEGEL, this.ringPosition(8)));
   }
 
   /** Spawn Fruegel as fought on the second visit (his pets are still to come). */
