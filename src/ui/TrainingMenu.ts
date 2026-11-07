@@ -36,6 +36,8 @@ export interface TrainingCallbacks {
   onSpawnFruegel: () => void | Promise<void>;
   onSpawnFruegel2: () => void | Promise<void>;
   onSpawnSeniorWarden: () => void | Promise<void>;
+  onSpawnHellenaWarden: () => void | Promise<void>;
+  onSpawnHellenaWarden2: () => void | Promise<void>;
   onSpawnBerserkMouse: () => void | Promise<void>;
   onSpawnTrent: () => void | Promise<void>;
   onSpawnGoblin: () => void | Promise<void>;
@@ -261,7 +263,7 @@ export class TrainingMenu {
       ),
       locationGroup(
         t("spawn.locHellena"),
-        [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel), spawnButton(t("spawn.fruegel2"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel2), spawnButton(t("spawn.seniorWarden"), ELEMENT_COLOR.Fire, this.cb.onSpawnSeniorWarden)],
+        [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel), spawnButton(t("spawn.fruegel2"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel2), spawnButton(t("spawn.seniorWarden"), ELEMENT_COLOR.Fire, this.cb.onSpawnSeniorWarden), spawnButton(t("spawn.hellenaWarden"), ELEMENT_COLOR.Fire, this.cb.onSpawnHellenaWarden), spawnButton(t("spawn.hellenaWarden2"), ELEMENT_COLOR.Fire, this.cb.onSpawnHellenaWarden2)],
         true,
       ),
     );

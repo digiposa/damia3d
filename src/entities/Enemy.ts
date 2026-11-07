@@ -10,7 +10,7 @@ import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { Animation } from "@babylonjs/core/Animations/animation";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 
-import type { EnemyDef } from "../data/enemies";
+import type { EnemyAttack, EnemyDef } from "../data/enemies";
 import { ELEMENT_COLOR, type Element } from "../combat/element";
 import { projectToScreen } from "../world/project";
 import { tuneImportedMetal, flattenCellShaded, tuneWeapon, fitHeight } from "../world/props";
@@ -639,6 +639,12 @@ export class Enemy {
     this.playOneShot((twice && this.anims.slashTwice) || this.anims.attack);
   }
 
+  /** A spell: its cast clip — or, for a thrown item with no cast clip, the throw (at its own pace). */
+  private playSpell(lobbed?: boolean): void {
+    if (!this.anims.cast && lobbed && this.anims.throw) this.playThrow();
+    else this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED);
+  }
+
   /** Play the dagger-throw animation once. */
   private playThrow(): void {
     this.playOneShot(this.anims.throw, 1.0);
@@ -883,7 +889,7 @@ export class Enemy {
         if (flying) {
           this.gauge.spend();
           this.setMoving(false);
-          if (flying.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED);
+          if (flying.kind === "magical") this.playSpell(flying.lobbed);
           else this.playThrow();
           return this.afterTurn(flying);
         }
@@ -900,7 +906,7 @@ export class Enemy {
     const wasPowered = this.poweredUp;
     const action = this.chooseAction(ctx);
     if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
-    else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED); // spell cast
+    else if (action.kind === "magical") this.playSpell(action.lobbed); // spell cast / item thrown
     else if (action.kind === "physical" && action.ranged) this.playThrow(); // a rock hurled point-blank
     else this.playAttack(action.name);
     return this.afterTurn(action);
@@ -1024,8 +1030,37 @@ export class Enemy {
     return (clip.to - clip.from) / 60 / (kind === "magical" ? CAST_SPEED : ATTACK_SPEED);
   }
 
+  /** The attacks its HP allows right now (HP-gated minor enemies). */
+  private eligibleAttacks(): EnemyAttack[] {
+    const f = this.hp / this.def.stats.maxHp;
+    const ok = this.def.attacks.filter((a) => (a.hpAbove === undefined || f > a.hpAbove) && (a.hpAtMost === undefined || f <= a.hpAtMost));
+    return ok.length ? ok : this.def.attacks;
+  }
+
+  /** A warden's turn, decided once per full gauge (so a melee pick walks in to strike, while an item
+   *  is thrown from where it stands). */
+  private planned?: EnemyAttack;
+  private plan(): EnemyAttack {
+    if (!this.planned) {
+      const pool = this.eligibleAttacks();
+      this.planned = pool[Math.floor(Math.random() * pool.length)];
+    }
+    return this.planned;
+  }
+
+  private toAction(a: EnemyAttack): EnemyAction {
+    return a.kind === "magical"
+      ? { kind: "magical", name: a.name, multiplier: a.multiplier, element: a.element, lobbed: a.lobbed }
+      : { kind: "physical", name: a.name, multiplier: a.multiplier, hpFraction: a.hpFraction };
+  }
+
   private chooseAction(_ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction();
+    if (this.def.behavior === "warden") {
+      const a = this.plan();
+      this.planned = undefined;
+      return this.toAction(a);
+    }
     if (this.def.behavior === "fruegel" || this.def.behavior === "fruegel2") {
       // His blows, one at random; the Rock Throw is hurled even point-blank, but it has the same
       // recharge as from afar (no spamming it).
@@ -1087,6 +1122,12 @@ export class Enemy {
    * is what forces a thrower to eventually stop plinking and walk into melee.
    */
   private flyingAction(dist: number): EnemyAction | null {
+    if (this.def.behavior === "warden") {
+      const a = this.plan();
+      if (!a.lobbed || dist > SPELL_RANGE * this.scale) return null; // a blow: walk in first
+      this.planned = undefined;
+      return this.toAction(a);
+    }
     if (dist <= SPELL_RANGE * this.scale) {
       const spell = this.burnOutAction();
       if (spell) return spell;

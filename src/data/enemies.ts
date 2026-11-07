@@ -19,12 +19,19 @@ export interface EnemyAttack {
    * target can hit for a known, repeatable number (see {@link SPARRING_DUMMY}).
    */
   hpFraction?: number;
+  /** Only while HP is above this fraction of max HP (minor enemies' HP-gated actions). */
+  hpAbove?: number;
+  /** Only while HP is at or below this fraction of max HP. */
+  hpAtMost?: number;
+  /** An attack item thrown at the target (Burn Out, Spark Net): lobbed, the spell bursts on landing. */
+  lobbed?: boolean;
 }
 
 /** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script; "fruegel" /
- *  "fruegel2" the Hellena warden's two fights; "seniorWarden" his summoned guards; "dummy" never
- *  acts. */
-export type EnemyBehavior = "basic" | "commander" | "fruegel" | "fruegel2" | "seniorWarden" | "dummy";
+ *  "fruegel2" the Hellena warden's two fights; "seniorWarden" his summoned guards; "warden" an
+ *  equal pick among the attacks its HP allows (an item thrown from afar, a blow up close); "dummy"
+ *  never acts. */
+export type EnemyBehavior = "basic" | "commander" | "fruegel" | "fruegel2" | "seniorWarden" | "warden" | "dummy";
 
 /** Static definition of an enemy: identity, element, stats and battle yield. */
 export interface EnemyDef {
@@ -345,28 +352,91 @@ export const FRUEGEL_2: EnemyDef = {
   ...FRUEGEL_LOOK,
 };
 
+/** The Hellena Wardens' look: all three units are visually identical. The Knight of Sandora stands
+ *  in until their own model is rigged; the weapon is theirs — a spear ending in a spiked head. */
+const HELLENA_WARDEN_LOOK = {
+  scale: 1.0,
+  bodyColor: [0.4, 0.25, 0.2] as [number, number, number],
+  model: "knight_sandora",
+  weaponModel: "hellena_warden_spear",
+  weaponScale: 1.8,
+  weaponGrip: 0.6, // fists two-thirds down the haft from the spiked head
+};
+
 /**
- * Hellena Warden, at Fruegel's side in the first fight (their fall makes him whistle). Stats are the
- * first-visit Hellena Warden's JP figures (HP 12; US/EU 9); the boss formation's copies have
- * "slightly higher HP" (exact figure not documented). Element Fire. The Knight of Sandora's model
- * stands in for him until his own.
+ * Hellena Warden — three units under one name (wiki; JP stats first when known, wiki for the
+ * rules). ~Clubbing is a blow with the spear; their items are thrown like the player's attack items.
+ * Equal odds among the eligible actions, picked by HP. No "Do nothing" turns (house rule, as for
+ * the Senior Warden). Counters on Additions: dormant data for now.
+ *
+ * 1st visit: Fire, HP 12 / AT 4 / MAT 4 (Fandom JP; wiki US 9/3/3), EXP 6, Gold 3 (JP; US 9).
+ * ~Clubbing (1×) above 25% HP; Spark Net (1.5× Thunder magic) at 50% HP or less.
  */
-export const HELLENA_WARDEN_BOSS: EnemyDef = {
-  id: "hellena_warden_boss",
+export const HELLENA_WARDEN: EnemyDef = {
+  id: "hellena_warden",
   name: "Hellena Warden",
   element: "Fire",
   stats: { maxHp: 12, at: 4, df: 100, mat: 4, mdf: 100 },
   spd: 50,
   aAv: 0,
   mAv: 0,
-  countersAdditions: false,
-  attacks: [{ name: "Spear", kind: "physical", multiplier: 1 }],
+  countersAdditions: true,
+  attacks: [
+    { name: "Clubbing", kind: "physical", multiplier: 1, hpAbove: 0.25 },
+    { name: "Spark Net", kind: "magical", multiplier: 1.5, element: "Thunder", lobbed: true, hpAtMost: 0.5 },
+  ],
   expReward: 6,
+  goldReward: 3,
+  behavior: "warden",
+  ...HELLENA_WARDEN_LOOK,
+};
+
+/**
+ * Hellena Warden at Fruegel's side in the first fight (their fall makes him whistle): HP 12 / AT 3 /
+ * MAT 3 (wiki; no JP figures), EXP 0, Gold 0, drops a Healing Potion (100%, no loot yet).
+ * ~Clubbing (1×) or Burn Out (1.5× Fire magic), at any HP.
+ */
+export const HELLENA_WARDEN_BOSS: EnemyDef = {
+  id: "hellena_warden_boss",
+  name: "Hellena Warden",
+  element: "Fire",
+  stats: { maxHp: 12, at: 3, df: 100, mat: 3, mdf: 100 },
+  spd: 50,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Clubbing", kind: "physical", multiplier: 1 },
+    { name: "Burn Out", kind: "magical", multiplier: 1.5, element: "Fire", lobbed: true },
+  ],
+  expReward: 0,
   goldReward: 0,
-  scale: 1.0,
-  bodyColor: [0.4, 0.25, 0.2],
-  model: "knight_sandora",
-  weaponModel: "kos_sword",
+  behavior: "warden",
+  ...HELLENA_WARDEN_LOOK,
+};
+
+/**
+ * Hellena Warden, second visit: HP 120 / AT 17 / MAT 16 (wiki, US — no JP figures), EXP 20, Gold 15,
+ * drops a Morning Star (2%, no loot yet). ~Clubbing (1×) above 50% HP; Burn Out (1.5× Fire magic)
+ * at 50% or less (wiki; Fandom says Gushing Magma).
+ */
+export const HELLENA_WARDEN_2: EnemyDef = {
+  id: "hellena_warden_2",
+  name: "Hellena Warden",
+  element: "Fire",
+  stats: { maxHp: 120, at: 17, df: 100, mat: 16, mdf: 100 },
+  spd: 50,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Clubbing", kind: "physical", multiplier: 1, hpAbove: 0.5 },
+    { name: "Burn Out", kind: "magical", multiplier: 1.5, element: "Fire", lobbed: true, hpAtMost: 0.5 },
+  ],
+  expReward: 20,
+  goldReward: 15,
+  behavior: "warden",
+  ...HELLENA_WARDEN_LOOK,
 };
 
 /**

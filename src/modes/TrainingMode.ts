@@ -35,7 +35,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, FRUEGEL_2, SUMMONS, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, FRUEGEL_2, HELLENA_WARDEN, HELLENA_WARDEN_2, SUMMONS, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -666,13 +666,15 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnFruegel: () => this.spawnFruegel(),
         onSpawnFruegel2: () => this.spawnFruegel2(),
         onSpawnSeniorWarden: () => this.spawnSeniorWarden(),
+        onSpawnHellenaWarden: () => this.spawnOne(HELLENA_WARDEN),
+        onSpawnHellenaWarden2: () => this.spawnOne(HELLENA_WARDEN_2),
         onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
         onSpawnTrent: () => this.spawnTrent(),
         onSpawnGoblin: () => this.spawnGoblin(),
         onSpawnAssassinCock: () => this.spawnAssassinCock(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "fruegel_mace", "fruegel_rock", "senior_warden", "senior_warden_spear", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "fruegel_mace", "fruegel_rock", "senior_warden", "senior_warden_spear", "hellena_warden_spear", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -3656,6 +3658,13 @@ export abstract class ArenaCombatMode extends GameMode {
     await this.ensureEnemyAssets(FRUEGEL_2);
     if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, FRUEGEL_2, this.ringPosition(8)));
+  }
+
+  /** Spawn one enemy of `def` on the ring (its assets loaded first). */
+  private async spawnOne(def: EnemyDef): Promise<void> {
+    await this.ensureEnemyAssets(def);
+    if (this.scene.isDisposed) return;
+    this.addEnemy(new Enemy(this.scene, def, this.ringPosition()));
   }
 
   /** Spawn one Senior Warden (the guard Fruegel whistles for). */
