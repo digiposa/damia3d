@@ -2025,6 +2025,51 @@ export abstract class ArenaCombatMode extends GameMode {
       this.refreshHud();
       return;
     }
+    if (spell.id === "jadeDragon" && p.castGestureLength("summon") > 0 && this.enemies.some((e) => e.alive)) {
+      // Jade Dragon (PS1): Lavitz summons — a column of wind whirls up before him, the dragon of
+      // wind rises out of it to hang there facing the foes, and unleashes a storm over them all.
+      p.mp = Math.max(0, p.mp - spell.mp);
+      const release = p.castGesture("summon");
+      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("summon") + 3.2);
+      this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#9ff2d2");
+      const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
+      const column = p.position.add(fwd.scale(SUMMON_COLUMN_AHEAD));
+      if (this.world.heightAt) column.y = this.world.heightAt(column.x, column.z);
+      this.comboTimers.push({
+        t: SUMMON_COLUMN_AT,
+        fn: () => {
+          this.spellFx?.powerUp(column, release - SUMMON_COLUMN_AT + 0.6, new Color3(0.5, 1, 0.7));
+          audio.playSfx("wind_charge");
+          this.camera.shake(0.08, 0.5);
+        },
+      });
+      this.comboTimers.push({
+        t: release,
+        fn: () => {
+          audio.playSfx("dragon_roar", { rate: 1.25 });
+          this.spellFx?.windDragon(
+            column.add(new Vector3(0, 0.5, 0)),
+            fwd,
+            () => {
+              const foes = this.enemies.filter((e) => e.alive);
+              audio.playSfx("wind_rush");
+              for (const foe of foes) this.spellFx?.burst(spell.element, foe.position, 1.6);
+              if (primary?.alive) this.spellFx?.tornado(primary.position, 1.2);
+              this.camera.shake(0.3, 0.6);
+              if (foes.length) this.castSpell(p, spell, primary ?? foes[0], allies(), false, foes);
+              this.refreshHud();
+            },
+            () => {
+              this.attackAnimT = 0;
+              this.finishAction();
+              this.refreshHud();
+            },
+          );
+        },
+      });
+      this.refreshHud();
+      return;
+    }
     if (spell.id === "finalBurst" && primary && p.castGestureLength("flight") > 0) {
       // Final Burst (PS1): Dart wraps himself in fire, charges straight THROUGH the foe and flies
       // back to where he stood. Rooted throughout; the figure is moved here (see tickDash).

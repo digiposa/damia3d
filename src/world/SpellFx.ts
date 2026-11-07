@@ -59,6 +59,9 @@ export class SpellFx {
   /** A line of fire racing along the ground (Explosion): its flames, and the run in progress. */
   private readonly trail: ParticleSystem;
   private trailRun?: { from: Vector3; to: Vector3; t: number; dur: number; onArrive: () => void; wind?: boolean };
+  /** The Jade Dragon (Lavitz's summon): the wind serpent rises before him, hangs there facing the
+   *  foes, unleashes its storm, then climbs away. */
+  private summon?: { beast: FlameDragon; phase: "rise" | "hold" | "storm" | "leave"; from: Vector3; to: Vector3; look: Vector3; t: number; dur: number; onStorm: () => void; onDone: () => void };
   /** The mini tornado (Gaspless): a spinning funnel of wind on the struck foe, motes whirling up. */
   private readonly funnel: Mesh;
   private readonly funnelMat: StandardMaterial;
@@ -182,6 +185,7 @@ export class SpellFx {
         }
       }
       this.tickDragon(dt);
+      this.tickSummon(dt);
       // The wall of wind: spins up round the party, breathes, then thins out as the petals settle.
       const wall = this.wallRun;
       if (wall) {
@@ -350,6 +354,82 @@ export class SpellFx {
     this.shell.setEnabled(true);
     this.trail.emitter = at();
     this.trail.emitRate = 320;
+  }
+
+  /**
+   * The Jade Dragon (Lavitz's summon): the wind serpent rises out of `from` (the summoning column)
+   * to hang `ahead` of it, `look`ing at the foes; after a beat it unleashes its storm — a torrent
+   * of wind pouring from its mouth over the foes (`onStorm` fires as it breaks, the caller lands
+   * the damage) — then climbs away and fades; `onDone` at the end.
+   */
+  windDragon(from: Vector3, look: Vector3, onStorm: () => void, onDone: () => void): void {
+    this.endSummon();
+    const beast = new FlameDragon(this.scene, from, WIND_PALETTE);
+    const to = from.add(new Vector3(0, 2.6, 0)).add(look.scale(0.6));
+    this.summon = { beast, phase: "rise", from: from.clone(), to, look: look.clone(), t: 0, dur: 0.55, onStorm, onDone };
+    this.setTrailColours(SpellFx.WIND_TRAIL);
+    this.trail.emitter = from.clone();
+    this.trail.emitRate = 380;
+  }
+
+  private endSummon(): void {
+    if (!this.summon) return;
+    this.summon.beast.dispose();
+    this.summon = undefined;
+    this.trail.emitRate = 0;
+    this.setTrailColours(SpellFx.FIRE_TRAIL);
+  }
+
+  private tickSummon(dt: number): void {
+    const s = this.summon;
+    if (!s) return;
+    s.t += dt;
+    const k = Math.min(1, s.t / s.dur);
+    const ease = k * k * (3 - 2 * k);
+    if (s.phase === "rise") {
+      s.beast.update(dt, Vector3.Lerp(s.from, s.to, ease));
+      this.trail.emitter = s.beast.flamePoint().clone();
+      if (k >= 1) {
+        s.phase = "hold";
+        s.t = 0;
+        s.dur = 0.7;
+      }
+      return;
+    }
+    if (s.phase === "hold" || s.phase === "storm") {
+      // Hanging there, swaying a little, facing the foes; the storm pours out ahead of its mouth.
+      const bob = new Vector3(0, 0.15 * Math.sin(s.t * 5), 0);
+      s.beast.update(dt, s.to.add(bob), s.look);
+      if (s.phase === "storm") {
+        const mouth = s.beast.head.position.add(s.look.scale(1.3));
+        this.trail.emitter = mouth.add(s.look.scale(k * 7)); // the torrent runs out across the foes
+        this.trail.emitRate = 520;
+      } else this.trail.emitter = s.beast.flamePoint().clone();
+      if (k >= 1) {
+        if (s.phase === "hold") {
+          s.phase = "storm";
+          s.t = 0;
+          s.dur = 1.1;
+          s.onStorm();
+        } else {
+          s.phase = "leave";
+          s.from = s.beast.head.position.clone();
+          s.to = s.from.add(new Vector3(0, 7, 0)).add(s.look.scale(2));
+          s.t = 0;
+          s.dur = 0.7;
+          this.trail.emitRate = 0;
+        }
+      }
+      return;
+    }
+    // leave
+    s.beast.update(dt, Vector3.Lerp(s.from, s.to, ease));
+    s.beast.fade(k);
+    if (k >= 1) {
+      const done = s.onDone;
+      this.endSummon();
+      done();
+    }
   }
 
   /**

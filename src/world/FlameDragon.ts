@@ -144,10 +144,14 @@ export class FlameDragon {
   }
 
   /** Move the head to `pos` (the body trails, undulating); `dt` drives the flap and the ripple. */
-  update(dt: number, pos: Vector3): void {
+  update(dt: number, pos: Vector3, look?: Vector3): void {
     this.t += dt;
     const v = pos.subtract(this.prevHead);
-    if (v.length() > 1e-3) {
+    if (look) {
+      // Told where to look (hovering in place, facing the foes): ease the heading round to it.
+      this.heading.addInPlace(look.subtract(this.heading).scaleInPlace(Math.min(1, dt * 6))).normalize();
+      this.prevHead.copyFrom(pos);
+    } else if (v.length() > 1e-3) {
       this.heading.copyFrom(v).normalize();
       this.prevHead.copyFrom(pos);
     }
