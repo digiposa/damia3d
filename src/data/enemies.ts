@@ -382,7 +382,7 @@ export const SENIOR_WARDEN_BOSS: EnemyDef = {
   expReward: 0,
   goldReward: 0,
   behavior: "seniorWarden",
-  scale: 1.05,
+  scale: 0.95,
   bodyColor: [0.45, 0.2, 0.2],
   model: "senior_warden",
   cellShaded: true,

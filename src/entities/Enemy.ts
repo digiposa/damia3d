@@ -439,6 +439,17 @@ export class Enemy {
     const left = bone("LeftHand");
     if (!hand || !elbow) return;
     const twoHand = this.def.weaponCarry === "twoHand" && !!left;
+    // A fist's centre — where a shaft passes through it — not the wrist the hand bone pivots on:
+    // the middle of the hand bone and the middle finger's three joints (curled round the grip).
+    const fingers = (side: string): TransformNode[] =>
+      ["Middle1", "Middle2", "Middle3"].map((f) => bone(`${side}Hand${f}`)).filter((n): n is TransformNode => !!n);
+    const fistBones = { Right: [hand, ...fingers("Right")], Left: left ? [left, ...fingers("Left")] : [] };
+    const fist = (side: "Right" | "Left"): Vector3 => {
+      const c = new Vector3();
+      const ns = fistBones[side];
+      for (const n of ns) c.addInPlace(n.getAbsolutePosition());
+      return c.scaleInPlace(1 / ns.length);
+    };
     const scene = this.root.getScene();
     node.rotationQuaternion = Quaternion.FromEulerVector(node.rotation);
     const target = new Quaternion();
@@ -453,18 +464,19 @@ export class Enemy {
       if (twoHand) {
         // A polearm in both hands: along the line through the fists when they are on the shaft
         // (its forward blade ahead of him), else stood upright in the right hand.
-        hand.computeWorldMatrix(true);
-        left!.computeWorldMatrix(true);
-        const between = left!.getAbsolutePosition().subtract(hand.getAbsolutePosition());
+        for (const n of [...fistBones.Right, ...fistBones.Left]) n.computeWorldMatrix(true);
+        const wrist = hand.getAbsolutePosition();
+        const r = fist("Right");
+        const between = fist("Left").subtract(r);
         const span = between.length();
         if (span > 0.12 && span < TWO_HAND_REACH * this.scale) {
+          // Slide the shaft so its middle sits halfway between the fists.
+          Vector3.LerpToRef(shift, r.add(between.scale(0.5)).subtractInPlace(wrist), 0.35, shift);
           d = between.normalize();
           if (Vector3.Dot(d, fwd) < 0) d.scaleInPlace(-1);
-          // Slide the shaft so its middle sits halfway between the fists.
-          Vector3.LerpToRef(shift, between.scale(span / 2), 0.35, shift);
         } else {
           d = up.clone();
-          Vector3.LerpToRef(shift, Vector3.ZeroReadOnly, 0.35, shift);
+          Vector3.LerpToRef(shift, r.subtract(wrist), 0.35, shift);
         }
       } else if (this.attacking) {
         hand.computeWorldMatrix(true);
