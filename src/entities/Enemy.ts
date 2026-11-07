@@ -3,7 +3,7 @@ import { audio } from "../core/audio";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
@@ -75,7 +75,11 @@ export type EnemyAction =
        *  triggers where the flask lands, not instantly on the caster's turn. */
       lobbed?: boolean;
     }
-  | { kind: "heal"; name: string; amount: number };
+  | { kind: "heal"; name: string; amount: number }
+  /** A self-buff with no heal (Fruegel's / a Senior Warden's Power Up): the mode shows the aura. */
+  | { kind: "buff"; name: string }
+  /** Call reinforcements (Fruegel's Whistle): the mode spawns `count` of the enemy `id` by him. */
+  | { kind: "summon"; name: string; id: string; count: number };
 
 /** Per-frame context the AI needs for conditional behaviour. */
 export interface EnemyContext {
@@ -99,6 +103,19 @@ export class Enemy {
    *  (`atbFillTime` = 150 / SPD). An enemy may only act when it is full, and acting spends it. */
   readonly gauge: AtbGauge;
   private poweredUp = false;
+  /** The rest of the battle, for the AI's "if → then" rules (set by the mode when it adds him). */
+  others?: () => Enemy[];
+  /** Fruegel's Whistle has been blown (single use). */
+  private whistled = false;
+  /** Power Up (Fruegel, a Senior Warden): queued by its trigger, used (single use), turns left of
+   *  its effect (Infinity = for good). */
+  private powerUpPending = false;
+  private powerUpUsed = false;
+  private powerTurns = 0;
+  /** Fruegel's Retaliate: a Club blow owed out of turn order (an Addition aimed at him). */
+  private retaliate?: EnemyAction;
+  /** A Senior Warden whose partner fell: its own turns left before it powers up. */
+  private partnerFellTurns = -1;
   /** Commander only: seconds until Burn Out is ready again (counts down in {@link aiUpdate}). */
   private burnOutCooldown = 0;
   /** Seconds until the thrown weapon is available again (counts down in {@link aiUpdate}). */
@@ -388,6 +405,7 @@ export class Enemy {
     sword.rotation.z = -Math.PI / 2; // orient the grip-to-blade axis out of the fist
     if (this.def.weaponRotation) sword.rotation = new Vector3(...this.def.weaponRotation).scaleInPlace(Math.PI / 180);
     sword.scaling.setAll(WEAPON_SCALE);
+    if (this.def.weaponCarry) this.carryWeapon(sword, skeleton);
 
     // The KoS sword mesh runs tip(y=0)→grip(y≈GRIP_Y)→pommel(y=1); flip so the blade points +Y and
     // slide the grip onto the socket origin (the fist).
@@ -399,6 +417,52 @@ export class Enemy {
       if (!mesh.parent) mesh.parent = align;
       mesh.isPickable = false;
     }
+  }
+
+  /**
+   * A one-handed weapon held out before the enemy (Fruegel's mace) rather than at a fixed turn in
+   * the fist: every frame, after the clips, its length axis (+Y of `node`, grip → head) is aimed
+   * forward and up at rest, and along the forearm during a blow, so it swings with the arm — but
+   * never behind him. Eased, so the two cases don't pop.
+   */
+  private carryWeapon(node: TransformNode, skeleton?: Skeleton): void {
+    const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
+    const hand = bone("RightHand");
+    const elbow = bone("RightForeArm");
+    if (!hand || !elbow) return;
+    const scene = this.root.getScene();
+    node.rotationQuaternion = Quaternion.FromEulerVector(node.rotation);
+    const target = new Quaternion();
+    const m = new Matrix();
+    const obs = scene.onAfterAnimationsObservable.add(() => {
+      if (this.dead || !node.parent) return;
+      this.root.computeWorldMatrix(true);
+      const fwd = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
+      const up = Vector3.Up();
+      let d: Vector3;
+      if (this.attacking) {
+        hand.computeWorldMatrix(true);
+        elbow.computeWorldMatrix(true);
+        d = hand.getAbsolutePosition().subtract(elbow.getAbsolutePosition()).normalize();
+        const ahead = Vector3.Dot(d, fwd);
+        if (ahead < 0.2) d.addInPlace(fwd.scale(0.2 - ahead)).normalize();
+      } else d = fwd.scale(0.85).addInPlace(up.scale(0.5)).normalize(); // carried before him, head up
+      // World frame for the weapon: y along it, x across (his right), z completing it.
+      const x = Vector3.Cross(up, d);
+      if (x.lengthSquared() < 1e-4) x.copyFrom(Vector3.Cross(fwd, d));
+      x.normalize();
+      const z = Vector3.Cross(x, d).normalize();
+      Matrix.FromXYZAxesToRef(x, d, z, m);
+      // Into the parent's frame (rotation only: the socket's scale is uniform).
+      const parent = node.parent as TransformNode;
+      parent.computeWorldMatrix(true);
+      const pr = new Matrix();
+      parent.getWorldMatrix().getRotationMatrixToRef(pr);
+      m.multiplyToRef(pr.invert(), m);
+      Quaternion.FromRotationMatrixToRef(m, target);
+      Quaternion.SlerpToRef(node.rotationQuaternion!, target, 0.35, node.rotationQuaternion!);
+    });
+    this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
   }
 
   /** Rate of this enemy's clips: the world's clock (the combat-speed setting, and the slow-motion
@@ -605,6 +669,22 @@ export class Enemy {
     // Stunned: frozen — no chase, no acting, and the ATB does NOT charge (that's what a stun is).
     if (this.stunned) return null;
 
+    // Fruegel's Observer: while a Hellena Warden still stands he only watches (untargetable).
+    if (this.def.behavior === "fruegel" && !this.targetable) {
+      const look = targetPos.subtract(this.position);
+      if (look.x * look.x + look.z * look.z > 1e-6) this.root.rotation.y = Math.atan2(look.x, look.z);
+      this.setMoving(false);
+      return null;
+    }
+    // Retaliate: the Club blow he owes ignores turn order (no gauge), as soon as he is free.
+    if (this.retaliate && !this.attacking) {
+      const r = this.retaliate;
+      this.retaliate = undefined;
+      this.setMoving(false);
+      this.playAttack(r.name);
+      return this.afterTurn(r);
+    }
+
     this.gauge.tick(dt); // combat-scaled dt, like the party's gauges
 
     // Mid-attack (sword swing or dagger throw): stay planted and let the one-shot animation play out,
@@ -629,7 +709,7 @@ export class Enemy {
         this.gauge.spend();
         this.setMoving(false);
         if (this.anims.powerUp) this.playOneShot(this.anims.powerUp);
-        return self;
+        return this.afterTurn(self);
       }
     }
 
@@ -643,7 +723,7 @@ export class Enemy {
           this.setMoving(false);
           if (flying.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED);
           else this.playThrow();
-          return flying;
+          return this.afterTurn(flying);
         }
       }
       this.root.position.addInPlace(to.normalize().scale(Math.min(SPEED * dt, dist)));
@@ -659,8 +739,62 @@ export class Enemy {
     const action = this.chooseAction(ctx);
     if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
     else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED); // spell cast
+    else if (action.kind === "physical" && action.ranged) this.playThrow(); // a rock hurled point-blank
     else this.playAttack(action.name);
+    return this.afterTurn(action);
+  }
+
+  /** Book-keeping at the end of each of his turns: a timed Power Up wears off; a Senior Warden
+   *  whose partner fell counts down to its own. */
+  private afterTurn(action: EnemyAction): EnemyAction {
+    if (action.kind !== "buff" && this.powerTurns > 0 && Number.isFinite(this.powerTurns)) this.powerTurns -= 1;
+    if (this.partnerFellTurns > 0) {
+      this.partnerFellTurns -= 1;
+      if (this.partnerFellTurns === 0) this.powerUpPending = true;
+    }
     return action;
+  }
+
+  /** False while he cannot be targeted at all (Fruegel behind his Hellena Wardens). */
+  get targetable(): boolean {
+    if (this.def.behavior !== "fruegel") return true;
+    return !(this.others?.() ?? []).some((e) => e !== this && e.alive && e.def.id === "hellena_warden_boss");
+  }
+
+  /** Damage he deals, times this (Power Up: ×1.5). */
+  get damageOutMultiplier(): number {
+    return this.powerTurns > 0 && this.def.behavior !== "seniorWarden" ? 1.5 : 1;
+  }
+
+  /** Damage he takes, times this (Power Up: ×0.5). */
+  get damageInMultiplier(): number {
+    return this.powerTurns > 0 ? 0.5 : 1;
+  }
+
+  /** A spell or a magic attack item hit him: Fruegel's Power Up (single use; in the first fight
+   *  only if no other enemy has powered up) is queued for his very next turn ("Auto"). */
+  onMagicHit(): void {
+    if ((this.def.behavior !== "fruegel" && this.def.behavior !== "fruegel2") || this.powerUpUsed || !this.alive) return;
+    if (this.def.behavior === "fruegel" && (this.others?.() ?? []).some((e) => e !== this && e.poweredUpOnce)) return;
+    this.powerUpPending = true;
+    this.gauge.reset(); // Auto: his next action, now
+  }
+
+  /** An Addition was aimed at him: Fruegel (first fight) strikes back with his Club 20% of the time,
+   *  out of turn order. */
+  onAdditionTargeted(): void {
+    if (this.def.behavior !== "fruegel" || !this.alive || !this.targetable || this.retaliate) return;
+    if (Math.random() < 0.2) this.retaliate = { kind: "physical", name: "Club", multiplier: 1 };
+  }
+
+  /** A Senior Warden saw its partner fall: a few of its turns later it powers up (half damage). */
+  onPartnerFell(): void {
+    if (this.def.behavior === "seniorWarden" && this.alive && !this.powerUpUsed && this.partnerFellTurns < 0) this.partnerFellTurns = 2;
+  }
+
+  /** True once this enemy has used its Power Up (Fruegel's: only one per battle). */
+  get poweredUpOnce(): boolean {
+    return this.powerUpUsed;
   }
 
   /** The enemy's thrown (ranged) attack, if it has one — its name contains "Throw". */
@@ -703,6 +837,13 @@ export class Enemy {
 
   private chooseAction(_ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction();
+    if (this.def.behavior === "fruegel" || this.def.behavior === "fruegel2") {
+      // His blows, one at random (the Club of the first fight is only his Retaliate); the Rock
+      // Throw is hurled even point-blank.
+      const pool = this.def.attacks.filter((a) => !(this.def.behavior === "fruegel" && /club/i.test(a.name)));
+      const a = pool[Math.floor(Math.random() * pool.length)] ?? this.def.attacks[0];
+      return { kind: "physical", name: a.name, multiplier: a.multiplier, ranged: /throw/i.test(a.name) };
+    }
     // Melee: the first non-thrown attack (a thrown one is reserved for range).
     const a = this.def.attacks.find((x) => !/throw/i.test(x.name)) ?? this.def.attacks[0];
     return a.kind === "magical"
@@ -718,12 +859,28 @@ export class Enemy {
   /** True when a range-independent self action is available RIGHT NOW (drives the instant ATB fill
    *  in {@link takeDamage}). Pure predicate — no side effects, unlike {@link selfAction}. */
   private selfActionPending(): boolean {
+    if (this.powerUpPending && !this.powerUpUsed) return true;
+    if (this.def.behavior === "fruegel" && !this.whistled && this.targetable) return true;
     return this.def.behavior === "commander" && !this.poweredUp && this.hp < 0.5 * this.def.stats.maxHp;
   }
 
   /** Range-independent actions (self-buffs / heals): checked before the melee gate. */
   private selfAction(): EnemyAction | null {
     const max = this.def.stats.maxHp;
+    // Power Up (Fruegel: ×1.5 dealt, ×0.5 taken for 3 of his turns; a Senior Warden: half damage
+    // taken from then on).
+    if (this.powerUpPending && !this.powerUpUsed) {
+      this.powerUpPending = false;
+      this.powerUpUsed = true;
+      this.powerTurns = this.def.behavior === "seniorWarden" ? Infinity : 3;
+      this.markPowered();
+      return { kind: "buff", name: "Power Up" };
+    }
+    // Whistle: the Hellena Wardens down, Fruegel calls two Senior Wardens (Auto, single use).
+    if (this.def.behavior === "fruegel" && !this.whistled && this.targetable) {
+      this.whistled = true;
+      return { kind: "summon", name: "Whistle", id: "senior_warden_boss", count: 2 };
+    }
     // Power Up + HP recover, together, the first time he's below 50% (single use).
     if (this.selfActionPending()) {
       this.poweredUp = true;

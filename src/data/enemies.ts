@@ -21,8 +21,10 @@ export interface EnemyAttack {
   hpFraction?: number;
 }
 
-/** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script; "dummy" never acts. */
-export type EnemyBehavior = "basic" | "commander" | "dummy";
+/** AI profile: "basic" uses attacks[0]; "commander" runs the Seles boss script; "fruegel" /
+ *  "fruegel2" the Hellena warden's two fights; "seniorWarden" his summoned guards; "dummy" never
+ *  acts. */
+export type EnemyBehavior = "basic" | "commander" | "fruegel" | "fruegel2" | "seniorWarden" | "dummy";
 
 /** Static definition of an enemy: identity, element, stats and battle yield. */
 export interface EnemyDef {
@@ -74,6 +76,9 @@ export interface EnemyDef {
   fitSkinned?: boolean;
   /** The weapon's turn in the hand, degrees [x, y, z] (default: the swords' [0, 0, -90]). */
   weaponRotation?: [number, number, number];
+  /** Aim the weapon every frame (forward at rest, along the forearm in a blow) instead of a fixed
+   *  turn in the fist — for a rig whose hand pose changes a lot between clips. */
+  weaponCarry?: boolean;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -240,37 +245,135 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
   weaponModel: "commander_sword",
 };
 
+/* ============================================================================
+ * Hellena Prison — Fruegel, the warden, fought on both visits (Disc 1).
+ *
+ * Sources: legendofdragoon.org (the wiki, which prevails on behaviour and on whatever it alone
+ * gives) and the Fandom wiki, with the JP stat values taken first where either lists them (Fandom
+ * gives the JP figures beside the US/EU ones). Ability names marked ~ are the community's.
+ * Drops (Knight Shield / 4 Healing Potions; Gravity Grabber) are not modelled yet.
+ * ========================================================================== */
+
+/** Fruegel's model, mace and fit — shared by both fights. */
+const FRUEGEL_LOOK = {
+  isBoss: true,
+  scale: 1.25,
+  bodyColor: [0.25, 0.2, 0.4] as [number, number, number],
+  model: "fruegel",
+  cellShaded: true,
+  weaponModel: "fruegel_mace", // his mace (head at the mesh origin, like the swords' tip)
+  fitSkinned: true,
+  weaponCarry: true, // the mace held out before him, head forward and up, swung with the arm
+};
+
 /**
- * Fruegel — warden of Hellena Prison, the first real boss (Disc 1). A mountain of a man in a
- * horned helm and cape. Stats are a first approximation of the PS1 boss (to be checked against
- * the JP figures); his kit — Mace Smash, a hurled rock, a body press — runs on the basic AI: he
- * throws a rock from range when it is ready, else walks in to smash. Model: a Tripo mesh rigged
- * through Mixamo (28 joints); clips: combat idle and walk, Rock Throw (no run: he lumbers).
+ * Fruegel, first visit (formation 386: Fruegel, Hellena Warden ×2, Senior Warden ×2). He opens
+ * behind two Hellena Wardens — Observer: he only watches and cannot be targeted while one stands.
+ * Once they are down he blows his Whistle (Auto, single use) and two Senior Wardens come in.
+ * Moves: ~Slam (1.5×) and ~Rock Throw (2×) at random; ~Club (1×) only as his Retaliate — 20% when
+ * an Addition is aimed at him, out of turn order; Power Up (dealt ×1.5, taken ×0.5 for 3 of his
+ * turns) on his next turn after he is hit by magic, single use, only if no other enemy has.
+ * Stats: JP HP/AT/MAT/EXP/Gold (Fandom), DF/MDF/SPD as both list them. US/EU: HP 90, AT 5,
+ * MAT 3, EXP 300, Gold 50.
  */
 export const FRUEGEL: EnemyDef = {
   id: "fruegel",
   name: "Fruegel",
   element: "Earth",
-  stats: { maxHp: 1200, at: 18, df: 100, mat: 10, mdf: 100 },
-  spd: 45,
+  stats: { maxHp: 125, at: 6, df: 100, mat: 4, mdf: 80 },
+  spd: 50,
   aAv: 0,
   mAv: 0,
-  countersAdditions: true, // a boss: he strikes back at a botched Addition
+  countersAdditions: true,
   attacks: [
-    { name: "Mace Smash", kind: "physical", multiplier: 1 },
-    { name: "Rock Throw", kind: "physical", multiplier: 1.2 }, // hurled from range (his Throw clip)
-    { name: "Body Press", kind: "physical", multiplier: 1.6 },
+    { name: "Slam", kind: "physical", multiplier: 1.5 },
+    { name: "Rock Throw", kind: "physical", multiplier: 2 }, // hurled (his Throw clip)
+    { name: "Club", kind: "physical", multiplier: 1 }, // Retaliate only
   ],
-  expReward: 180,
-  goldReward: 400,
-  isBoss: true,
-  scale: 1.25,
-  bodyColor: [0.25, 0.2, 0.4],
-  model: "fruegel",
-  cellShaded: true,
-  weaponModel: "fruegel_mace", // his mace (head at the mesh origin, like the swords' tip)
-  fitSkinned: true,
-  weaponRotation: [-180, -45, -90], // the mace held out before him, head forward and up
+  expReward: 240,
+  goldReward: 20,
+  behavior: "fruegel",
+  ...FRUEGEL_LOOK,
+};
+
+/**
+ * Fruegel, second visit (formation 387: Fruegel, Rodriguez, Guftas). Final Blow: the battle ends
+ * when he falls (his pets flee). ~Club (1×), ~Chop (1.5×), ~Rock Throw (2×) at random; Power Up
+ * when hit by magic (Auto, single use). His pets and his Command to them are still to come.
+ * Stats: the wiki's (no JP figures given for this fight).
+ */
+export const FRUEGEL_2: EnemyDef = {
+  id: "fruegel_2",
+  name: "Fruegel",
+  element: "Earth",
+  stats: { maxHp: 1000, at: 25, df: 100, mat: 19, mdf: 80 },
+  spd: 50,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true,
+  attacks: [
+    { name: "Club", kind: "physical", multiplier: 1 },
+    { name: "Chop", kind: "physical", multiplier: 1.5 },
+    { name: "Rock Throw", kind: "physical", multiplier: 2 },
+  ],
+  expReward: 2000,
+  goldReward: 200,
+  behavior: "fruegel2",
+  ...FRUEGEL_LOOK,
+};
+
+/**
+ * Hellena Warden, at Fruegel's side in the first fight: the guard he hides behind. Stats are the
+ * first-visit Hellena Warden's JP figures (HP 12; US/EU 9); the boss formation's copies have
+ * "slightly higher HP" (exact figure not documented). Element Fire. The Knight of Sandora's model
+ * stands in for him until his own.
+ */
+export const HELLENA_WARDEN_BOSS: EnemyDef = {
+  id: "hellena_warden_boss",
+  name: "Hellena Warden",
+  element: "Fire",
+  stats: { maxHp: 12, at: 4, df: 100, mat: 4, mdf: 100 },
+  spd: 50,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: false,
+  attacks: [{ name: "Spear", kind: "physical", multiplier: 1 }],
+  expReward: 6,
+  goldReward: 0,
+  scale: 1.0,
+  bodyColor: [0.4, 0.25, 0.2],
+  model: "knight_sandora",
+  weaponModel: "kos_sword",
+};
+
+/**
+ * Senior Warden, whistled in by Fruegel in the first fight. Double Voulge; as he falls he throws a
+ * Gushing Magma ("Huh, I may as well take you to hell with me!"); a few turns after his partner
+ * falls he powers up and takes half damage. Stats: the wiki's boss-extra figures (HP 20, no EXP;
+ * Fandom gives ~25 HP). Element Fire. The Knight of Sandora's model stands in for him.
+ */
+export const SENIOR_WARDEN_BOSS: EnemyDef = {
+  id: "senior_warden_boss",
+  name: "Senior Warden",
+  element: "Fire",
+  stats: { maxHp: 20, at: 4, df: 100, mat: 8, mdf: 100 },
+  spd: 50,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: false,
+  attacks: [{ name: "Double Voulge", kind: "physical", multiplier: 1 }],
+  expReward: 0,
+  goldReward: 0,
+  behavior: "seniorWarden",
+  scale: 1.05,
+  bodyColor: [0.45, 0.2, 0.2],
+  model: "knight_sandora",
+  weaponModel: "kos_sword",
+};
+
+/** Enemies a boss can call into the fight (Fruegel's Whistle), by id. */
+export const SUMMONS: Record<string, EnemyDef> = {
+  senior_warden_boss: SENIOR_WARDEN_BOSS,
 };
 
 /* ============================================================================

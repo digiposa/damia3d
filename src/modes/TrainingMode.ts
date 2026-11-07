@@ -35,7 +35,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, FRUEGEL_2, HELLENA_WARDEN_BOSS, SUMMONS, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -662,6 +662,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnKnight: () => this.spawnKnight(),
         onSpawnCommander: () => this.spawnCommander(),
         onSpawnFruegel: () => this.spawnFruegel(),
+        onSpawnFruegel2: () => this.spawnFruegel2(),
         onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
         onSpawnTrent: () => this.spawnTrent(),
         onSpawnGoblin: () => this.spawnGoblin(),
@@ -1771,6 +1772,7 @@ export abstract class ArenaCombatMode extends GameMode {
           const element = elementMultiplier(atk.element, foe.def.element);
           const dmg = powerfulItemAttack(mat, foe.def.stats.mdf, lv, atk.bid, { element, field });
           this.landDamage(foe, Math.max(1, dmg), m === this.controlled);
+          foe.onMagicHit();
         }
       }
     };
@@ -1841,6 +1843,7 @@ export abstract class ArenaCombatMode extends GameMode {
       const element = elementMultiplier(s.element, foe.def.element);
       const dmg = multiItemAttack(s.mat, foe.def.stats.mdf, s.lv, s.bid, s.pct, { element, field: s.field });
       this.landDamage(foe, Math.max(1, dmg), s.member === this.controlled);
+      foe.onMagicHit();
     }
     this.refreshHud();
   }
@@ -2345,6 +2348,7 @@ export abstract class ArenaCombatMode extends GameMode {
         );
         totalDamage += dmg;
         this.landDamage(foe, dmg, caster === this.player);
+        foe.onMagicHit(); // targeted by magic: Fruegel's Power Up
       }
     }
 
@@ -2431,7 +2435,7 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Keep the aim lock valid and the ring under it. Re-acquires the nearest enemy when the lock is
    *  empty or its target has fallen, so a fight never leaves you with nothing selected. */
   private updateLock(dt: number): void {
-    if (this.locked && (!this.locked.alive || !this.enemies.includes(this.locked))) this.locked = undefined;
+    if (this.locked && (!this.locked.alive || !this.locked.targetable || !this.enemies.includes(this.locked))) this.locked = undefined;
     if (!this.locked) {
       const next = this.nearestEnemy(ACQUIRE_RANGE);
       if (next) this.lockOn(next, false); // auto-acquired: no pulse, you did not ask for it
@@ -2467,7 +2471,7 @@ export abstract class ArenaCombatMode extends GameMode {
     let best: Enemy | undefined;
     let bestDist = radius;
     for (const e of this.enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || !e.targetable) continue;
       const p = projectToScreen(this.scene, e.bodyPosition);
       if (!p.visible) continue;
       const d = Math.hypot(p.x - x, p.y - y);
@@ -2509,7 +2513,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // middle one is the browser's).
     if (e.button !== 0) return;
     const picked = this.scene.pick(e.offsetX, e.offsetY)?.pickedMesh?.metadata;
-    if (picked instanceof Enemy && this.enemies.includes(picked)) {
+    if (picked instanceof Enemy && this.enemies.includes(picked) && picked.targetable) {
       this.lockOn(picked);
       this.attackTarget = picked;
       this.moveTarget = undefined;
@@ -2684,6 +2688,7 @@ export abstract class ArenaCombatMode extends GameMode {
     const res = this.runner.press(def);
     if (res.kind !== "started") return; // ignored (e.g. during recovery)
     this.comboTarget = target;
+    target.onAdditionTargeted(); // Fruegel may strike back out of turn
     this.comboDamage = 0; // fresh combo — start its damage tally from zero
     // The PS1 read-out along the bottom (multi-hit Additions only; the tally grows per press).
     // (A D'Attack earns no SP: its read-out counts the blows, in the Dragoon's element colour.)
@@ -2862,6 +2867,8 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Apply damage to an enemy with hit feedback. `fromControlled` = the hit came from the member the
    *  player is steering, so the screen shakes (an ally's hits pop numbers but don't shake the view). */
   private landDamage(target: Enemy, dmg: number, fromControlled = false): void {
+    if (!target.targetable) return; // Fruegel behind his wardens: out of reach of everything
+    dmg = Math.max(1, Math.floor(dmg * target.damageInMultiplier)); // his Power Up halves it
     target.takeDamage(dmg);
     this.atmosphere?.spark(target.headPosition); // hit-spark burst at the point of impact
     // Juice: the bigger the hit (relative to the target's health), the harder the number pops and
@@ -2896,6 +2903,12 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
   private rewardKill(target: Enemy): void {
     if (target.dying) return; // death sequence already running — don't double-award or re-trigger
+    if (target.def.behavior === "seniorWarden") {
+      // "Huh, I may as well take you to hell with me!" — a Gushing Magma as he falls, and his
+      // partner powers up a few turns later.
+      this.resolveEnemyAction(target, { kind: "magical", name: "Gushing Magma", multiplier: 1, element: "Fire", lobbed: true });
+      for (const e of this.enemies) if (e !== target && e.def.behavior === "seniorWarden") e.onPartnerFell();
+    }
     const xp = Math.round(target.def.expReward * this.xpMultiplier);
     if (this.shareXpWithParty) {
       for (const m of this.party) if (m.avatar.hp > 0) m.avatar.gainExp(xp);
@@ -2979,6 +2992,29 @@ export abstract class ArenaCombatMode extends GameMode {
       // Above the head plate — the damage/heal numbers already own the head height.
       this.announceSkill(() => enemy.headPosition.add(new Vector3(0, 0.85, 0)), enemy.def.name, action.name, color);
     }
+    if (action.kind === "buff") {
+      // Power Up with no heal (Fruegel, a Senior Warden): the same rising aura as the Commander's.
+      this.spellFx?.powerUp(enemy.position, 1.5);
+      this.auraSource = enemy;
+      this.popText(enemy.headPosition, "POWER UP", TEXT.dragoon);
+      return;
+    }
+    if (action.kind === "summon") {
+      // Fruegel's Whistle: the reinforcements come running in at his sides.
+      const def = SUMMONS[action.id];
+      if (!def) return;
+      audio.playSfx("dial_tick", { rate: 1.6, jitter: 0 });
+      const fwd = new Vector3(Math.sin(enemy.root.rotation.y), 0, Math.cos(enemy.root.rotation.y));
+      const side = new Vector3(fwd.z, 0, -fwd.x);
+      void this.ensureEnemyAssets(def).then(() => {
+        if (this.scene.isDisposed) return;
+        for (let i = 0; i < action.count; i++) {
+          const at = enemy.position.add(side.scale(i % 2 === 0 ? 2.2 : -2.2)).add(fwd.scale(0.6));
+          this.addEnemy(new Enemy(this.scene, def, at));
+        }
+      });
+      return;
+    }
     if (action.kind === "heal") {
       enemy.heal(action.amount);
       this.popText(enemy.headPosition, `+${action.amount}`, TEXT.hp);
@@ -3000,8 +3036,9 @@ export abstract class ArenaCombatMode extends GameMode {
     const raw = magical
       ? enemyMagicalAttack(enemy.def.stats.mat, this.player.mdef, action.multiplier, { guard, element, field })
       : enemyPhysicalAttack(enemy.def.stats.at, this.player.def, action.multiplier, { guard });
-    // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…), then Rose/Blossom Storm.
-    let dmg = Math.floor(raw * this.player.incomingMultiplier(magical ? "magic" : "phys"));
+    // Damage-reduction gear (Phantom/Dragon Shield, Angel Scarf…), then Rose/Blossom Storm; the
+    // attacker's own Power Up (×1.5) first.
+    let dmg = Math.floor(raw * enemy.damageOutMultiplier * this.player.incomingMultiplier(magical ? "magic" : "phys"));
     if (this.player.damageHalved) dmg = Math.floor(dmg * 0.5);
     // Test tool (Sparring Dummy): a flat share of max HP, every single blow. Deliberately placed
     // AFTER the formula so it overrides everything — guard, element, gear — and stays predictable.
@@ -3318,7 +3355,7 @@ export abstract class ArenaCombatMode extends GameMode {
     let best: Enemy | undefined;
     let bestDist = maxDist;
     for (const e of this.enemies) {
-      if (!e.alive) continue; // skip corpses still lingering through their death animation
+      if (!e.alive || !e.targetable) continue; // skip corpses (death animation) and the untargetable
       const d = Vector3.Distance(this.player.position, e.position);
       if (d <= bestDist) {
         best = e;
@@ -3332,7 +3369,7 @@ export abstract class ArenaCombatMode extends GameMode {
     let best: Enemy | undefined;
     let bestDist = this.reach;
     for (const e of this.enemies) {
-      if (!e.alive) continue; // skip corpses still lingering through their death animation
+      if (!e.alive || !e.targetable) continue; // skip corpses (death animation) and the untargetable
       const d = Vector3.Distance(this.player.position, e.position);
       if (d <= bestDist) {
         best = e;
@@ -3545,6 +3582,7 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Register a spawned enemy and (re)register shadow casters — once now for the placeholder,
    *  and again when its rigged model finishes loading (its meshes appear then). */
   protected addEnemy(e: Enemy): void {
+    e.others = () => this.enemies; // the battle, for the bosses' "if → then" rules
     this.enemies.push(e);
     this.refreshShadowCasters();
     void e.ready.then(() => this.refreshShadowCasters());
@@ -3584,11 +3622,25 @@ export abstract class ArenaCombatMode extends GameMode {
     this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
   }
 
-  /** Spawn Fruegel, the Hellena warden (boss). */
+  /** Spawn Fruegel's first-visit formation: Fruegel behind his two Hellena Wardens (he whistles
+   *  in two Senior Wardens once they are down). */
   private async spawnFruegel(): Promise<void> {
-    await this.ensureEnemyAssets(FRUEGEL);
+    await Promise.all([this.ensureEnemyAssets(FRUEGEL), this.ensureEnemyAssets(HELLENA_WARDEN_BOSS), this.ensureEnemyAssets(SUMMONS.senior_warden_boss)]);
     if (this.scene.isDisposed) return;
-    this.addEnemy(new Enemy(this.scene, FRUEGEL, this.ringPosition(8)));
+    const at = this.ringPosition(8);
+    this.addEnemy(new Enemy(this.scene, FRUEGEL, at));
+    const toPlayer = this.player.position.subtract(at);
+    toPlayer.y = 0;
+    const fwd = toPlayer.lengthSquared() > 1e-4 ? toPlayer.normalize() : new Vector3(0, 0, -1);
+    const side = new Vector3(fwd.z, 0, -fwd.x);
+    for (const s of [1, -1]) this.addEnemy(new Enemy(this.scene, HELLENA_WARDEN_BOSS, at.add(fwd.scale(2)).add(side.scale(1.8 * s))));
+  }
+
+  /** Spawn Fruegel as fought on the second visit (his pets are still to come). */
+  private async spawnFruegel2(): Promise<void> {
+    await this.ensureEnemyAssets(FRUEGEL_2);
+    if (this.scene.isDisposed) return;
+    this.addEnemy(new Enemy(this.scene, FRUEGEL_2, this.ringPosition(8)));
   }
 
   /** Spawn a Forest minor enemy — Berserk Mouse (non-humanoid, procedural animation). */

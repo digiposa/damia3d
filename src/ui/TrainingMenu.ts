@@ -34,6 +34,7 @@ export interface TrainingCallbacks {
   onSpawnKnight: () => void | Promise<void>;
   onSpawnCommander: () => void | Promise<void>;
   onSpawnFruegel: () => void | Promise<void>;
+  onSpawnFruegel2: () => void | Promise<void>;
   onSpawnBerserkMouse: () => void | Promise<void>;
   onSpawnTrent: () => void | Promise<void>;
   onSpawnGoblin: () => void | Promise<void>;
@@ -257,7 +258,11 @@ export class TrainingMenu {
         ],
         true,
       ),
-      locationGroup(t("spawn.locHellena"), [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel)], true),
+      locationGroup(
+        t("spawn.locHellena"),
+        [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel), spawnButton(t("spawn.fruegel2"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel2)],
+        true,
+      ),
     );
     return box;
   }
