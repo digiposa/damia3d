@@ -180,6 +180,8 @@ export const LAVITZ_ADDITIONS = {
     multiplier: [100, 108, 116, 124, 135],
     spMax: 100,
     acquireLevel: 7,
+    // The thrust, then Harpoon's downward cut four times over (the clip supplied for it is that one).
+    choreo: [LAVITZ_THRUST, ...Array.from({ length: 4 }, () => ({ clip: "harpoon2", impact: 0.75, length: 1.1 }))],
   },
   gustOfWindDance: {
     name: "Gust of Wind Dance",
