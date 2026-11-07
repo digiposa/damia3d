@@ -114,8 +114,9 @@ export class Enemy {
   private powerTurns = 0;
   /** Fruegel's Retaliate: a Club blow owed out of turn order (an Addition aimed at him). */
   private retaliate?: EnemyAction;
-  /** A Senior Warden whose partner fell: its own turns left before it powers up. */
-  private partnerFellTurns = -1;
+  /** A Senior Warden saw an ally fall (his Power Up's condition), and has used his Last Gasp. */
+  private allyFell = false;
+  private lastGaspUsed = false;
   /** Commander only: seconds until Burn Out is ready again (counts down in {@link aiUpdate}). */
   private burnOutCooldown = 0;
   /** Seconds until the thrown weapon is available again (counts down in {@link aiUpdate}). */
@@ -577,6 +578,15 @@ export class Enemy {
   takeDamage(amount: number): void {
     // Immortal targets (the training dummy) clamp at 1 HP so they never die.
     this.hp = Math.max(this.def.immortal ? 1 : 0, this.hp - amount);
+    // A Senior Warden's Last Gasp: brought to 0 with his Power Up open, he does not fall — he
+    // powers up out of turn order instead. (Otherwise he falls, and the mode has him throw his
+    // Gushing Magma.)
+    if (this.hp === 0 && this.def.behavior === "seniorWarden" && !this.lastGaspUsed && this.canPowerUp()) {
+      this.lastGaspUsed = true;
+      this.hp = 1;
+      this.powerUpPending = true;
+      this.gauge.reset();
+    }
     // A self-buff trigger just fired (the Commander crossing 50% HP): fill the ATB so the reaction
     // is IMMEDIATE. Otherwise he'd stand there for up to a full gauge (3.75 s) before powering up,
     // which reads as him ignoring the threshold.
@@ -732,6 +742,7 @@ export class Enemy {
     // animation to it: the Power-Up instant plays its own clip; Slash Twice / Multi pick theirs.
     const wasPowered = this.poweredUp;
     const action = this.chooseAction(ctx);
+    if (!action) return null; // a Senior Warden's ~Do nothing: the turn passes
     if (!wasPowered && this.poweredUp && this.anims.powerUp) this.playOneShot(this.anims.powerUp);
     else if (action.kind === "magical") this.playOneShot(this.anims.cast ?? this.anims.attack, CAST_SPEED); // spell cast
     else if (action.kind === "physical" && action.ranged) this.playThrow(); // a rock hurled point-blank
@@ -743,10 +754,6 @@ export class Enemy {
    *  whose partner fell counts down to its own. */
   private afterTurn(action: EnemyAction): EnemyAction {
     if (action.kind !== "buff" && this.powerTurns > 0 && Number.isFinite(this.powerTurns)) this.powerTurns -= 1;
-    if (this.partnerFellTurns > 0) {
-      this.partnerFellTurns -= 1;
-      if (this.partnerFellTurns === 0) this.powerUpPending = true;
-    }
     return action;
   }
 
@@ -768,7 +775,7 @@ export class Enemy {
 
   /** Damage he deals, times this (Power Up: ×1.5). */
   get damageOutMultiplier(): number {
-    return this.powerTurns > 0 && this.def.behavior !== "seniorWarden" ? 1.5 : 1;
+    return this.powerTurns > 0 ? 1.5 : 1;
   }
 
   /** Damage he takes, times this (Power Up: ×0.5). */
@@ -795,9 +802,20 @@ export class Enemy {
     }
   }
 
-  /** A Senior Warden saw its partner fall: a few of its turns later it powers up (half damage). */
-  onPartnerFell(): void {
-    if (this.def.behavior === "seniorWarden" && this.alive && !this.powerUpUsed && this.partnerFellTurns < 0) this.partnerFellTurns = 2;
+  /** An ally of his has fallen: a Senior Warden's Power Up (Auto) — unless any enemy has already
+   *  powered up in this battle (once used, no enemy uses it again). */
+  onAllyFell(): void {
+    if (this.def.behavior !== "seniorWarden" || !this.alive) return;
+    this.allyFell = true;
+    if (this.canPowerUp()) {
+      this.powerUpPending = true;
+      this.gauge.reset(); // Auto: his next action, now
+    }
+  }
+
+  /** A Senior Warden's Power Up is open: an ally fell, and nobody in the battle has powered up. */
+  private canPowerUp(): boolean {
+    return this.allyFell && !this.powerUpUsed && !(this.others?.() ?? []).some((e) => e !== this && e.poweredUpOnce);
   }
 
   /** True once this enemy has used its Power Up (Fruegel's: only one per battle). */
@@ -849,8 +867,10 @@ export class Enemy {
     return (clip.to - clip.from) / 60 / (kind === "magical" ? CAST_SPEED : ATTACK_SPEED);
   }
 
-  private chooseAction(_ctx: EnemyContext): EnemyAction {
+  private chooseAction(_ctx: EnemyContext): EnemyAction | null {
     if (this.def.behavior === "commander") return this.commanderAction();
+    // A Senior Warden: ~Do nothing or ~Slash & Pierce, at random (PS1).
+    if (this.def.behavior === "seniorWarden" && Math.random() < 0.5) return null;
     if (this.def.behavior === "fruegel" || this.def.behavior === "fruegel2") {
       // His blows, one at random; the Rock Throw is hurled even point-blank, but it has the same
       // recharge as from afar (no spamming it).
@@ -888,7 +908,7 @@ export class Enemy {
     if (this.powerUpPending && !this.powerUpUsed) {
       this.powerUpPending = false;
       this.powerUpUsed = true;
-      this.powerTurns = this.def.behavior === "seniorWarden" ? Infinity : 3;
+      this.powerTurns = 3;
       this.markPowered();
       return { kind: "buff", name: "Power Up" };
     }

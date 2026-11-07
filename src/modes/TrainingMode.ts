@@ -2904,11 +2904,11 @@ export abstract class ArenaCombatMode extends GameMode {
   private rewardKill(target: Enemy): void {
     if (target.dying) return; // death sequence already running — don't double-award or re-trigger
     if (target.def.behavior === "seniorWarden") {
-      // "Huh, I may as well take you to hell with me!" — a Gushing Magma as he falls, and his
-      // partner powers up a few turns later.
+      // His Last Gasp: "Huh, I may as well take you to hell with me!" — a Gushing Magma (1× Fire
+      // magic on the party) as he falls.
       this.resolveEnemyAction(target, { kind: "magical", name: "Gushing Magma", multiplier: 1, element: "Fire", lobbed: true });
-      for (const e of this.enemies) if (e !== target && e.def.behavior === "seniorWarden") e.onPartnerFell();
     }
+    for (const e of this.enemies) if (e !== target && e.alive) e.onAllyFell(); // a Senior Warden powers up
     const xp = Math.round(target.def.expReward * this.xpMultiplier);
     if (this.shareXpWithParty) {
       for (const m of this.party) if (m.avatar.hp > 0) m.avatar.gainExp(xp);
