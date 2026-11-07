@@ -246,7 +246,6 @@ export class TrainingMenu {
       locationGroup(t("spawn.locSeles"), [
         spawnButton(t("spawn.knight"), ELEMENT_COLOR.Fire, this.cb.onSpawnKnight),
         spawnButton(t("spawn.commander"), ELEMENT_COLOR.Darkness, this.cb.onSpawnCommander),
-        spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel),
       ]),
       locationGroup(
         t("spawn.locForest"),
@@ -258,6 +257,7 @@ export class TrainingMenu {
         ],
         true,
       ),
+      locationGroup(t("spawn.locHellena"), [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel)], true),
     );
     return box;
   }
