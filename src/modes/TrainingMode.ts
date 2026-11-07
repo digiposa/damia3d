@@ -185,6 +185,8 @@ const REVERT_LINGER = 2.5;
 const ITEM_BURST_MIN_POWER = 0.9;
 /** Thrown attack items travel slower than an arrow and hang in the air — you can see them coming. */
 const ITEM_LOB_SPEED = 9;
+/** Seconds a landed enemy spell takes to burn out (its burst settling) before the thrower may fall. */
+const SPELL_SETTLE = 0.9;
 /** Peak height of a lobbed item's arc, in world units. */
 const ITEM_LOB_ARC = 2.2;
 /** Joystick magnitude (0–1) at/above which movement is a run rather than a walk. */
@@ -2904,11 +2906,6 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Award EXP/gold for a felled enemy, end any combo locked on it, and remove it. */
   private rewardKill(target: Enemy): void {
     if (target.dying) return; // death sequence already running — don't double-award or re-trigger
-    if (target.def.behavior === "seniorWarden") {
-      // His Last Gasp: "Huh, I may as well take you to hell with me!" — a Gushing Magma (1× Fire
-      // magic on the party): he throws it in full, and only then falls.
-      this.resolveEnemyAction(target, { kind: "magical", name: "Gushing Magma", multiplier: 1, element: "Fire", lobbed: true });
-    }
     for (const e of this.enemies) if (e !== target && e.alive) e.onAllyFell(); // a Senior Warden powers up
     const xp = Math.round(target.def.expReward * this.xpMultiplier);
     if (this.shareXpWithParty) {
@@ -2926,8 +2923,19 @@ export abstract class ArenaCombatMode extends GameMode {
       this.comboTarget = undefined;
     }
     if (this.attackTarget === target) this.clearNav(); // stop chasing the corpse
-    // Play the death animation, then despawn (a Senior Warden throws his Gushing Magma first).
-    target.playDeath(() => this.removeEnemy(target), target.def.behavior === "seniorWarden");
+    // Play the death animation, then despawn. A Senior Warden first has his Last Gasp: "Huh, I may
+    // as well take you to hell with me!" — staggered, he heaves a Gushing Magma (1× Fire magic on
+    // the party), and falls once it has burst.
+    const parting =
+      target.def.behavior === "seniorWarden"
+        ? (spellOver: () => void): void =>
+            this.resolveEnemyAction(
+              target,
+              { kind: "magical", name: "Gushing Magma", multiplier: 1, element: "Fire", lobbed: true },
+              { released: true, onLanded: () => window.setTimeout(spellOver, SPELL_SETTLE * 1000) },
+            )
+        : undefined;
+    target.playDeath(() => this.removeEnemy(target), parting);
   }
 
   /** Put the party in combat stance while a living enemy is within {@link COMBAT_RANGE}, holding it
@@ -2980,7 +2988,9 @@ export abstract class ArenaCombatMode extends GameMode {
   }
 
   /** Apply an enemy's chosen action: damage the player, or self-heal. */
-  private resolveEnemyAction(enemy: Enemy, action: EnemyAction): void {
+  /** `opts.released`: the thrown item is already leaving the hand (no wait for the throw);
+   *  `opts.onLanded`: told when a lobbed item lands. */
+  private resolveEnemyAction(enemy: Enemy, action: EnemyAction, opts: { released?: boolean; onLanded?: () => void } = {}): void {
     // Name the action — but only when it's NOTABLE (a spell, a buff/heal, a signature strike).
     // Basic auto-attacks fire on every ATB tick, so captioning those would just be noise.
     const notable = action.kind !== "physical" || /twice|multi|power|stunning|throw/i.test(action.name);
@@ -3130,8 +3140,9 @@ export abstract class ArenaCombatMode extends GameMode {
             // The SAME spell the player throws — the Burn Out flame column — at its un-mashed power.
             this.spellFx?.burst(element, this.player.position, ITEM_BURST_MIN_POWER);
             applyHit(dmg);
+            opts.onLanded?.();
           },
-          delay: enemy.castReleaseDelay,
+          delay: opts.released ? 0 : enemy.castReleaseDelay,
           follow: feet,
           kind: "flask",
           arc: ITEM_LOB_ARC,

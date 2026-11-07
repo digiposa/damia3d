@@ -391,7 +391,7 @@ export const SENIOR_WARDEN_BOSS: EnemyDef = {
   weaponGrip: 0.5,
   weaponScale: 1.9,
   weaponCarry: "twoHand",
-  throwRelease: 0.38, // the overhand Gushing Magma leaves the hand at the top of the swing
+  throwRelease: 0.32, // the Gushing Magma, heaved underarm, leaves the hand on the way up
 };
 
 /** Enemies a boss can call into the fight (Fruegel's Whistle), by id. */

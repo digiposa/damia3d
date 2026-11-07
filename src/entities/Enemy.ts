@@ -143,6 +143,8 @@ export class Enemy {
     throw?: AnimationGroup;
     /** Calling reinforcements (Fruegel's Whistle). */
     whistle?: AnimationGroup;
+    /** Staggered by a blow (a Senior Warden's fall, before his parting throw). */
+    hurt?: AnimationGroup;
     death?: AnimationGroup;
   } = {};
   private currentAnim?: AnimationGroup;
@@ -300,6 +302,7 @@ export class Enemy {
     this.anims.cast = groups.find((a) => has(a, "cast", "spell", "magic", "burn"));
     this.anims.throw = groups.find((a) => has(a, "throw", "dagger", "knife"));
     this.anims.whistle = groups.find((a) => has(a, "whistle"));
+    this.anims.hurt = groups.find((a) => has(a, "hurt", "hit"));
     this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
 
@@ -456,7 +459,8 @@ export class Enemy {
     const m = new Matrix();
     const shift = new Vector3(); // two-handed: world offset from the right fist to the shaft's middle
     const obs = scene.onAfterAnimationsObservable.add(() => {
-      if ((this.dead && this.currentAnim !== this.anims.throw) || !node.parent) return; // (still held through a parting throw)
+      const parting = this.currentAnim === this.anims.throw || this.currentAnim === this.anims.hurt;
+      if ((this.dead && !parting) || !node.parent) return; // (still held through a parting throw)
       this.root.computeWorldMatrix(true);
       const fwd = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
       const up = Vector3.Up();
@@ -569,7 +573,7 @@ export class Enemy {
    * the health bar and freezes on the final (fallen) frame. Falls back to an immediate despawn when
    * there's no death clip (placeholder enemies), so callers can always defer removal through here.
    */
-  playDeath(done: () => void, lastThrow = false): void {
+  playDeath(done: () => void, parting?: (spellOver: () => void) => void): void {
     if (this.dead) return;
     this.dead = true;
     this.attacking = false;
@@ -589,16 +593,39 @@ export class Enemy {
         this.deathTimer = window.setTimeout(done, 700); // linger a beat on the ground before despawning
       });
     };
-    // A parting shot (a Senior Warden's Gushing Magma): the whole throw first, then the fall.
-    const t = lastThrow ? this.anims.throw : undefined;
-    if (!t) return fall();
-    this.currentAnim?.stop();
-    this.currentAnim = t;
-    this.clipBase = 1;
-    t.start(false, this.clipScale, t.from, t.to);
-    t.onAnimationGroupEndObservable.addOnce(() => {
-      if (!this.root.isDisposed()) fall();
-    });
+    // A parting shot (a Senior Warden's Gushing Magma): he staggers (Hurt), throws — `parting`
+    // fires as it leaves his hand — and falls only once the mode reports the spell over.
+    const t = parting ? this.anims.throw : undefined;
+    if (!t || !parting) return fall();
+    const scene = this.root.getScene();
+    const once = (g: AnimationGroup, then: () => void): void => {
+      this.currentAnim?.stop();
+      this.currentAnim = g;
+      this.clipBase = 1;
+      g.start(false, this.clipScale, g.from, g.to);
+      g.onAnimationGroupEndObservable.addOnce(() => {
+        if (!this.root.isDisposed()) then();
+      });
+    };
+    let fell = false;
+    const spellOver = (): void => {
+      if (fell || this.root.isDisposed()) return;
+      fell = true;
+      fall();
+    };
+    const throwIt = (): void => {
+      once(t, () => window.setTimeout(spellOver, 1500)); // a spell that never reports back
+      const at = t.from + (t.to - t.from) * (this.def.throwRelease ?? 0.5);
+      const obs = scene.onBeforeRenderObservable.add(() => {
+        const f = t.animatables[0]?.masterFrame;
+        if (this.currentAnim === t && f !== undefined && f < at) return;
+        scene.onBeforeRenderObservable.remove(obs);
+        if (!this.root.isDisposed()) parting(spellOver);
+      });
+      this.modelDisposables.push({ dispose: () => scene.onBeforeRenderObservable.remove(obs) });
+    };
+    if (this.anims.hurt) once(this.anims.hurt, throwIt);
+    else throwIt();
   }
 
   get position(): Vector3 {
