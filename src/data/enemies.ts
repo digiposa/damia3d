@@ -76,9 +76,14 @@ export interface EnemyDef {
   fitSkinned?: boolean;
   /** The weapon's turn in the hand, degrees [x, y, z] (default: the swords' [0, 0, -90]). */
   weaponRotation?: [number, number, number];
-  /** Aim the weapon every frame (forward at rest, along the forearm in a blow) instead of a fixed
-   *  turn in the fist — for a rig whose hand pose changes a lot between clips. */
-  weaponCarry?: boolean;
+  /** Aim the weapon every frame instead of a fixed turn in the fist — for a rig whose hand pose
+   *  changes a lot between clips: `true` = a one-handed weapon held forward at rest and along the
+   *  forearm in a blow; `"twoHand"` = a polearm through both fists (upright when they part). */
+  weaponCarry?: boolean | "twoHand";
+  /** Where along the weapon mesh (0 = tip, 1 = butt) the fist closes (default 0.87, a sword). */
+  weaponGrip?: number;
+  /** Length of the weapon mesh (a unit tall) in the enemy's model units (default 1.3, a sword). */
+  weaponScale?: number;
   /** Size multiplier of the rock this enemy throws (Fruegel hurls a boulder). */
   thrownSize?: number;
   /** Marks a boss: wider health bar + name plate. */
@@ -359,8 +364,8 @@ export const HELLENA_WARDEN_BOSS: EnemyDef = {
  * used Power Up, no enemy uses it again; Last Gasp: brought to 0 HP, he powers up instead of
  * falling if his Power Up is open, else he throws a Gushing Magma (1× Fire magic on the party) and
  * falls. Stats: JP HP 25 (Fandom; US 20), AT 5 / MAT 9 (Fandom; US 4 / 8), no EXP (wiki).
- * Element Fire. Drop: Healing Potion (100%, not modelled yet). The Knight of Sandora's model stands
- * in for him until his own is rigged.
+ * Element Fire. Drop: Healing Potion (100%, not modelled yet). Model: Tripo mesh rigged through
+ * Mixamo; clips Idle (combat), Walk, Attack, Throw (the Gushing Magma), Power Up, Death.
  */
 export const SENIOR_WARDEN_BOSS: EnemyDef = {
   id: "senior_warden_boss",
@@ -377,8 +382,13 @@ export const SENIOR_WARDEN_BOSS: EnemyDef = {
   behavior: "seniorWarden",
   scale: 1.05,
   bodyColor: [0.45, 0.2, 0.2],
-  model: "knight_sandora",
-  weaponModel: "kos_sword",
+  model: "senior_warden",
+  cellShaded: true,
+  fitSkinned: true,
+  weaponModel: "senior_warden_spear", // a double-bladed spear, held by the middle in both hands
+  weaponGrip: 0.5,
+  weaponScale: 1.9,
+  weaponCarry: "twoHand",
 };
 
 /** Enemies a boss can call into the fight (Fruegel's Whistle), by id. */

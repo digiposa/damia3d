@@ -47,6 +47,9 @@ const ATTACK_SPEED = 1.2;
 const WEAPON_SCALE = 1.3;
 /** Height of a rigged enemy's toe joints above the floor once grounded (the sole). */
 const SOLE = 0.04;
+/** How far apart (world units, at scale 1) a rigged enemy's fists may be and still both hold a
+ *  two-handed polearm. */
+const TWO_HAND_REACH = 1.3;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
 const WEAPON_GRIP_Y = 0.87;
 
@@ -408,7 +411,7 @@ export class Enemy {
     sword.parent = socket;
     sword.rotation.z = -Math.PI / 2; // orient the grip-to-blade axis out of the fist
     if (this.def.weaponRotation) sword.rotation = new Vector3(...this.def.weaponRotation).scaleInPlace(Math.PI / 180);
-    sword.scaling.setAll(WEAPON_SCALE);
+    sword.scaling.setAll(this.def.weaponScale ?? WEAPON_SCALE);
     if (this.def.weaponCarry) this.carryWeapon(sword, skeleton);
 
     // The KoS sword mesh runs tip(y=0)→grip(y≈GRIP_Y)→pommel(y=1); flip so the blade points +Y and
@@ -416,7 +419,7 @@ export class Enemy {
     const align = new TransformNode(`weaponAlign:${this.def.id}`, scene);
     align.parent = sword;
     align.rotation.x = Math.PI;
-    align.position.y = WEAPON_GRIP_Y;
+    align.position.y = this.def.weaponGrip ?? WEAPON_GRIP_Y;
     for (const mesh of res.meshes) {
       if (!mesh.parent) mesh.parent = align;
       mesh.isPickable = false;
@@ -433,18 +436,37 @@ export class Enemy {
     const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
     const hand = bone("RightHand");
     const elbow = bone("RightForeArm");
+    const left = bone("LeftHand");
     if (!hand || !elbow) return;
+    const twoHand = this.def.weaponCarry === "twoHand" && !!left;
     const scene = this.root.getScene();
     node.rotationQuaternion = Quaternion.FromEulerVector(node.rotation);
     const target = new Quaternion();
     const m = new Matrix();
+    const shift = new Vector3(); // two-handed: world offset from the right fist to the shaft's middle
     const obs = scene.onAfterAnimationsObservable.add(() => {
       if (this.dead || !node.parent) return;
       this.root.computeWorldMatrix(true);
       const fwd = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
       const up = Vector3.Up();
       let d: Vector3;
-      if (this.attacking) {
+      if (twoHand) {
+        // A polearm in both hands: along the line through the fists when they are on the shaft
+        // (its forward blade ahead of him), else stood upright in the right hand.
+        hand.computeWorldMatrix(true);
+        left!.computeWorldMatrix(true);
+        const between = left!.getAbsolutePosition().subtract(hand.getAbsolutePosition());
+        const span = between.length();
+        if (span > 0.12 && span < TWO_HAND_REACH * this.scale) {
+          d = between.normalize();
+          if (Vector3.Dot(d, fwd) < 0) d.scaleInPlace(-1);
+          // Slide the shaft so its middle sits halfway between the fists.
+          Vector3.LerpToRef(shift, between.scale(span / 2), 0.35, shift);
+        } else {
+          d = up.clone();
+          Vector3.LerpToRef(shift, Vector3.ZeroReadOnly, 0.35, shift);
+        }
+      } else if (this.attacking) {
         hand.computeWorldMatrix(true);
         elbow.computeWorldMatrix(true);
         d = hand.getAbsolutePosition().subtract(elbow.getAbsolutePosition()).normalize();
@@ -462,8 +484,11 @@ export class Enemy {
       parent.computeWorldMatrix(true);
       const pr = new Matrix();
       parent.getWorldMatrix().getRotationMatrixToRef(pr);
-      m.multiplyToRef(pr.invert(), m);
+      pr.invert();
+      m.multiplyToRef(pr, m);
       Quaternion.FromRotationMatrixToRef(m, target);
+      // The socket's frame is in units of this.scale world units.
+      if (twoHand) Vector3.TransformNormalToRef(shift, pr, node.position).scaleInPlace(1 / this.scale);
       Quaternion.SlerpToRef(node.rotationQuaternion!, target, 0.35, node.rotationQuaternion!);
     });
     this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
