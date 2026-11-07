@@ -3006,13 +3006,18 @@ export abstract class ArenaCombatMode extends GameMode {
       audio.playSfx("dial_tick", { rate: 1.6, jitter: 0 });
       const fwd = new Vector3(Math.sin(enemy.root.rotation.y), 0, Math.cos(enemy.root.rotation.y));
       const side = new Vector3(fwd.z, 0, -fwd.x);
-      void this.ensureEnemyAssets(def).then(() => {
-        if (this.scene.isDisposed) return;
-        for (let i = 0; i < action.count; i++) {
-          const at = enemy.position.add(side.scale(i % 2 === 0 ? 2.2 : -2.2)).add(fwd.scale(0.6));
-          this.addEnemy(new Enemy(this.scene, def, at));
-        }
-      });
+      // They come in as the whistle goes out (partway through his gesture).
+      const come = (): void => {
+        void this.ensureEnemyAssets(def).then(() => {
+          if (this.scene.isDisposed) return;
+          for (let i = 0; i < action.count; i++) {
+            const at = enemy.position.add(side.scale(i % 2 === 0 ? 2.2 : -2.2)).add(fwd.scale(0.6));
+            this.addEnemy(new Enemy(this.scene, def, at));
+          }
+        });
+      };
+      if (enemy.whistleDelay > 0) this.comboTimers.push({ t: enemy.whistleDelay, fn: come });
+      else come();
       return;
     }
     if (action.kind === "heal") {

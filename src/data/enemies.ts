@@ -272,9 +272,10 @@ const FRUEGEL_LOOK = {
  * (PS1), but — unlike PS1's Observer, which made the fight too easy — he attacks from the start.
  * Once both are down he blows his Whistle (Auto, single use) and two Senior Wardens come in.
  * Spawned alone (Training), he is targetable at once and never whistles.
- * Moves: ~Slam (1.5×) and ~Rock Throw (2×) at random; ~Club (1×) only as his Retaliate — 20% when
- * an Addition is aimed at him, out of turn order; Power Up (dealt ×1.5, taken ×0.5 for 3 of his
- * turns) on his next turn after he is hit by magic, single use, only if no other enemy has.
+ * Moves: his mace blow (PS1's ~Club and ~Slam merged into one, at the Slam's 1.5×) and ~Rock Throw
+ * (2×, on a recharge even point-blank) at random; the mace blow is also his Retaliate — 20% when an
+ * Addition is aimed at him, out of turn order; Power Up (dealt ×1.5, taken ×0.5 for 3 of his turns)
+ * on his next turn after he is hit by magic, single use, only if no other enemy has.
  * Stats: JP HP/AT/MAT/EXP/Gold (Fandom), DF/MDF/SPD as both list them. US/EU: HP 90, AT 5,
  * MAT 3, EXP 300, Gold 50.
  */
@@ -288,9 +289,8 @@ export const FRUEGEL: EnemyDef = {
   mAv: 0,
   countersAdditions: true,
   attacks: [
-    { name: "Slam", kind: "physical", multiplier: 1.5 },
-    { name: "Rock Throw", kind: "physical", multiplier: 2 }, // hurled (his Throw clip)
-    { name: "Club", kind: "physical", multiplier: 1 }, // Retaliate only
+    { name: "Mace", kind: "physical", multiplier: 1.5 }, // his basic blow (Club + Slam), and Retaliate
+    { name: "Rock Throw", kind: "physical", multiplier: 2 }, // hurled (his Throw clip), on a recharge
   ],
   expReward: 240,
   goldReward: 20,

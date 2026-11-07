@@ -137,6 +137,8 @@ export class Enemy {
     /** Spell-cast clip (magical attacks like the Commander's Burn Out); falls back to `attack`. */
     cast?: AnimationGroup;
     throw?: AnimationGroup;
+    /** Calling reinforcements (Fruegel's Whistle). */
+    whistle?: AnimationGroup;
     death?: AnimationGroup;
   } = {};
   private currentAnim?: AnimationGroup;
@@ -293,6 +295,7 @@ export class Enemy {
     this.anims.powerUp = groups.find((a) => has(a, "power"));
     this.anims.cast = groups.find((a) => has(a, "cast", "spell", "magic", "burn"));
     this.anims.throw = groups.find((a) => has(a, "throw", "dagger", "knife"));
+    this.anims.whistle = groups.find((a) => has(a, "whistle"));
     this.anims.death = groups.find((a) => has(a, "death") || has(a, "die"));
     for (const g of groups) g.stop(); // ImportMesh auto-plays the first — stop all
 
@@ -699,7 +702,8 @@ export class Enemy {
       if (self) {
         this.gauge.spend();
         this.setMoving(false);
-        if (this.anims.powerUp) this.playOneShot(this.anims.powerUp);
+        const clip = self.kind === "summon" ? this.anims.whistle ?? this.anims.powerUp : this.anims.powerUp;
+        if (clip) this.playOneShot(clip, 1);
         return this.afterTurn(self);
       }
     }
@@ -785,7 +789,10 @@ export class Enemy {
    *  out of turn order. */
   onAdditionTargeted(): void {
     if (this.def.behavior !== "fruegel" || !this.alive || !this.targetable || this.retaliate) return;
-    if (Math.random() < 0.2) this.retaliate = { kind: "physical", name: "Club", multiplier: 1 };
+    if (Math.random() < 0.2) {
+      const blow = this.def.attacks.find((a) => !/throw/i.test(a.name)) ?? this.def.attacks[0];
+      this.retaliate = { kind: "physical", name: blow.name, multiplier: blow.multiplier };
+    }
   }
 
   /** A Senior Warden saw its partner fall: a few of its turns later it powers up (half damage). */
@@ -801,6 +808,12 @@ export class Enemy {
   /** The enemy's thrown (ranged) attack, if it has one — its name contains "Throw". */
   private rangedAttack() {
     return this.def.attacks.find((a) => /throw/i.test(a.name));
+  }
+
+  /** Seconds (REAL time) into the Whistle when the call goes out and the reinforcements come. */
+  get whistleDelay(): number {
+    const a = this.anims.whistle;
+    return a ? ((a.to - a.from) / 60) * 0.4 : 0;
   }
 
   /** Seconds into the throw animation when the dagger leaves the hand (arm fully forward ≈ 50%),
@@ -839,11 +852,13 @@ export class Enemy {
   private chooseAction(_ctx: EnemyContext): EnemyAction {
     if (this.def.behavior === "commander") return this.commanderAction();
     if (this.def.behavior === "fruegel" || this.def.behavior === "fruegel2") {
-      // His blows, one at random (the Club of the first fight is only his Retaliate); the Rock
-      // Throw is hurled even point-blank.
-      const pool = this.def.attacks.filter((a) => !(this.def.behavior === "fruegel" && /club/i.test(a.name)));
+      // His blows, one at random; the Rock Throw is hurled even point-blank, but it has the same
+      // recharge as from afar (no spamming it).
+      const pool = this.def.attacks.filter((a) => !/throw/i.test(a.name) || this.throwCooldown <= 0);
       const a = pool[Math.floor(Math.random() * pool.length)] ?? this.def.attacks[0];
-      return { kind: "physical", name: a.name, multiplier: a.multiplier, ranged: /throw/i.test(a.name) };
+      const ranged = /throw/i.test(a.name);
+      if (ranged) this.throwCooldown = THROW_COOLDOWN;
+      return { kind: "physical", name: a.name, multiplier: a.multiplier, ranged };
     }
     // Melee: the first non-thrown attack (a thrown one is reserved for range).
     const a = this.def.attacks.find((x) => !/throw/i.test(x.name)) ?? this.def.attacks[0];
