@@ -248,9 +248,9 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
 /* ============================================================================
  * Hellena Prison — Fruegel, the warden, fought on both visits (Disc 1).
  *
- * Sources: legendofdragoon.org (the wiki, which prevails on behaviour and on whatever it alone
- * gives) and the Fandom wiki, with the JP stat values taken first where either lists them (Fandom
- * gives the JP figures beside the US/EU ones). Ability names marked ~ are the community's.
+ * Sources: legendofdragoon.org (the wiki, which prevails on behaviour; its stats are the US ones)
+ * and the Fandom wiki. Stats: the JP value whenever one is known, from either source; otherwise
+ * the US one. Ability names marked ~ are the community's.
  * Drops (Knight Shield / 4 Healing Potions; Gravity Grabber) are not modelled yet.
  * ========================================================================== */
 
@@ -349,14 +349,15 @@ export const HELLENA_WARDEN_BOSS: EnemyDef = {
 /**
  * Senior Warden, whistled in by Fruegel in the first fight. Double Voulge; as he falls he throws a
  * Gushing Magma ("Huh, I may as well take you to hell with me!"); a few turns after his partner
- * falls he powers up and takes half damage. Stats: the wiki's boss-extra figures (HP 20, no EXP;
- * Fandom gives ~25 HP). Element Fire. The Knight of Sandora's model stands in for him.
+ * falls he powers up and takes half damage. Stats: JP HP 25 (Fandom; US 20 on the wiki), the
+ * wiki's boss-extra figures otherwise (no EXP). Element Fire. The Knight of Sandora's model stands
+ * in for him.
  */
 export const SENIOR_WARDEN_BOSS: EnemyDef = {
   id: "senior_warden_boss",
   name: "Senior Warden",
   element: "Fire",
-  stats: { maxHp: 20, at: 4, df: 100, mat: 8, mdf: 100 },
+  stats: { maxHp: 25, at: 4, df: 100, mat: 8, mdf: 100 },
   spd: 50,
   aAv: 0,
   mAv: 0,
