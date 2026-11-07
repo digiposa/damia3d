@@ -663,6 +663,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnCommander: () => this.spawnCommander(),
         onSpawnFruegel: () => this.spawnFruegel(),
         onSpawnFruegel2: () => this.spawnFruegel2(),
+        onSpawnSeniorWardens: () => this.spawnSeniorWardens(),
         onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
         onSpawnTrent: () => this.spawnTrent(),
         onSpawnGoblin: () => this.spawnGoblin(),
@@ -3641,6 +3642,15 @@ export abstract class ArenaCombatMode extends GameMode {
     await this.ensureEnemyAssets(FRUEGEL_2);
     if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, FRUEGEL_2, this.ringPosition(8)));
+  }
+
+  /** Spawn the pair of Senior Wardens Fruegel whistles for — always two: the first to fall
+   *  spurs the other (Power Up), so the pair is the fight. */
+  private async spawnSeniorWardens(): Promise<void> {
+    const def = SUMMONS.senior_warden_boss;
+    await this.ensureEnemyAssets(def);
+    if (this.scene.isDisposed) return;
+    for (let i = 0; i < 2; i++) this.addEnemy(new Enemy(this.scene, def, this.ringPosition()));
   }
 
   /** Spawn a Forest minor enemy — Berserk Mouse (non-humanoid, procedural animation). */
