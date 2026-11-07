@@ -72,6 +72,8 @@ export interface EnemyDef {
   /** Fit and ground the model on its skinned rest pose (a Mixamo-rigged Tripo export, whose raw
    *  geometry sits elsewhere than where its bones put it) rather than on the raw mesh. */
   fitSkinned?: boolean;
+  /** The weapon's turn in the hand, degrees [x, y, z] (default: the swords' [0, 0, -90]). */
+  weaponRotation?: [number, number, number];
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -268,6 +270,7 @@ export const FRUEGEL: EnemyDef = {
   cellShaded: true,
   weaponModel: "fruegel_mace", // his mace (head at the mesh origin, like the swords' tip)
   fitSkinned: true,
+  weaponRotation: [-180, -45, -90], // the mace held out before him, head forward and up
 };
 
 /* ============================================================================

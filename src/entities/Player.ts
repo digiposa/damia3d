@@ -1339,7 +1339,13 @@ export class Player {
     own.onAnimationGroupEndObservable.addOnce(() => {
       if (this.modelCurrent !== own) return; // something else took over
       const next = this.blowQueue.shift();
-      if (next) this.strike(next.clip, next.speed, next.spin); // the chain goes on, same frame
+      if (next && next.clip.toLowerCase() === own.name.toLowerCase()) {
+        // The same clip again (Rod Typhoon's repeated strike): restarting a group from inside its
+        // own end event is swallowed, so it goes on at the next frame.
+        this.root.getScene().onBeforeRenderObservable.addOnce(() => {
+          if (this.modelCurrent === own) this.strike(next.clip, next.speed, next.spin);
+        });
+      } else if (next) this.strike(next.clip, next.speed, next.spin); // the chain goes on, same frame
       else {
         this.modelAttacking = false;
         this.throwing = false;

@@ -386,6 +386,7 @@ export class Enemy {
     const sword = new TransformNode(`weapon:${this.def.id}`, scene);
     sword.parent = socket;
     sword.rotation.z = -Math.PI / 2; // orient the grip-to-blade axis out of the fist
+    if (this.def.weaponRotation) sword.rotation = new Vector3(...this.def.weaponRotation).scaleInPlace(Math.PI / 180);
     sword.scaling.setAll(WEAPON_SCALE);
 
     // The KoS sword mesh runs tip(y=0)→grip(y≈GRIP_Y)→pommel(y=1); flip so the blade points +Y and
