@@ -1,4 +1,5 @@
 import type { Stats } from "../combat/types";
+import type { EnemyDrop } from "./drops";
 import type { Element } from "../combat/element";
 
 export type { Element };
@@ -89,6 +90,8 @@ export interface EnemyDef {
   weaponCarry?: boolean | "twoHand";
   /** Where along the weapon mesh (0 = tip, 1 = butt) the fist closes (default 0.87, a sword). */
   weaponGrip?: number;
+  /** What it can leave on the ground when it falls (PS1 drop table; see data/drops). */
+  drops?: EnemyDrop[];
   /** Fraction of the throw clip at which the projectile leaves the hand (default 0.5). */
   throwRelease?: number;
   /** Length of the weapon mesh (a unit tall) in the enemy's model units (default 1.3, a sword). */
@@ -176,6 +179,7 @@ export const KNIGHT_OF_SANDORA_SELES: EnemyDef = {
   model: "knight_sandora",
   cellShaded: true,
   weaponModel: "kos_sword",
+  drops: [{ item: "healingPotion", chance: 1 }], // Seles doc: Healing Potion 100%
 };
 
 /**
@@ -236,6 +240,7 @@ export const COMMANDER_SELES: EnemyDef = {
   model: "commander",
   cellShaded: true,
   weaponModel: "commander_sword",
+  drops: [{ item: "burnOut", chance: 1 }], // Seles doc: Burn Out 100% (Fandom adds 2 Healing Potions)
 };
 
 /**
@@ -322,6 +327,7 @@ export const FRUEGEL: EnemyDef = {
   thrownSize: 6, // a boulder (~1 m across), not a goblin's pebble
   ...FRUEGEL_ROCK,
   ...FRUEGEL_LOOK,
+  drops: [{ item: "knight_shield", chance: 1 }], // Hellena doc: Knight Shield 100%
 };
 
 /**
@@ -350,6 +356,7 @@ export const FRUEGEL_2: EnemyDef = {
   thrownSize: 6,
   ...FRUEGEL_ROCK,
   ...FRUEGEL_LOOK,
+  drops: [{ item: "gravityGrabber", chance: 1 }], // Hellena doc: Gravity Grabber 100%
 };
 
 /** The Hellena Wardens' look: all three units are visually identical. The Knight of Sandora stands
@@ -413,6 +420,7 @@ export const HELLENA_WARDEN_BOSS: EnemyDef = {
   goldReward: 0,
   behavior: "warden",
   ...HELLENA_WARDEN_LOOK,
+  drops: [{ item: "healingPotion", chance: 1 }], // wiki: Healing Potion 100%
 };
 
 /**
@@ -437,6 +445,7 @@ export const HELLENA_WARDEN_2: EnemyDef = {
   goldReward: 15,
   behavior: "warden",
   ...HELLENA_WARDEN_LOOK,
+  drops: [{ item: "morning_star", chance: 0.02 }], // wiki / Hellena doc: Morning Star 2%
 };
 
 /**
@@ -472,6 +481,7 @@ export const SENIOR_WARDEN_BOSS: EnemyDef = {
   weaponScale: 1.9,
   weaponCarry: "twoHand",
   throwRelease: 0.32, // the Gushing Magma, heaved underarm, leaves the hand on the way up
+  drops: [{ item: "healingPotion", chance: 1 }], // wiki: Healing Potion 100%
 };
 
 /** Enemies a boss can call into the fight (Fruegel's Whistle), by id. */
@@ -519,6 +529,7 @@ export const BERSERK_MOUSE: EnemyDef = {
   scale: 0.45,
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.28, 0.24, 0.34], // fallback capsule tint if the model fails to load
+  drops: [{ item: "healingPotion", chance: 0.1 }], // Forest doc: Healing Potion 10%
 };
 
 /**
@@ -551,6 +562,7 @@ export const TRENT: EnemyDef = {
   scale: 1.4, // a looming treant — taller than the ~1.8 party (fitHeight normalises to 1.8, ×1.4 ≈ 2.5)
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.3, 0.34, 0.22], // fallback capsule tint if the model fails to load
+  drops: [{ item: "pellet", chance: 0.1 }], // Forest doc: Pellet 10%
 };
 
 /**
@@ -587,6 +599,7 @@ export const GOBLIN: EnemyDef = {
   scale: 0.7, // a small humanoid, shorter than the ~1.8 party. Tune in-game.
   modelYaw: 0, // flip to 180 if it faces away from its target in-game
   bodyColor: [0.32, 0.4, 0.24], // fallback capsule tint if the model fails to load
+  drops: [{ item: "detonateRock", chance: 0.1 }], // Forest doc: Detonate Rock 10%
 };
 
 /**
@@ -616,4 +629,5 @@ export const ASSASSIN_COCK: EnemyDef = {
   scale: 0.5, // a big fighting-cock, small-critter sized. Tune in-game.
   modelYaw: 90, // its Tripo mesh faces -X; +90° points the head at +Z (the enemy's forward)
   bodyColor: [0.5, 0.32, 0.24], // reddish placeholder capsule if the model fails to load
+  drops: [{ item: "healingPotion", chance: 0.1 }], // Forest doc: Healing Potion 10%
 };

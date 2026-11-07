@@ -44,6 +44,8 @@ import {
 } from "../data/additions";
 import { RosterStore, EQUIP_SLOTS } from "../data/roster";
 import { EquipInventory } from "../data/inventory";
+import { rollDrops, type DropThing } from "../data/drops";
+import { GroundDrop, dropColor } from "../world/GroundDrop";
 import {
   additionAttack,
   dragoonAttack,
@@ -187,8 +189,8 @@ const ITEM_BURST_MIN_POWER = 0.9;
 const ITEM_LOB_SPEED = 9;
 /** Seconds a landed enemy spell takes to burn out (its burst settling) before the thrower may fall. */
 const SPELL_SETTLE = 0.9;
-/** Size of a thrown item's flask in flight (1 = a real-size flask, too small to follow in the iso view). */
-const ITEM_FLASK_SIZE = 1.7;
+/** Size of a thrown item's ball of magic in flight (PS1: a small glowing ball of its element). */
+const ITEM_ORB_SIZE = 1.2;
 /** Peak height of a lobbed item's arc, in world units. */
 const ITEM_LOB_ARC = 2.2;
 /** Joystick magnitude (0–1) at/above which movement is a run rather than a walk. */
@@ -507,6 +509,8 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Owned-equipment stash (a shared inventory). Only consulted when {@link allowAllGear} is off;
    *  seeded from each member's starting loadout, grown by loot/rewards/shops. */
   protected inventory = new EquipInventory();
+  /** Items fallen enemies left on the ground, waiting to be walked over. */
+  private drops: GroundDrop[] = [];
 
   /** Hook: the last enemy was cleared from the arena. Survival advances to the next wave. */
   protected onEnemiesCleared(): void {}
@@ -1286,6 +1290,7 @@ export abstract class ArenaCombatMode extends GameMode {
     // Arrows fly in real time; each removes itself (and lands its damage) on arrival.
     if (this.arrows.length) this.arrows = this.arrows.filter((a) => a.update(dt * settings.combatSpeed));
     if (this.pendingHits.length) this.updatePendingHits(dt);
+    if (this.drops.length) this.drops = this.drops.filter((d) => d.update(dt, this.player.position, (thing) => this.pickUp(thing)));
     if (this.captions.length) this.updateCaptions(dt);
     if (this.attackAnimT > 0) this.attackAnimT = Math.max(0, this.attackAnimT - dt);
     this.updateLock(dt);
@@ -1783,7 +1788,8 @@ export abstract class ArenaCombatMode extends GameMode {
         }
       }
     };
-    // The item itself flies: it leaves the hand at the release and arcs over to the target (the
+    // The item's magic flies — PS1: a small glowing ball of its element — leaving the hand at the
+    // release and arcing over to the target (the
     // middle of the group for an all-enemies item); its spell — the mash QTE, or the burst — starts
     // where it lands.
     const lob = (): void => {
@@ -1803,8 +1809,8 @@ export abstract class ArenaCombatMode extends GameMode {
           to: aim(),
           speed: ITEM_LOB_SPEED,
           follow: aim,
-          kind: "flask",
-          size: ITEM_FLASK_SIZE,
+          kind: "orb",
+          size: ITEM_ORB_SIZE,
           arc: ITEM_LOB_ARC,
           color: Color3.FromHexString(ELEMENT_COLOR[atk.element]),
           onHit: effect,
@@ -2946,6 +2952,7 @@ export abstract class ArenaCombatMode extends GameMode {
       this.player.gainExp(xp);
     }
     this.gold += target.def.goldReward;
+    this.dropLoot(target);
     this.popText(target.headPosition, `+${xp} EXP`, TEXT.exp);
     this.onEnemyKilled(target); // after XP: Survival checks for a level-up to offer reward cards
     // Only cancel the player's combo if it's the one that just died (an ally kill
@@ -2968,6 +2975,35 @@ export abstract class ArenaCombatMode extends GameMode {
             )
         : undefined;
     target.playDeath(() => this.removeEnemy(target), parting);
+  }
+
+  /** Roll a fallen enemy's drop table (PS1 rates) and leave what drops on the ground around it. */
+  private dropLoot(target: Enemy): void {
+    const loot = rollDrops(target.def.drops);
+    loot.forEach((thing, i) => {
+      const a = (i / Math.max(1, loot.length)) * Math.PI * 2 + Math.random() * 0.8;
+      const spot = target.position.add(new Vector3(Math.cos(a) * 0.7, 0, Math.sin(a) * 0.7));
+      this.world.clamp?.(spot); // on walkable ground, where the hero can reach it
+      spot.y = target.position.y;
+      this.drops.push(new GroundDrop(this.scene, thing, target.bodyPosition, spot));
+    });
+  }
+
+  /** The hero walked over a drop: into the party's stock (an item) or gear stash (equipment). */
+  private pickUp(thing: DropThing): void {
+    let name: string;
+    if (thing.kind === "item") {
+      const stock = this.items.find((s) => s.def.id === thing.def.id);
+      if (stock) stock.count += 1;
+      else this.items.push({ def: thing.def, count: 1 });
+      name = t(thing.def.nameKey);
+    } else {
+      this.inventory.add(thing.def.id);
+      name = thing.def.name;
+    }
+    audio.playSfx("switch", { volume: 0.6 });
+    this.popText(this.player.position.add(new Vector3(0, 2.3, 0)), `+ ${name}`, dropColor(thing).toHexString());
+    this.refreshHud();
   }
 
   /** Put the party in combat stance while a living enemy is within {@link COMBAT_RANGE}, holding it
@@ -3157,7 +3193,7 @@ export abstract class ArenaCombatMode extends GameMode {
         }),
       );
     } else if (magical && action.lobbed) {
-      // Thrown attack item (the Commander's Burn Out): a flask arcs over to the target and the spell
+      // Thrown attack item (the Commander's Burn Out): a ball of its magic arcs over to the target and the spell
       // goes off where it lands — same delivery as the player's own attack items.
       const element = action.element ?? "Non-Elemental";
       const fwd = this.player.position.subtract(enemy.position);
@@ -3178,8 +3214,8 @@ export abstract class ArenaCombatMode extends GameMode {
           },
           delay: opts.released ? 0 : enemy.castReleaseDelay,
           follow: feet,
-          kind: "flask",
-          size: ITEM_FLASK_SIZE,
+          kind: "orb",
+          size: ITEM_ORB_SIZE,
           arc: ITEM_LOB_ARC,
           color: Color3.FromHexString(ELEMENT_COLOR[element]),
         }),
@@ -3894,6 +3930,8 @@ export abstract class ArenaCombatMode extends GameMode {
     window.removeEventListener("keydown", this.onKeyDown);
     for (const a of this.arrows) a.dispose();
     this.arrows = [];
+    for (const d of this.drops) d.dispose();
+    this.drops = [];
     this.pendingHits = [];
     for (const e of this.enemies) e.dispose();
     this.enemies = [];

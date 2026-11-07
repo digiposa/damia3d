@@ -12,8 +12,9 @@ export type ProjectileKind =
   | "arrow"
   /** A thrown rock (the Goblin's Throw Stone). */
   | "stone"
-  /** A thrown attack item (a flask): lobbed in an arc, bursts into its spell on landing. */
-  | "flask"
+  /** A thrown attack item's magic (PS1: a small glowing ball of its element): lobbed in an arc,
+   *  bursts into its spell on landing. */
+  | "orb"
   /** A ball of flame (a Dragoon's Flame Shot): a blazing core in a glowing halo, flickering. */
   | "fireball";
 
@@ -31,7 +32,7 @@ export interface ProjectileOptions {
   kind?: ProjectileKind;
   /** Peak height of a lobbed arc, in world units. 0 = flat, straight line. */
   arc?: number;
-  /** Body tint (a flask takes its spell's element colour). */
+  /** Body tint (a thrown item's ball of magic takes its element's colour). */
   color?: Color3;
   /** Size multiplier of the body (a boss's boulder against a goblin's pebble). */
   size?: number;
@@ -42,7 +43,7 @@ export interface ProjectileOptions {
 }
 
 /**
- * A flying projectile: an arrow/dagger, a thrown rock, or a lobbed item flask. Travels from `from`
+ * A flying projectile: an arrow/dagger, a thrown rock, or a thrown item's ball of magic. Travels from `from`
  * to `to` — flat, or on a parabolic arc when {@link ProjectileOptions.arc} is set — and on arrival
  * fires `onHit` once and disposes itself. Purely visual: the caller owns the damage.
  */
@@ -74,7 +75,7 @@ export class Arrow {
     this.follow = follow;
     this.arc = arc;
     this.delay = delay;
-    this.spin = kind !== "arrow"; // a rock or flask tumbles; an arrow keeps its heading
+    this.spin = kind !== "arrow"; // a rock or orb tumbles; an arrow keeps its heading
 
     this.root = new TransformNode("projectile", scene);
     this.root.position = from.clone();
@@ -84,42 +85,31 @@ export class Arrow {
     if (body) {
       body.parent = this.root;
       body.position.setAll(0);
-    } else if (kind === "flask") {
-      // A small glass flask: a tinted glowing body with a stopper — the item that carries the spell.
+    } else if (kind === "orb") {
+      // A thrown item's magic (PS1): a small glowing ball of its element — a bright heart in a
+      // halo of the element's colour, a streak of it behind.
       const tint = color ?? new Color3(1, 0.5, 0.15);
-      const glassMat = new StandardMaterial("flaskMat", scene);
-      glassMat.diffuseColor = tint.scale(0.6);
-      glassMat.emissiveColor = tint.scale(0.85); // reads as "charged" even in the dim arena
-      glassMat.specularColor = new Color3(0.4, 0.4, 0.4);
-      glassMat.alpha = 0.92;
-      const flask = new TransformNode("flask", scene); // scaled as a whole by `size`
-      flask.parent = this.root;
-      flask.scaling.setAll(size);
-      const body = MeshBuilder.CreateSphere("flaskBody", { diameter: 0.26, segments: 8 }, scene);
-      body.scaling = new Vector3(1, 1.15, 1);
-      body.material = glassMat;
-      body.isPickable = false;
-      body.parent = flask;
-
-      const corkMat = new StandardMaterial("flaskCorkMat", scene);
-      corkMat.diffuseColor = new Color3(0.42, 0.3, 0.16);
-      const cork = MeshBuilder.CreateCylinder("flaskCork", { height: 0.1, diameter: 0.09 }, scene);
-      cork.position.y = 0.17;
-      cork.material = corkMat;
-      cork.isPickable = false;
-      cork.parent = flask;
-
-      // Readable from the iso camera: a pulsing halo of its spell's colour, and a streak behind it.
-      const haloMat = new StandardMaterial("flaskHaloMat", scene);
+      const orb = new TransformNode("orb", scene); // scaled as a whole by `size`
+      orb.parent = this.root;
+      orb.scaling.setAll(size);
+      const coreMat = new StandardMaterial("orbCoreMat", scene);
+      coreMat.diffuseColor = Color3.Black();
+      coreMat.emissiveColor = Color3.Lerp(tint, Color3.White(), 0.55);
+      coreMat.disableLighting = true;
+      const core = MeshBuilder.CreateSphere("orbCore", { diameter: 0.16, segments: 8 }, scene);
+      core.material = coreMat;
+      core.isPickable = false;
+      core.parent = orb;
+      const haloMat = new StandardMaterial("orbHaloMat", scene);
       haloMat.diffuseColor = Color3.Black();
       haloMat.emissiveColor = tint;
       haloMat.disableLighting = true;
-      haloMat.alpha = 0.4;
+      haloMat.alpha = 0.45;
       haloMat.backFaceCulling = false;
-      const halo = MeshBuilder.CreateSphere("flaskHalo", { diameter: 0.55, segments: 8 }, scene);
+      const halo = MeshBuilder.CreateSphere("orbHalo", { diameter: 0.42, segments: 8 }, scene);
       halo.material = haloMat;
       halo.isPickable = false;
-      halo.parent = flask;
+      halo.parent = orb;
       this.halo = halo;
       this.trailTint = tint;
       this.trailWidth = 0.1 * size;
@@ -196,8 +186,8 @@ export class Arrow {
     if (this.trail || !this.trailTint) return;
     const scene = this.root.getScene();
     this.root.computeWorldMatrix(true);
-    const trail = new TrailMesh("flaskTrail", this.root, scene, this.trailWidth, 22, true);
-    const mat = new StandardMaterial("flaskTrailMat", scene);
+    const trail = new TrailMesh("orbTrail", this.root, scene, this.trailWidth, 22, true);
+    const mat = new StandardMaterial("orbTrailMat", scene);
     mat.diffuseColor = Color3.Black();
     mat.emissiveColor = this.trailTint;
     mat.disableLighting = true;
