@@ -263,6 +263,7 @@ export const FRUEGEL: EnemyDef = {
   bodyColor: [0.25, 0.2, 0.4],
   model: "fruegel",
   cellShaded: true,
+  weaponModel: "fruegel_mace", // his mace (head at the mesh origin, like the swords' tip)
 };
 
 /* ============================================================================

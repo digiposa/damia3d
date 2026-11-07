@@ -668,7 +668,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnAssassinCock: () => this.spawnAssassinCock(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "fruegel_mace", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
