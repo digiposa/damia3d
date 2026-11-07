@@ -2906,7 +2906,7 @@ export abstract class ArenaCombatMode extends GameMode {
     if (target.dying) return; // death sequence already running — don't double-award or re-trigger
     if (target.def.behavior === "seniorWarden") {
       // His Last Gasp: "Huh, I may as well take you to hell with me!" — a Gushing Magma (1× Fire
-      // magic on the party) as he falls.
+      // magic on the party): he throws it in full, and only then falls.
       this.resolveEnemyAction(target, { kind: "magical", name: "Gushing Magma", multiplier: 1, element: "Fire", lobbed: true });
     }
     for (const e of this.enemies) if (e !== target && e.alive) e.onAllyFell(); // a Senior Warden powers up
@@ -2926,7 +2926,8 @@ export abstract class ArenaCombatMode extends GameMode {
       this.comboTarget = undefined;
     }
     if (this.attackTarget === target) this.clearNav(); // stop chasing the corpse
-    target.playDeath(() => this.removeEnemy(target)); // play the death animation, then despawn
+    // Play the death animation, then despawn (a Senior Warden throws his Gushing Magma first).
+    target.playDeath(() => this.removeEnemy(target), target.def.behavior === "seniorWarden");
   }
 
   /** Put the party in combat stance while a living enemy is within {@link COMBAT_RANGE}, holding it

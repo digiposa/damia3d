@@ -82,6 +82,8 @@ export interface EnemyDef {
   weaponCarry?: boolean | "twoHand";
   /** Where along the weapon mesh (0 = tip, 1 = butt) the fist closes (default 0.87, a sword). */
   weaponGrip?: number;
+  /** Fraction of the throw clip at which the projectile leaves the hand (default 0.5). */
+  throwRelease?: number;
   /** Length of the weapon mesh (a unit tall) in the enemy's model units (default 1.3, a sword). */
   weaponScale?: number;
   /** Size multiplier of the rock this enemy throws (Fruegel hurls a boulder). */
@@ -389,6 +391,7 @@ export const SENIOR_WARDEN_BOSS: EnemyDef = {
   weaponGrip: 0.5,
   weaponScale: 1.9,
   weaponCarry: "twoHand",
+  throwRelease: 0.38, // the overhand Gushing Magma leaves the hand at the top of the swing
 };
 
 /** Enemies a boss can call into the fight (Fruegel's Whistle), by id. */

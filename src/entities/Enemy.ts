@@ -445,7 +445,7 @@ export class Enemy {
     const m = new Matrix();
     const shift = new Vector3(); // two-handed: world offset from the right fist to the shaft's middle
     const obs = scene.onAfterAnimationsObservable.add(() => {
-      if (this.dead || !node.parent) return;
+      if ((this.dead && this.currentAnim !== this.anims.throw) || !node.parent) return; // (still held through a parting throw)
       this.root.computeWorldMatrix(true);
       const fwd = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
       const up = Vector3.Up();
@@ -557,7 +557,7 @@ export class Enemy {
    * the health bar and freezes on the final (fallen) frame. Falls back to an immediate despawn when
    * there's no death clip (placeholder enemies), so callers can always defer removal through here.
    */
-  playDeath(done: () => void): void {
+  playDeath(done: () => void, lastThrow = false): void {
     if (this.dead) return;
     this.dead = true;
     this.attacking = false;
@@ -569,11 +569,23 @@ export class Enemy {
       done();
       return;
     }
+    const fall = (): void => {
+      this.currentAnim?.stop();
+      this.currentAnim = a;
+      a.start(false, 1.0, a.from, a.to); // once; holds the last frame when it ends
+      a.onAnimationGroupEndObservable.addOnce(() => {
+        this.deathTimer = window.setTimeout(done, 700); // linger a beat on the ground before despawning
+      });
+    };
+    // A parting shot (a Senior Warden's Gushing Magma): the whole throw first, then the fall.
+    const t = lastThrow ? this.anims.throw : undefined;
+    if (!t) return fall();
     this.currentAnim?.stop();
-    this.currentAnim = a;
-    a.start(false, 1.0, a.from, a.to); // once; holds the last frame when it ends
-    a.onAnimationGroupEndObservable.addOnce(() => {
-      this.deathTimer = window.setTimeout(done, 700); // linger a beat on the ground before despawning
+    this.currentAnim = t;
+    this.clipBase = 1;
+    t.start(false, this.clipScale, t.from, t.to);
+    t.onAnimationGroupEndObservable.addOnce(() => {
+      if (!this.root.isDisposed()) fall();
     });
   }
 
@@ -862,7 +874,7 @@ export class Enemy {
    *  so the mode can release the projectile in sync. Falls back to a sensible default. */
   get throwReleaseDelay(): number {
     const a = this.anims.throw;
-    return a ? ((a.to - a.from) / 60) * 0.5 : 0.4; // clip plays at speed 1.0, Babylon 60 fps
+    return a ? ((a.to - a.from) / 60) * (this.def.throwRelease ?? 0.5) : 0.4; // clip plays at speed 1.0, Babylon 60 fps
   }
 
   /** Seconds (REAL time) into the cast clip when the item leaves the hand. Divided by the playback
@@ -870,6 +882,7 @@ export class Enemy {
    *  this wrong makes the projectile pop out after the throw gesture is over. */
   get castReleaseDelay(): number {
     const a = this.anims.cast;
+    if (!a && this.anims.throw) return this.throwReleaseDelay; // an item thrown with the throw clip
     return a ? (((a.to - a.from) / 60) * CAST_RELEASE_FRACTION) / CAST_SPEED : 0.3;
   }
 
