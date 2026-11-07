@@ -35,7 +35,7 @@ export interface TrainingCallbacks {
   onSpawnCommander: () => void | Promise<void>;
   onSpawnFruegel: () => void | Promise<void>;
   onSpawnFruegel2: () => void | Promise<void>;
-  onSpawnSeniorWardens: () => void | Promise<void>;
+  onSpawnSeniorWarden: () => void | Promise<void>;
   onSpawnBerserkMouse: () => void | Promise<void>;
   onSpawnTrent: () => void | Promise<void>;
   onSpawnGoblin: () => void | Promise<void>;
@@ -261,7 +261,7 @@ export class TrainingMenu {
       ),
       locationGroup(
         t("spawn.locHellena"),
-        [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel), spawnButton(t("spawn.fruegel2"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel2), spawnButton(t("spawn.seniorWardens"), ELEMENT_COLOR.Fire, this.cb.onSpawnSeniorWardens)],
+        [spawnButton(t("spawn.fruegel"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel), spawnButton(t("spawn.fruegel2"), ELEMENT_COLOR.Earth, this.cb.onSpawnFruegel2), spawnButton(t("spawn.seniorWarden"), ELEMENT_COLOR.Fire, this.cb.onSpawnSeniorWarden)],
         true,
       ),
     );
