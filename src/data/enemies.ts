@@ -243,9 +243,9 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
 /**
  * Fruegel — warden of Hellena Prison, the first real boss (Disc 1). A mountain of a man in a
  * horned helm and cape. Stats are a first approximation of the PS1 boss (to be checked against
- * the JP figures); his kit — Mace Smash, a thrown boulder, a body press — runs on the basic AI
- * (first attack) until his clips and behaviour are in. Model: a Tripo mesh rigged through
- * Mixamo (28 joints), its clips grafted as they come (Idle for now).
+ * the JP figures); his kit — Mace Smash, a hurled rock, a body press — runs on the basic AI: he
+ * throws a rock from range when it is ready, else walks in to smash. Model: a Tripo mesh rigged
+ * through Mixamo (28 joints); clips: combat idle and walk, Rock Throw (no run: he lumbers).
  */
 export const FRUEGEL: EnemyDef = {
   id: "fruegel",
@@ -258,7 +258,7 @@ export const FRUEGEL: EnemyDef = {
   countersAdditions: true, // a boss: he strikes back at a botched Addition
   attacks: [
     { name: "Mace Smash", kind: "physical", multiplier: 1 },
-    { name: "Boulder Toss", kind: "magical", multiplier: 1.2, element: "Earth" },
+    { name: "Rock Throw", kind: "physical", multiplier: 1.2 }, // hurled from range (his Throw clip)
     { name: "Body Press", kind: "physical", multiplier: 1.6 },
   ],
   expReward: 180,

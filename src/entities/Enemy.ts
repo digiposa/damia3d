@@ -446,7 +446,9 @@ export class Enemy {
   /** Play the melee swing for the chosen action (Slash Twice uses its own clip when present). */
   private playAttack(name = ""): void {
     const twice = /twice|multi/i.test(name);
-    this.playOneShot((twice && this.anims.slashTwice) || this.anims.attack);
+    // No melee clip yet (a boss whose swing is still to come): his throwing gesture, so the blow
+    // at least reads as one.
+    this.playOneShot((twice && this.anims.slashTwice) || this.anims.attack || this.anims.throw);
   }
 
   /** Play the dagger-throw animation once. */
