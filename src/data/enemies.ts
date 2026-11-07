@@ -353,23 +353,23 @@ export const HELLENA_WARDEN_BOSS: EnemyDef = {
 };
 
 /**
- * Senior Warden, whistled in by Fruegel in the first fight. Double Voulge; as he falls he throws a
- * Gushing Magma ("Huh, I may as well take you to hell with me!"); a few turns after his partner
- * falls he powers up and takes half damage. Stats: JP HP 25 (Fandom; US 20 on the wiki), the
- * wiki's boss-extra figures otherwise (no EXP). Element Fire. The Knight of Sandora's model stands
- * in for him.
+ * Senior Warden, whistled in by Fruegel in the first fight (once both Hellena Wardens are down).
+ * ~Spear Strike with his double-ended spear; as he falls he throws a Gushing Magma at the whole
+ * party ("Huh, I may as well take you to hell with me!"); a few turns after his partner falls he
+ * powers up. Stats: Fandom's (JP HP 25; US 24). Element Fire. Drop: Healing Potion (100%, not
+ * modelled yet). The Knight of Sandora's model stands in for him until his own is rigged.
  */
 export const SENIOR_WARDEN_BOSS: EnemyDef = {
   id: "senior_warden_boss",
   name: "Senior Warden",
   element: "Fire",
-  stats: { maxHp: 25, at: 4, df: 100, mat: 8, mdf: 100 },
+  stats: { maxHp: 25, at: 5, df: 100, mat: 9, mdf: 100 },
   spd: 50,
   aAv: 0,
   mAv: 0,
-  countersAdditions: false,
-  attacks: [{ name: "Double Voulge", kind: "physical", multiplier: 1 }],
-  expReward: 0,
+  countersAdditions: true,
+  attacks: [{ name: "Spear Strike", kind: "physical", multiplier: 1 }],
+  expReward: 24,
   goldReward: 0,
   behavior: "seniorWarden",
   scale: 1.05,
