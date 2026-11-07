@@ -159,9 +159,9 @@ const BURST_LIFT = 0.7;
 const WIND_CHARGE_SECONDS = 1.6;
 const WIND_OUT_SECONDS = 0.5;
 const WIND_SPIN = { at: 0.25, seconds: 1.1, turns: 2, plane: "front" as const };
-/** Gaspless (Lavitz): seconds gathering the air (the spear wheeling), the stream's flight to the
- *  foe, and the tornado's life there. */
-const GASP_CHARGE_SECONDS = 1.3;
+/** Gaspless (Lavitz): the spear's twirl while the air gathers (the cast6 clip holds the arm up
+ *  over 0.45–1.35 s before slamming it down), the stream's flight to the foe, the tornado's life. */
+const GASP_SPIN = { at: 0.4, seconds: 1.0, turns: 2, plane: "front" as const };
 const GASP_STREAM_SECONDS = 0.35;
 const GASP_TORNADO_SECONDS = 1.3;
 /** D'Attack: the Dragoon flies at the foe (seconds), stops this far in front, strikes, and at the
@@ -213,11 +213,11 @@ const ACTION_RECOVERY = 0.5;
  *  overlap, which penalised long combos). The combo's own timing runs at real time regardless. */
 const COMBO_TIME_SCALE = 0.2;
 /** The arena's battle music: one of these, drawn at random each time it is entered. */
-/** The glow an item's restore sends up the body: HP a watery blue, MP a leafy green, SP indigo. */
+/** The glow an item's restore sends up the body: HP a watery blue, MP indigo, SP a leafy green. */
 const RESTORE_GLOW = {
   hp: new Color3(0.25, 0.55, 1),
-  mp: new Color3(0.4, 1, 0.5),
-  sp: new Color3(0.45, 0.3, 1),
+  mp: new Color3(0.45, 0.3, 1),
+  sp: new Color3(0.4, 1, 0.5),
 };
 /** Seconds before the last blow's clip ends at which the Addition's call-out starts. */
 const ADDITION_CALLOUT_LEAD = 0.35;
@@ -1868,7 +1868,7 @@ export abstract class ArenaCombatMode extends GameMode {
   /** Apply a consumable to a member (heal + SP restore) and decrement the shared stock. */
   private useItem(m: PartyMember, stock: { def: ItemDef; count: number }, decrement = true): void {
     const a = m.avatar;
-    // Each kind of restore has its own glow climbing the body: blue for HP, green for MP, indigo
+    // Each kind of restore has its own glow climbing the body: blue for HP, indigo for MP, green
     // for SP (the Dragoon gauge), with the heal chime pitched apart.
     if (stock.def.healFraction > 0) {
       const healed = a.heal(Math.floor(a.maxHp * stock.def.healFraction));
@@ -2096,37 +2096,29 @@ export abstract class ArenaCombatMode extends GameMode {
       this.refreshHud();
       return;
     }
-    if (spell.id === "gaspless" && primary && p.castGestureLength("ball") > 0 && p.castGestureLength("shot") > 0) {
-      // Gaspless (PS1): Lavitz gathers a flow of air before him (the spear wheeling), thrusts a
-      // hand out and the flow streams straight at the foe, where it whips up a mini tornado.
+    if (spell.id === "gaspless" && primary && p.castGestureLength("gust") > 0) {
+      // Gaspless (PS1): Lavitz raises the spear and wheels it before him while the air gathers,
+      // then slams it down: the flow streams straight at the foe, where it whips up a mini tornado.
       p.mp = Math.max(0, p.mp - spell.mp);
       this.announceSkill(() => p.position.add(new Vector3(0, 2.6, 0)), p.bearer.name, spell.name, ELEMENT_COLOR[spell.element] ?? "#9ff2d2");
       const target = primary;
-      p.castPose("ball", WIND_SPIN);
-      this.spellFx?.powerUp(p.position, GASP_CHARGE_SECONDS, new Color3(0.5, 1, 0.7));
+      const release = p.castGesture("gust", GASP_SPIN);
+      this.spellFx?.powerUp(p.position, release, new Color3(0.5, 1, 0.7));
       audio.playSfx("wind_charge");
-      this.attackAnimT = Math.max(this.attackAnimT, GASP_CHARGE_SECONDS + p.castGestureLength("shot") + 0.3);
+      this.attackAnimT = Math.max(this.attackAnimT, p.castGestureLength("gust") + 0.3);
       this.comboTimers.push({
-        t: GASP_CHARGE_SECONDS,
+        t: release,
         fn: () => {
-          p.endCastPose();
-          if (target.alive) p.face(target.position.subtract(p.position));
-          const release = p.castGesture("shot");
-          this.comboTimers.push({
-            t: release,
-            fn: () => {
-              const from = p.position.add(new Vector3(0, 1.2 + p.dragoonLift, 0));
-              const to = target.position.add(new Vector3(0, 1.0, 0));
-              audio.playSfx("wind_rush");
-              this.spellFx?.windStream(from, to, GASP_STREAM_SECONDS, () => {
-                this.spellFx?.tornado(target.position, GASP_TORNADO_SECONDS);
-                this.spellFx?.burst(spell.element, target.position, 1.2);
-                audio.playSfx("magic_burst");
-                this.camera.shake(0.2, 0.3);
-                this.castSpell(p, spell, target, allies(), false);
-                this.refreshHud();
-              });
-            },
+          const from = p.position.add(new Vector3(0, 1.2 + p.dragoonLift, 0));
+          const to = target.position.add(new Vector3(0, 1.0, 0));
+          audio.playSfx("wind_rush");
+          this.spellFx?.windStream(from, to, GASP_STREAM_SECONDS, () => {
+            this.spellFx?.tornado(target.position, GASP_TORNADO_SECONDS);
+            this.spellFx?.burst(spell.element, target.position, 1.2);
+            audio.playSfx("magic_burst");
+            this.camera.shake(0.2, 0.3);
+            this.castSpell(p, spell, target, allies(), false);
+            this.refreshHud();
           });
         },
       });
