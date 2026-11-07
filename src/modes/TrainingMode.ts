@@ -35,7 +35,7 @@ import {
   ITEM_MULTIPLIER_MIN,
   ITEM_MULTIPLIER_MAX,
 } from "../data/items";
-import { KNIGHT_OF_SANDORA, COMMANDER_SELES, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
+import { KNIGHT_OF_SANDORA, COMMANDER_SELES, FRUEGEL, BERSERK_MOUSE, TRENT, GOBLIN, ASSASSIN_COCK, TRAINING_DUMMY, SPARRING_DUMMY, type EnemyDef } from "../data/enemies";
 import {
   additionHitsPercent,
   additionMultiplier,
@@ -661,13 +661,14 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnSparringDummy: () => this.spawnSparringDummy(),
         onSpawnKnight: () => this.spawnKnight(),
         onSpawnCommander: () => this.spawnCommander(),
+        onSpawnFruegel: () => this.spawnFruegel(),
         onSpawnBerserkMouse: () => this.spawnBerserkMouse(),
         onSpawnTrent: () => this.spawnTrent(),
         onSpawnGoblin: () => this.spawnGoblin(),
         onSpawnAssassinCock: () => this.spawnAssassinCock(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -3581,6 +3582,13 @@ export abstract class ArenaCombatMode extends GameMode {
     await this.ensureEnemyAssets(COMMANDER_SELES);
     if (this.scene.isDisposed) return;
     this.addEnemy(new Enemy(this.scene, COMMANDER_SELES, this.ringPosition(8)));
+  }
+
+  /** Spawn Fruegel, the Hellena warden (boss). */
+  private async spawnFruegel(): Promise<void> {
+    await this.ensureEnemyAssets(FRUEGEL);
+    if (this.scene.isDisposed) return;
+    this.addEnemy(new Enemy(this.scene, FRUEGEL, this.ringPosition(8)));
   }
 
   /** Spawn a Forest minor enemy — Berserk Mouse (non-humanoid, procedural animation). */

@@ -235,6 +235,36 @@ export const COMMANDER_MARSHLAND: EnemyDef = {
   weaponModel: "commander_sword",
 };
 
+/**
+ * Fruegel — warden of Hellena Prison, the first real boss (Disc 1). A mountain of a man in a
+ * horned helm and cape. Stats are a first approximation of the PS1 boss (to be checked against
+ * the JP figures); his kit — Mace Smash, a thrown boulder, a body press — runs on the basic AI
+ * (first attack) until his clips and behaviour are in. Model: a Tripo mesh rigged through
+ * Mixamo (28 joints), its clips grafted as they come (Idle for now).
+ */
+export const FRUEGEL: EnemyDef = {
+  id: "fruegel",
+  name: "Fruegel",
+  element: "Earth",
+  stats: { maxHp: 1200, at: 18, df: 100, mat: 10, mdf: 100 },
+  spd: 45,
+  aAv: 0,
+  mAv: 0,
+  countersAdditions: true, // a boss: he strikes back at a botched Addition
+  attacks: [
+    { name: "Mace Smash", kind: "physical", multiplier: 1 },
+    { name: "Boulder Toss", kind: "magical", multiplier: 1.2, element: "Earth" },
+    { name: "Body Press", kind: "physical", multiplier: 1.6 },
+  ],
+  expReward: 180,
+  goldReward: 400,
+  isBoss: true,
+  scale: 1.25,
+  bodyColor: [0.25, 0.2, 0.4],
+  model: "fruegel",
+  cellShaded: true,
+};
+
 /* ============================================================================
  * Forest — Disc 1, area #2 (Seles → Forest → Hellena Prison). Four minor enemies,
  * one per element: Berserk Mouse (Darkness), Assassin Cock (Wind), Trent (Earth),
