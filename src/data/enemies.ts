@@ -88,6 +88,11 @@ export interface EnemyDef {
   weaponScale?: number;
   /** Size multiplier of the rock this enemy throws (Fruegel hurls a boulder). */
   thrownSize?: number;
+  /** A model for what it throws (Fruegel's boulder), seen between its fists from {@link thrownPickup}
+   *  of its throw clip until the release, then flying in place of the plain stone. */
+  thrownModel?: string;
+  /** Fraction of the throw clip at which the thrown thing is picked up (appears in the hands). */
+  thrownPickup?: number;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -275,6 +280,9 @@ const FRUEGEL_LOOK = {
   weaponCarry: true, // the mace held out before him, head forward and up, swung with the arm
 };
 
+/** Fruegel's boulder: scooped off the floor as his throw bends low (≈22% in), hurled at mid-clip. */
+const FRUEGEL_ROCK = { thrownModel: "fruegel_rock", thrownPickup: 0.22, throwRelease: 0.5 } as const;
+
 /**
  * Fruegel, first visit (formation 386: Fruegel, Hellena Warden ×2, Senior Warden ×2). In the story
  * fight he opens with two Hellena Wardens at his side: he cannot be targeted while one stands
@@ -305,6 +313,7 @@ export const FRUEGEL: EnemyDef = {
   goldReward: 20,
   behavior: "fruegel",
   thrownSize: 6, // a boulder (~1 m across), not a goblin's pebble
+  ...FRUEGEL_ROCK,
   ...FRUEGEL_LOOK,
 };
 
@@ -332,6 +341,7 @@ export const FRUEGEL_2: EnemyDef = {
   goldReward: 200,
   behavior: "fruegel2",
   thrownSize: 6,
+  ...FRUEGEL_ROCK,
   ...FRUEGEL_LOOK,
 };
 

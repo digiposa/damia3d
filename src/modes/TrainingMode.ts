@@ -672,7 +672,7 @@ export abstract class ArenaCombatMode extends GameMode {
         onSpawnAssassinCock: () => this.spawnAssassinCock(),
         // Opening the Spawn tab starts the Commander download in the background (the knight is
         // preloaded by the entry gate), so by the time the player taps, it's usually instant.
-        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "fruegel_mace", "senior_warden", "senior_warden_spear", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
+        onSpawnTabShown: () => prefetchModels(["commander", "commander_sword", "fruegel", "fruegel_mace", "fruegel_rock", "senior_warden", "senior_warden_spear", "berserk_mouse", "trent", "goblin", "assassin_cock"]),
         onResume: () => this.closeDebugMenu(),
       });
       this.debugBtn = new Button({
@@ -3120,6 +3120,8 @@ export abstract class ArenaCombatMode extends GameMode {
           follow: torso,
           kind: projectile,
           size: enemy.def.thrownSize,
+          body: enemy.thrownBody(), // Fruegel's boulder: the very rock he lifted
+          launchFrom: () => enemy.thrownAt,
         }),
       );
     } else if (magical && action.lobbed) {
@@ -3622,7 +3624,7 @@ export abstract class ArenaCombatMode extends GameMode {
    *  it pops fully formed (no capsule flash). Instant when cached; the spawn button shows its own
    *  pending state during a first-time load. */
   protected async ensureEnemyAssets(def: EnemyDef): Promise<void> {
-    const names = [def.model, def.weaponModel].filter((n): n is string => !!n);
+    const names = [def.model, def.weaponModel, def.thrownModel].filter((n): n is string => !!n);
     if (names.length && !names.every((n) => hasContainer(this.scene, n))) {
       await loadModels(this.scene, names);
     }

@@ -34,6 +34,10 @@ export interface ProjectileOptions {
   color?: Color3;
   /** Size multiplier of the body (a boss's boulder against a goblin's pebble). */
   size?: number;
+  /** A ready-made body (a model of the thing thrown) instead of the built one; owned from now on. */
+  body?: TransformNode;
+  /** Where it really leaves the hand, read at the release (the boulder as last held). */
+  launchFrom?: () => Vector3 | undefined;
 }
 
 /**
@@ -43,7 +47,8 @@ export interface ProjectileOptions {
  */
 export class Arrow {
   private readonly root: TransformNode;
-  private readonly origin: Vector3;
+  private origin: Vector3;
+  private readonly launchFrom?: () => Vector3 | undefined;
   private readonly target: Vector3;
   private readonly speed: number;
   private readonly onHit: () => void;
@@ -59,7 +64,8 @@ export class Arrow {
   private done = false;
 
   constructor(scene: Scene, opts: ProjectileOptions) {
-    const { from, to, speed, onHit, delay = 0, follow, kind = "arrow", arc = 0, color, size = 1 } = opts;
+    const { from, to, speed, onHit, delay = 0, follow, kind = "arrow", arc = 0, color, size = 1, body } = opts;
+    this.launchFrom = opts.launchFrom;
     this.speed = speed;
     this.onHit = onHit;
     this.follow = follow;
@@ -72,7 +78,10 @@ export class Arrow {
     this.origin = from.clone();
     if (delay > 0) this.root.setEnabled(false); // hidden while the thrower winds up
 
-    if (kind === "flask") {
+    if (body) {
+      body.parent = this.root;
+      body.position.setAll(0);
+    } else if (kind === "flask") {
       // A small glass flask: a tinted glowing body with a stopper — the item that carries the spell.
       const tint = color ?? new Color3(1, 0.5, 0.15);
       const glassMat = new StandardMaterial("flaskMat", scene);
@@ -164,6 +173,11 @@ export class Arrow {
     if (this.delay > 0) {
       this.delay -= dt;
       if (this.delay > 0) return true; // still winding up — hold at the hand, hidden
+      const at = this.launchFrom?.();
+      if (at) {
+        this.root.position.copyFrom(at);
+        this.origin = at.clone();
+      }
       this.root.setEnabled(true); // released: appear and fly
     }
     const target = this.follow ? this.follow() : this.target;

@@ -50,6 +50,8 @@ const SOLE = 0.04;
 /** How far apart (world units, at scale 1) a rigged enemy's fists may be and still both hold a
  *  two-handed polearm. */
 const TWO_HAND_REACH = 1.3;
+/** World diameter of a thrown stone per unit of `thrownSize` (the Goblin's pebble at 1). */
+const THROWN_DIAMETER = 0.16;
 /** Height (0–1, up the weapon mesh) of the grip that seats in the fist — KoS sword grip ≈ 0.87. */
 const WEAPON_GRIP_Y = 0.87;
 
@@ -155,6 +157,8 @@ export class Enemy {
   /** Scene-level objects from imported GLBs (animation groups, skeletons) — not children of root,
    *  so dispose() must clean them up or they (and their observers) leak on every despawn. */
   private modelDisposables: { dispose(): void }[] = [];
+  /** What it throws, carried between its fists during the throw (Fruegel's boulder). */
+  private thrown?: TransformNode;
   /** Pending death-despawn timer id, cleared on dispose. */
   private deathTimer?: number;
 
@@ -322,6 +326,7 @@ export class Enemy {
     // Attach the enemy's weapon model to the right-hand bone (our AI models are rigged weaponless),
     // so it follows every animation with no baked-in bending.
     if (this.def.weaponModel) await this.attachWeapon(this.def.weaponModel, scene, res.skeletons[0]);
+    if (this.def.thrownModel) await this.attachThrown(this.def.thrownModel, scene, res.skeletons[0]);
 
     this.play(this.anims.idle);
     if (this.def.fitSkinned) {
@@ -427,6 +432,82 @@ export class Enemy {
       if (!mesh.parent) mesh.parent = align;
       mesh.isPickable = false;
     }
+  }
+
+  /**
+   * The thing this enemy throws, as a model it really picks up: hidden, then — from
+   * {@link EnemyDef.thrownPickup} of the throw clip to its release — held at the middle of its two
+   * fists. The projectile takes a copy of it at the release ({@link thrownBody}).
+   */
+  private async attachThrown(name: string, scene: Scene, skeleton?: Skeleton): Promise<void> {
+    const res = await instantiateModel(scene, name).catch(() => undefined);
+    if (!res || this.root.isDisposed()) {
+      res?.dispose();
+      return;
+    }
+    this.modelDisposables.push(...res.animationGroups, ...res.skeletons);
+    const holder = new TransformNode(`thrown:${this.def.id}`, scene);
+    const centre = new TransformNode(`thrownCentre:${this.def.id}`, scene);
+    centre.parent = holder;
+    centre.position.y = -0.5; // the mesh stands 0..1 tall: pivot it on its middle
+    for (const mesh of res.meshes) {
+      if (!mesh.parent) mesh.parent = centre;
+      mesh.isPickable = false;
+    }
+    holder.scaling.setAll(THROWN_DIAMETER * (this.def.thrownSize ?? 1));
+    holder.setEnabled(false);
+    this.thrown = holder;
+    this.modelDisposables.push(holder);
+
+    const bone = (n: string): TransformNode | undefined => skeleton?.bones.find((b) => b.name === `mixamorig:${n}`)?.getTransformNode() ?? undefined;
+    const fist = ["Right", "Left"].flatMap((side) =>
+      ["", "Middle1", "Middle2", "Middle3"].map((f) => bone(`${side}Hand${f}`)).filter((n): n is TransformNode => !!n),
+    );
+    if (!fist.length) return;
+    const pickup = this.def.thrownPickup ?? 0;
+    const release = this.def.throwRelease ?? 0.5;
+    const obs = scene.onAfterAnimationsObservable.add(() => {
+      const g = this.anims.throw;
+      let show = false;
+      if (g && this.currentAnim === g && !this.dead) {
+        const f = g.animatables[0]?.masterFrame;
+        if (f !== undefined) {
+          const k = (f - g.from) / Math.max(1, g.to - g.from);
+          show = k >= pickup && k < release;
+        }
+      }
+      if (holder.isEnabled() !== show) holder.setEnabled(show);
+      if (!show) return;
+      const mid = new Vector3();
+      for (const n of fist) {
+        n.computeWorldMatrix(true);
+        mid.addInPlace(n.getAbsolutePosition());
+      }
+      // Out in front of him, its near face in his palms — not its middle through his chest/head.
+      this.root.computeWorldMatrix(true);
+      const fwd = Vector3.TransformNormal(Vector3.Forward(), this.root.getWorldMatrix()).normalize();
+      holder.position.copyFrom(mid.scaleInPlace(1 / fist.length).addInPlace(fwd.scaleInPlace(0.45 * holder.scaling.x)));
+      holder.rotation.y = this.root.rotation.y;
+    });
+    this.modelDisposables.push({ dispose: () => scene.onAfterAnimationsObservable.remove(obs) });
+  }
+
+  /** A copy of the carried missile for the projectile to fly (undefined: none, use a plain stone). */
+  thrownBody(): TransformNode | undefined {
+    const src = this.thrown;
+    if (!src || src.isDisposed()) return undefined;
+    const copy = src.instantiateHierarchy(null, { doNotInstantiate: true });
+    if (!copy) return undefined;
+    copy.position.setAll(0);
+    copy.rotation.setAll(0);
+    copy.setEnabled(true);
+    for (const n of copy.getDescendants(false)) if (n instanceof TransformNode) n.setEnabled(true);
+    return copy;
+  }
+
+  /** Where the carried missile was last held (its release point), if it has one. */
+  get thrownAt(): Vector3 | undefined {
+    return this.thrown && !this.thrown.isDisposed() ? this.thrown.position.clone() : undefined;
   }
 
   /**
