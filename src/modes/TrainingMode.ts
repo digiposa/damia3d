@@ -3107,6 +3107,7 @@ export abstract class ArenaCombatMode extends GameMode {
           delay: enemy.throwReleaseDelay,
           follow: torso,
           kind: projectile,
+          size: enemy.def.thrownSize,
         }),
       );
     } else if (magical && action.lobbed) {

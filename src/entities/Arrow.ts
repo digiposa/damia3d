@@ -32,6 +32,8 @@ export interface ProjectileOptions {
   arc?: number;
   /** Body tint (a flask takes its spell's element colour). */
   color?: Color3;
+  /** Size multiplier of the body (a boss's boulder against a goblin's pebble). */
+  size?: number;
 }
 
 /**
@@ -57,7 +59,7 @@ export class Arrow {
   private done = false;
 
   constructor(scene: Scene, opts: ProjectileOptions) {
-    const { from, to, speed, onHit, delay = 0, follow, kind = "arrow", arc = 0, color } = opts;
+    const { from, to, speed, onHit, delay = 0, follow, kind = "arrow", arc = 0, color, size = 1 } = opts;
     this.speed = speed;
     this.onHit = onHit;
     this.follow = follow;
@@ -116,7 +118,7 @@ export class Arrow {
       const rockMat = new StandardMaterial("rockMat", scene);
       rockMat.diffuseColor = color ?? new Color3(0.42, 0.4, 0.37);
       rockMat.specularColor = new Color3(0.05, 0.05, 0.05);
-      const rock = MeshBuilder.CreateSphere("stone", { diameter: 0.16, segments: 5 }, scene);
+      const rock = MeshBuilder.CreateSphere("stone", { diameter: 0.16 * size, segments: size > 2 ? 7 : 5 }, scene);
       rock.scaling = new Vector3(1, 0.8, 1.1); // irregular, not a perfect ball
       rock.material = rockMat;
       rock.isPickable = false;

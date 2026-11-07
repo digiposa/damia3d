@@ -79,6 +79,8 @@ export interface EnemyDef {
   /** Aim the weapon every frame (forward at rest, along the forearm in a blow) instead of a fixed
    *  turn in the fist — for a rig whose hand pose changes a lot between clips. */
   weaponCarry?: boolean;
+  /** Size multiplier of the rock this enemy throws (Fruegel hurls a boulder). */
+  thrownSize?: number;
   /** Marks a boss: wider health bar + name plate. */
   isBoss?: boolean;
   /** Cannot be killed (clamped at 1 HP) — for the training dummy. */
@@ -295,6 +297,7 @@ export const FRUEGEL: EnemyDef = {
   expReward: 240,
   goldReward: 20,
   behavior: "fruegel",
+  thrownSize: 6, // a boulder (~1 m across), not a goblin's pebble
   ...FRUEGEL_LOOK,
 };
 
@@ -321,6 +324,7 @@ export const FRUEGEL_2: EnemyDef = {
   expReward: 2000,
   goldReward: 200,
   behavior: "fruegel2",
+  thrownSize: 6,
   ...FRUEGEL_LOOK,
 };
 
