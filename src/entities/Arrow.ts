@@ -1,5 +1,6 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { TrailMesh } from "@babylonjs/core/Meshes/trailMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -58,6 +59,8 @@ export class Arrow {
   private delay: number;
   /** The fireball's halo, pulsed in {@link update}. */
   private halo?: TransformNode;
+  /** A thrown item's streak of light (its element's colour), behind it in flight. */
+  private trail?: TrailMesh;
   private age = 0;
   /** Distance covered so far — drives the arc's parabola (0 → total). */
   private travelled = 0;
@@ -89,11 +92,14 @@ export class Arrow {
       glassMat.emissiveColor = tint.scale(0.85); // reads as "charged" even in the dim arena
       glassMat.specularColor = new Color3(0.4, 0.4, 0.4);
       glassMat.alpha = 0.92;
+      const flask = new TransformNode("flask", scene); // scaled as a whole by `size`
+      flask.parent = this.root;
+      flask.scaling.setAll(size);
       const body = MeshBuilder.CreateSphere("flaskBody", { diameter: 0.26, segments: 8 }, scene);
       body.scaling = new Vector3(1, 1.15, 1);
       body.material = glassMat;
       body.isPickable = false;
-      body.parent = this.root;
+      body.parent = flask;
 
       const corkMat = new StandardMaterial("flaskCorkMat", scene);
       corkMat.diffuseColor = new Color3(0.42, 0.3, 0.16);
@@ -101,7 +107,22 @@ export class Arrow {
       cork.position.y = 0.17;
       cork.material = corkMat;
       cork.isPickable = false;
-      cork.parent = this.root;
+      cork.parent = flask;
+
+      // Readable from the iso camera: a pulsing halo of its spell's colour, and a streak behind it.
+      const haloMat = new StandardMaterial("flaskHaloMat", scene);
+      haloMat.diffuseColor = Color3.Black();
+      haloMat.emissiveColor = tint;
+      haloMat.disableLighting = true;
+      haloMat.alpha = 0.4;
+      haloMat.backFaceCulling = false;
+      const halo = MeshBuilder.CreateSphere("flaskHalo", { diameter: 0.55, segments: 8 }, scene);
+      halo.material = haloMat;
+      halo.isPickable = false;
+      halo.parent = flask;
+      this.halo = halo;
+      this.trailTint = tint;
+      this.trailWidth = 0.1 * size;
     } else if (kind === "fireball") {
       const tint = color ?? new Color3(1, 0.45, 0.1);
       const coreMat = new StandardMaterial("fireCoreMat", scene);
@@ -163,7 +184,28 @@ export class Arrow {
     }
 
     this.target = to.clone();
+    if (delay <= 0) this.startTrail(); // thrown at once: streak from the hand
     if (!this.spin) this.root.lookAt(to);
+  }
+
+  private trailTint?: Color3;
+  private trailWidth = 0.14;
+
+  /** Start the light streak from where it now is (it would otherwise draw from the hidden hold). */
+  private startTrail(): void {
+    if (this.trail || !this.trailTint) return;
+    const scene = this.root.getScene();
+    this.root.computeWorldMatrix(true);
+    const trail = new TrailMesh("flaskTrail", this.root, scene, this.trailWidth, 22, true);
+    const mat = new StandardMaterial("flaskTrailMat", scene);
+    mat.diffuseColor = Color3.Black();
+    mat.emissiveColor = this.trailTint;
+    mat.disableLighting = true;
+    mat.alpha = 0.45;
+    mat.backFaceCulling = false;
+    trail.material = mat;
+    trail.isPickable = false;
+    this.trail = trail;
   }
 
   /** Advance the projectile; returns false once it has landed (and disposed). Re-aims at a live
@@ -179,6 +221,7 @@ export class Arrow {
         this.origin = at.clone();
       }
       this.root.setEnabled(true); // released: appear and fly
+      if (this.trailTint) this.startTrail();
     }
     const target = this.follow ? this.follow() : this.target;
     // Horizontal (ground) progress drives both the travel and the arc's parabola.
@@ -190,6 +233,7 @@ export class Arrow {
       this.done = true;
       this.onHit();
       this.root.dispose();
+      this.trail?.dispose(false, true);
       return false;
     }
     this.travelled += step;
@@ -222,5 +266,6 @@ export class Arrow {
     if (this.done) return;
     this.done = true;
     this.root.dispose();
+    this.trail?.dispose(false, true);
   }
 }

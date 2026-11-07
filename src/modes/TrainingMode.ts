@@ -187,6 +187,8 @@ const ITEM_BURST_MIN_POWER = 0.9;
 const ITEM_LOB_SPEED = 9;
 /** Seconds a landed enemy spell takes to burn out (its burst settling) before the thrower may fall. */
 const SPELL_SETTLE = 0.9;
+/** Size of a thrown item's flask in flight (1 = a real-size flask, too small to follow in the iso view). */
+const ITEM_FLASK_SIZE = 1.7;
 /** Peak height of a lobbed item's arc, in world units. */
 const ITEM_LOB_ARC = 2.2;
 /** Joystick magnitude (0–1) at/above which movement is a run rather than a walk. */
@@ -1781,10 +1783,38 @@ export abstract class ArenaCombatMode extends GameMode {
         }
       }
     };
+    // The item itself flies: it leaves the hand at the release and arcs over to the target (the
+    // middle of the group for an all-enemies item); its spell — the mash QTE, or the burst — starts
+    // where it lands.
+    const lob = (): void => {
+      const p = m.avatar;
+      const fwd = new Vector3(Math.sin(p.facingAngle), 0, Math.cos(p.facingAngle));
+      const from = p.position.add(fwd.scale(0.5)).add(new Vector3(0, 1.35, 0));
+      const aim = (): Vector3 => {
+        const alive = targets.filter((e) => e.alive);
+        const set = alive.length ? alive : targets;
+        const c = new Vector3();
+        for (const e of set) c.addInPlace(e.position);
+        return c.scaleInPlace(1 / set.length);
+      };
+      this.arrows.push(
+        new Arrow(this.scene, {
+          from,
+          to: aim(),
+          speed: ITEM_LOB_SPEED,
+          follow: aim,
+          kind: "flask",
+          size: ITEM_FLASK_SIZE,
+          arc: ITEM_LOB_ARC,
+          color: Color3.FromHexString(ELEMENT_COLOR[atk.element]),
+          onHit: effect,
+        }),
+      );
+    };
     if (release > 0) {
       this.attackAnimT = Math.max(this.attackAnimT, release + 0.3); // rooted through the throw
-      this.comboTimers.push({ t: release, fn: effect });
-    } else effect();
+      this.comboTimers.push({ t: release, fn: lob });
+    } else lob();
     return true;
   }
 
@@ -3149,6 +3179,7 @@ export abstract class ArenaCombatMode extends GameMode {
           delay: opts.released ? 0 : enemy.castReleaseDelay,
           follow: feet,
           kind: "flask",
+          size: ITEM_FLASK_SIZE,
           arc: ITEM_LOB_ARC,
           color: Color3.FromHexString(ELEMENT_COLOR[element]),
         }),
